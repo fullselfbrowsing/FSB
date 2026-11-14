@@ -1873,14 +1873,14 @@
       },
       {
         "id": "agents.power.card.tools.stat",
-        "sourceSha256": "f2e9494e99a028839cb7d4a71a4ae6d305bcc46ce2acfbf573d4feaa49221c63",
-        "targetSha256": "d0d8ce69e94c85b63a100eca4ad1ef470e61c02e37f86b8a9cea58cab780fd5f",
+        "sourceSha256": "52c28cd61a1a54ddd6f6f65a9635ad0d0e9427ff5a5de54819578afc48bc6550",
+        "targetSha256": "23649e2b1aae1eb067b01d1c4d18fa2b42d81784623b676894687401292f902a",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
       },
       {
         "id": "home.engine.mcp.fact.tools",
-        "sourceSha256": "485c669be39838cb5f5e9593d6393b2eeb78676f283835af645bb7f1625946e6",
-        "targetSha256": "dedc78f12f58994c4f436de0107e23cc658ee138e559e5b14b9ab9c1f1a0027e",
+        "sourceSha256": "37319308e6c107586593d10df290928f377e604a514441aa272744847e121bd6",
+        "targetSha256": "af2da84669a587b676d6a8dd8fe25c8c078e8fab86356775a098ebb54725f2e3",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
       },
       {

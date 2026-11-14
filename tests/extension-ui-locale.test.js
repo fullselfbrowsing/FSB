@@ -137,11 +137,17 @@ const source = fs.readFileSync(path.join(root, 'extension/utils/ui-locale.js'), 
 check(!source.includes('fsb-locale'), 'resolver does not mention the website cookie name');
 check(!source.includes('document.cookie'), 'resolver does not read document.cookie');
 
-// Nothing in the service worker translates, so it does not load the module.
-// Content scripts do, right before the overlay that uses it.
+// The service worker loads the module once, ahead of the Skopeo alert runtime
+// whose notifications it translates. Content scripts load it right before the
+// overlay that uses it.
 const background = fs.readFileSync(path.join(root, 'extension/background.js'), 'utf8');
 const wsClient = fs.readFileSync(path.join(root, 'extension/ws/ws-client.js'), 'utf8');
-check(!background.includes("importScripts('utils/ui-locale.js')"), 'the service worker does not load ui-locale.js');
+{
+  const localeLoad = "importScripts('utils/ui-locale.js')";
+  const alertRuntimeLoad = "importScripts('utils/skopeo-alert-runtime.js')";
+  check(background.split(localeLoad).length === 2 && background.indexOf(alertRuntimeLoad) > background.indexOf(localeLoad),
+    "the service worker loads ui-locale.js once, before 'utils/skopeo-alert-runtime.js'");
+}
 const contentScriptOrder = /'utils\/ui-locale\.js',\s*'content\/visual-feedback\.js'/;
 check(contentScriptOrder.test(background) && contentScriptOrder.test(wsClient),
   'both content-script lists inject ui-locale.js right before visual-feedback.js');
@@ -156,8 +162,10 @@ for (const [english, key] of Object.entries(locale.exact)) {
   check(englishCatalog[key] && englishCatalog[key].message === english, 'exact chrome key ' + key + ' matches the English catalog');
 }
 
+// The UI-language work never touches the MCP wire. This hash includes the two
+// additive settings-tool message types (mcp:get-settings, mcp:set-setting).
 check(
-  sha256('mcp/src/types.ts') === '6b5f312a5e9a9f3390c973a7f93ef7552db1c110aeeb116084c1f522e776770a',
+  sha256('mcp/src/types.ts') === '7d8f9776a1c7ea8b32c72f24058a4697453714faa6646a45efbdea53c3e0fc98',
   'mcp/src/types.ts is byte-stable'
 );
 check(
@@ -191,6 +199,38 @@ const copyMismatches = Object.entries(locale.exact).filter(([english, key]) => {
   return String(key).startsWith('copy_') && (!englishCatalog[key] || englishCatalog[key].message !== english);
 });
 check(copyMismatches.length === 0, 'copy exact map matches the English catalog');
+
+// The Skopeo HUD loads ui-locale.js and skopeo-hud-exact.js only. Every HUD
+// entry must resolve to its English message, and none may remap English that
+// ui-locale's built-in map or copy-exact.js already owns.
+const readExtra = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8').match(/var extra = (\{.*\});/)[1]);
+const hudExact = readExtra('extension/utils/skopeo-hud-exact.js');
+const copyExactMap = readExtra('extension/utils/copy-exact.js');
+const hudMismatches = Object.entries(hudExact).filter(([english, key]) => !englishCatalog[key] || englishCatalog[key].message !== english);
+check(Object.keys(hudExact).length > 400 && hudMismatches.length === 0,
+  `the Skopeo HUD exact map matches the English catalog${hudMismatches.length ? ': ' + hudMismatches.slice(0, 3).map(([e]) => e).join(' | ') : ''}`);
+const hudShadows = Object.entries(hudExact).filter(([english, key]) => {
+  const owned = Object.prototype.hasOwnProperty.call(copyExactMap, english) ? copyExactMap[english]
+    : (Object.prototype.hasOwnProperty.call(locale.exact, english) && String(locale.exact[english]).startsWith('shell_') ? locale.exact[english] : null);
+  return owned !== null && owned !== key;
+});
+check(hudShadows.length === 0, 'the Skopeo HUD map never remaps English owned by another exact map');
+const sameSource = JSON.parse(fs.readFileSync(path.join(root, 'extension/_locales/same-source-allowlist.json'), 'utf8'));
+const hudKeys = new Set(Object.values(hudExact));
+for (const folder of ['en', 'es', 'de', 'ru', 'ja', 'ko', 'zh_CN', 'zh_TW']) {
+  const raw = fs.readFileSync(path.join(root, 'extension/_locales', folder, 'messages.json'), 'utf8');
+  check(raw === JSON.stringify(JSON.parse(raw), null, 2) + '\n', `${folder} catalog round-trips byte for byte, so it holds no duplicate key`);
+}
+// English left inside a ru or CJK translation passes the catalog gate unless
+// the whole message is copied; every HUD message must use its own script.
+for (const [folder, script] of Object.entries({
+  ru: /[\u0400-\u04ff]/, ja: /[\u3040-\u30ff\u4e00-\u9fff]/, ko: /[\uac00-\ud7af]/, zh_CN: /[\u4e00-\u9fff]/, zh_TW: /[\u4e00-\u9fff]/
+})) {
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'extension/_locales', folder, 'messages.json'), 'utf8'));
+  const latinOnly = [...hudKeys].filter((key) => catalog[key] && !sameSource[key] &&
+    !script.test(catalog[key].message.replace(/\$[A-Z0-9_]+\$/g, '')));
+  check(latinOnly.length === 0, `${folder} Skopeo HUD messages are written in their own script${latinOnly.length ? ': ' + latinOnly.slice(0, 5).join(', ') : ''}`);
+}
 const panelExact = JSON.parse(fs.readFileSync(path.join(root, 'extension/utils/panel-exact.js'), 'utf8').match(/var extra = (\{.*\});/)[1]);
 const panelMismatches = Object.entries(panelExact).filter(([english, key]) => !englishCatalog[key] || englishCatalog[key].message !== english);
 check(panelMismatches.length === 0, 'panel exact map matches the English catalog');
@@ -235,6 +275,8 @@ check(String(badSentence.stderr).includes('ui.js:3: uncataloged chrome: This tem
   'fixture reports a sentence inside a template expression on its own line');
 check(String(badSentence.stderr).includes('$NAME$ sentence is not cataloged here.'), 'fixture reports a sentence that opens with a placeholder');
 check(!String(badSentence.stderr).includes('User typed a secret sentence here.'), 'log sentences stay off the coverage gate');
+check(!String(badSentence.stderr).includes('This thrown sentence is a diagnostic only.'), 'thrown error messages stay off the coverage gate');
+check(!String(badSentence.stderr).includes('This ledger detail sentence stays internal'), 'resource-ledger detail labels stay off the coverage gate');
 const badUnwired = spawnSync(process.execPath, ['scripts/verify-extension-copy.mjs', '--file', 'tests/fixtures/extension-i18n/bad-unwired/page.html'], { cwd: root, encoding: 'utf8' });
 check(badUnwired.status === 1, 'cataloged but unwired HTML text fails');
 check(String(badUnwired.stderr).includes('page.html:1: unwired chrome'), 'fixture reports the unwired button label');
@@ -302,7 +344,13 @@ for (const [file, exactMap, texts] of [
     'the provider became unavailable', 'the agent process could not be started', 'the agent process could not be verified',
     'the agent spoke an unexpected protocol', 'the connection to the local agent service was lost',
     'the local agent service shut down', 'an earlier agent process did not shut down',
-    'an earlier agent run was not cleaned up', 'the start was cancelled'
+    'an earlier agent run was not cleaned up', 'the start was cancelled',
+    'Off for this tab', 'Turn on Skopeo', 'Turn off Skopeo', 'Open Chrome shortcut settings',
+    'Shortcut not assigned · Set in Chrome shortcuts', 'Shortcut: $SHORTCUT$ · Change shortcut',
+    'Esc Esc: turn off Skopeo in this tab', 'Skopeo can’t open safely on this layout.',
+    'Zoom out or resize the page, then try again.', 'Starting on this tab…', 'On · Ambient',
+    'Skopeo can’t run on this page.', 'Open a standard web page, then try again.', 'Skopeo didn’t start.',
+    'Nothing was added to the page. Try again.', 'Try again'
   ]],
   ['extension/ui/popup.js', sidePanelMap, ['Error occurred', 'Task completed', 'Task partially completed']],
   ['extension/ui/options.js', controlPanelMap, [
@@ -337,7 +385,10 @@ for (const [file, exactMap, texts] of [
   ]]
 ]) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
-  const missing = texts.filter((text) => !source.includes("'" + text.replace(/'/g, "\\'") + "'"));
+  // A literal may spell punctuation as a \u escape, as the Skopeo row does.
+  const escaped = (text) => text.replace(/’/g, '\\u2019').replace(/…/g, '\\u2026').replace(/·/g, '\\u00b7');
+  const missing = texts.filter((text) => ![text, escaped(text)]
+    .some((form) => source.includes("'" + form.replace(/'/g, "\\'") + "'")));
   const unresolved = texts.filter((text) => !Object.prototype.hasOwnProperty.call(exactMap, text));
   check(missing.length === 0 && unresolved.length === 0,
     `${file} status and delegation copy resolves on its page${missing.length ? '; not in source: ' + missing.join(' | ') : ''}${unresolved.length ? '; unresolved: ' + unresolved.join(' | ') : ''}`);
@@ -2057,8 +2108,8 @@ function sidepanelMessageContext(api) {
 }
 
 // The dashboard chart draws its legend, axis titles and tooltip on a canvas,
-// so analytics.js translates them itself. The service worker loads the same
-// file without the locale helper and keeps English.
+// so analytics.js translates them itself. Without the locale helper it keeps
+// English.
 {
   const analyticsSource = fs.readFileSync(path.join(root, 'extension/utils/analytics.js'), 'utf8');
   function chartSandbox(withLocale) {
@@ -2103,7 +2154,7 @@ function sidepanelMessageContext(api) {
   const en = chartText(english.analytics, english.sandbox);
   check(JSON.stringify(en.legend) === JSON.stringify(['Input Tokens', 'Output Tokens']) && en.x === 'Time' && en.y === 'Tokens'
       && en.tooltip === `Input Tokens: ${en.formatted} tokens`,
-    'without the locale helper (service worker) the chart stays in English');
+    'without the locale helper the chart stays in English');
   english.analytics.updateChartLocale();
   check(english.analytics.chart.data.datasets[0].label === 'Input Tokens', 'updateChartLocale is safe without the locale helper');
 
@@ -2584,10 +2635,25 @@ async function asyncChecks() {
   locale.setBrowserTag(null);
   const bootRequests = [];
   const fetchBeforeBoot = globalThis.fetch;
+  // A content script never touches storage.local: the background limits it to
+  // trusted contexts. The saved choice arrives through the language bridge.
+  const bridgeRequests = [];
   globalThis.chrome = {
-    i18n: { getUILanguage: () => 'ja', getMessage: (key) => (jaOverlay[key] ? jaOverlay[key].message : '') },
-    storage: { local: { get: (_key, cb) => cb({ fsbUiLocale: 'en' }) }, onChanged: { addListener() {} } },
-    runtime: { getURL: (file) => file }
+    i18n: {
+      getUILanguage: () => 'ja',
+      getAcceptLanguages: () => Promise.resolve(['ja']),
+      getMessage: (key) => (jaOverlay[key] ? jaOverlay[key].message : '')
+    },
+    storage: {
+      local: { get: () => { throw new Error('content boot read storage.local'); } },
+      onChanged: { addListener: () => { throw new Error('content boot watched storage'); } }
+    },
+    runtime: {
+      id: 'fsb-test',
+      getURL: (file) => file,
+      sendMessage: (message, callback) => { bridgeRequests.push(message); callback({ ok: true, locale: 'en' }); },
+      onMessage: { addListener() {} }
+    }
   };
   globalThis.fetch = (url) => {
     bootRequests.push(url);
@@ -2605,9 +2671,114 @@ async function asyncChecks() {
     'content-script boot loads the browser catalog next to the override');
   check(locale.isMessage('probe_overlay', drawnBeforeBoot), 'boot recognises browser-language text drawn before it finished');
   check(locale.t('probe_overlay') === 'FSB Automating', 'the stored override applies after boot');
+  check(bridgeRequests.length === 1 && JSON.stringify(bridgeRequests[0]) === '{"action":"fsb:ui-language-config-get"}',
+    'content-script boot asks the background for the saved language with one fixed message');
   locale.setOverride(null);
   locale.setBrowserTag(null);
   locale.setPreferredLanguages(null);
+
+  // The language bridge for content scripts: every bad answer falls back to
+  // the automatic language, a late answer still applies, and only an exact
+  // change broadcast from this extension switches the language.
+  function bridgeSandbox(answer, extra) {
+    const listeners = [];
+    const requests = [];
+    const sandbox = freshLocale(Object.assign({
+      chrome: {
+        i18n: { getUILanguage: () => 'ja', getMessage: () => '', getAcceptLanguages: () => Promise.resolve(['ja']) },
+        runtime: {
+          id: 'fsb-test',
+          getURL: (file) => file,
+          sendMessage: (message, callback) => { requests.push(message); answer(callback, sandbox); },
+          onMessage: { addListener: (fn) => { listeners.push(fn); } }
+        }
+      },
+      fetch: () => Promise.resolve({ json: () => ({}) })
+    }, extra || {}));
+    return { sandbox, api: sandbox.fsbUiLocale, listeners, requests };
+  }
+  for (const [label, answer] of [
+    ['a lastError answer', (cb, sb) => { sb.chrome.runtime.lastError = { message: 'Receiving end does not exist.' }; cb(undefined); delete sb.chrome.runtime.lastError; }],
+    ['a closed trusted store', (cb) => cb({ ok: false, code: 'TRUSTED_STORAGE_CLOSED' })],
+    ['an unknown language code', (cb) => cb({ ok: true, locale: 'xx' })],
+    ['no saved choice', (cb) => cb({ ok: true, locale: null })]
+  ]) {
+    const bridge = bridgeSandbox(answer);
+    await bridge.api.boot();
+    check(bridge.api.current() === 'ja', `${label} falls back to the automatic language`);
+  }
+  let lateCallback = null;
+  const late = bridgeSandbox((cb) => { lateCallback = cb; }, { setTimeout: (fn) => { fn(); return 1; }, clearTimeout() {} });
+  let lateRefreshes = 0;
+  late.api.onChange(() => { lateRefreshes += 1; });
+  await late.api.boot();
+  check(late.api.current() === 'ja' && typeof lateCallback === 'function', 'boot does not wait past the bridge timeout');
+  lateCallback({ ok: true, locale: 'de' });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(late.api.current() === 'de' && lateRefreshes === 1, 'a late bridge answer still applies and refreshes once');
+
+  const live = bridgeSandbox((cb) => cb({ ok: true, locale: null }));
+  let liveRefreshes = 0;
+  const unsubscribe = live.api.onChange(() => { liveRefreshes += 1; });
+  await live.api.bootOnce();
+  await live.api.bootOnce();
+  check(live.requests.length === 1, 'bootOnce asks the background once');
+  check(live.listeners.length === 1, 'boot registers one change listener');
+  const own = { id: 'fsb-test' };
+  const deliver = (message, sender) => {
+    let replied = false;
+    const kept = live.listeners[0](message, sender, () => { replied = true; });
+    return { replied, kept };
+  };
+  let outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'de', extra: true }, own);
+  outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'de' }, { id: 'another-extension' });
+  outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'xx' }, own);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(live.api.current() === 'ja' && liveRefreshes === 0, 'extra keys, a foreign sender and an unknown code are ignored');
+  outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'de' }, own);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(live.api.current() === 'de' && liveRefreshes === 1, 'a change broadcast from this extension switches the language');
+  check(outcome.replied === false && outcome.kept === false, 'the change listener never answers or holds the channel');
+  unsubscribe();
+  deliver({ action: 'fsb:ui-language-changed', locale: null }, own);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(live.api.current() === 'ja' && liveRefreshes === 1, 'onChange returns a working unsubscribe');
+
+  // The overlay's own boot block on a content-world instance: before the
+  // bridge it never heard about a language change, now a broadcast redraws
+  // every overlay root it watches.
+  const overlayBridge = bridgeSandbox((cb) => cb({ ok: true, locale: null }));
+  const feedbackSource = fs.readFileSync(path.join(root, 'extension/content/visual-feedback.js'), 'utf8');
+  const overlayBoot = extractNamedBlock(feedbackSource,
+    feedbackSource.indexOf("if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function')"));
+  const redrawn = [];
+  overlayBridge.sandbox.chromeRoots = [{ id: 'overlay-root' }];
+  overlayBridge.sandbox.refreshOwnedChrome = (overlayRoot) => { redrawn.push(overlayRoot.id); };
+  vm.runInContext(overlayBoot, overlayBridge.sandbox);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(overlayBridge.requests.length === 1 && redrawn.length === 1, 'the overlay boots through the language bridge');
+  redrawn.length = 0;
+  overlayBridge.listeners[0]({ action: 'fsb:ui-language-changed', locale: 'ru' }, { id: 'fsb-test' }, () => {});
+  await new Promise((resolve) => setImmediate(resolve));
+  check(overlayBridge.api.current() === 'ru' && redrawn.join() === 'overlay-root',
+    'a language change in the control panel redraws the in-page overlay');
+
+  // The service worker is a trusted context without a document: it reads the
+  // saved choice from storage but loads only the catalogs it can show.
+  const workerRequests = [];
+  const worker = freshLocale({
+    location: { protocol: 'chrome-extension:' },
+    chrome: {
+      i18n: { getUILanguage: () => 'ja', getMessage: () => '', getAcceptLanguages: () => Promise.resolve(['ja']) },
+      storage: { local: { get: (_key, cb) => cb({ fsbUiLocale: 'ko' }) }, onChanged: { addListener() {} } },
+      runtime: { getURL: (file) => file, sendMessage: () => { throw new Error('the worker used the bridge'); } }
+    },
+    fetch: (url) => { workerRequests.push(url); return Promise.resolve({ json: () => ({}) }); }
+  });
+  await worker.fsbUiLocale.boot();
+  check(worker.fsbUiLocale.current() === 'ko', 'the service worker reads the saved language from storage');
+  check(workerRequests.length === 3 && ['ko', 'ja', 'en'].every((code) => workerRequests.indexOf(`_locales/${code}/messages.json`) !== -1),
+    'the service worker loads only the active, browser and English catalogs');
 
   // boot() reads Chrome's preferred-languages list before it loads catalogs.
   // getAcceptLanguages() returns a promise in MV3 and takes a callback in

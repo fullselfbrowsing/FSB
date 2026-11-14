@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-mixed-settings-change",
+  "version": 1,
+  "set": "core",
+  "category": "mixed",
+  "startPath": "/fixtures/settings-change/index.html",
+  "instruction": "Open {startUrl}. Read the time zone shown on the profile card, set the digest time zone to the same zone, turn on the weekly digest, and save.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/settings-change/save", "count": 1, "jsonEquals": { "digestTimezone": "America/New_York", "weeklyDigest": true } },
+      { "kind": "request", "method": "POST", "path": "/api/settings-change/save", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/settings-change/index.html", "queryIncludes": { "view": "saved" } },
+      { "kind": "marker", "name": "settings-saved", "equals": "America/New_York|on" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "settings-change/index.html"]
+}

@@ -1,0 +1,40 @@
+{
+  "_fixture": "Synthetic, hand-written xAI non-streaming chat.completion body, shaped per the documented response and usage fields at https://docs.x.ai/developers/cost-tracking (fetched 2026-09-29). No network call was made to produce it. usage.cost_in_usd_ticks uses 1e10 ticks = $1: 85250000 ticks = $0.008525 = 4000 uncached input x $1.25/M + 8000 cached input x $0.20/M + 770 output-rate units (350 completion + 420 reasoning) x $2.50/M (grok-4.3, <200k tier).",
+  "id": "synthetic-66-04-chatcmpl-0001",
+  "object": "chat.completion",
+  "created": 1790726400,
+  "model": "grok-4.3",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_synthetic_66_04_0001",
+            "type": "function",
+            "function": {
+              "name": "click",
+              "arguments": "{\"selector\":\"#submit\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 12000,
+    "completion_tokens": 350,
+    "total_tokens": 12770,
+    "prompt_tokens_details": {
+      "cached_tokens": 8000
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 420
+    },
+    "cost_in_usd_ticks": 85250000
+  },
+  "system_fingerprint": "fp_synthetic_66_04"
+}

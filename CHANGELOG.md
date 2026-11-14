@@ -6,6 +6,11 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Added
+
+- **Skopeo, an on-page HUD for supported apps (the v1.2.0 Skopeo milestone).** It shows the verified actions FSB can take on the current app, reads permitted Google Drive contract folders, answers contract questions with citations, and raises local deadline alerts. Its HUD copy, the side-panel Skopeo row, and its deadline notifications follow the FSB language in all eight extension languages; catalog labels, Drive and document names, extracted values, and model answers stay as written.
+- **Extension storage is limited to trusted contexts.** `chrome.storage.local` is now reachable only from extension pages and the service worker. Content scripts get settings, the saved interface language, and session history through fixed background messages, so the in-page overlay keeps following the language picked in the control panel.
+
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline and Antigravity installer fixes, Grok Build capability checks, and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.

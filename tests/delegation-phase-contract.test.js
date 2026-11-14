@@ -156,10 +156,87 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/server-client-ip-geo.test.js',
   'node tests/ws-client-relay-reconnect.test.js',
   'node --test tests/network-capture-debugger-lifecycle.test.js',
+  'node --test tests/content-click-single-activation.test.js',
+  'node --test tests/bench-export-history.test.mjs tests/bench-stats.test.mjs tests/bench-outcome.test.mjs tests/bench-identity.test.mjs tests/bench-tasks.test.mjs tests/bench-fixture-server.test.mjs tests/bench-claude-stream.test.mjs tests/bench-corpus.test.mjs tests/bench-report.test.mjs tests/bench-drivers.test.mjs tests/bench-f5-token.test.mjs tests/bench-conditions.test.mjs tests/bench-runs-v2.test.mjs tests/bench-gate-synthetic.test.mjs tests/bench-gate-power.test.mjs tests/bench-gate.test.mjs tests/bench-gate-evaluate.test.mjs tests/bench-gate-cli.test.mjs tests/release-diff.test.mjs tests/mcp-count-tool-tokens.test.mjs',
+  'node tests/settings-schema.test.js',
+  'node tests/settings-panel-sync.test.js',
+  'node tests/mcp-settings-route.test.js',
+  'node tests/mcp-settings-tool-contract.test.js',
+  'node tests/mcp-tools-list-baseline.test.js',
+  'node tests/mcp-tools-list-shape-freeze.test.js',
+  'node tests/mcp-description-budget.test.js',
+  'node tests/expect-evaluator.test.js',
+  'node tests/change-report-redaction.test.js',
+  'node tests/expect-dispatcher.test.js',
+  'node tests/mcp-expect-wire.test.js',
+  'node tests/expect-parity.test.js',
+  'node --test tests/mcp-expect-caller.test.mjs',
+  'node --test tests/expect-outcome-browser.test.mjs',
+  'node tests/jev-gateway-contract.test.js',
+  'node tests/jev-gateway-config.test.js',
+  'node tests/jev-gateway-upstream.test.js',
+  'node tests/jev-instrument.test.js',
+  'node tests/jev-calibration-profile.test.js',
+  'node tests/jev-gateway-ledger.test.js',
+  'node tests/jev-gateway-router.test.js',
+  'node tests/jev-gateway-log-hygiene.test.js',
+  'node tests/jev-state.test.js',
+  'node tests/jev-contract-parity.test.js',
+  'node tests/jev-client.test.js',
+  'node tests/jev-policy-tighten-only.test.js',
+  'node tests/jev-extension-boundary.test.js',
+  'node --test tests/jev-shadow-score.test.mjs tests/jev-shadow-select.test.mjs tests/jev-shadow-records.test.mjs tests/jev-shadow-harness.test.mjs',
+  'node tests/jev-fast-upstream-contract.test.js',
+  'node tests/jev-fast-settings.test.js',
+  'node tests/jev-fast-menu.test.js',
+  'node tests/jev-fast-path.test.js',
+  'node tests/jev-fast-start-path.test.js',
+  'node tests/jev-fast-loop.test.js',
+  'node --test tests/jev-fast-capture.test.mjs',
+  'node tests/jev-fast-measurement.test.js',
+  'node tests/jev-run-task-upstream-contract.test.js',
+  'node tests/run-task-fast-mode-wire.test.js',
+  'node tests/jev-run-task-disclosure.test.js',
+  'node tests/jev-run-task-outcome.test.js',
+  'node --test tests/mcp-run-task-fast-caller.test.mjs',
+  'node --test tests/bench-fast-mode-record.test.mjs',
+  'node tests/release-version-rehearsal.test.js',
+  'node tests/mcp-release-compat.test.js',
   'node tests/extension-ui-locale.test.js',
   'node scripts/verify-extension-i18n.mjs',
   'node scripts/verify-extension-copy.mjs',
   'node tests/benchmark-assets-parity.test.js',
+  'node tests/skopeo-hud-locale-coverage.test.js',
+]);
+
+const SKOPEO_ROOT_TEST_COMMANDS = Object.freeze([
+  'node tests/skopeo-corpus-schema.test.js',
+  'node tests/skopeo-corpus-store.test.js',
+  'node tests/skopeo-drive-corpus-transport.test.js',
+  'node tests/skopeo-drive-authority.test.js',
+  'node tests/skopeo-drive-reconciler.test.js',
+  'node tests/skopeo-corpus-runtime.test.js',
+  'npm run test:skopeo-graph-evals',
+  'npm run test:skopeo-truth-evals',
+  'npm run test:skopeo-hud-evals',
+  'npm run test:skopeo-ask-evals',
+  'npm run test:skopeo-release-evals',
+  'node tests/skopeo-profile-schema.test.js',
+  'node tests/skopeo-profile-coverage.test.js',
+  'node tests/skopeo-capability-projection.test.js',
+  'node tests/skopeo-app-context-resolver.test.js',
+  'node tests/skopeo-adaptive-composer.test.js',
+  'node tests/skopeo-genre-adapters.test.js',
+  'node tests/skopeo-consequence-gate.test.js',
+  'node tests/skopeo-catalog-runtime.test.js',
+  'node tests/skopeo-context-router.test.js',
+  'node tests/skopeo-anchor-registry.test.js',
+  'node tests/skopeo-session-lifecycle.test.js',
+  'node tests/skopeo-shell-contract.test.js',
+  'node tests/skopeo-sidepanel-command.test.js',
+  'node tests/skopeo-accessibility.test.js',
+  'node tests/skopeo-gap-closure.test.js',
+  'node tests/skopeo-browser-contract.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
@@ -2379,6 +2456,12 @@ check(planSources[7].includes('  - "61-07"'), 'Plan 08 evidence gate follows the
 console.log('\n--- serial root-chain inclusion and prior-gate preservation ---');
 
 const rootCommands = packageJson.scripts.test.split(' && ');
+check(SKOPEO_ROOT_TEST_COMMANDS.length === 27,
+  'the merge declares exactly 27 Skopeo-only root test steps');
+for (const command of SKOPEO_ROOT_TEST_COMMANDS) {
+  check(rootCommands.filter((candidate) => candidate === command).length === 1,
+    `${command} appears exactly once in the merged serial root chain`);
+}
 for (const command of REFINEMENT_ROOT_TEST_COMMANDS) {
   check(rootCommands.filter((candidate) => candidate === command).length === 1,
     `${command} appears exactly once in the refinements root chain`);
@@ -2394,6 +2477,7 @@ const prePhase61Commands = rootCommands.filter((command) => (
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
   && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
+  && !SKOPEO_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
@@ -3141,6 +3225,7 @@ const prePhase62Commands = rootCommands.filter((command) => (
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
   && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
+  && !SKOPEO_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
   'removing the three Phase 62 gates reproduces the exact prior serial chain');

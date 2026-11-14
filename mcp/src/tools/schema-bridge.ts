@@ -74,9 +74,14 @@ export const getToolsByRoute: (route: string) => ToolDefinition[] = toolDefs.get
  * that McpServer.tool() expects as its third argument.
  *
  * Handles: string, number, integer, boolean, string enums, defaults, optionals.
+ *
+ * Phase 69 D-07: `paramDescriptions` optionally replaces a property's
+ * description text (MCP-only wording from ./descriptions.ts). Only the
+ * `.describe()` argument changes; without the map the output is unchanged.
  */
 export function jsonSchemaToZod(
   inputSchema: ToolDefinition['inputSchema'],
+  paramDescriptions?: Readonly<Record<string, string>>,
 ): Record<string, z.ZodTypeAny> {
   const shape: Record<string, z.ZodTypeAny> = {};
   const required = new Set(inputSchema.required || []);
@@ -113,8 +118,12 @@ export function jsonSchemaToZod(
         zodType = z.any();
     }
 
-    if (prop.description) {
-      zodType = zodType.describe(prop.description);
+    const override = paramDescriptions && Object.prototype.hasOwnProperty.call(paramDescriptions, key)
+      ? paramDescriptions[key]
+      : undefined;
+    const description = (typeof override === 'string' && override.length > 0) ? override : prop.description;
+    if (description) {
+      zodType = zodType.describe(description);
     }
 
     if (prop.default !== undefined) {

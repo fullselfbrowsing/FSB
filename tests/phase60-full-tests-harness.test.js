@@ -64,7 +64,7 @@ function main() {
     write(repository, '.planning/phases/.gitkeep', '');
     write(
       repository,
-      '.planning/milestones/v1.0.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md',
+      '.planning/milestones/v0.13.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md',
       'archived compatibility bytes\n',
     );
     write(repository, 'clean.txt', 'committed clean baseline\n');

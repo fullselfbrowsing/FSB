@@ -121,7 +121,8 @@
     get_session_detail: 1, get_session_replay: 1,
     get_logs: 1, get_memory_stats: 1,
     'mcp:get-session': 1, 'mcp:get-session-replay': 1,
-    'mcp:get-logs': 1, 'mcp:get-memory': 1, 'mcp:get-diagnostics': 1
+    'mcp:get-logs': 1, 'mcp:get-memory': 1, 'mcp:get-diagnostics': 1,
+    'mcp:get-settings': 1, 'mcp:set-setting': 1
   });
   var JOURNAL_ACTION_RESULT_FIELDS = Object.freeze([
     'success', 'status', 'error', 'errorCode', 'code', 'message',
@@ -297,6 +298,17 @@
       /(?:^|[_-])(?:url|uri|href)$/i.test(key);
   }
 
+  // Generic echo keys whose string values are sometimes whole URLs:
+  // expect_result.checks[].observed / expected (url_includes) and
+  // change_report url.before / url.after. Only values that start with an
+  // http(s) scheme go through the URL sanitizer; benign URLs stay byte-exact.
+  var URL_ECHO_KEY_PATTERN = /^(observed|expected|before|after)$/;
+  var HTTP_URL_VALUE_PATTERN = /^https?:\/\//i;
+
+  function _valueIsEchoedHttpUrl(key, value) {
+    return URL_ECHO_KEY_PATTERN.test(key) && typeof value === 'string' && HTTP_URL_VALUE_PATTERN.test(value);
+  }
+
   function _urlValueLooksTokenShaped(value) {
     if (typeof value !== 'string' || value.length === 0) return false;
     var candidate = value;
@@ -445,7 +457,7 @@
       var key = keys[k];
       if (SENSITIVE_KEY_PATTERN.test(key) || (sensitiveTarget && SENSITIVE_TEXT_KEY_PATTERN.test(key))) {
         node[key] = REDACTED_VALUE;
-      } else if (_keyLooksUrlLike(key) && typeof node[key] === 'string') {
+      } else if ((_keyLooksUrlLike(key) && typeof node[key] === 'string') || _valueIsEchoedHttpUrl(key, node[key])) {
         node[key] = _sanitizeUrlForPersistence(node[key]) || REDACTED_VALUE;
       } else {
         _redactSensitiveValuesInPlace(node[key], sensitiveTarget);
@@ -498,13 +510,20 @@
     if (!Array.isArray(history)) return [];
     return history.slice(-MCP_SESSION_ACTION_HISTORY_CAP).map(function (entry) {
       var item = (entry && typeof entry === 'object') ? entry : {};
-      return {
+      var row = {
         tool: typeof item.tool === 'string' ? item.tool : '',
         params: cloneParamsForReplay(item.params, item.result),
         result: cloneResultForReplay(item.result, item.params),
         timestamp: typeof item.timestamp === 'number' ? item.timestamp : null,
         logicalTab: typeof item.logicalTab === 'string' ? item.logicalTab : 'primary'
       };
+      // Restored rows keep a valid call timing; durationMs is re-derived.
+      var rowTiming = _sanitizeCallTiming(item.timing);
+      if (rowTiming) {
+        row.timing = rowTiming;
+        row.durationMs = rowTiming.fsbMs;
+      }
+      return row;
     });
   }
 
@@ -650,6 +669,12 @@
   function _sanitizeRequestPayload(payload, result) {
     var clone = _sanitizeReplayValue(payload, {}, false);
     if (!clone || typeof clone !== 'object' || Array.isArray(clone)) clone = {};
+    // Phase 69 D-15: a same-call expect is never replayed, so the request
+    // payload of a replay manifest never carries it. The stored response can
+    // still hold the caller's value string in expect_result.checks[].expected,
+    // but only when the evaluator saw a plain field; sensitive or unobserved
+    // fields are already the redaction marker there.
+    delete clone.expect;
     var sourceParams = payload && typeof payload.params === 'object' ? payload.params : {};
     clone.params = cloneParamsForReplay(sourceParams, result);
     return clone;
@@ -678,7 +703,7 @@
     if (typeof tool === 'string' && tool.indexOf('mcp:') === 0) {
       [
         'agentId', 'agent_id', 'ownershipToken', 'ownership_token',
-        'connectionId', 'connection_id', 'visualSession', 'client'
+        'connectionId', 'connection_id', 'visualSession', 'client', 'expect'
       ].forEach(function (key) { delete source[key]; });
       return source;
     }
@@ -851,6 +876,25 @@
     }
   }
 
+  // Per-call MCP timing (Phase 66, D-04) arrives from the call site as
+  // { v, receivedAt, completedAt, fsbMs }. Keep a fresh copy only when it
+  // matches the v1 contract: safe non-negative integer times, completedAt at
+  // or after receivedAt, fsbMs recomputed. Anything else is dropped, so an
+  // unmeasured call never carries an invented duration.
+  function _sanitizeCallTiming(value) {
+    try {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+      if (value.v !== 1) return null;
+      var receivedAt = value.receivedAt;
+      var completedAt = value.completedAt;
+      if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+      if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+      return { v: 1, receivedAt: receivedAt, completedAt: completedAt, fsbMs: completedAt - receivedAt };
+    } catch (_e) {
+      return null;
+    }
+  }
+
   function _snapshotEntry(entry) {
     var sourcePayload = (entry.requestPayload && typeof entry.requestPayload === 'object')
       ? entry.requestPayload
@@ -863,7 +907,7 @@
     var rawTargetUrl = entry.replayContext && typeof entry.replayContext.targetUrl === 'string'
       ? entry.replayContext.targetUrl
       : null;
-    return {
+    var snapshot = {
       client: entry.client,
       tool: entry.tool,
       requestPayload: sanitizedPayload,
@@ -877,6 +921,9 @@
       targetRedacted: entry.targetRedacted === true ||
         (rawTargetUrl !== null && safeContext.targetUrl !== rawTargetUrl)
     };
+    var callTiming = _sanitizeCallTiming(entry.timing);
+    if (callTiming) snapshot.timing = callTiming;
+    return snapshot;
   }
 
   function _journalUsesFullResult(entry) {
@@ -943,7 +990,7 @@
     var taskSource = hasVisualTask
       ? JOURNAL_TASK_SOURCE_VISUAL
       : (hasCapabilityTask ? JOURNAL_TASK_SOURCE_CAPABILITY : JOURNAL_TASK_SOURCE_TOOL);
-    return {
+    var snapshot = {
       agentId: typeof sourcePayload.agentId === 'string' ? sourcePayload.agentId : '',
       recordingRunId: typeof sourcePayload.recordingRunId === 'string' ? sourcePayload.recordingRunId : '',
       recordingCallId: typeof sourcePayload.recordingCallId === 'string' ? sourcePayload.recordingCallId : null,
@@ -963,6 +1010,9 @@
       targetRedacted: entry.targetRedacted === true ||
         (rawTargetUrl !== null && safeContext.targetUrl !== rawTargetUrl)
     };
+    var callTiming = _sanitizeCallTiming(entry && entry.timing);
+    if (callTiming) snapshot.timing = callTiming;
+    return snapshot;
   }
 
   function _legacyCanRetainRawEntry(entry) {
@@ -1782,7 +1832,8 @@
             success: !(input.response && input.response.success === false),
             dispatcher_route: 'task-status',
             tabId: snapshot.tabId,
-            replayContext: { routeFamily: 'lifecycle' }
+            replayContext: { routeFamily: 'lifecycle' },
+            timing: input.timing
           });
           var result = await journal.recordTaskOutcome(journalEntry, outcome);
           if (result && result.candidate) {
@@ -2143,13 +2194,20 @@
       var replayParams = cloneParamsForReplay(params, entry.response);
       var replayResult = cloneResultForReplay(entry.response, params);
       var logicalTab = _registerSessionTab(session, numericTabId);
-      session.actionHistory.push({
+      var historyRow = {
         tool: storedTool,
         params: replayParams,
         result: replayResult,
         timestamp: now,
         logicalTab: logicalTab
-      });
+      };
+      // Legacy rows carry the measured call timing; unmeasured rows omit it.
+      var rowTiming = _sanitizeCallTiming(entry.timing);
+      if (rowTiming) {
+        historyRow.timing = rowTiming;
+        historyRow.durationMs = rowTiming.fsbMs;
+      }
+      session.actionHistory.push(historyRow);
       if (session.actionHistory.length > MCP_SESSION_ACTION_HISTORY_CAP) {
         session.actionHistory.splice(0, session.actionHistory.length - MCP_SESSION_ACTION_HISTORY_CAP);
       }
@@ -2346,7 +2404,8 @@
         success: input.success !== false,
         dispatcher_route: 'bridge-action',
         tabId: input.tabId,
-        replayContext: input.replayContext
+        replayContext: input.replayContext,
+        timing: input.timing
       });
     } catch (_e) { /* fire-and-forget */ }
   }

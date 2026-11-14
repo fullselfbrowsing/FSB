@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-kanban-moves-02",
+  "provenance": "hand",
+  "task": {
+    "id": "core-click-kanban-moves",
+    "version": 1,
+    "fixtureSha256": "ebc4b855ddf0c5c1b7b99a4a275ea558b2681c774a55dc9df08c28a2971f62d3"
+  },
+  "step": 7,
+  "request": {
+    "v": 1,
+    "kinds": ["completion", "stuck"],
+    "goal": "Move Write release notes to Done, Fix login redirect to Doing, and Update dependencies to Done.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/kanban-moves/index.html",
+      "title": "Sprint board",
+      "text": "Sprint board\nMoved Fix login redirect to Doing.\nTo do\nUpdate dependencies\nMove to: Update dependencies\nDraft roadmap\nMove to: Draft roadmap\nDoing\nReview PR 42\nMove to: Review PR 42\nFix login redirect\nMove to: Fix login redirect\nDone\nSet up CI\nMove to: Set up CI\nWrite release notes\nMove to: Write release notes\nDoing: Fix login redirect|Review PR 42\nDone: Set up CI|Write release notes"
+    },
+    "elements": [
+      { "id": "e0", "role": "button", "label": "Move to: Update dependencies", "ops": ["click"] },
+      { "id": "e1", "role": "button", "label": "Move to: Draft roadmap", "ops": ["click"] },
+      { "id": "e2", "role": "button", "label": "Move to: Review PR 42", "ops": ["click"] },
+      { "id": "e3", "role": "button", "label": "Move to: Fix login redirect", "ops": ["click"] },
+      { "id": "e4", "role": "button", "label": "Move to: Set up CI", "ops": ["click"] },
+      { "id": "e5", "role": "button", "label": "Move to: Write release notes", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "click", "targetId": "e5", "changed": true },
+      { "op": "click", "targetId": null, "changed": true },
+      { "op": "click", "targetId": "e3", "changed": true },
+      { "op": "click", "targetId": null, "changed": true },
+      { "op": "click", "targetId": "e0", "changed": false },
+      { "op": "click", "targetId": "e0", "changed": false },
+      { "op": "click", "targetId": "e0", "changed": false }
+    ],
+    "offeredOps": ["click", "scroll"]
+  },
+  "labels": {
+    "operation": null,
+    "target": null,
+    "completion": false,
+    "stuck": true,
+    "risk": null
+  },
+  "note": "Two of the three moves are done; Update dependencies is still in To do. The last three clicks on its Move to button (e0) changed nothing: a stuck loop."
+}

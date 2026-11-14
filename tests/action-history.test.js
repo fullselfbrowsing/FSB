@@ -64,8 +64,20 @@ console.log('\n--- createActionEvent uses sensible defaults ---');
   assertEqual(evt.result.hadEffect, false, 'default hadEffect is false');
   assertEqual(evt.result.error, null, 'default error is null');
   assertEqual(evt.iteration, 0, 'default iteration is 0');
-  assertEqual(evt.durationMs, 0, 'default durationMs is 0');
+  assertEqual(evt.durationMs, null, 'default durationMs is null (unmeasured, never 0)');
   assert(typeof evt.timestamp === 'number' && evt.timestamp > 0, 'timestamp auto-populated');
+}
+
+// --- createActionEvent keeps measured durations (Phase 66 D-05) -----------
+
+console.log('\n--- createActionEvent keeps measured durations ---');
+{
+  assertEqual(createActionEvent({ durationMs: 125 }).durationMs, 125, 'measured durationMs 125 preserved');
+  assertEqual(createActionEvent({ durationMs: 0 }).durationMs, 0, 'a measured 0 ms stays 0');
+  assertEqual(createActionEvent({ durationMs: NaN }).durationMs, null, 'NaN durationMs -> null');
+  assertEqual(createActionEvent({ durationMs: '125' }).durationMs, null, 'string durationMs -> null');
+  assertEqual(createActionEvent({ durationMs: null }).durationMs, null, 'null durationMs stays null');
+  assertEqual(createActionEvent().durationMs, null, 'no fields -> durationMs null');
 }
 
 // --- push() adds an event and length reflects it -------------------------

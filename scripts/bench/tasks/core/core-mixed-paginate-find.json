@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-mixed-paginate-find",
+  "version": 1,
+  "set": "core",
+  "category": "mixed",
+  "startPath": "/fixtures/paginate-find/index.html",
+  "instruction": "Open {startUrl}. Page through the catalog to find the 12 oz blue ceramic mug and add it to the cart.",
+  "timeBudgetMs": 360000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/paginate-find/add", "count": 1, "jsonEquals": { "itemId": "ITM-0437" } },
+      { "kind": "request", "method": "POST", "path": "/api/paginate-find/add", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/paginate-find/index.html", "queryIncludes": { "page": "4", "view": "added" } },
+      { "kind": "marker", "name": "cart-count", "equals": "1" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "paginate-find/index.html", "paginate-find/items.js"]
+}

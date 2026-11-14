@@ -5,7 +5,7 @@
 **Researched:** 2026-07-07
 **Confidence:** HIGH (all findings verified directly against the repo's own source files, CI workflow, and git history — this is an internal-architecture question about an existing system, not an ecosystem-discovery question)
 
-> Canonical-path note: per this directory's established convention (see `PITFALLS-EXCALIDRAW.md`, `PITFALLS-v0.9.69-TELEMETRY.md` as precedent), this document replaces the prior milestone's content at the canonical `ARCHITECTURE.md` path. The superseded v1.0.0 (Full App Catalog / OpenTabs Parity) architecture research is preserved on-disk at `ARCHITECTURE-v1.0.0-OPENTABS-CATALOG.md`.
+> Canonical-path note: per this directory's established convention (see `PITFALLS-EXCALIDRAW.md`, `PITFALLS-v0.9.69-TELEMETRY.md` as precedent), this document replaces the prior milestone's content at the canonical `ARCHITECTURE.md` path. The superseded v0.13.0 (Full App Catalog / OpenTabs Parity) architecture research is preserved on-disk at `ARCHITECTURE-v0.13.0-OPENTABS-CATALOG.md`.
 
 ---
 

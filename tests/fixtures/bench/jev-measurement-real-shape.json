@@ -1,0 +1,94 @@
+{
+  "_fixture": "Phase 71 plan 02: a session.jevMeasurement in the exact v1 shape that extension/ws/mcp-tool-dispatcher.js projectJevMeasurement returns (71-SYNC-RECHECK S4, attempt keys as implemented, no toolMs). Synthetic: modelled on the sampleBlock() builder in tests/jev-fast-measurement.test.js (Phase 68-09); nothing was captured from a live run. Two commands; an acted calibrated attempt, a calibrated below-threshold attempt with no action, a timeout fallback and a local sensitive_goal attempt with jevCalled false. Expected sums: fastSteps 1, jevCalls 3, jevMs 360, usd.provider 0.0000756, usd.estimate null.",
+  "jevMeasurement": {
+    "v": 1,
+    "attempts": [
+      {
+        "iteration": 2,
+        "command": 1,
+        "decisionSource": "jev",
+        "jevCalled": true,
+        "servedModel": "jev-1.13.0",
+        "instrumentVersion": "fsb-jev-instrument-1",
+        "calibrationStatus": "calibrated",
+        "latencyMs": 120,
+        "usage": { "inputTokens": 900, "source": "provider" },
+        "cost": { "usd": 0.0000378, "source": "provider" },
+        "fallback": null,
+        "outcome": "acted",
+        "escalationReason": null,
+        "op": "click",
+        "stepOutcome": "progress"
+      },
+      {
+        "iteration": 3,
+        "command": 1,
+        "decisionSource": "jev",
+        "jevCalled": true,
+        "servedModel": "jev-1.13.0",
+        "instrumentVersion": "fsb-jev-instrument-1",
+        "calibrationStatus": "calibrated",
+        "latencyMs": 115,
+        "usage": { "inputTokens": 880, "source": "provider" },
+        "cost": { "usd": 0.0000378, "source": "provider" },
+        "fallback": null,
+        "outcome": "escalated",
+        "escalationReason": "operation_below_threshold",
+        "op": null,
+        "stepOutcome": null
+      },
+      {
+        "iteration": 4,
+        "command": 1,
+        "decisionSource": "jev",
+        "jevCalled": true,
+        "servedModel": null,
+        "instrumentVersion": null,
+        "calibrationStatus": null,
+        "latencyMs": 125,
+        "usage": { "inputTokens": null, "source": "unavailable" },
+        "cost": { "usd": null, "source": "unavailable" },
+        "fallback": "timeout",
+        "outcome": "escalated",
+        "escalationReason": "timeout",
+        "op": null,
+        "stepOutcome": null
+      },
+      {
+        "iteration": 6,
+        "command": 2,
+        "decisionSource": null,
+        "jevCalled": false,
+        "servedModel": null,
+        "instrumentVersion": null,
+        "calibrationStatus": null,
+        "latencyMs": null,
+        "usage": { "inputTokens": null, "source": "unavailable" },
+        "cost": { "usd": null, "source": "unavailable" },
+        "fallback": "sensitive_goal",
+        "outcome": "declined",
+        "escalationReason": "sensitive_goal",
+        "op": null,
+        "stepOutcome": null
+      }
+    ],
+    "commands": [
+      {
+        "command": 1,
+        "fastSteps": 1,
+        "jevCalls": 3,
+        "jevMs": 360,
+        "usd": { "provider": 0.0000756, "estimate": null },
+        "escalations": { "operation_below_threshold": 1, "timeout": 1 }
+      },
+      {
+        "command": 2,
+        "fastSteps": 0,
+        "jevCalls": 0,
+        "jevMs": null,
+        "usd": { "provider": null, "estimate": null },
+        "escalations": { "sensitive_goal": 1 }
+      }
+    ]
+  }
+}

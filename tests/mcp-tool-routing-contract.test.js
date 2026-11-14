@@ -82,7 +82,9 @@ const requiredMessageRoutes = [
   'mcp:trigger',
   'mcp:stop-trigger',
   'mcp:get-trigger-status',
-  'mcp:list-triggers'
+  'mcp:list-triggers',
+  'mcp:get-settings',
+  'mcp:set-setting'
 ];
 
 // Phase 199 left fill_credential / fill_payment_method out of the route-contract
@@ -182,13 +184,22 @@ const groupDefinitions = {
       'mcp:get-trigger-status',
       'mcp:list-triggers'
     ]
+  },
+  // Phase 66.1: the settings tool is registered in mcp/src/tools/settings.ts and is
+  // not a TOOL_REGISTRY tool, so it has message routes only.
+  settings: {
+    tools: [],
+    messages: [
+      'mcp:get-settings',
+      'mcp:set-setting'
+    ]
   }
 };
 
 function selectedGroups() {
   const groupArg = process.argv.find(arg => arg.startsWith('--group='));
   if (!groupArg) {
-    return ['browser', 'visual', 'autopilot', 'observability', 'read', 'trigger'];
+    return ['browser', 'visual', 'autopilot', 'observability', 'read', 'trigger', 'settings'];
   }
 
   const group = groupArg.slice('--group='.length);
@@ -321,6 +332,20 @@ function runDispatcherChecks(dispatcher, groups) {
         : false;
       assert(hasRoute === true, `requiredMessageRoutes includes direct route for ${messageType}`);
     }
+  }
+
+  if (groups.includes('settings') && isPlainObject(messageRoutes)) {
+    console.log('\n--- settings route contracts ---');
+    assertDeepEqual(
+      messageRoutes['mcp:get-settings'],
+      { routeFamily: 'settings', handler: 'handleGetSettingsMessageRoute' },
+      'settings route contract: mcp:get-settings is handled by handleGetSettingsMessageRoute'
+    );
+    assertDeepEqual(
+      messageRoutes['mcp:set-setting'],
+      { routeFamily: 'settings', handler: 'handleSetSettingMessageRoute' },
+      'settings route contract: mcp:set-setting is handled by handleSetSettingMessageRoute'
+    );
   }
 
   console.log('\n--- background registry route contracts ---');

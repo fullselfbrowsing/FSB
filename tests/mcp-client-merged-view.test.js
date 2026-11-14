@@ -94,6 +94,7 @@ function createRuntimeHarness(initial, options = {}) {
     Promise,
     setTimeout,
     clearTimeout,
+    fsbHandlesTrustedFeatureAction() { return false; },
     armMcpBridge() {},
     fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} }

@@ -87,7 +87,7 @@ None - plan executed exactly as written.
 
 ## Issues Encountered
 
-- The pre-existing deletion of `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` caused the first raw root-suite run to stop in `coverage-report.test.js`. Each required root-suite gate used a temporary symlink to the identical archived v1.0.0 milestone copy; the link and temporary directory were removed after each run, preserving the user's deletion exactly.
+- The pre-existing deletion of `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` caused the first raw root-suite run to stop in `coverage-report.test.js`. Each required root-suite gate used a temporary symlink to the identical archived v0.13.0 milestone copy; the link and temporary directory were removed after each run, preserving the user's deletion exactly.
 
 ## Verification
 

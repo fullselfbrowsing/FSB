@@ -772,6 +772,51 @@ function readDispatch(o) {
     passAssertEqual(recorder.cloneParamsForReplay({ url: 'not a valid URL' }).url, '[REDACTED]',
       'malformed URL-like replay fields fail closed');
 
+    // Phase 69 CR-02: URLs echoed under generic keys (expect_result checks,
+    // change_report url.before/after) get the same sanitizer as url fields.
+    const echoedUrlResult = recorder.cloneResultForReplay({
+      success: true,
+      url: 'https://app.test/cb?code=SECRETCODE123&state=s',
+      expect_result: {
+        status: 'verified',
+        checks: [
+          { kind: 'url_includes', expected: '/cb', observed: 'https://app.test/cb?code=SECRETCODE123&state=s', status: 'met' },
+          { kind: 'url_includes', expected: 'https://app.test/cb?code=EXPECTEDCODE9&state=s', observed: 'https://app.test/cb', status: 'met' },
+          { kind: 'text_visible', expected: 'Saved', observed: 'present', status: 'met' }
+        ],
+        waited_ms: 0,
+        timeout_ms: 2000
+      },
+      change_report: {
+        url: {
+          before: 'https://app.test/login?session=SESSIONSECRET&next=home',
+          after: 'https://app.test/#access_token=FRAGMENTSECRET'
+        },
+        inputs_changed: { notes: { before: 'plain words', after: 'https://example.com/search?q=munich%20trip' } }
+      }
+    }, { selector: '#go' });
+    passAssertEqual(echoedUrlResult.url, 'https://app.test/cb?state=s',
+      'the url field keeps its existing sanitizer');
+    passAssertEqual(echoedUrlResult.expect_result.checks[0].observed, 'https://app.test/cb?state=s',
+      'expect_result url_includes observed drops the OAuth code before storage');
+    passAssertEqual(echoedUrlResult.expect_result.checks[1].expected, 'https://app.test/cb?state=s',
+      'a full URL passed as url_includes expected is sanitized too');
+    passAssertEqual(echoedUrlResult.expect_result.checks[1].observed, 'https://app.test/cb',
+      'an already-clean observed URL stays byte-exact');
+    passAssertEqual(echoedUrlResult.expect_result.checks[2].observed, 'present',
+      'non-URL observed values are untouched');
+    passAssertEqual(echoedUrlResult.change_report.url.before, 'https://app.test/login?next=home',
+      'change_report url.before drops session parameters');
+    passAssertEqual(echoedUrlResult.change_report.url.after, 'https://app.test/',
+      'change_report url.after drops token fragments');
+    passAssertEqual(echoedUrlResult.change_report.inputs_changed.notes.before, 'plain words',
+      'non-URL before values are untouched');
+    passAssertEqual(echoedUrlResult.change_report.inputs_changed.notes.after, 'https://example.com/search?q=munich%20trip',
+      'benign URL after values stay byte-exact');
+    passAssert(['SECRETCODE123', 'EXPECTEDCODE9', 'SESSIONSECRET', 'FRAGMENTSECRET']
+      .every(function (secret) { return JSON.stringify(echoedUrlResult).indexOf(secret) === -1; }),
+      'no echoed URL credential reaches the replay clone');
+
     const urlSection = await freshSection();
     const failedPasswordResponse = {
       success: false,

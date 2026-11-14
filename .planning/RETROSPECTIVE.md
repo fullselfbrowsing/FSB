@@ -214,6 +214,42 @@
 
 ---
 
+## Milestone: v0.9.91 -- MCP Clients as Providers
+
+**Shipped:** 2026-09-28
+**Phases:** 9 | **Plans:** 61
+
+### What Was Built
+- Durable MCP client identity (handshake clientInfo, a 21-client installed sweep, copy intent) behind one guarded `getMcpClients` view
+- A Providers panel with explicit `api` vs `agent` kinds and one evidence-based recommendation, with BYOK settings preserved
+- An authenticated reverse-request channel with a rotating session secret, exact Host/Origin checks, secret redaction and a permanent forbidden-flag CI gate
+- One five-method adapter contract and spawn supervisor running Claude Code, OpenCode and Codex, with pinned profiles, recorded fixtures and drift CI
+- Delegation UX (consent, live feed, Take Control/Stop, heartbeat, service-worker-eviction recovery) and an optional native wake host that only starts `serve`
+
+### What Worked
+- Security-first ordering: the channel's trust boundary (Phase 59) landed and was tested before any spawn code existed (Phase 60).
+- The adapter contract stayed unchanged while OpenCode and Codex were added, which proved the abstraction.
+- Source-pin contract tests caught drift early, and every phase kept the full suite green.
+
+### What Was Inefficient
+- Every live check was deferred to one milestone-end sweep that never ran; 48 scenarios accumulated and were waived at close, so the milestone has no live evidence.
+- The milestone sat at `human_needed` for two months after implementation finished (2026-07-22 to 2026-09-28).
+- Tests read live planning files (phase folders, ROADMAP.md, REQUIREMENTS.md), so archiving the milestone required repointing test paths.
+
+### Patterns Established
+- Closing with waived UAT: record the waiver in STATE.md and MILESTONES.md and leave the UAT ledgers untouched, so no pass is fabricated.
+- Tests that inspect planning artifacts read the archived milestone copies once a milestone closes.
+
+### Key Lessons
+1. Deferring all live checks to a single end-of-milestone sweep turns UAT into debt; schedule them per phase, or agree up front that closure is automated-only.
+2. Point planning-artifact tests at archive paths (or keep fixtures out of `.planning/`) so milestone archival cannot break the suite.
+
+### Cost Observations
+- Model mix: inherit profile.
+- Notable: 157 tasks across 61 plans; implementation ran 2026-07-10 to 2026-07-22.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -234,6 +270,7 @@
 | v0.9.35 | 5 | 15 | MCP reliability before new feature expansion |
 | v0.9.36 | 3 | 6 | Explicit MCP visual lifecycle and trusted client identity |
 | v0.9.60 | 11 | 30 | Multi-agent tab concurrency, MCP 0.8.0, run_task lifecycle return, change_report, restricted-tab recovery |
+| v0.9.91 | 9 | 61 | Agent CLIs as side-panel providers; security-first reverse channel; all live UAT waived at close |
 
 ### Top Lessons (Verified Across Milestones)
 

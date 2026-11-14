@@ -60,6 +60,9 @@ const DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH = 64;
 const DELEGATION_HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const MCP_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
+// In-process-only call timing stamp (D-04). JSON and structuredClone drop
+// Symbol keys, so the stamp never reaches a response or storage.
+const MCP_BRIDGE_CALL_TIMING = Symbol.for('fsb.mcp.call-timing');
 // Toolbar icon classes keyed by message type. Read-only tools never reach
 // mcp:execute-action -- they have their own routes and carry no tool name, so
 // the route itself is what identifies them as reading.
@@ -70,6 +73,7 @@ const MCP_ICON_READ_MESSAGE_TYPES = new Set([
   'mcp:get-task-snapshot', 'mcp:get-status', 'mcp:get-config', 'mcp:get-site-guides',
   'mcp:get-memory', 'mcp:search-memory', 'mcp:list-sessions', 'mcp:get-session',
   'mcp:get-session-replay',
+  'mcp:get-settings',
   'mcp:get-logs', 'mcp:get-diagnostics', 'mcp:capabilities-search', 'mcp:list-agents',
   'mcp:list-credentials', 'mcp:list-payments'
 ]);
@@ -1350,6 +1354,18 @@ class MCPBridgeClient {
     const { id, type, payload } = msg;
     if (!id || !type) return;
 
+    // Stamp the moment this call entered the extension. The action tap reads
+    // it back to compute FSB-side execution time for the session record.
+    if (payload && typeof payload === 'object') {
+      try {
+        Object.defineProperty(payload, MCP_BRIDGE_CALL_TIMING, {
+          value: { receivedAt: Date.now() },
+          enumerable: false,
+          configurable: true
+        });
+      } catch (_error) { /* timing capture never gates routing */ }
+    }
+
     const recorder = (typeof globalThis !== 'undefined') ? globalThis.fsbMcpSessionRecorder : null;
     const recordingIdentity = payload && typeof payload.agentId === 'string' &&
       typeof payload.recordingRunId === 'string' && typeof payload.recordingCallId === 'string'
@@ -1438,6 +1454,12 @@ class MCPBridgeClient {
       case 'mcp:stop-trigger':
       case 'mcp:get-trigger-status':
       case 'mcp:list-triggers':
+        return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
+
+      // Phase 66.1 (D-06): the settings tool. Dispatcher-owned routes; the
+      // delegated-write refusal runs in handleSetSettingMessageRoute (D-20).
+      case 'mcp:get-settings':
+      case 'mcp:set-setting':
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
 
       case 'mcp:trigger':
@@ -1944,6 +1966,23 @@ class MCPBridgeClient {
     } catch (_error) { /* unsupported-route inspection never changes the wire error */ }
   }
 
+  // Builds the recorder's call timing from the hidden ingress stamp only.
+  // completedAt is taken here, synchronously, when the action has finished;
+  // a missing or malformed stamp yields null rather than an invented zero.
+  _buildMcpCallTiming(payload) {
+    try {
+      const stamp = payload && payload[MCP_BRIDGE_CALL_TIMING];
+      const receivedAt = stamp ? stamp.receivedAt : null;
+      if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+      const completedAt = Date.now();
+      // A wall clock that stepped backwards has no measurable duration.
+      if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+      return { v: 1, receivedAt, completedAt, fsbMs: completedAt - receivedAt };
+    } catch (_error) {
+      return null;
+    }
+  }
+
   _recordMcpSessionAction(payload, response, resolvedTabId, targetContext) {
     try {
       if (typeof globalThis === 'undefined' ||
@@ -1980,7 +2019,8 @@ class MCPBridgeClient {
         requireTargetOrigin: true,
         targetOriginResolved: targetContext && targetContext.targetOriginResolved === true,
         spreadsheetTarget: targetContext && targetContext.spreadsheetTarget === true,
-        replayContext
+        replayContext,
+        timing: this._buildMcpCallTiming(payload)
       };
       const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
       const spreadsheetTool = sessionRecordEntry.spreadsheetTarget === true ||
@@ -2045,6 +2085,7 @@ class MCPBridgeClient {
           toolName,
           tabId: tabIdForReport,
           params,
+          expect: payload.expect,
           execute: executeFn
         });
       }
@@ -2189,6 +2230,7 @@ class MCPBridgeClient {
         toolName: payload.tool,
         tabId,
         params,
+        expect: payload.expect,
         execute: executeFn
       });
     } else {
@@ -2628,6 +2670,17 @@ class MCPBridgeClient {
 
     const sessionId = response.sessionId;
 
+    // Phase 70 (D-19): keep the session only when fast mode was on at start,
+    // so settle can report the typed fast-mode outcome. This is the same
+    // guarded map read fireHeartbeat does, done once; a stopped session has
+    // already left the map by settle time, so the read happens here.
+    let fastModeSession = null;
+    try {
+      const fastStartSessions = (typeof activeSessions !== 'undefined') ? activeSessions : null;
+      const fastStartSession = (fastStartSessions && typeof fastStartSessions.get === 'function') ? fastStartSessions.get(sessionId) : null;
+      fastModeSession = (fastStartSession && fastStartSession.fastMode) ? fastStartSession : null;
+    } catch (_e) { fastModeSession = null; }
+
     // Listen for automation completion via message listener
     //
     // Phase 225-01: chrome.runtime.sendMessage() does NOT loop back to
@@ -2708,7 +2761,7 @@ class MCPBridgeClient {
         } catch (_e) { /* best-effort persistence */ }
       };
 
-      const settle = (value, source) => {
+      const settle = (value, source, terminal) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
@@ -2717,6 +2770,39 @@ class MCPBridgeClient {
         if (lifecycleBus && typeof lifecycleBus.removeEventListener === 'function') {
           lifecycleBus.removeEventListener('automationComplete', busCompleteHandler);
           lifecycleBus.removeEventListener('automationError', busErrorHandler);
+        }
+
+        // Phase 70 (D-17, D-19): a run_task that started with fast mode on
+        // gets one more key, fast_mode, appended last; every other key stays
+        // as it is. The block is built here, synchronously, from the session
+        // captured at start, which is released now. Any failure gives the
+        // classifier_error block, and if even that fails the value goes out
+        // unchanged, so resolve below is always reached. The JSON round trip
+        // keeps the block plain data for the stored snapshot and the wire.
+        let finalValue = value;
+        if (fastModeSession) {
+          const fastSessionRef = fastModeSession;
+          fastModeSession = null;
+          let fastBlock = null;
+          try {
+            const fastPath = (typeof globalThis !== 'undefined') ? globalThis.FsbFastPath : null;
+            const fastKind = (terminal && terminal.kind) || (source === 'safety_net_600s' ? 'safety_net' : null);
+            const built = fastPath.buildFastModeBlock(fastSessionRef, { source, kind: fastKind, message: terminal ? terminal.message : undefined });
+            const plain = JSON.parse(JSON.stringify(built));
+            if (plain && typeof plain === 'object' && !Array.isArray(plain)) fastBlock = plain;
+          } catch (_e) { fastBlock = null; }
+          try {
+            finalValue = Object.assign({}, value, {
+              fast_mode: fastBlock || {
+                outcome: 'ambiguous',
+                reason: 'classifier_error',
+                uncertain_unobserved: null,
+                human_gate: null,
+                budget_profile: null,
+                jev: null,
+              },
+            });
+          } catch (_e) { finalValue = value; }
         }
 
         // Phase 239 plan 02 -- D-04 terminal write (state transition to
@@ -2740,7 +2826,7 @@ class MCPBridgeClient {
               current_step: heartbeatTickCount,
               ai_cycle_count: heartbeatTickCount,
               last_dom_hash: null,
-              final_result: value,
+              final_result: finalValue,
             }).catch(() => { /* best-effort */ });
           }
         } catch (_e) { /* never block resolve on persistence */ }
@@ -2755,7 +2841,7 @@ class MCPBridgeClient {
             source
           }));
         } catch (_e) { /* logging never blocks resolution */ }
-        resolve(value);
+        resolve(finalValue);
       };
 
       // Phase 239 plan 03 -- raise 300s ceiling to 600s safety net per D-06
@@ -2850,7 +2936,7 @@ class MCPBridgeClient {
           sessionId,
           status: message.outcome || message.result?.status || (message.partial ? 'partial' : 'completed'),
           result: message.result || {},
-        }, source);
+        }, source, { kind: 'complete', message });
       };
 
       const handleError = (message, source) => {
@@ -2858,7 +2944,7 @@ class MCPBridgeClient {
           sessionId,
           status: 'error',
           error: message.error || 'Unknown automation error',
-        }, source);
+        }, source, { kind: 'error', message });
       };
 
       const runtimeListener = (message) => {
@@ -2968,11 +3054,40 @@ class MCPBridgeClient {
   }
 
   async _handleGetConfig() {
-    const config = await chrome.storage.local.get([
-      'selectedModel', 'selectedProvider', 'defaultModel',
-      'maxIterations', 'domOptimization', 'maxDOMElements',
-    ]);
-    return { config };
+    // fsb://config run identity (D-18): an explicit allowlist of non-secret
+    // settings plus the loaded build. No other stored setting is ever read.
+    // Defaults match fsbReadAuthoritativeProviderConfig in background.js.
+    const stored = (await chrome.storage.local.get([
+      'providerKind', 'modelProvider', 'modelName',
+      'maxIterations', 'domOptimization', 'maxDOMElements'
+    ])) || {};
+    const config = {
+      providerKind: typeof stored.providerKind === 'string' ? stored.providerKind : 'api',
+      modelProvider: typeof stored.modelProvider === 'string' ? stored.modelProvider : 'xai',
+      modelName: typeof stored.modelName === 'string' ? stored.modelName.trim() : ''
+    };
+    if (Number.isFinite(stored.maxIterations)) config.maxIterations = stored.maxIterations;
+    if (typeof stored.domOptimization === 'boolean') config.domOptimization = stored.domOptimization;
+    if (Number.isFinite(stored.maxDOMElements)) config.maxDOMElements = stored.maxDOMElements;
+    const runtime = (chrome && chrome.runtime) || null;
+    let version = null;
+    try {
+      if (runtime && typeof runtime.getManifest === 'function') {
+        const manifest = runtime.getManifest();
+        version = manifest && typeof manifest.version === 'string' ? manifest.version : null;
+      }
+    } catch (_error) {
+      version = null;
+    }
+    return {
+      config,
+      extension: {
+        id: (runtime && runtime.id) || null,
+        version,
+        // Marks a build that carries the Phase 66 measurement changes.
+        measurement: { callTiming: 1, sessionDetailJournal: 1 }
+      }
+    };
   }
 
   async _handleGetSiteGuides(payload) {

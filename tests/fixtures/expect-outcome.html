@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Expect outcome fixture</title></head><body>
+<!-- Phase 69 plan 07 (SC4 layer 2): a static page for the same-call expect probe. No FSB content scripts are
+     loaded, so window.FSB is absent and a ref selector (e12) cannot resolve. Nothing is scheduled at load:
+     the test arms the delayed change with window.__armDelayed(ms) right before it evaluates. -->
+<p id="status">Idle</p>
+<label><input id="agree" type="checkbox"> Agree</label>
+<button id="bold" type="button" aria-pressed="true">Bold</button>
+<div id="panel" data-state="open">Panel</div>
+<input id="email" type="email" value="a@b.c">
+<input id="pw" type="password" value="hunter2">
+<dialog id="dlg" open>Dialog body</dialog>
+<div id="reload-slot"></div>
+<script>
+(function () {
+  var timer = null;
+  // Resets #status to "Saving" and re-inserts #spinner ("Loading"), then, ms later, sets #status to "Saved" and
+  // removes #spinner. Each call cancels the previous pending change, so cases do not depend on order or on start-up.
+  window.__armDelayed = function (ms) {
+    if (timer !== null) clearTimeout(timer);
+    var status = document.getElementById('status');
+    status.textContent = 'Saving';
+    var spinner = document.getElementById('spinner');
+    if (!spinner) {
+      spinner = document.createElement('div');
+      spinner.id = 'spinner';
+      status.parentNode.insertBefore(spinner, status.nextSibling);
+    }
+    spinner.textContent = 'Loading';
+    timer = setTimeout(function () {
+      timer = null;
+      status.textContent = 'Saved';
+      var current = document.getElementById('spinner');
+      if (current) current.remove();
+    }, ms);
+    return true;
+  };
+  // A reload renders a marker that the first load never shows.
+  var entries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : [];
+  var reloaded = (entries[0] && entries[0].type === 'reload')
+    || (performance.navigation && performance.navigation.type === 1);
+  if (reloaded) {
+    var marker = document.createElement('p');
+    marker.id = 'reloaded';
+    marker.textContent = 'Reloaded';
+    document.getElementById('reload-slot').appendChild(marker);
+  }
+})();
+</script>
+</body></html>

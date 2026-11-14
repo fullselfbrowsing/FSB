@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-custom-dropdowns-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-click-custom-dropdowns",
+    "version": 1,
+    "fixtureSha256": "9750d903bcda7ebc8590309a3f70d391f2ec29801ac3ad5f226081cc287411d9"
+  },
+  "step": 3,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion", "stuck"],
+    "goal": "Choose Europe (West) for Region, Large for Size, Graphite for Color and Express for Shipping, then submit.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/custom-dropdowns/index.html",
+      "title": "Order options",
+      "text": "Order options\nRegion\nEurope (West)\nSize\nChoose a size\nSmall\nMedium\nLarge\nX-Large\nColor\nChoose a color\nShipping\nChoose a shipping speed\nSubmit"
+    },
+    "elements": [
+      { "id": "e0", "role": "combobox", "label": "Region", "ops": ["click"] },
+      { "id": "e1", "role": "combobox", "label": "Size", "ops": ["click"] },
+      { "id": "e2", "role": "option", "label": "Small", "ops": ["click"] },
+      { "id": "e3", "role": "option", "label": "Medium", "ops": ["click"] },
+      { "id": "e4", "role": "option", "label": "Large", "ops": ["click"] },
+      { "id": "e5", "role": "option", "label": "X-Large", "ops": ["click"] },
+      { "id": "e6", "role": "combobox", "label": "Color", "ops": ["click"] },
+      { "id": "e7", "role": "combobox", "label": "Shipping", "ops": ["click"] },
+      { "id": "e8", "role": "button", "label": "Submit", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "click", "targetId": "e0", "changed": true },
+      { "op": "click", "targetId": null, "changed": true },
+      { "op": "click", "targetId": "e1", "changed": true }
+    ],
+    "offeredOps": ["click", "scroll"]
+  },
+  "labels": {
+    "operation": "click",
+    "target": "e4",
+    "completion": false,
+    "stuck": false,
+    "risk": null
+  },
+  "note": "Region shows Europe (West) and the Size list is open. Large (e4) is next; X-Large (e5) is the near-miss. Color, Shipping and Submit remain."
+}

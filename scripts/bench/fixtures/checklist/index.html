@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" data-bench-app="checklist">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checklist</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  fieldset { border: 0; margin: 0 0 12px; padding: 0; }
+  legend { font-weight: 600; margin-bottom: 8px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; }
+  .check { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+  .check:hover { background: #f3f6fc; }
+  .check input { width: 18px; height: 18px; margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Checklist</h1>
+  <form id="checklist" class="panel" novalidate>
+    <fieldset>
+      <legend>Items</legend>
+      <div class="grid">
+        <label class="check"><input type="checkbox" name="item" value="alpha"> Alpha</label>
+        <label class="check"><input type="checkbox" name="item" value="bravo"> Bravo</label>
+        <label class="check"><input type="checkbox" name="item" value="charlie"> Charlie</label>
+        <label class="check"><input type="checkbox" name="item" value="delta"> Delta</label>
+        <label class="check"><input type="checkbox" name="item" value="echo"> Echo</label>
+        <label class="check"><input type="checkbox" name="item" value="foxtrot"> Foxtrot</label>
+        <label class="check"><input type="checkbox" name="item" value="golf"> Golf</label>
+        <label class="check"><input type="checkbox" name="item" value="hotel"> Hotel</label>
+        <label class="check"><input type="checkbox" name="item" value="india"> India</label>
+        <label class="check"><input type="checkbox" name="item" value="juliet"> Juliet</label>
+      </div>
+    </fieldset>
+    <button id="save" class="btn primary" type="submit">Save</button>
+    <p id="save-error" class="error" role="alert" hidden></p>
+    <p id="save-status" class="status" role="status" hidden>Saved. Checked items: <output data-bench-marker="saved-count"></output></p>
+  </form>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const form = document.getElementById('checklist');
+    const boxes = [...form.querySelectorAll('input[name="item"]')];
+    const saveButton = document.getElementById('save');
+    const error = document.getElementById('save-error');
+    const status = document.getElementById('save-status');
+    let busy = false;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      const checked = boxes.filter((box) => box.checked).map((box) => box.value).sort();
+      busy = true;
+      saveButton.disabled = true;
+      error.hidden = true;
+      try {
+        await benchPost('save', { checked });
+        setView({ view: 'saved' });
+        setMarker('saved-count', String(checked.length));
+        status.hidden = false;
+      } catch {
+        error.textContent = 'The checklist could not be saved. Try again.';
+        error.hidden = false;
+      } finally {
+        busy = false;
+        saveButton.disabled = false;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

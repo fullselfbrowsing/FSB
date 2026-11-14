@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bench sample: save a value</title>
+<link rel="icon" href="data:,">
+<style>
+  body { font: 16px/1.4 system-ui, sans-serif; margin: 2rem; }
+  label, input, button { font: inherit; }
+  label { display: block; margin-bottom: 0.25rem; }
+  #status { margin-top: 1rem; }
+  #error { color: #b00020; }
+</style>
+</head>
+<body>
+<!--
+  Phase 66 benchmark sample fixture (tests/fixtures/bench/tasks-sample).
+  Self-contained: relative URLs only, no external resources, no in-page probes.
+  Save posts JSON to ../../api/sample/save, which resolves to
+  /r/<token>/api/sample/save from /r/<token>/fixtures/sample/index.html.
+-->
+<main>
+  <h1>Sample settings</h1>
+  <form id="save-form">
+    <label for="value">Value</label>
+    <input id="value" name="value" type="text" autocomplete="off">
+    <button id="save" type="submit">Save</button>
+  </form>
+  <p id="status" role="status">Saved value: <output id="saved" data-bench-marker="saved-value"></output></p>
+  <p id="error" hidden>Save failed.</p>
+</main>
+<script>
+  (() => {
+    const form = document.getElementById('save-form');
+    const input = document.getElementById('value');
+    const saved = document.getElementById('saved');
+    const error = document.getElementById('error');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const value = input.value;
+      error.hidden = true;
+      try {
+        const response = await fetch('../../api/sample/save', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ value })
+        });
+        if (!response.ok) throw new Error('save failed');
+        history.replaceState(null, '', '?view=saved');
+        saved.textContent = value;
+      } catch (_err) {
+        error.hidden = false;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

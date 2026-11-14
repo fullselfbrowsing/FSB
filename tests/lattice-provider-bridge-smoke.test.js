@@ -633,8 +633,12 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (side-panel active tab handed to the delegated agent) adds one -> 333.
   // The retained debugger session manager adds one shared load -> 334.
   // Deleting the four commented-out background-agent loads drops it to 330.
+  // Phase 67 adds three inert Jev decision modules (state, client, policy) -> 333.
+  // Phase 68 adds the fast-path decision module -> 334.
+  // The Skopeo runtime families add 37 more mentions -> 371, and the
+  // service-worker UI locale helper for Skopeo alert notifications adds one -> 372.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 330, 'background.js importScripts count includes the retained debugger session manager');
+  passAssertEqual(importScriptsCount, 372, 'background.js importScripts count includes the retained debugger session manager, the three inert Jev modules (jev-state, jev-client, jev-policy) and the fast-path module (jev-fast-path), the Skopeo runtime families and the service-worker UI locale helper');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -682,14 +686,49 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // shared model discovery add two more call sites -> 328. The delegation tab
   // seed is call site 329. The debugger session manager is call site 330.
   // Deleting the four commented-out background-agent loads drops it to 326.
+  // Phase 67's three Jev modules are call sites 327..329.
+  // Phase 68's fast-path module is call site 330.
+  // The Skopeo runtime families add 35 more call sites -> 365, and the
+  // service-worker UI locale helper is call site 366.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 326, 'background.js importScripts() call sites include the retained debugger session manager');
+  passAssertEqual(importScriptsCallSites, 366, 'background.js importScripts() call sites include the retained debugger session manager, the three inert Jev modules (jev-state, jev-client, jev-policy) and the fast-path module (jev-fast-path), the Skopeo runtime families and the service-worker UI locale helper');
   passAssertEqual((bgSource.match(/importScripts\(['"]utils\/debugger-sessions\.js['"]\)/g) || []).length, 1,
     'debugger session manager is loaded exactly once');
   const lineLease = bgLines.findIndex(line => /importScripts\(['"]utils\/cdp-lease\.js['"]\)/.test(line));
   const lineSessions = bgLines.findIndex(line => /importScripts\(['"]utils\/debugger-sessions\.js['"]\)/.test(line));
   passAssert(lineLease >= 0 && lineSessions > lineLease,
     'debugger session manager loads after its CDP lease dependency');
+
+  const corpusLoadOrder = [
+    'utils/capability-fetch.js',
+    'utils/skopeo-corpus-schema.js',
+    'utils/skopeo-corpus-store.js',
+    'utils/skopeo-drive-corpus-transport.js',
+    'utils/skopeo-drive-authority.js',
+    'utils/skopeo-corpus-controller.js',
+    'utils/skopeo-drive-reconciler.js'
+  ].map(file => bgLines.findIndex(line => line.includes("importScripts('" + file + "')")));
+  passAssert(
+    corpusLoadOrder.every((line, index) => line >= 0 && (index === 0 || line > corpusLoadOrder[index - 1])),
+    'order: capability-fetch -> corpus schema -> store -> transport -> authority -> controller -> reconciler'
+  );
+  const hudLoadOrder = [
+    'utils/skopeo-truth-engine.js',
+    'utils/skopeo-ask-schema.js',
+    'utils/skopeo-ask-engine.js',
+    'utils/skopeo-decision-policy-store.js',
+    'utils/skopeo-decision-policy.js',
+    'utils/skopeo-alert-schema.js',
+    'utils/skopeo-alert-store.js',
+    'utils/skopeo-alert-engine.js',
+    'utils/skopeo-alert-runtime.js',
+    'utils/skopeo-hud-schema.js',
+    'utils/skopeo-hud-projector.js'
+  ].map(file => bgLines.findIndex(line => line.includes("importScripts('" + file + "')")));
+  passAssert(
+    hudLoadOrder.every((line, index) => line >= 0 && (index === 0 || line === hudLoadOrder[index - 1] + 1)),
+    'order: truth -> Ask -> policy -> alert -> HUD modules is exactly-once and adjacent'
+  );
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

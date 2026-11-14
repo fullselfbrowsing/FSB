@@ -1,0 +1,539 @@
+{
+  "p70Start": "3f7efb0ac7aae5607b97f0e5c3b26f41733a3e8e",
+  "sessionId": "sess_p70_wire",
+  "paths": {
+    "runtime-complete": {
+      "value": {
+        "sessionId": "sess_p70_wire",
+        "status": "success",
+        "result": "Ticked Alpha on the checklist."
+      },
+      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"success\",\n  \"result\": \"Ticked Alpha on the checklist.\"\n}",
+      "storeWrites": [
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "complete",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null,
+            "final_result": {
+              "sessionId": "sess_p70_wire",
+              "status": "success",
+              "result": "Ticked Alpha on the checklist."
+            }
+          }
+        }
+      ]
+    },
+    "bus-complete": {
+      "value": {
+        "sessionId": "sess_p70_wire",
+        "status": "success",
+        "result": "Ticked Alpha on the checklist."
+      },
+      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"success\",\n  \"result\": \"Ticked Alpha on the checklist.\"\n}",
+      "storeWrites": [
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "complete",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null,
+            "final_result": {
+              "sessionId": "sess_p70_wire",
+              "status": "success",
+              "result": "Ticked Alpha on the checklist."
+            }
+          }
+        }
+      ]
+    },
+    "bus-error": {
+      "value": {
+        "sessionId": "sess_p70_wire",
+        "status": "error",
+        "error": "API call failed: provider returned 500"
+      },
+      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"error\",\n  \"error\": \"API call failed: provider returned 500\"\n}",
+      "storeWrites": [
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "error",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null,
+            "final_result": {
+              "sessionId": "sess_p70_wire",
+              "status": "error",
+              "error": "API call failed: provider returned 500"
+            }
+          }
+        }
+      ]
+    },
+    "bus-stop": {
+      "value": {
+        "sessionId": "sess_p70_wire",
+        "status": "stopped",
+        "result": {}
+      },
+      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"stopped\",\n  \"result\": {}\n}",
+      "storeWrites": [
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "stopped",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null,
+            "final_result": {
+              "sessionId": "sess_p70_wire",
+              "status": "stopped",
+              "result": {}
+            }
+          }
+        }
+      ]
+    },
+    "safety-net": {
+      "value": {
+        "sessionId": "sess_p70_wire",
+        "success": true,
+        "partial_outcome": "timeout",
+        "partial_state": {
+          "task_id": "sess_p70_wire",
+          "status": "in_progress",
+          "started_at": 1760000000000,
+          "last_heartbeat_at": 1760000570000,
+          "originating_mcp_call_id": "mcp_p70_wire",
+          "target_tab_id": null,
+          "current_step": 0,
+          "ai_cycle_count": 0,
+          "last_dom_hash": null
+        },
+        "hint": "lifecycle event missing -- audit cleanup paths"
+      },
+      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"partial_outcome\": \"timeout\",\n  \"partial_state\": {\n    \"task_id\": \"sess_p70_wire\",\n    \"status\": \"in_progress\",\n    \"started_at\": 1760000000000,\n    \"last_heartbeat_at\": 1760000570000,\n    \"originating_mcp_call_id\": \"mcp_p70_wire\",\n    \"target_tab_id\": null,\n    \"current_step\": 0,\n    \"ai_cycle_count\": 0,\n    \"last_dom_hash\": null\n  },\n  \"hint\": \"lifecycle event missing -- audit cleanup paths\"\n}",
+      "storeWrites": [
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000000000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000030000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000060000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000090000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000120000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000150000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000180000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000210000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000240000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000270000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000300000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000330000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000360000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000390000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000420000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000450000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000480000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000510000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000540000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "in_progress",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000570000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "partial",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000570000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 0,
+            "ai_cycle_count": 0,
+            "last_dom_hash": null,
+            "final_result": {
+              "partial_outcome": "timeout"
+            }
+          }
+        },
+        {
+          "taskId": "sess_p70_wire",
+          "snapshot": {
+            "task_id": "sess_p70_wire",
+            "status": "complete",
+            "started_at": 1760000000000,
+            "last_heartbeat_at": 1760000600000,
+            "originating_mcp_call_id": "mcp_p70_wire",
+            "target_tab_id": null,
+            "current_step": 19,
+            "ai_cycle_count": 19,
+            "last_dom_hash": null,
+            "final_result": {
+              "sessionId": "sess_p70_wire",
+              "success": true,
+              "partial_outcome": "timeout",
+              "partial_state": {
+                "task_id": "sess_p70_wire",
+                "status": "in_progress",
+                "started_at": 1760000000000,
+                "last_heartbeat_at": 1760000570000,
+                "originating_mcp_call_id": "mcp_p70_wire",
+                "target_tab_id": null,
+                "current_step": 0,
+                "ai_cycle_count": 0,
+                "last_dom_hash": null
+              },
+              "hint": "lifecycle event missing -- audit cleanup paths"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "heartbeat": {
+    "timestamp": 1760000030000,
+    "sessionId": "sess_p70_wire",
+    "taskId": "sess_p70_wire",
+    "alive": true,
+    "step": 0,
+    "elapsed_ms": 30000,
+    "current_url": null,
+    "ai_cycles": 0,
+    "last_action": null
+  }
+}

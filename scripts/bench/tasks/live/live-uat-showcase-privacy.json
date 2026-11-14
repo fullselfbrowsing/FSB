@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "live-uat-showcase-privacy",
+  "version": 1,
+  "set": "live",
+  "category": "reading",
+  "startUrl": "https://full-selfbrowsing.com/privacy",
+  "instruction": "Open {startUrl} and check, as a UAT reviewer would, that the privacy policy has a section stating FSB does no third-party tracking. Report that section's heading.",
+  "timeBudgetMs": 180000,
+  "success": {
+    "all": [
+      { "kind": "finalUrl", "urlIncludes": "/privacy" },
+      { "kind": "text", "includes": "Privacy Policy" },
+      { "kind": "text", "includes": "No Third-Party Tracking" }
+    ]
+  }
+}

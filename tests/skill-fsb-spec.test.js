@@ -176,6 +176,8 @@ const nonToolAllowlist = new Set([
   'search_capabilities', 'invoke_capability',
   // v0.9.90 Trigger Watchers params / conditions (action inputs, not tools):
   'trigger_id', 'include_terminal', 'delta_percent',
+  // Phase 71 same-call expect result field and its older-extension reason (outputs, not tools):
+  'expect_result', 'extension_unsupported',
 ]);
 let unknownTokens = [];
 for (const token of referenced) {

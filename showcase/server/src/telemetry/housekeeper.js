@@ -28,6 +28,8 @@
  *   5. Nudge salt rotation by calling hashIp('0.0.0.0', db) -- the result is
  *      discarded; '0.0.0.0' is a harmless throwaway literal; the side effect
  *      is the lazy getOrMintTodaySalt() inside hashIp.
+ *   6. Phase 67: prune jev_decisions after 7 days and jev_daily after 365 days
+ *      (src/jev/ledger.js), in a separate guarded step after steps 1-5.
  *
  * Errors are logged via console.error but NEVER thrown. The interval must
  * never crash. tests/server-telemetry-housekeeper.test.js exercises a single
@@ -39,6 +41,7 @@
 const Queries = require('../db/queries');
 const { hashIp } = require('../utils/telemetry-hash');
 const { regionDepth, regionParent } = require('../utils/region-label');
+const { pruneJevLedger } = require('../jev/ledger');
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -261,6 +264,16 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
   } catch (err) {
     // Per CONTEXT "Errors logged but never crash the interval".
     console.error('[housekeeper] tick failed:', err && err.message ? err.message : err);
+  }
+
+  // Phase 67 / D-24 -- Jev retention in its own guarded step, so it runs even
+  // when the telemetry steps fail and can never break them: ledger rows after
+  // 7 days, daily aggregates after 365. Fixed line only; a SQLite error is
+  // never logged (D-22).
+  try {
+    pruneJevLedger(db, nowMs);
+  } catch {
+    console.error('[housekeeper] jev prune failed');
   }
 }
 

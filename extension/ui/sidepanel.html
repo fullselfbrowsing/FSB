@@ -35,6 +35,23 @@
       </div>
     </header>
 
+    <section id="skopeoControl" class="skopeo-control-row" data-state="off" aria-live="off" aria-atomic="true" aria-busy="false" aria-labelledby="skopeoTitle">
+      <div class="skopeo-control-copy">
+        <div class="skopeo-control-heading">
+          <span id="skopeoTitle" class="skopeo-control-title" translate="no">Skopeo</span>
+          <span id="skopeoStatus" class="skopeo-control-status" data-i18n="copy_1ca28d1918">Off for this tab</span>
+        </div>
+        <p id="skopeoStatusBody" class="skopeo-control-body" hidden></p>
+        <span id="skopeoAction" class="skopeo-control-action" data-i18n="copy_dc069f34dd">Turn on Skopeo</span>
+        <button id="skopeoHint" class="skopeo-control-hint" type="button" aria-label="Open Chrome shortcut settings" data-i18n="copy_f262cf94ab" data-i18n-attr="aria-label:copy_14893d4a92">Shortcut not assigned &#183; Set in Chrome shortcuts</button>
+      </div>
+      <button id="skopeoToggle" class="skopeo-toggle" type="button" role="switch" aria-checked="false" aria-label="Skopeo for this tab" aria-describedby="skopeoStatus skopeoStatusBody skopeoHint" data-i18n-attr="aria-label:copy_b7fb9f7ede">
+        <span class="skopeo-switch-track" aria-hidden="true">
+          <span class="skopeo-switch-thumb"></span>
+        </span>
+      </button>
+    </section>
+
     <div id="historyView" class="history-view hidden">
       <div class="history-header">
         <h3 data-i18n="shell_history">Session History</h3>

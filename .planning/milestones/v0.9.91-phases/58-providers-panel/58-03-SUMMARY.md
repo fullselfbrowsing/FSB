@@ -99,7 +99,7 @@ None - plan behavior and test scope were implemented as specified.
 
 ## Issues Encountered
 
-- The shared Conductor worktree intentionally lacks the old Phase 39 coverage manifest. Full-suite gates temporarily linked the identical archived v1.0.0 milestone copy and removed the link afterward, preserving the user's deletions.
+- The shared Conductor worktree intentionally lacks the old Phase 39 coverage manifest. Full-suite gates temporarily linked the identical archived v0.13.0 milestone copy and removed the link afterward, preserving the user's deletions.
 - The first clean-worktree dependency provisioning used symlink paths with one extra parent segment, so the environment stopped at `tsc: command not found` with exit `127`. Corrected ignored dependency links restored `tsc`/Angular executables; a clean pre-test status was reconfirmed and the complete suite then exited `0`.
 - The in-app Browser runtime initialized, but browser discovery returned `[]` after its troubleshooting flow. No live visual item or screenshot was claimed; `58-VISUAL-QA.md` records exact human reproduction for each item.
 

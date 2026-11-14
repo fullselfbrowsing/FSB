@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-mixed-search-detail",
+  "version": 1,
+  "set": "core",
+  "category": "mixed",
+  "startPath": "/fixtures/search-detail/index.html",
+  "instruction": "Open {startUrl}. Search for trail running shoe, open the result that is waterproof and costs under $120, and add it to the list.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/search-detail/add", "count": 1, "jsonEquals": { "sku": "TRS-4427" } },
+      { "kind": "request", "method": "POST", "path": "/api/search-detail/add", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/search-detail/detail.html", "queryIncludes": { "sku": "TRS-4427", "view": "added" } },
+      { "kind": "marker", "name": "list-added", "equals": "TRS-4427" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "search-detail/catalog.js", "search-detail/detail.html", "search-detail/index.html", "search-detail/results.html"]
+}

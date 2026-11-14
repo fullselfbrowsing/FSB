@@ -1,0 +1,2647 @@
+{
+  "meta": {
+    "sourceCommit": "8a058bdf0d17c1e3e79ec3104cc1996326b4c402",
+    "sdkVersion": "1.29.0",
+    "zodVersion": "3.25.76",
+    "command": "node scripts/mcp/tools-list-baseline.mjs --write",
+    "count": 72,
+    "sha256": "b0e67bb7974cf1cf0d649113162b438559585aa02ba28666f17df5d14a8274b8",
+    "toolsListDigest": "8321cc7234a7e1d817b5a3e818e75e243d76e60d1911d88b410d38147c8c4a05"
+  },
+  "tools": [
+    {
+      "description": "Navigate one step back in browser history on the agent's active tab. Single-step only (no back(n)); no companion forward tool in v0.9.60. Agent-scoped: targets the agent's active tab unless tab_id is supplied. Ownership-enforced via the Phase 240 dispatch gate -- cross-agent calls reject with TAB_NOT_OWNED. Returns a structured result of shape { status, resultingUrl, historyDepth } where status is one of: ok (back navigation settled cleanly), no_history (history depth <= 1, nothing to go back to), cross_origin (target page is on a different origin from the source), bf_cache (back was served from the back/forward cache and the pageshow listener observed event.persisted=true), fragment_only (only the URL fragment changed via history navigation). Background-tab compatible: does not steal focus or call chrome.tabs.update({active: true}). Multi-agent contract: agent_id is FSB-issued and required (the server captures it via agent:register on first tool call -- callers do not provide it). tab_id is agent-scoped: only tabs owned by the calling agent can be addressed. The concurrency cap is configurable (default 8, range 1-64); the (N+1)th agent claim is rejected with AGENT_CAP_REACHED { cap, active }. Ownership enforcement: cross-agent calls reject with TAB_NOT_OWNED; incognito tabs reject with TAB_INCOGNITO_NOT_SUPPORTED; cross-window tabs reject with TAB_OUT_OF_SCOPE. Tool-specific typed error codes returnable by this tool: NO_BACK_HISTORY, CROSS_ORIGIN, BF_CACHE, FRAGMENT_ONLY. RETURNS change_report: the response includes a `change_report` field with a compact diff of what the back navigation mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Cross-origin transitions emit a URL-only report with `cross_origin:true`. Use this to learn the consequence without calling read_page next; if `change_report.truncated:true` is set, call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "tab_id": {
+            "description": "Target tab in agent pool. If omitted, defaults to the agent's active tab.",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "back"
+    },
+    {
+      "description": "Capture the live Chromium-composited web page as a lossless PNG for visual inspection and UAT. Supports the current viewport, the full rendered document, an exact page/viewport region, or an element selected by CSS or an FSB element ref. Includes CSS, web fonts, SVG, canvas, images, open shadow DOM, and runtime state; browser chrome and the desktop are not included. FSB overlays are hidden by default and restored after capture. MCP returns a native image and private managed file; autopilot attaches the image transiently to the model without creating a file. Responsive desktop/mobile emulation is temporary and never spoofs the user agent or reloads the page. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only to disambiguate an owned tab.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "coordinate_space": {
+            "description": "Region coordinate space. Valid only for region mode; defaults to viewport.",
+            "enum": [
+              "viewport",
+              "page"
+            ],
+            "type": "string"
+          },
+          "device_mode": {
+            "description": "Use current metrics or temporary responsive emulation. Viewport dimensions without this field imply desktop.",
+            "enum": [
+              "current",
+              "desktop",
+              "mobile"
+            ],
+            "type": "string"
+          },
+          "device_scale_factor": {
+            "description": "Temporary emulated device scale factor from 1 through 4; defaults to 1 while emulating.",
+            "type": "number"
+          },
+          "height": {
+            "description": "Region height in CSS pixels. Region mode only.",
+            "type": "number"
+          },
+          "include_fsb_overlays": {
+            "description": "Capture FSB overlays instead of temporarily hiding them. Defaults to false.",
+            "type": "boolean"
+          },
+          "mode": {
+            "description": "Capture mode. Defaults to viewport.",
+            "enum": [
+              "viewport",
+              "full_page",
+              "region",
+              "element"
+            ],
+            "type": "string"
+          },
+          "orientation": {
+            "description": "Mobile screen orientation. Mobile mode only; defaults to auto.",
+            "enum": [
+              "auto",
+              "portrait",
+              "landscape"
+            ],
+            "type": "string"
+          },
+          "selector": {
+            "description": "CSS selector or FSB element ref. Element mode only.",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional owned tab id. Omit when the calling agent owns exactly one tab.",
+            "type": "number"
+          },
+          "viewport_height": {
+            "description": "Temporary viewport height in integer CSS pixels. Desktop/mobile require both dimensions.",
+            "type": "number"
+          },
+          "viewport_width": {
+            "description": "Temporary viewport width in integer CSS pixels. Desktop/mobile require both dimensions.",
+            "type": "number"
+          },
+          "wait_ms": {
+            "description": "Additional settle delay from 0 through 5000 ms after font readiness and two animation frames. Defaults to 250.",
+            "type": "number"
+          },
+          "width": {
+            "description": "Region width in CSS pixels. Region mode only.",
+            "type": "number"
+          },
+          "x": {
+            "description": "Region left edge in CSS pixels. Region mode only.",
+            "type": "number"
+          },
+          "y": {
+            "description": "Region top edge in CSS pixels. Region mode only.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "name": "capture_screenshot"
+    },
+    {
+      "description": "Toggle a checkbox element. Returns the new checked state. When to use: to check or uncheck form checkboxes or toggle switches. Related: get_dom_snapshot (find checkbox selectors), click (alternative for custom checkbox UI components). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference for the checkbox",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "check_box"
+    },
+    {
+      "description": "Clear the contents of an input field. Returns clear confirmation. When to use: before typing new text into an already-filled field to remove existing content. Related: type_text (type new text after clearing), get_dom_snapshot (find input selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference for the input to clear",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "clear_input"
+    },
+    {
+      "description": "Click an element on the page. When to use: to press buttons, follow links, activate controls, or select items. Get selectors from get_dom_snapshot first. If click fails, try refreshing selectors with get_dom_snapshot or use click_at with viewport coordinates. Supports text-based targeting: pass \"text\" instead of \"selector\" to click the first visible element containing that text (useful for dynamic apps like LinkedIn where element IDs change). CUSTOM DROPDOWN PATTERN: custom (non-native) dropdowns require TWO clicks -- (1) `click` the dropdown control to open the listbox, (2) `click` the option element. Example: react-select / Material-UI Select / Headless UI -- `click e5` opens, `click e23` picks \"Green\". `select_option` only works on native <select> elements. Returns whether the click succeeded. Related: get_dom_snapshot (find element selectors/refs), click_at (coordinate-based fallback for canvas/overlay elements), hover (for menus that need hover before click), select_option (for native <select> only). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference from get_dom_snapshot (e.g., \"#submit-btn\", \".nav-link\", or element ref \"e5\")",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "text": {
+            "description": "Text content to find and click. Case-insensitive substring match. Clicks the first visible element containing this text. Use when CSS selectors are unstable (e.g., LinkedIn, Facebook). Example: \"Latha Pulipati\" or \"Send message\".",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "click"
+    },
+    {
+      "description": "Click and hold at specific viewport coordinates for a specified duration using CDP trusted events. Dispatches mousePressed, waits holdMs milliseconds, then dispatches mouseReleased at the same position. Coordinates are CSS pixels relative to the browser viewport. When to use: for record buttons, long-press menus, or any UI that requires sustained mouse press. Related: click_at (simple click without hold), drag (click, move, and release for dragging interactions). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "holdMs": {
+            "description": "Duration to hold the mouse button in milliseconds (default 5000 = 5 seconds)",
+            "type": "number"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          },
+          "x": {
+            "description": "X coordinate in viewport CSS pixels",
+            "type": "number"
+          },
+          "y": {
+            "description": "Y coordinate in viewport CSS pixels",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "click_and_hold"
+    },
+    {
+      "description": "Click at specific viewport coordinates using CDP trusted events. Supports modifier keys for shift+click (multi-select), ctrl+click, alt+click. Coordinates are CSS pixels relative to the browser viewport (use getBoundingClientRect() values). Returns success/failure with method used. When to use: for canvas elements, SVG graphics, overlays, or any element where DOM-based click (click tool) does not work. Fallback for click failures. Related: click (preferred for DOM elements -- use click_at only when click fails), get_dom_snapshot (check element coordinates via position data), drag (for click-and-drag interactions). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "alt": {
+            "description": "Hold Alt key during click",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "ctrl": {
+            "description": "Hold Ctrl key during click",
+            "type": "boolean"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "shift": {
+            "description": "Hold Shift key during click (for multi-select)",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          },
+          "x": {
+            "description": "X coordinate in viewport CSS pixels",
+            "type": "number"
+          },
+          "y": {
+            "description": "Y coordinate in viewport CSS pixels",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "click_at"
+    },
+    {
+      "description": "Close an agent-owned browser tab without changing the foreground tab. When to use: clean up background tabs opened by this agent after work is complete. By default, refuses to close the current active foreground tab; pass allow_active:true only when the user explicitly wants the active tab closed. Related: open_tab (create a new tab), list_tabs (find tab IDs), switch_tab (select an agent tab). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "allow_active": {
+            "default": false,
+            "description": "When true, allow closing the active foreground tab. Default false protects the user-visible active tab.",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id to close. Omit when the calling agent owns exactly one tab; required to disambiguate when the agent owns multiple.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "close_tab"
+    },
+    {
+      "description": "Signal that the task is fully complete. ONLY call this when the user's requested task has been fully achieved -- all data collected, all entries made, all actions performed. Include a summary of what was accomplished, but never include passwords, tokens, API keys, or sensitive form values. Provide tab_id when more than one tab/session could be active so the local task memory is associated exactly. Provide session_token only when completing a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-lifecycle semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "session_token": {
+            "description": "Optional token returned by start_visual_session. Provide this only when finalizing a client-owned visual session.",
+            "type": "string"
+          },
+          "summary": {
+            "description": "Summary of what was accomplished (e.g. \"Found 50 Tesla internships and added them to Google Sheet with title, department, location columns\")",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional target tab id used to associate this outcome with the correct local MCP replay session.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "type": "object"
+      },
+      "name": "complete_task"
+    },
+    {
+      "description": "Double-click an element. Returns click confirmation. When to use: for actions requiring double-click such as selecting a word, opening items in file managers, or activating edit mode. Related: click (single click), select_text_range (precise text selection by offsets), get_dom_snapshot (find element selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference to double-click",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "double_click"
+    },
+    {
+      "description": "Double-click at specific viewport coordinates using CDP trusted events. Dispatches two rapid mousePressed/mouseReleased cycles with clickCount=2 on the second pair. Supports modifier keys. Coordinates are CSS pixels relative to the browser viewport. When to use: for entering edit mode in canvas-based editors (Excalidraw text boxes, Google Sheets cells), selecting words in contenteditable elements, or any double-click on coordinate-targeted elements. Related: click_at (single click at coordinates), double_click (double-click DOM elements by selector), insert_text (type text after entering edit mode via double-click). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "alt": {
+            "description": "Hold Alt key during double-click",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "ctrl": {
+            "description": "Hold Ctrl key during double-click",
+            "type": "boolean"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "shift": {
+            "description": "Hold Shift key during double-click",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          },
+          "x": {
+            "description": "X coordinate in viewport CSS pixels",
+            "type": "number"
+          },
+          "y": {
+            "description": "Y coordinate in viewport CSS pixels",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "double_click_at"
+    },
+    {
+      "description": "Drag from one viewport coordinate to another using CDP trusted events. Produces mousePressed at start, N intermediate mouseMoved events, then mouseReleased at end. Essential for canvas drawing tools, sliders, and map interactions where DOM drag events are ignored. Supports modifier keys for constrained drawing (shift+drag). Coordinates are CSS pixels relative to the browser viewport. Related: drag_drop (DOM element-to-element drag using selectors), drag_variable_speed (human-like variable-speed drag for CAPTCHAs), click_at (simple click at coordinates), click_and_hold (press and hold without moving). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "alt": {
+            "description": "Hold Alt key during drag",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "ctrl": {
+            "description": "Hold Ctrl key during drag",
+            "type": "boolean"
+          },
+          "endX": {
+            "description": "End X coordinate in viewport CSS pixels",
+            "type": "number"
+          },
+          "endY": {
+            "description": "End Y coordinate in viewport CSS pixels",
+            "type": "number"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "shift": {
+            "description": "Hold Shift key during drag (for constrained movement)",
+            "type": "boolean"
+          },
+          "startX": {
+            "description": "Start X coordinate in viewport CSS pixels",
+            "type": "number"
+          },
+          "startY": {
+            "description": "Start Y coordinate in viewport CSS pixels",
+            "type": "number"
+          },
+          "stepDelayMs": {
+            "description": "Delay in ms between each mouseMoved step (default 20)",
+            "type": "number"
+          },
+          "steps": {
+            "description": "Number of intermediate mouseMoved events (default 10, increase for smoother drag)",
+            "type": "number"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "startX",
+          "startY",
+          "endX",
+          "endY",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "drag"
+    },
+    {
+      "description": "Drag and drop one DOM element onto another using element references. Tries three methods in order: HTML5 DragEvent (dragstart/drop), PointerEvent sequence (for react-beautiful-dnd and similar libraries), and MouseEvent sequence (basic fallback). Use for Kanban card reordering, sortable lists, file drag targets, or any drag-and-drop interaction between two identifiable DOM elements. Returns which method succeeded. For canvas/coordinate-based drag, use the drag tool instead. Related: drag (coordinate-based drag for canvas/map), drop_file (drop files onto upload zones), get_dom_snapshot (find source and target element refs). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "holdMs": {
+            "description": "Milliseconds to hold before starting drag motion (default 150, increase for libraries that need longer press)",
+            "type": "number"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "sourceSelector": {
+            "description": "CSS selector or element reference (e.g., \"e5\", \"#card-1\") for the element to drag",
+            "type": "string"
+          },
+          "stepDelayMs": {
+            "description": "Delay in ms between each move step (default 20)",
+            "type": "number"
+          },
+          "steps": {
+            "description": "Number of intermediate move events during drag (default 10)",
+            "type": "number"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "targetSelector": {
+            "description": "CSS selector or element reference (e.g., \"e12\", \"#column-2\") for the drop target element",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceSelector",
+          "targetSelector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "drag_drop"
+    },
+    {
+      "description": "Drag from one viewport coordinate to another at variable speed using an ease-in-out timing curve. Produces mousePressed at start, N intermediate mouseMoved events with varying delays (slow-fast-slow), then mouseReleased at end. The speed curve mimics human drag behavior: slow acceleration at start, peak speed in the middle, slow deceleration at end. Essential for slider CAPTCHAs and puzzle CAPTCHAs where constant-speed drag is detected as bot behavior. For uniform-speed drag (canvas drawing, map panning), use the regular drag tool instead. Related: drag (uniform-speed drag for canvas/maps), drag_drop (DOM element-to-element drag). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "endX": {
+            "description": "End X coordinate in viewport CSS pixels (target/gap position)",
+            "type": "number"
+          },
+          "endY": {
+            "description": "End Y coordinate in viewport CSS pixels (usually same as startY for horizontal slider)",
+            "type": "number"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "maxDelayMs": {
+            "description": "Maximum delay in ms between steps at start/end (default 40, edges of drag)",
+            "type": "number"
+          },
+          "minDelayMs": {
+            "description": "Minimum delay in ms between steps at peak speed (default 5, center of drag)",
+            "type": "number"
+          },
+          "startX": {
+            "description": "Start X coordinate in viewport CSS pixels (slider thumb position)",
+            "type": "number"
+          },
+          "startY": {
+            "description": "Start Y coordinate in viewport CSS pixels (slider thumb position)",
+            "type": "number"
+          },
+          "steps": {
+            "description": "Number of intermediate mouseMoved events (default 20, more = smoother curve)",
+            "type": "number"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "startX",
+          "startY",
+          "endX",
+          "endY",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "drag_variable_speed"
+    },
+    {
+      "description": "Simulate dropping a file onto a dropzone element. Creates a synthetic File with the given name, content, and MIME type, then dispatches HTML5 DragEvent sequence (dragenter, dragover, drop) on the target element. Use for file upload dropzones (Dropzone.js, react-dropzone, native HTML5 drop handlers). For drag-and-drop of DOM elements (not files), use drag_drop instead. Related: drag_drop (drag DOM elements between containers), get_dom_snapshot (find dropzone selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "fileContent": {
+            "description": "Text content of the file (for text-based files)",
+            "type": "string"
+          },
+          "fileName": {
+            "description": "Name of the synthetic file to drop (e.g., \"photo.jpg\", \"document.pdf\")",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "mimeType": {
+            "description": "MIME type of the file (e.g., \"text/plain\", \"image/png\", \"application/pdf\")",
+            "type": "string"
+          },
+          "selector": {
+            "description": "CSS selector for the dropzone element (the area where files are dropped)",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "drop_file"
+    },
+    {
+      "description": "[REMOVED in v0.9.0] This tool was removed in fsb-mcp-server v0.9.0 (FSB v0.9.62 implicit visual-session contract). Calling it returns the typed TOOL_REMOVED error with a migration recipe pointer. The visual session now clears either automatically after 60 seconds of silence (sliding window) or immediately when an action tool is called with is_final: true -- there is no longer a separate end call. See CHANGELOG.md#v0.9.0 and the Visual Session Lifecycle section of mcp/README.md for the migration recipe.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "description": "Optional end reason for analytics/debugging.",
+            "enum": [
+              "cancelled",
+              "ended"
+            ],
+            "type": "string"
+          },
+          "session_token": {
+            "description": "Session token returned by start_visual_session.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_token"
+        ],
+        "type": "object"
+      },
+      "name": "end_visual_session"
+    },
+    {
+      "description": "Run JavaScript directly in the active page. PRIMARY INTERACTION TOOL: try execute_js FIRST for clicks, scrolls, reads, attribute lookups, and most other DOM work -- it bypasses overlay/obscured-element issues, viewport constraints, and CDP timeouts that block native click/scroll. Typical patterns: `return document.querySelector('#add-to-cart-button').click(), true;` for clicks; `return Array.from(document.querySelectorAll('a')).map(a=>a.href);` for extraction; `window.scrollTo(0, document.body.scrollHeight); return true;` for scroll. After a JS click, verify with read_page or get_page_snapshot (a true click should produce observable DOM change). FALLBACK TO NATIVE TOOLS WHEN: (1) JS click reports success but the page state did not change (framework swallowed the synthetic event -- use native click which fires real CDP events that React/Angular/Vue listen to); (2) typing into controlled text inputs (use native `type` so React onChange fires correctly -- `element.value = ...` will NOT update component state); (3) real drag operations on react-beautiful-dnd / Sortable.js / Trello-style widgets (use drag_drop / drag for real pointer events); (4) form submission that depends on validated input state (use native click on submit). Code runs as a function body -- use `return` to send values back (results are stringified). Async work: Promises are not awaited, so fire-and-forget then poll on `window.__yourKey`. Related: read_page (verify result), get_dom_snapshot (debug after JS click), click / type / drag_drop (fallbacks when JS doesn't take effect). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "code": {
+            "description": "JavaScript code to execute in the page (use `return` to send a value back, e.g., \"return document.title;\" or \"document.querySelector('button').click()\")",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "execute_js"
+    },
+    {
+      "description": "Signal that the task cannot be completed. Include the reason why, but never include passwords, tokens, API keys, or sensitive form values. Call this instead of just stopping when you encounter an unrecoverable problem. Provide tab_id when more than one tab/session could be active. Provide session_token only when ending a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-failure semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "description": "Why the task cannot be completed (e.g. \"Page requires login\", \"Data not found on page\")",
+            "type": "string"
+          },
+          "session_token": {
+            "description": "Optional token returned by start_visual_session. Provide this only when failing a client-owned visual session.",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional target tab id used to associate this outcome with the correct local MCP replay session.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "name": "fail_task"
+    },
+    {
+      "description": "Auto-fill login form on the active tab with a saved credential. The password is resolved inside the extension and injected directly into the page -- it never crosses the WebSocket bridge. The domain parameter is accepted for backward compatibility but the actual lookup domain is derived from the tab URL for security. Requires the credential vault to be unlocked. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "description": "Hint for which credential to fill. Ignored for security -- the actual domain is derived from the resolved tab URL. Kept for backward compatibility.",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple.",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "fill_credential"
+    },
+    {
+      "description": "Fill cells in a spreadsheet starting from a given cell with CSV data. Returns fill confirmation. When to use: for bulk data entry into Google Sheets. Related: read_sheet (read existing data before filling), navigate (go to the spreadsheet first). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "csvData": {
+            "description": "CSV data with \\n for row breaks",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "sheetName": {
+            "description": "Optional sheet name to set",
+            "type": "string"
+          },
+          "startCell": {
+            "description": "Starting cell reference (e.g., \"A1\", \"B5\", \"D10\")",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "startCell",
+          "csvData",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "fill_sheet"
+    },
+    {
+      "description": "Move keyboard focus to an element. Returns focus confirmation. When to use: to prepare an element for keyboard input, or to bring an element into the accessibility focus ring. Related: type_text (type into a focused input), press_key (send keystrokes to focused element), click (also focuses the clicked element). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference to focus",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "focus"
+    },
+    {
+      "description": "Get an HTML attribute value from an element. Returns the attribute value. When to use: to read href, src, value, data attributes, or ARIA properties from an element. Related: get_text (read element text content), get_dom_snapshot (find element selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "attribute": {
+            "description": "HTML attribute name (e.g., 'href', 'src', 'value')",
+            "type": "string"
+          },
+          "selector": {
+            "description": "CSS selector or element ref (e.g., \"#link\", \"a.nav-item\", or \"e7\" from get_dom_snapshot)",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this read targets. Omit when the calling agent owns exactly one tab; required to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "selector",
+          "attribute"
+        ],
+        "type": "object"
+      },
+      "name": "get_attribute"
+    },
+    {
+      "description": "Get a structured DOM snapshot with element references (e.g., e1, e2, e3). When to use: BEFORE any interaction tool (click, type_text, etc.) to find the right selector or element ref. Returns elements with tag, text, attributes, and position data. Element refs like 'e5' can be passed directly to click, type_text, hover, and other tools. Related: read_page (quick text content), click/type_text/hover (use refs from this snapshot). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "maxElements": {
+            "description": "Maximum elements to include (default: 2000)",
+            "type": "number"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this read targets. Omit when the calling agent owns exactly one tab; required to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_dom_snapshot"
+    },
+    {
+      "description": "Get recent automation logs or logs for a specific session. Includes error/warning summary report. Use to debug issues or understand what FSB has been doing.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "Number of recent logs to return (default: 50, max: 200). Ignored when sessionId is provided.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sessionId": {
+            "description": "If provided, get logs only for this session. Otherwise get most recent logs.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_logs"
+    },
+    {
+      "description": "Get FSB memory system statistics including total count, type breakdown, and storage usage. Use to understand how much FSB has learned from past sessions.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "get_memory_stats"
+    },
+    {
+      "description": "Get a markdown snapshot of the current page DOM. Returns interactive elements with ref IDs for targeting. When to use: BEFORE any click/type/interaction to see current page state. Call this at the start of each new page or when you need to find elements. Related: read_page (plain text content), get_text (single element text). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "tab_id": {
+            "description": "Optional. Tab id this read targets. Omit when the calling agent owns exactly one tab; required to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_page_snapshot"
+    },
+    {
+      "description": "Get full detail for an automation session including logs, action history, and timing. Use after list_sessions to inspect what happened. For an in-flight session id (one that get_task_status reports as currentSessionId), returns a partial snapshot with `final: false` and the latest known action; the full payload becomes available once the session finishes. Returns structured JSON or human-readable text report. Related: list_sessions (find session IDs first), get_logs (get raw log entries), get_task_status (check if a session is still in flight).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "description": "Output format: json (structured, default) or text (human-readable report)",
+            "enum": [
+              "json",
+              "text"
+            ],
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "Session ID from list_sessions",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "type": "object"
+      },
+      "name": "get_session_detail"
+    },
+    {
+      "description": "Get the verified, structurally redacted replay manifest for a recorded session. Returns exact executable step structure, logical tab targets, risk classifications, and the manifest hash without returning signing receipts. Use this instead of reconstructing a replay from logs. Related: list_sessions (find a session), replay_session (request a consent-gated replay).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "sessionId": {
+            "description": "Session ID from list_sessions",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "type": "object"
+      },
+      "name": "get_session_replay"
+    },
+    {
+      "description": "Get site-specific automation guidance for a domain. Returns selectors, navigation patterns, and tips for automating the site. When to use: when starting work on a new site or when standard selectors fail. Related: get_page_snapshot (see current elements), get_dom_snapshot (raw DOM). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "description": "Domain name to get guide for (e.g. \"google.com\", \"github.com\")",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "type": "object"
+      },
+      "name": "get_site_guide"
+    },
+    {
+      "description": "Check whether a task is currently running and its progress. Use to poll status when not receiving progress notifications. Returns percent complete, current phase, and ETA. Related: run_task (the task being monitored), stop_task (cancel if needed). Agent-scoped: returns the calling agent's task status only.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "get_task_status"
+    },
+    {
+      "description": "Get the text content of a specific element. Returns the element's text. When to use: to read a specific element's text without reading the whole page. Related: read_page (read full page), get_attribute (read element attributes like href, src). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "selector": {
+            "description": "CSS selector or element ref (e.g., \"#price\", \".title\", or \"e3\" from get_dom_snapshot)",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this read targets. Omit when the calling agent owns exactly one tab; required to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "selector"
+        ],
+        "type": "object"
+      },
+      "name": "get_text"
+    },
+    {
+      "description": "Read the persisted status for one trigger by id. Returns storage-of-truth trigger state including status, watch mode, condition, target tab, owner, current value, timing, and attention details when available.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "tab_id": {
+            "description": "Optional. Tab id used to disambiguate scoped trigger access.",
+            "type": "number"
+          },
+          "trigger_id": {
+            "description": "Trigger id returned by trigger.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trigger_id"
+        ],
+        "type": "object"
+      },
+      "name": "get_trigger_status"
+    },
+    {
+      "description": "Navigate back one page in browser history. Returns the new URL. When to use: to return to the previous page after following a link or navigating away. Related: go_forward (undo a go_back), navigate (go to a specific URL instead). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "go_back"
+    },
+    {
+      "description": "Navigate forward one page in browser history. Returns the new URL. When to use: after using go_back, to move forward again. Related: go_back (go back in history), navigate (go to a specific URL instead). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "go_forward"
+    },
+    {
+      "description": "Move the mouse over an element. Returns hover confirmation. When to use: to reveal dropdown menus, tooltips, or hover-activated content before clicking. Related: click (click revealed menu item after hover), get_dom_snapshot (find element selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference to hover over",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "hover"
+    },
+    {
+      "description": "Insert text through CDP at the caret by default. Use position end to append or replace_all to replace an editable field; selector can identify that field. Canvas editors require focus first. Related: type_text, double_click_at, click_at. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "position": {
+            "description": "Insertion position; defaults to caret.",
+            "enum": [
+              "caret",
+              "end",
+              "replace_all"
+            ],
+            "type": "string"
+          },
+          "selector": {
+            "description": "Optional CSS selector identifying exactly one editable field.",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "text": {
+            "description": "Text to insert at current cursor position via CDP",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "insert_text"
+    },
+    {
+      "description": "Invoke a capability by slug (from a search_capabilities hit) with validated params. Verified T1/T1b capabilities execute the service's real web API in your authenticated session and return a structured result; guarded or catalog-tail hits return typed pending/fallback responses. Mutating ready capabilities perform real side effects -- check the side-effect class first. If it returns RECIPE_DOM_FALLBACK_PENDING, RECIPE_LEARN_PENDING, or RECIPE_EXPIRED, continue the same task with DOM tools.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "params": {
+            "additionalProperties": {},
+            "description": "Parameters matching the hit's params JSON-Schema",
+            "type": "object"
+          },
+          "slug": {
+            "description": "Capability slug from a search_capabilities hit",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional tab id; omit to use the active/owned tab",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "invoke_capability"
+    },
+    {
+      "description": "List saved credentials. Returns domain and username pairs only -- passwords are never included in the response. Use fill_credential to autofill a login form.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "list_credentials"
+    },
+    {
+      "description": "List saved payment methods. Returns card brand, last 4 digits, and cardholder name only -- full card numbers and CVV are never included. Use use_payment_method to fill a checkout form.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "list_payment_methods"
+    },
+    {
+      "description": "List all past FSB automation sessions with summary info (task, status, duration, action count, cost). Use to find session IDs for deeper inspection with get_session_detail. Related: get_session_detail (inspect a specific session), get_logs (get raw logs).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Max sessions to return (default: all, max 50)",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_sessions"
+    },
+    {
+      "description": "List all open browser tabs with title, URL, and active status. Returns array of tab objects. When to use: to see all open tabs before switching. Related: switch_tab (switch to a tab by ID), open_tab (open a new tab). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "list_tabs"
+    },
+    {
+      "description": "List persisted trigger snapshots. By default, returns active and attention-state watchers; include_terminal can include fired and stopped triggers for audit or cleanup workflows.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "include_terminal": {
+            "description": "Optional. When true, include terminal fired or stopped triggers in the listing.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Optional status filter.",
+            "enum": [
+              "armed",
+              "needs_attention",
+              "blocked",
+              "fired",
+              "timed_out",
+              "stopped"
+            ],
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Limit results to a target tab when supported by the background route.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_triggers"
+    },
+    {
+      "description": "Open a URL in the active browser tab. Returns the final URL after any redirects. When to use: as the first step to reach a target website. Related: read_page (read content after navigating), list_tabs (see what tabs are already open). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "url": {
+            "description": "URL to navigate to",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "navigate"
+    },
+    {
+      "description": "Open a new browser tab with the given URL. Returns the new tab ID. When to use: when you need to work on a different site without losing the current page. Related: switch_tab (switch between open tabs), list_tabs (see all open tabs), navigate (change URL in current tab instead). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Active behavior: defaults to background (active=false); pass active:true to steal focus. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "default": false,
+            "description": "When true, the new tab is foregrounded (steals focus). Multi-agent default is FALSE (background) so this agent does not steal focus from the user or another agent. Set true ONLY when the new tab needs immediate user visibility.",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "url": {
+            "description": "URL to open in new tab",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "open_tab"
+    },
+    {
+      "description": "Signal that the task is partially complete because useful work was completed but an external blocker prevents the final step. Use this instead of fail_task when the user can still benefit from the completed work, especially for auth/manual handoff blockers after research, drafting, or data entry is already done. Auth/manual blockers include login required, no saved credentials, user skipped login, credentials failed, and manual approval, MFA, or external verification. Preserve three things clearly: what you completed, the exact blocker, and the manual next step the user should take, but never include passwords, tokens, API keys, or sensitive form values. If the runtime offers one saved-credential or operator-prompt attempt, let that single attempt happen first; call partial_task only after that attempt is unavailable, skipped, exhausted, or fails. Provide tab_id when more than one tab/session could be active. Provide session_token only when finalizing a client-owned visual session created by start_visual_session. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "blocker": {
+            "description": "What prevented the final step from being completed (e.g. \"Messaging requires login\", \"Manual approval required\")",
+            "type": "string"
+          },
+          "next_step": {
+            "description": "Manual next step the user can take to finish manually or resume later. Include this for auth or approval blockers.",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Optional machine-readable blocker category. Keep it narrow and stable for blocked/manual-handoff outcomes.",
+            "enum": [
+              "blocked",
+              "auth_required",
+              "credentials_missing",
+              "user_skipped_login",
+              "credentials_failed",
+              "manual_approval"
+            ],
+            "type": "string"
+          },
+          "session_token": {
+            "description": "Optional token returned by start_visual_session. Provide this only when finalizing a client-owned visual session.",
+            "type": "string"
+          },
+          "summary": {
+            "description": "Summary of the useful work that was completed before the blocker was hit",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional target tab id used to associate this outcome with the correct local MCP replay session.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "summary",
+          "blocker"
+        ],
+        "type": "object"
+      },
+      "name": "partial_task"
+    },
+    {
+      "description": "Press the Enter key to submit a form or confirm input. When to use: after typing into a search box or form field. Automatically falls back to clicking the submit button if Enter has no effect. Returns key press confirmation. Related: type_text (type before pressing Enter), click (click submit button directly). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "Optional CSS selector or element reference to press Enter on",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "press_enter"
+    },
+    {
+      "description": "Press a keyboard key with optional modifiers (ctrl, shift, alt). Returns key press confirmation. When to use: for keyboard shortcuts (Ctrl+C, Ctrl+V), special keys (Escape, Tab, ArrowDown), or key combinations. Related: press_enter (dedicated Enter key tool), type_text (type full strings), focus (focus element before sending keys). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "alt": {
+            "description": "Hold Alt",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "ctrl": {
+            "description": "Hold Ctrl",
+            "type": "boolean"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Key to press (e.g., 'Escape', 'Tab', 'ArrowDown')",
+            "type": "string"
+          },
+          "shift": {
+            "description": "Hold Shift",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "press_key"
+    },
+    {
+      "description": "Read the text content of the current page. When to use: as the FIRST step after navigating to understand what is on the page. Automatically waits for DOM stability on JS-heavy sites. Returns main content prioritized over sidebars/nav/footer, capped at ~8K chars. Related: get_dom_snapshot (get structured element data with selectors for interaction), navigate (go to a page first), scroll (scroll to load more content before reading). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "full": {
+            "description": "If true, read entire page; if false (default), read visible viewport only",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this read targets. Omit when the calling agent owns exactly one tab; required to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "name": "read_page"
+    },
+    {
+      "description": "Read cell values from a spreadsheet range. Returns cell values as array. When to use: to extract tabular data from a spreadsheet. Related: fill_sheet (write data), navigate (go to the spreadsheet first). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "range": {
+            "description": "Cell range to read (e.g., 'A1:C5')",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this read targets. Omit when the calling agent owns exactly one tab; required to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "range"
+        ],
+        "type": "object"
+      },
+      "name": "read_sheet"
+    },
+    {
+      "description": "Reload the current page. Returns the refreshed URL. When to use: when page content may be stale, after errors, or to reset page state. Related: navigate (go to a different URL), wait_for_stable (wait for page to settle after refresh). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "refresh"
+    },
+    {
+      "description": "Request replay of a recorded session. FSB verifies the signed manifest and shows one approval card in the extension side panel; browser execution starts automatically only after the user approves that exact manifest hash. FSB creates the recorded tabs itself, so never ask the user to open target pages manually. Related: get_session_replay (inspect first), list_sessions (find a session).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "sessionId": {
+            "description": "Session ID from list_sessions",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "type": "object"
+      },
+      "name": "replay_session"
+    },
+    {
+      "description": "Open context menu on an element. Returns context menu confirmation. When to use: to access right-click context menu options on an element. Related: click (standard left-click), get_dom_snapshot (find element selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference to right-click",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "right_click"
+    },
+    {
+      "description": "IMPORTANT: Only use this tool if the user explicitly requests autopilot, asks to \"run a task\", or says \"let FSB handle it\". For all other browser tasks, use the manual tools (navigate, read_page, get_dom_snapshot, click, type_text, execute_js, etc.) to accomplish the task step by step -- they are more reliable and give you full control. This tool hands control to FSB's built-in AI which decides the steps autonomously. Returns a completion summary with success status and action log. Multi-agent contract: agent_id is FSB-issued and required (the server captures it via agent:register on first tool call -- callers do not provide it). The concurrency cap is configurable (default 8, range 1-64); the (N+1)th agent claim is rejected with AGENT_CAP_REACHED { cap, active }. Ownership enforcement: cross-agent calls reject with TAB_NOT_OWNED; incognito tabs reject with TAB_INCOGNITO_NOT_SUPPORTED; cross-window tabs reject with TAB_OUT_OF_SCOPE.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "description": "Natural language description of the task to perform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "type": "object"
+      },
+      "name": "run_task"
+    },
+    {
+      "description": "Scroll the page up or down by a specified amount. Returns new scroll position. When to use: to bring off-screen content into view, load lazy-loaded content, or navigate long pages. Related: scroll_to_top, scroll_to_bottom (quick jumps), read_page (read content after scrolling). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "description": "Scroll amount in pixels (default: one viewport)",
+            "type": "number"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "direction": {
+            "description": "Scroll direction",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "direction",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "scroll"
+    },
+    {
+      "description": "Scroll (mouse wheel) at specific viewport coordinates using CDP trusted events. Negative deltaY = zoom in / scroll up, positive deltaY = zoom out / scroll down. Each call dispatches one wheel tick; call multiple times for more zoom. Coordinates are CSS pixels relative to the browser viewport. When to use: for map zoom (Google Maps, Leaflet), canvas zoom, or any element where page-level scrolling does not trigger the desired zoom/scroll behavior. Related: scroll (page-level scroll up/down), scroll_to_top/scroll_to_bottom (quick page jumps). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "deltaX": {
+            "description": "Horizontal scroll delta (usually 0)",
+            "type": "number"
+          },
+          "deltaY": {
+            "description": "Vertical scroll delta (-120 = one tick zoom in, 120 = one tick zoom out)",
+            "type": "number"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          },
+          "x": {
+            "description": "X coordinate in viewport CSS pixels (center of zoom target)",
+            "type": "number"
+          },
+          "y": {
+            "description": "Y coordinate in viewport CSS pixels (center of zoom target)",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "scroll_at"
+    },
+    {
+      "description": "Scroll to the bottom of the page. Returns confirmation. When to use: to reach the end of the page, load lazy content, or trigger infinite scroll. Related: scroll_to_top (jump to beginning), scroll (scroll by specific amount), read_page (read content after scrolling). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "scroll_to_bottom"
+    },
+    {
+      "description": "Scroll a specific element into the visible viewport. Returns confirmation with element position. When to use: when you need to bring a particular element into view before interacting with it, especially on long pages where the element is off-screen. Related: scroll (scroll by pixel amount), click (interact after scrolling into view), get_dom_snapshot (find element selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference to scroll into view",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "scroll_to_element"
+    },
+    {
+      "description": "Scroll to the top of the page. Returns confirmation. When to use: to return to the beginning of the page or reset scroll position. Related: scroll_to_bottom (jump to end), scroll (scroll by specific amount), read_page (read content after scrolling). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "scroll_to_top"
+    },
+    {
+      "description": "Search for content on the current site or web. When to use: to find content on the current site or web. Automatically detects the site's search input (Amazon, YouTube, GitHub, etc.) via DOM heuristics -- only falls back to Google when no site search exists. Returns search results status. Related: read_page (read search results after searching), click (click a specific search result). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "query": {
+            "description": "Search query text",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "search"
+    },
+    {
+      "description": "Search the FSB capability catalog by intent. Use before DOM tools for first-party actions on the current site. Returns up to topN ranked capabilities with slug, service, side-effect class (read/mutate/destructive), readiness status, description, and params JSON-Schema (schema-on-hit). Results are biased toward the resolved tab origin; only t1-ready hits are direct API executable.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "origin": {
+            "description": "Optional expected-origin hint (e.g. \"https://github.com\"). For agent-scoped calls, omit to use the resolved owned tab origin; if supplied, it must match that tab origin. Legacy callers may still use it as an origin override.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Natural-language intent, e.g. \"show my github notifications\"",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional tab id; omit to use the active/owned tab",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "topN": {
+            "description": "Max results (default 5, max 5)",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "search_capabilities"
+    },
+    {
+      "description": "Search FSB's memory system for relevant past experiences. Returns memories ranked by relevance with keyword matching and recency scoring. Use to find what FSB learned from previous tasks on similar sites or domains. When to use: before automating a site to check if FSB has learned relevant patterns from past sessions. Related: get_memory_stats (check memory size), list_sessions (find specific sessions).",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "description": "Filter by domain (e.g., \"amazon.com\")",
+            "type": "string"
+          },
+          "query": {
+            "description": "Natural language search query",
+            "type": "string"
+          },
+          "topN": {
+            "description": "Max results to return (default: 5)",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "type": {
+            "description": "Filter by memory type",
+            "enum": [
+              "task",
+              "episodic",
+              "semantic",
+              "procedural"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "search_memory"
+    },
+    {
+      "description": "Select an option from a NATIVE <select> dropdown by value or visible text. NATIVE-ONLY: this tool only works on real <select> elements -- it has no effect on custom (div-based) dropdowns like react-select, Material-UI Select, Headless UI Listbox, or any non-<select> picker. For CUSTOM DROPDOWNS, use the two-click pattern instead: (1) `click` the dropdown control to open the listbox, (2) `click` the desired option element. Example: react-select on react-select.com -- `click e5` to open, then `click e23` on the \"Green\" option. If `select_option` returns no error but the dropdown value does not change, you are on a custom dropdown -- switch to the two-click pattern. Returns the selected value. Related: get_dom_snapshot (find select element selectors), click (the correct tool for custom non-native dropdowns). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element ref for the <select> dropdown (e.g., \"#country\", \"select[name=size]\", or \"e8\")",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "value": {
+            "description": "Option value attribute or visible text (e.g., \"US\", \"Large\", \"Option 3\")",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "value",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "select_option"
+    },
+    {
+      "description": "Select a specific substring within a DOM element by character offsets. Uses the Range API to highlight text from startOffset to endOffset within the element's text content. Essential for precise text selection like highlighting a specific sentence in a paragraph. Returns the selected text for verification. For selecting an entire element's text, use double-click instead. Related: double_click (select entire word/element text), get_text (read element text to determine offsets), get_dom_snapshot (find container selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "endOffset": {
+            "description": "Character offset where selection ends (exclusive, like string.substring)",
+            "type": "number"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element reference for the container element (e.g., \"#mw-content-text p:nth-of-type(3)\" for third paragraph)",
+            "type": "string"
+          },
+          "startOffset": {
+            "description": "Character offset where selection starts (0-based, counting from start of element text content)",
+            "type": "number"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "startOffset",
+          "endOffset",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "select_text_range"
+    },
+    {
+      "description": "Set an HTML attribute value on an element. Returns confirmation. When to use: to modify element attributes for form manipulation, changing hidden field values, toggling ARIA states, or setting data attributes. Related: get_attribute (read attribute value first), get_dom_snapshot (find element selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "attribute": {
+            "description": "HTML attribute name to set",
+            "type": "string"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element ref for the target element",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "value": {
+            "description": "Value to set the attribute to",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "attribute",
+          "value",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "set_attribute"
+    },
+    {
+      "description": "[REMOVED in v0.9.0] This tool was removed in fsb-mcp-server v0.9.0 (FSB v0.9.62 implicit visual-session contract). Calling it returns the typed TOOL_REMOVED error with a migration recipe pointer. The visual session is now implicit on every action tool call via the required visual_reason + client field bundle -- there is no longer a separate start call. See CHANGELOG.md#v0.9.0 and the Visual Session Lifecycle section of mcp/README.md for the migration recipe.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Trusted MCP client label, for example Codex, ChatGPT, Claude, or Gemini. Must be on the approved allowlist.",
+            "type": "string"
+          },
+          "detail": {
+            "description": "Optional initial detail line for the overlay, such as \"Preparing checkout flow\".",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id the visual session attaches to. Omit when this agent owns exactly one tab; required to disambiguate when this agent owns multiple. Legacy popup/sidepanel/autopilot do not need to pass this.",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "task": {
+            "description": "Short task title shown in the visible automation surface.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client",
+          "task"
+        ],
+        "type": "object"
+      },
+      "name": "start_visual_session"
+    },
+    {
+      "description": "Cancel the currently running automation task. Returns confirmation of cancellation. When to use: when run_task is taking too long, heading in the wrong direction, or you need to regain manual control. Related: get_task_status (check progress before deciding to stop), run_task (the task being cancelled). Agent-scoped: only the calling agent's task is cancelled; cross-agent calls reject with TAB_NOT_OWNED.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {},
+        "type": "object"
+      },
+      "name": "stop_task"
+    },
+    {
+      "description": "Cancel a trigger by id. This is cancellation-critical and bypass-class: it must be callable promptly even if a trigger or another mutation is pending. Missing or already terminal triggers are handled idempotently by the background trigger runtime.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "tab_id": {
+            "description": "Optional. Tab id associated with the trigger when needed for scoped cleanup.",
+            "type": "number"
+          },
+          "trigger_id": {
+            "description": "Trigger id returned by trigger.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trigger_id"
+        ],
+        "type": "object"
+      },
+      "name": "stop_trigger"
+    },
+    {
+      "description": "Select an agent-owned browser tab by tab ID without changing the foreground tab by default. Returns confirmation with the selected tab info. When to use: to move between tabs for multi-tab workflows while keeping the user foreground undisturbed. Pass active:true only when the user explicitly wants this tab foregrounded. Related: list_tabs (get available tab IDs first), open_tab (open a new tab). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "default": false,
+            "description": "When true, foreground this tab. Default false selects the tab for this agent without stealing focus.",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "tabId": {
+            "description": "Tab ID to select (get IDs from list_tabs tool)",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tabId",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "switch_tab"
+    },
+    {
+      "description": "Arm a reactive DOM trigger on one selector. Use this when the user wants to watch an element until it changes, crosses a threshold, equals or matches a value, or contains text. The watch is owned by the background trigger runtime and persisted across service-worker eviction. Pass one selector and one condition object; runtime validation checks the nested condition details before arming. Use stop_trigger to cancel, get_trigger_status to inspect one watcher, and list_triggers to enumerate watchers.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "attrName": {
+            "description": "Optional alias for attribute when content-side trigger readers use attrName.",
+            "type": "string"
+          },
+          "attribute": {
+            "description": "Optional attribute name when extract is attribute.",
+            "type": "string"
+          },
+          "condition": {
+            "description": "Trigger condition object validated by the trigger manager. Supported kinds include changed, threshold, delta_percent, equals, contains, regex, and compound AND/OR conditions."
+          },
+          "decimal_separator": {
+            "description": "Optional decimal separator override for numeric parsing.",
+            "type": "string"
+          },
+          "detached": {
+            "description": "When true, arm and return trigger_id immediately instead of blocking.",
+            "type": "boolean"
+          },
+          "extract": {
+            "description": "Optional value extraction mode. Defaults are selected by the trigger runtime from the condition.",
+            "enum": [
+              "text",
+              "number",
+              "attribute"
+            ],
+            "type": "string"
+          },
+          "locale": {
+            "description": "Optional locale hint for numeric parsing, such as en-US or de-DE.",
+            "type": "string"
+          },
+          "poll_interval_ms": {
+            "description": "Optional refresh-poll interval in milliseconds. The background runtime enforces its minimum floor.",
+            "type": "number"
+          },
+          "rearm_on_fire": {
+            "description": "When true, keep watching after a fire and expose fire_count/last_event through status.",
+            "type": "boolean"
+          },
+          "safety_ceiling_ms": {
+            "description": "Maximum blocking wait before auto-detach. Default/max 240000.",
+            "type": "number"
+          },
+          "selector": {
+            "description": "CSS selector or stable element selector to watch.",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id to arm the trigger against. Alias of target_tab_id for callers that use ordinary tool tab targeting.",
+            "type": "number"
+          },
+          "target_tab_id": {
+            "description": "Optional. Explicit target tab id for the watched page.",
+            "type": "number"
+          },
+          "timeout_ms": {
+            "description": "Blocking wait timeout in ms. Default 120000. Timeout returns timed_out.",
+            "type": "number"
+          },
+          "trigger_id": {
+            "description": "Optional caller-supplied trigger correlation id. MCP callers may omit it; the server generates one before arming.",
+            "type": "string"
+          },
+          "watch": {
+            "description": "Optional watch mechanism. live-observe uses in-page mutation observation; refresh-poll periodically reloads the trigger-owned tab and reads the selector.",
+            "enum": [
+              "live-observe",
+              "refresh-poll"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector"
+        ],
+        "type": "object"
+      },
+      "name": "trigger"
+    },
+    {
+      "description": "Type text into an editable field by selector. Normal fields replace existing text by default; set clear_first to false to append. Google Docs inserts at the cursor by default; explicitly set clear_first to true to replace the document. Returns the rendered text after insertion. Related: clear_input, press_enter, get_dom_snapshot. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "clear_first": {
+            "description": "Replace existing text (default true for normal fields, false for Google Docs document editing). False appends to normal fields or inserts at the Docs cursor.",
+            "type": "boolean"
+          },
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector or element ref for the input field (e.g., \"#email\", \"input[name=search]\", or \"e12\" from get_dom_snapshot)",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "text": {
+            "description": "Text to type into the field",
+            "type": "string"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "text",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "type_text"
+    },
+    {
+      "description": "Upload a real file from a local disk path to a file input on the page. Sets the file directly on the target <input type=\"file\"> via the browser DevTools protocol (DOM.setFileInputFiles), so it works for real binaries -- images, PDFs, documents -- that page JavaScript cannot upload. This is different from drop_file, which only fakes inline text content onto a dropzone; prefer upload_file whenever you know the file path on disk. Provide a CSS selector for the <input type=\"file\"> (or a container/dropzone that wraps a hidden one) and an ABSOLUTE file path. The browser reads the file and fires the input/change events natively. When to use: any web form upload where the file already exists on disk. For pure drag-only dropzones with no underlying file input, fall back to drop_file. Security: a sensitive-path denylist blocks secrets (~/.ssh, ~/.aws, .env, private keys, the FSB vault) and every upload is audit-logged. Related: drop_file (synthetic dropzone content), get_dom_snapshot (find the input[type=file] selector), read_page (verify the upload took). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise. RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "client": {
+            "description": "Allowlisted client label. Validated against the shared v0.9.36 server/extension allowlist (see mcp/src/tools/visual-session.ts -- MCP_VISUAL_CLIENT_LABELS). Required.",
+            "type": "string"
+          },
+          "file_path": {
+            "description": "Absolute path to the file on disk (e.g. \"/Users/me/Documents/resume.pdf\"). Relative or ~ paths are rejected; the file must be readable by the browser.",
+            "type": "string"
+          },
+          "is_final": {
+            "description": "When true, the visual session clears immediately after this tool resolves. Optional (default false).",
+            "type": "boolean"
+          },
+          "selector": {
+            "description": "CSS selector for the <input type=\"file\"> element, or a container/dropzone that holds a hidden one (e.g. \"#avatar\", \"input[type=file]\", \".dropzone\")",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.",
+            "type": "number"
+          },
+          "visual_reason": {
+            "description": "Short human-readable reason shown in the overlay (for example, \"Logging in to GitHub\"). Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "file_path",
+          "visual_reason",
+          "client"
+        ],
+        "type": "object"
+      },
+      "name": "upload_file"
+    },
+    {
+      "description": "Fill checkout form on the active tab with a saved payment method. Shows a confirmation prompt with card brand, last 4 digits, and merchant domain before any fill occurs. The fill domain is derived from the resolved tab URL inside the extension, not from this request. Requires both credential vault and payment access to be unlocked. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.",
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "properties": {
+          "payment_method_id": {
+            "description": "ID of the payment method to use (from list_payment_methods)",
+            "type": "string"
+          },
+          "tab_id": {
+            "description": "Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple.",
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "payment_method_id"
+        ],
+        "type": "object"
+      },
+      "name": "use_payment_method"
+    }
+  ]
+}

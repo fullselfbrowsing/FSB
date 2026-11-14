@@ -35,7 +35,7 @@ const compatibilityDirectory = resolve(
 const compatibilityPath = resolve(compatibilityDirectory, '39-06-REMAINING-APPS.md');
 const archivedPath = resolve(
   repositoryRoot,
-  '.planning/milestones/v1.0.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md',
+  '.planning/milestones/v0.13.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md',
 );
 const maximumGitOutput = 16 * 1024 * 1024;
 

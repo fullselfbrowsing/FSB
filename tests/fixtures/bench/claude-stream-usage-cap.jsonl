@@ -1,0 +1,4 @@
+{"type":"_fixture","note":"synthetic capped run; rate_limit_event shape per mcp/src/agent-providers/claude-stream.ts RateLimitSchema (passthrough); exact status strings are verified in the 66-10 smoke; no network"}
+{"type":"system","subtype":"init","session_id":"bench-cap-01","model":"claude-model-fixture","tools":["ToolSearch","mcp__fsb__open_tab"],"mcp_servers":[{"name":"fsb","status":"connected"}],"permissionMode":"dontAsk","apiKeySource":"none","plugins":[],"hooks":[]}
+{"type":"rate_limit_event","session_id":"bench-cap-01","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour"}}
+{"type":"result","subtype":"error_during_execution","session_id":"bench-cap-01","is_error":true,"duration_ms":2100,"duration_api_ms":900,"num_turns":1,"result":"CLAUDE_LIMIT_TEXT_5e0a: Claude usage limit reached","permission_denials":[]}

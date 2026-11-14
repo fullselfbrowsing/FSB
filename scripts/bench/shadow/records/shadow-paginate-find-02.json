@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-paginate-find-02",
+  "provenance": "hand",
+  "task": {
+    "id": "core-mixed-paginate-find",
+    "version": 1,
+    "fixtureSha256": "e314d37d60b8b1864be11a380e1b4b02286ea572e1f7f894430ab88531081230"
+  },
+  "step": 5,
+  "request": {
+    "v": 1,
+    "kinds": ["completion", "stuck", "risk"],
+    "goal": "Page through the catalog to find the 12 oz blue ceramic mug and add it to the cart.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/paginate-find/index.html",
+      "title": "Kitchen catalog - page 3 of 5",
+      "text": "Kitchen catalog\nPrevious\nPage 3 of 5\nNext\nGlass tumbler, 12 oz ITM-0421 $8.00 Add to cart\nCeramic butter dish ITM-0422 $18.00 Add to cart\nMarble mortar and pestle ITM-0423 $29.00 Add to cart\nWire whisk, 12 in ITM-0424 $10.00 Add to cart\nEnamel coffee pot ITM-0425 $36.00 Add to cart\nBlue stainless travel mug, 12 oz ITM-0426 $24.00 Add to cart\nLinen table runner ITM-0427 $27.00 Add to cart\nCeramic salt cellar ITM-0428 $12.00 Add to cart\nGlass mixing bowl set ITM-0429 $32.00 Add to cart\nBeech wood rolling pin ITM-0430 $15.00 Add to cart"
+    },
+    "elements": [
+      { "id": "e0", "role": "link", "label": "Previous", "ops": ["click"] },
+      { "id": "e1", "role": "link", "label": "Next", "ops": ["click"] },
+      { "id": "e2", "role": "button", "label": "Add to cart: Glass tumbler, 12 oz", "ops": ["click"] },
+      { "id": "e3", "role": "button", "label": "Add to cart: Ceramic butter dish", "ops": ["click"] },
+      { "id": "e4", "role": "button", "label": "Add to cart: Marble mortar and pestle", "ops": ["click"] },
+      { "id": "e5", "role": "button", "label": "Add to cart: Wire whisk, 12 in", "ops": ["click"] },
+      { "id": "e6", "role": "button", "label": "Add to cart: Enamel coffee pot", "ops": ["click"] },
+      { "id": "e7", "role": "button", "label": "Add to cart: Blue stainless travel mug, 12 oz", "ops": ["click"] },
+      { "id": "e8", "role": "button", "label": "Add to cart: Linen table runner", "ops": ["click"] },
+      { "id": "e9", "role": "button", "label": "Add to cart: Ceramic salt cellar", "ops": ["click"] },
+      { "id": "e10", "role": "button", "label": "Add to cart: Glass mixing bowl set", "ops": ["click"] },
+      { "id": "e11", "role": "button", "label": "Add to cart: Beech wood rolling pin", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "click", "targetId": null, "changed": true },
+      { "op": "click", "targetId": null, "changed": true },
+      { "op": "click", "targetId": "e1", "changed": false },
+      { "op": "click", "targetId": "e1", "changed": false },
+      { "op": "click", "targetId": "e1", "changed": false }
+    ],
+    "offeredOps": ["click", "scroll", "go_back"],
+    "proposedAction": { "op": "click", "targetId": "e1" }
+  },
+  "labels": {
+    "operation": null,
+    "target": null,
+    "completion": false,
+    "stuck": true,
+    "risk": false
+  },
+  "note": "Still on page 3 (its blue travel mug is stainless, a near-miss): the last three clicks on Next (e1) changed nothing, a stuck loop. Paging is not risky."
+}

@@ -20,8 +20,8 @@ function normalizeUsageSource(source) {
 }
 
 // Chart copy follows the control panel language when the locale helper is
-// loaded. The service worker loads this file too and has no helper, so the
-// English text is used there.
+// loaded, and stays English without it. The service worker loads this file
+// and the helper too, but never draws a chart.
 function analyticsLine(english, subs) {
   const locale = globalThis.fsbUiLocale;
   if (locale && typeof locale.line === 'function') return locale.line(english, subs);

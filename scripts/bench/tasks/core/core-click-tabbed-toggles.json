@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-click-tabbed-toggles",
+  "version": 1,
+  "set": "core",
+  "category": "click-heavy",
+  "startPath": "/fixtures/tabbed-toggles/index.html",
+  "instruction": "Open {startUrl}. Turn on Compact mode on the General tab, turn off Email mentions on the Notifications tab, turn on Hide online status on the Privacy tab, then press Save.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/tabbed-toggles/save", "count": 1, "jsonEquals": { "compactMode": true, "showAvatars": true, "reduceMotion": false, "emailMentions": false, "pushMentions": true, "weeklySummary": false, "hideOnlineStatus": true, "shareReadReceipts": true, "allowIndexing": false } },
+      { "kind": "request", "method": "POST", "path": "/api/tabbed-toggles/save", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/tabbed-toggles/index.html", "queryIncludes": { "view": "saved" } },
+      { "kind": "marker", "name": "changed-count", "equals": "3" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "tabbed-toggles/index.html"]
+}

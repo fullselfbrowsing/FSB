@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en" data-bench-app="accordion-drilldown">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin settings</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  h2, h3, h4 { margin: 0; font-size: inherit; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .acc-trigger { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; font: inherit; font-weight: 600; text-align: left; color: var(--ink); background: none; border: 0; border-radius: 6px; cursor: pointer; }
+  .acc-trigger:hover { background: #f3f6fc; }
+  .acc-trigger::before { content: "\25B8"; color: var(--muted); }
+  .acc-trigger[aria-expanded="true"]::before { content: "\25BE"; }
+  .level-1 > .acc-heading .acc-trigger { font-size: 1.1rem; }
+  .acc-panel { margin: 2px 0 6px 18px; padding-left: 10px; border-left: 2px solid var(--line); }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px 10px; margin: 4px 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; user-select: none; }
+  .switch-track { position: relative; flex: none; width: 40px; height: 22px; border-radius: 999px; background: #c3c8d2; }
+  .switch-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .switch-state { flex: none; width: 2rem; color: var(--muted); }
+  .switch-row .switch-text { flex: 1; }
+  .switch-row[aria-checked="true"] .switch-track { background: var(--accent); }
+  .switch-row[aria-checked="true"] .switch-thumb { left: 21px; }
+  .log h2 { font-size: 1.05rem; margin-bottom: 6px; }
+  .log ul { margin: 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Admin settings</h1>
+  <div class="panel">
+    <div class="acc-item level-1">
+      <h2 class="acc-heading"><button type="button" class="acc-trigger" id="acc-organization" aria-expanded="false" aria-controls="panel-organization">Organization</button></h2>
+      <div class="acc-panel" id="panel-organization" role="region" aria-labelledby="acc-organization" hidden>
+
+        <div class="acc-item level-2">
+          <h3 class="acc-heading"><button type="button" class="acc-trigger" id="acc-security" aria-expanded="false" aria-controls="panel-security">Security</button></h3>
+          <div class="acc-panel" id="panel-security" role="region" aria-labelledby="acc-security" hidden>
+
+            <div class="acc-item level-3">
+              <h4 class="acc-heading"><button type="button" class="acc-trigger" id="acc-sessions" aria-expanded="false" aria-controls="panel-sessions">Sessions</button></h4>
+              <div class="acc-panel" id="panel-sessions" role="region" aria-labelledby="acc-sessions" hidden>
+                <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Require re-authentication for exports" data-path="organization/security/sessions/reauth-exports">
+                  <span class="switch-text">Require re-authentication for exports</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span>
+                </div>
+                <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Require re-authentication for imports" data-path="organization/security/sessions/reauth-imports">
+                  <span class="switch-text">Require re-authentication for imports</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="acc-item level-3">
+              <h4 class="acc-heading"><button type="button" class="acc-trigger" id="acc-passwords" aria-expanded="false" aria-controls="panel-passwords">Passwords</button></h4>
+              <div class="acc-panel" id="panel-passwords" role="region" aria-labelledby="acc-passwords" hidden>
+                <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Block known breached passwords" data-path="organization/security/passwords/block-breached">
+                  <span class="switch-text">Block known breached passwords</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span>
+                </div>
+                <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Require at least 12 characters" data-path="organization/security/passwords/min-length-12">
+                  <span class="switch-text">Require at least 12 characters</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="acc-item level-3">
+              <h4 class="acc-heading"><button type="button" class="acc-trigger" id="acc-audit" aria-expanded="false" aria-controls="panel-audit">Audit</button></h4>
+              <div class="acc-panel" id="panel-audit" role="region" aria-labelledby="acc-audit" hidden>
+                <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Require re-authentication for exports (audit copy)" data-path="organization/security/audit/reauth-exports-audit-copy">
+                  <span class="switch-text">Require re-authentication for exports (audit copy)</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span>
+                </div>
+                <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Keep audit logs for one year" data-path="organization/security/audit/audit-retention">
+                  <span class="switch-text">Keep audit logs for one year</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="acc-item level-2">
+          <h3 class="acc-heading"><button type="button" class="acc-trigger" id="acc-billing" aria-expanded="false" aria-controls="panel-billing">Billing</button></h3>
+          <div class="acc-panel" id="panel-billing" role="region" aria-labelledby="acc-billing" hidden>
+            <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Email invoices to the billing contact" data-path="organization/billing/email-invoices">
+              <span class="switch-text">Email invoices to the billing contact</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span>
+            </div>
+            <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Require purchase order numbers" data-path="organization/billing/require-po">
+              <span class="switch-text">Require purchase order numbers</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="acc-item level-2">
+          <h3 class="acc-heading"><button type="button" class="acc-trigger" id="acc-members" aria-expanded="false" aria-controls="panel-members">Members</button></h3>
+          <div class="acc-panel" id="panel-members" role="region" aria-labelledby="acc-members" hidden>
+            <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Allow members to invite guests" data-path="organization/members/guest-invites">
+              <span class="switch-text">Allow members to invite guests</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span>
+            </div>
+            <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Require two-step verification" data-path="organization/members/require-2sv">
+              <span class="switch-text">Require two-step verification</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <p id="toggle-error" class="error" role="alert" hidden></p>
+  <section id="change-log" class="panel log" aria-labelledby="log-heading" hidden>
+    <h2 id="log-heading">Saved changes</h2>
+    <ul id="log-list"></ul>
+  </section>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const error = document.getElementById('toggle-error');
+    const logSection = document.getElementById('change-log');
+    const logList = document.getElementById('log-list');
+
+    for (const trigger of document.querySelectorAll('.acc-trigger')) {
+      const panel = document.getElementById(trigger.getAttribute('aria-controls'));
+      trigger.addEventListener('click', () => {
+        const expanded = trigger.getAttribute('aria-expanded') !== 'true';
+        trigger.setAttribute('aria-expanded', String(expanded));
+        panel.hidden = !expanded;
+      });
+    }
+
+    function showSwitch(row, on) {
+      row.setAttribute('aria-checked', String(on));
+      row.querySelector('.switch-state').textContent = on ? 'On' : 'Off';
+    }
+
+    // The change log holds one marker per toggle, named after its last path
+    // segment; the runner reads those markers after the timed window.
+    function recordChange(row, on) {
+      const name = row.dataset.path.split('/').pop();
+      let item = logList.querySelector(`li[data-toggle="${name}"]`);
+      if (!item) {
+        item = document.createElement('li');
+        item.dataset.toggle = name;
+        const label = document.createElement('span');
+        label.textContent = `${row.getAttribute('aria-label')}: `;
+        const output = document.createElement('output');
+        output.dataset.benchMarker = name;
+        item.append(label, output);
+        logList.append(item);
+      }
+      setMarker(name, on ? 'on' : 'off');
+      logSection.hidden = false;
+    }
+
+    for (const row of document.querySelectorAll('.switch-row')) {
+      let busy = false;
+      onActivate(row, async () => {
+        if (busy) return;
+        const on = row.getAttribute('aria-checked') !== 'true';
+        busy = true;
+        showSwitch(row, on);
+        error.hidden = true;
+        try {
+          await benchPost('toggle', { path: row.dataset.path, enabled: on });
+          setView({ view: 'updated' });
+          recordChange(row, on);
+        } catch {
+          showSwitch(row, !on);
+          error.textContent = 'The setting could not be saved. Try again.';
+          error.hidden = false;
+        } finally {
+          busy = false;
+        }
+      });
+    }
+  })();
+</script>
+</body>
+</html>

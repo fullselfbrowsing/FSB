@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-invoice-lookup-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-mixed-invoice-lookup",
+    "version": 1,
+    "fixtureSha256": "ffc7766698b42ff6ba8399ab9050a6d2aeef99016d8e83de24d2ac094ad4aab7"
+  },
+  "step": 1,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion", "stuck"],
+    "goal": "Find the unpaid invoice with the highest amount for customer Northwind Traders, enter its invoice ID in the review form, and submit it.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/invoice-lookup/index.html",
+      "title": "Invoices",
+      "text": "Invoices\nAll invoices\nInvoice Customer Amount Status\nINV-1003 Contoso Ltd $1,240.00 Paid\nINV-1007 Northwind Traders $860.50 Unpaid\nINV-1012 Fabrikam Inc $3,975.00 Unpaid\nINV-1016 Northwind Traders $4,310.00 Paid\nINV-1021 Tailspin Toys $512.25 Paid\nINV-1024 Contoso Ltd $2,780.00 Unpaid\nINV-1029 Northwind Traders $2,145.75 Unpaid\nINV-1033 Fabrikam Inc $690.00 Paid\nINV-1038 Northwind Traders $1,980.00 Unpaid\nINV-1041 Tailspin Toys $3,120.40 Unpaid\nINV-1045 Contoso Ltd $415.00 Unpaid\nINV-1052 Northwind Traders $2,990.00 Paid\nINV-1056 Fabrikam Inc $1,655.10 Paid\nReview form\nInvoice ID\nSubmit"
+    },
+    "elements": [
+      { "id": "e0", "role": "textbox", "label": "Invoice ID", "ops": ["type_text", "click", "press_enter"] },
+      { "id": "e1", "role": "button", "label": "Submit", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "scroll", "targetId": null, "changed": true }
+    ],
+    "offeredOps": ["click", "type_text", "press_enter", "scroll"]
+  },
+  "labels": {
+    "operation": "type_text",
+    "target": "e0",
+    "completion": false,
+    "stuck": false,
+    "risk": null
+  },
+  "note": "The table has been read (INV-1029 is the highest unpaid Northwind invoice; INV-1016 and INV-1052 are paid). Typing the ID into Invoice ID (e0) is next."
+}

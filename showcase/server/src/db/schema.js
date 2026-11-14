@@ -341,6 +341,55 @@ function initializeDatabase(db) {
     );
   `);
 
+  // Phase 67 / JEV-04, JEV-07 (D-24) -- Jev gateway accounting. Additive only;
+  // src/jev/ledger.js writes both tables and src/telemetry/housekeeper.js prunes them.
+  db.exec(`
+    -- jev_decisions: per-decision Jev accounting; body-free (no goal, URL, origin, title, text, label, element id, hash key or IP); 7-day retention.
+    -- One row per upstream attempt only (Pitfall 13). input_tokens and cost_usd are NULL when unknown,
+    -- never 0, and carry their source (D-23). served_model is stored verbatim from the upstream response.
+    -- kinds holds sorted CONTRACT.KINDS members joined with ','. hash_key_present is 0/1 only (D-07).
+    CREATE TABLE IF NOT EXISTS jev_decisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      decision_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      day_utc TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      served_model TEXT,
+      instrument_version TEXT,
+      calibration_status TEXT,
+      kinds TEXT NOT NULL,
+      element_count INTEGER NOT NULL,
+      request_bytes INTEGER NOT NULL,
+      input_tokens INTEGER,
+      usage_source TEXT NOT NULL,
+      cost_usd REAL,
+      cost_source TEXT NOT NULL,
+      upstream_latency_ms INTEGER,
+      gateway_latency_ms INTEGER NOT NULL,
+      upstream_status INTEGER,
+      hash_key_present INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_jev_decisions_created_at ON jev_decisions(created_at);
+
+    -- jev_daily: per UTC day and outcome; 365-day retention.
+    -- At most 18 rows per day ('ok' plus the 17 gateway reasons). cap_accrued_usd is the fleet-wide
+    -- spend-cap accumulator (D-06); it adds a conservative upper bound when cost is unknown (Pitfall 9),
+    -- so it is kept apart from the provider and estimate cost sums.
+    CREATE TABLE IF NOT EXISTS jev_daily (
+      day_utc TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      requests INTEGER NOT NULL DEFAULT 0,
+      input_tokens_known INTEGER NOT NULL DEFAULT 0,
+      input_tokens_unavailable INTEGER NOT NULL DEFAULT 0,
+      cost_provider_usd REAL NOT NULL DEFAULT 0,
+      cost_estimate_usd REAL NOT NULL DEFAULT 0,
+      cost_unavailable INTEGER NOT NULL DEFAULT 0,
+      cap_accrued_usd REAL NOT NULL DEFAULT 0,
+      UNIQUE(day_utc, outcome)
+    );
+  `);
+
   // Migration: add replay columns to existing databases
   try {
     db.exec(`ALTER TABLE agent_runs ADD COLUMN execution_mode TEXT DEFAULT 'ai_initial'`);

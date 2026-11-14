@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "note": "Shared Jev secret-scrubber corpus (Phase 67 D-19). Both showcase/server/src/jev/scrubber.js and its hand-mirror in extension/ai/jev-state.js must map every input to expected, be idempotent on expected, and report matchesSecret(input) === secret. Every value here is a synthetic fixture, not a real credential. Negative cases (secret false) keep expected === input.",
+  "cases": [
+    {
+      "name": "card-visa-spaces",
+      "input": "Card 4111 1111 1111 1111 on file",
+      "expected": "Card [REDACTED_CARD] on file",
+      "secret": true
+    },
+    {
+      "name": "card-mastercard-hyphens",
+      "input": "Pay with 5500-0000-0000-0004 today",
+      "expected": "Pay with [REDACTED_CARD] today",
+      "secret": true
+    },
+    {
+      "name": "card-13-digit",
+      "input": "Legacy card 4222222222222 expired",
+      "expected": "Legacy card [REDACTED_CARD] expired",
+      "secret": true
+    },
+    {
+      "name": "card-amex-grouped",
+      "input": "Amex 3782 822463 10005 is the backup",
+      "expected": "Amex [REDACTED_CARD] is the backup",
+      "secret": true
+    },
+    {
+      "name": "card-inside-cjk",
+      "input": "カード4111111111111111です",
+      "expected": "カード[REDACTED_CARD]です",
+      "secret": true
+    },
+    {
+      "name": "jwt",
+      "input": "token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmaXh0dXJlIn0.c2lnbmF0dXJlRklYVFVSRQ here",
+      "expected": "token [REDACTED_JWT] here",
+      "secret": true
+    },
+    {
+      "name": "key-sk",
+      "input": "OPENAI_KEY=sk-testfixture0000000000abcd",
+      "expected": "OPENAI_KEY=[REDACTED_API_KEY]",
+      "secret": true
+    },
+    {
+      "name": "key-sk-ant",
+      "input": "key sk-ant-test-fixture-0000000000 ok",
+      "expected": "key [REDACTED_API_KEY] ok",
+      "secret": true
+    },
+    {
+      "name": "key-ghp",
+      "input": "push with ghp_TestFixture0000000000000000 now",
+      "expected": "push with [REDACTED_API_KEY] now",
+      "secret": true
+    },
+    {
+      "name": "key-gho",
+      "input": "oauth gho_FixtureOnly00000000000000000",
+      "expected": "oauth [REDACTED_API_KEY]",
+      "secret": true
+    },
+    {
+      "name": "key-github-pat",
+      "input": "pat github_pat_TESTFIXTURE00000000000000 saved",
+      "expected": "pat [REDACTED_API_KEY] saved",
+      "secret": true
+    },
+    {
+      "name": "key-slack-xoxb",
+      "input": "slack xoxb-test-fixture-not-a-token end",
+      "expected": "slack [REDACTED_API_KEY] end",
+      "secret": true
+    },
+    {
+      "name": "key-aws-akia",
+      "input": "aws AKIAFIXTURE00000TEST key",
+      "expected": "aws [REDACTED_API_KEY] key",
+      "secret": true
+    },
+    {
+      "name": "key-google-aiza",
+      "input": "maps AIzaFixtureNotARealKey_0000000000000000 loaded",
+      "expected": "maps [REDACTED_API_KEY] loaded",
+      "secret": true
+    },
+    {
+      "name": "bearer-header",
+      "input": "Authorization: Bearer abc123.fixture-token",
+      "expected": "Authorization: Bearer [REDACTED_TOKEN]",
+      "secret": true
+    },
+    {
+      "name": "bearer-lowercase-normalized",
+      "input": "authorization: bearer FIXTUREtoken1234",
+      "expected": "authorization: Bearer [REDACTED_TOKEN]",
+      "secret": true
+    },
+    {
+      "name": "bearer-carrying-jwt",
+      "input": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.c2lnRklYVFVSRQ",
+      "expected": "Bearer [REDACTED_JWT]",
+      "secret": true
+    },
+    {
+      "name": "pem-rsa-private-key",
+      "input": "key file:\n-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAFIXTUREnotArealKEYline0000000000000000000000000000\nAbCdEfFIXTURE0000000000000000000000000000000000000000000000==\n-----END RSA PRIVATE KEY-----\nend",
+      "expected": "key file:\n[REDACTED_PRIVATE_KEY]\nend",
+      "secret": true
+    },
+    {
+      "name": "pem-openssh-private-key",
+      "input": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAFIXTURE0000000000000000000000000000000000\n-----END OPENSSH PRIVATE KEY-----",
+      "expected": "[REDACTED_PRIVATE_KEY]",
+      "secret": true
+    },
+    {
+      "name": "fsb-auth-bridge-secret-43",
+      "input": "pair fsb-auth.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCdE",
+      "expected": "pair [REDACTED_FSB_BRIDGE_SECRET]",
+      "secret": true
+    },
+    {
+      "name": "high-entropy-40-char-token",
+      "input": "session Zx9Qm2LkP7vR4tY8wN3bH6jF1sD5gA0cE2uK9pLm active",
+      "expected": "session [REDACTED_TOKEN] active",
+      "secret": true
+    },
+    {
+      "name": "high-entropy-whole-candidate-path",
+      "input": "/download/Q2xVZ3pKb21tb2FBcz1tZXhhbXBsZTAxMjM0/file",
+      "expected": "[REDACTED_TOKEN]",
+      "secret": true
+    },
+    {
+      "name": "two-secrets-one-string",
+      "input": "cards 4111-1111-1111-1111 and key sk-testfixture0000000000abcd",
+      "expected": "cards [REDACTED_CARD] and key [REDACTED_API_KEY]",
+      "secret": true
+    },
+    {
+      "name": "order-record-number",
+      "input": "REC-3",
+      "expected": "REC-3",
+      "secret": false
+    },
+    {
+      "name": "invoice-number",
+      "input": "INV-2024-0042",
+      "expected": "INV-2024-0042",
+      "secret": false
+    },
+    {
+      "name": "order-number-8-digit",
+      "input": "Order 84731920 confirmed",
+      "expected": "Order 84731920 confirmed",
+      "secret": false
+    },
+    {
+      "name": "luhn-invalid-16-digit",
+      "input": "4111111111111112",
+      "expected": "4111111111111112",
+      "secret": false
+    },
+    {
+      "name": "uuid-lowercase",
+      "input": "550e8400-e29b-41d4-a716-446655440000",
+      "expected": "550e8400-e29b-41d4-a716-446655440000",
+      "secret": false
+    },
+    {
+      "name": "hex-hash-lowercase-64",
+      "input": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "secret": false
+    },
+    {
+      "name": "hex-hash-uppercase-64",
+      "input": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "expected": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "secret": false
+    },
+    {
+      "name": "file-path",
+      "input": "/Users/alpha/Documents/2024/report-final.pdf",
+      "expected": "/Users/alpha/Documents/2024/report-final.pdf",
+      "secret": false
+    },
+    {
+      "name": "hyphenated-product-name",
+      "input": "Super-Long-Product-Name-Edition-2024-Black-XL",
+      "expected": "Super-Long-Product-Name-Edition-2024-Black-XL",
+      "secret": false
+    },
+    {
+      "name": "cjk-order-number",
+      "input": "注文番号は12345678です",
+      "expected": "注文番号は12345678です",
+      "secret": false
+    },
+    {
+      "name": "phone-number",
+      "input": "+1 415-555-0100",
+      "expected": "+1 415-555-0100",
+      "secret": false
+    },
+    {
+      "name": "sk-prefix-too-short",
+      "input": "sk-1",
+      "expected": "sk-1",
+      "secret": false
+    },
+    {
+      "name": "fsb-auth-42-chars",
+      "input": "fsb-auth.abcdefghijklmnopqrstuvwxyz0123456789abcdef",
+      "expected": "fsb-auth.abcdefghijklmnopqrstuvwxyz0123456789abcdef",
+      "secret": false
+    },
+    {
+      "name": "bearer-short-word",
+      "input": "Use a Bearer token for the API",
+      "expected": "Use a Bearer token for the API",
+      "secret": false
+    },
+    {
+      "name": "lowercase-32-char-run",
+      "input": "abcdefghijklmnopqrstuvwxyzabcdef",
+      "expected": "abcdefghijklmnopqrstuvwxyzabcdef",
+      "secret": false
+    },
+    {
+      "name": "mixed-case-long-word-no-digit",
+      "input": "SupercalifragilisticExpialidocious",
+      "expected": "SupercalifragilisticExpialidocious",
+      "secret": false
+    },
+    {
+      "name": "plain-goal-sentence",
+      "input": "Tick Alpha and save the checklist",
+      "expected": "Tick Alpha and save the checklist",
+      "secret": false
+    },
+    {
+      "name": "placeholder-already-present",
+      "input": "Card [REDACTED_CARD] and Bearer [REDACTED_TOKEN]",
+      "expected": "Card [REDACTED_CARD] and Bearer [REDACTED_TOKEN]",
+      "secret": false
+    }
+  ]
+}

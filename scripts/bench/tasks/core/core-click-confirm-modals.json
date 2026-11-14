@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-click-confirm-modals",
+  "version": 1,
+  "set": "core",
+  "category": "click-heavy",
+  "startPath": "/fixtures/confirm-modals/index.html",
+  "instruction": "Open {startUrl}. Delete the record named Q3 draft forecast, confirming both prompts. Do not delete anything else.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/confirm-modals/delete", "count": 1, "jsonEquals": { "recordId": "REC-3" } },
+      { "kind": "request", "method": "POST", "path": "/api/confirm-modals/delete", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/confirm-modals/index.html", "queryIncludes": { "view": "deleted" } },
+      { "kind": "marker", "name": "deleted-records", "equals": "REC-3" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "confirm-modals/index.html"]
+}

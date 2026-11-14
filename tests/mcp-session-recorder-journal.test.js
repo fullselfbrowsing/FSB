@@ -640,3 +640,212 @@ test('a hasCall read failure marks a shallow recording gap without materializing
   recorder._resetForTests();
   delete globalThis.FsbMcpLatticeJournal;
 });
+
+// ---- Phase 66: per-call MCP timing (D-04) -----------------------------------
+
+const CALL_TIMING = Object.freeze({ v: 1, receivedAt: 1_799_999_999_000, completedAt: 1_799_999_999_412, fsbMs: 412 });
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+test('journal dispatches carry only a validated call timing', async () => {
+  const journalStub = makeJournalStub();
+  await reset(journalStub);
+  await recorder._applyPolicyForTests(true, 30, recorder.FSB_MCP_RECORDER_BACKEND_JOURNAL);
+
+  const timed = journalEntry({ recordingCallId: 'recording-call-timed' });
+  timed.timing = { ...CALL_TIMING };
+  recorder.recordDispatch(timed);
+  await recorder._drainForTests();
+  assert.equal(journalStub.calls.dispatches.length, 1);
+  assert.deepEqual(journalStub.calls.dispatches[0].timing, CALL_TIMING);
+  assert.notStrictEqual(journalStub.calls.dispatches[0].timing, timed.timing,
+    'the journal receives a fresh copy, not the caller object');
+
+  const invalidTimings = [
+    ['a negative receivedAt', { ...CALL_TIMING, receivedAt: -1 }],
+    ['a string receivedAt', { ...CALL_TIMING, receivedAt: String(CALL_TIMING.receivedAt) }],
+    ['completedAt before receivedAt', { ...CALL_TIMING, completedAt: CALL_TIMING.receivedAt - 1 }],
+    ['version 2', { ...CALL_TIMING, v: 2 }],
+    ['a fractional completedAt', { ...CALL_TIMING, completedAt: CALL_TIMING.completedAt + 0.25 }],
+    ['an unsafe integer', { ...CALL_TIMING, completedAt: Number.MAX_SAFE_INTEGER + 2 }],
+    ['a missing completedAt', { v: 1, receivedAt: CALL_TIMING.receivedAt }],
+    ['a string', 'v1:1799999999000'],
+    ['an array', [1, 2, 3]],
+    ['null', null]
+  ];
+  for (const [index, [label, value]] of invalidTimings.entries()) {
+    const entry = journalEntry({ recordingCallId: 'recording-call-invalid-' + index });
+    entry.timing = value;
+    recorder.recordDispatch(entry);
+    await recorder._drainForTests();
+    assert.equal(journalStub.calls.dispatches.length, 2 + index, `${label} still records the call`);
+    assert.equal(hasOwn(journalStub.calls.dispatches.at(-1), 'timing'), false, `${label} is dropped`);
+  }
+
+  const inconsistent = journalEntry({ recordingCallId: 'recording-call-inconsistent' });
+  inconsistent.timing = { ...CALL_TIMING, fsbMs: 9 };
+  recorder.recordDispatch(inconsistent);
+  await recorder._drainForTests();
+  assert.deepEqual(journalStub.calls.dispatches.at(-1).timing, CALL_TIMING,
+    'an inconsistent fsbMs is kept but recomputed from completedAt - receivedAt');
+
+  recorder.recordDispatch(journalEntry({ recordingCallId: 'recording-call-untimed' }));
+  await recorder._drainForTests();
+  assert.equal(hasOwn(journalStub.calls.dispatches.at(-1), 'timing'), false,
+    'an untimed call carries no timing key, never a zero');
+
+  recorder._resetForTests();
+  delete globalThis.FsbMcpLatticeJournal;
+});
+
+test('recordAction forwards the bridge call timing to the journal dispatch', async () => {
+  const journalStub = makeJournalStub();
+  await reset(journalStub);
+  await recorder._applyPolicyForTests(true, 30, recorder.FSB_MCP_RECORDER_BACKEND_JOURNAL);
+  const actionPayload = (recordingCallId) => ({
+    tool: 'click',
+    agentId: 'agent-journal',
+    recordingRunId: 'recording-run-journal',
+    recordingCallId,
+    params: { selector: '#go' },
+    visualSession: { visualReason: 'Journal task', client: 'Codex' }
+  });
+
+  recorder.recordAction({
+    client: 'Codex',
+    tool: 'click',
+    params: { selector: '#go' },
+    payload: actionPayload('recording-call-action-timed'),
+    response: { success: true, clicked: true },
+    success: true,
+    tabId: 44,
+    replayContext: { routeFamily: 'content', targetUrl: 'https://example.test', targetOrigin: 'https://example.test' },
+    timing: { ...CALL_TIMING }
+  });
+  recorder.recordAction({
+    client: 'Codex',
+    tool: 'click',
+    params: { selector: '#go' },
+    payload: actionPayload('recording-call-action-null'),
+    response: { success: true, clicked: true },
+    success: true,
+    tabId: 44,
+    replayContext: { routeFamily: 'content' },
+    timing: null
+  });
+  await recorder._drainForTests();
+
+  assert.equal(journalStub.calls.dispatches.length, 2);
+  assert.equal(journalStub.calls.dispatches[0].dispatcher_route, 'bridge-action');
+  assert.deepEqual(journalStub.calls.dispatches[0].timing, CALL_TIMING);
+  assert.equal(hasOwn(journalStub.calls.dispatches[1], 'timing'), false,
+    'a null bridge timing is omitted from the journal entry');
+
+  recorder._resetForTests();
+  delete globalThis.FsbMcpLatticeJournal;
+});
+
+test('journal task outcomes carry the validated call timing', async () => {
+  const journalStub = makeJournalStub();
+  await reset(journalStub);
+  await recorder._applyPolicyForTests(true, 30, recorder.FSB_MCP_RECORDER_BACKEND_JOURNAL);
+  const outcome = (recordingCallId, timing) => ({
+    tool: 'complete_task',
+    params: { summary: 'Timed task complete' },
+    payload: {
+      agentId: 'agent-journal',
+      recordingRunId: 'recording-run-journal',
+      recordingCallId,
+      params: { summary: 'Timed task complete' }
+    },
+    response: { success: true, status: 'completed' },
+    timing
+  });
+
+  recorder.recordTaskOutcome(outcome('recording-call-outcome-timed', { ...CALL_TIMING }));
+  await recorder._drainForTests();
+  recorder.recordTaskOutcome(outcome('recording-call-outcome-invalid', { ...CALL_TIMING, v: 2 }));
+  await recorder._drainForTests();
+  recorder.recordTaskOutcome(outcome('recording-call-outcome-untimed', undefined));
+  await recorder._drainForTests();
+
+  assert.equal(journalStub.calls.outcomes.length, 3);
+  assert.deepEqual(journalStub.calls.outcomes[0].value.timing, CALL_TIMING);
+  assert.equal(journalStub.calls.outcomes[0].value.dispatcher_route, 'task-status');
+  assert.equal(hasOwn(journalStub.calls.outcomes[1].value, 'timing'), false, 'an invalid outcome timing is dropped');
+  assert.equal(hasOwn(journalStub.calls.outcomes[2].value, 'timing'), false, 'an untimed outcome has no timing key');
+
+  recorder._resetForTests();
+  delete globalThis.FsbMcpLatticeJournal;
+});
+
+test('legacy-only sessions carry timing and durationMs on actionHistory rows', async () => {
+  const journalStub = makeJournalStub();
+  await reset(journalStub);
+  await recorder._applyPolicyForTests(true, 30, recorder.FSB_MCP_RECORDER_BACKEND_JOURNAL);
+  const legacyEntry = (selector, timing) => {
+    const entry = journalEntry({
+      payload: {
+        agentId: 'agent-legacy-timing',
+        params: { selector },
+        visualSession: { visualReason: 'Legacy timed task', client: 'Claude' }
+      }
+    });
+    if (timing !== undefined) entry.timing = timing;
+    return entry;
+  };
+
+  recorder.recordDispatch(legacyEntry('#one', { ...CALL_TIMING }));
+  recorder.recordDispatch(legacyEntry('#two'));
+  recorder.recordDispatch(legacyEntry('#three', { ...CALL_TIMING, v: 2 }));
+  await recorder._drainForTests();
+
+  assert.equal(journalStub.calls.dispatches.length, 0, 'a client without recordingRunId stays on the legacy path');
+  const sessions = Object.values(recorder._peekOpenSessions());
+  assert.equal(sessions.length, 1);
+  const [timedRow, untimedRow, invalidRow] = sessions[0].actionHistory;
+  assert.deepEqual(timedRow.timing, CALL_TIMING);
+  assert.equal(timedRow.durationMs, CALL_TIMING.fsbMs);
+  for (const [label, row] of [['untimed', untimedRow], ['invalid', invalidRow]]) {
+    assert.equal(hasOwn(row, 'timing'), false, `${label} legacy row has no timing`);
+    assert.equal(hasOwn(row, 'durationMs'), false, `${label} legacy row has no durationMs`);
+    assert.deepEqual(Object.keys(row), ['tool', 'params', 'result', 'timestamp', 'logicalTab']);
+  }
+  assert.equal(sessions[0].replayEntries.length, 3);
+  assert.equal(sessions[0].replayEntries.some((row) => hasOwn(row, 'timing')), false,
+    'replay entries keep their existing shape');
+
+  // Open legacy sessions survive a service-worker eviction with their timing.
+  recorder._resetForTests();
+  await recorder._restoreFromBuffer();
+  await recorder._drainForTests();
+  const restored = Object.values(recorder._peekOpenSessions());
+  assert.equal(restored.length, 1);
+  assert.deepEqual(restored[0].actionHistory[0].timing, CALL_TIMING);
+  assert.equal(restored[0].actionHistory[0].durationMs, CALL_TIMING.fsbMs);
+  assert.equal(hasOwn(restored[0].actionHistory[1], 'timing'), false);
+  assert.equal(hasOwn(restored[0].actionHistory[1], 'durationMs'), false);
+
+  // Closing hands the timed rows to history (the logger persists them).
+  const saved = [];
+  globalThis.automationLogger.saveSession = async (sessionId, sessionData) => {
+    saved.push({ sessionId, sessionData });
+    return true;
+  };
+  recorder.recordTaskOutcome({
+    tool: 'complete_task',
+    params: { summary: 'Legacy timed task complete' },
+    payload: { agentId: 'agent-legacy-timing', params: { summary: 'Legacy timed task complete' } },
+    response: { success: true, status: 'completed' }
+  });
+  await recorder._drainForTests();
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0].sessionData.actionHistory[0].timing, CALL_TIMING);
+  assert.equal(saved[0].sessionData.actionHistory[0].durationMs, CALL_TIMING.fsbMs);
+  assert.equal(hasOwn(saved[0].sessionData.actionHistory[1], 'durationMs'), false);
+
+  recorder._resetForTests();
+  delete globalThis.FsbMcpLatticeJournal;
+});

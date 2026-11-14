@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en" data-bench-app="search-detail">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product details - Trailhead Outfitters</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 16px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <p><a id="back-link" href="index.html">Back to search</a></p>
+  <article id="product" class="panel" aria-labelledby="product-name" hidden>
+    <h1 id="product-name"></h1>
+    <dl class="facts">
+      <dt>SKU</dt><dd id="product-sku"></dd>
+      <dt>Category</dt><dd id="product-category"></dd>
+      <dt>Price</dt><dd id="product-price"></dd>
+      <dt>Waterproof</dt><dd id="product-waterproof"></dd>
+    </dl>
+    <button id="add" class="btn primary" type="button">Add to list</button>
+    <p id="add-error" class="error" role="alert" hidden></p>
+    <p id="add-status" class="status" role="status" hidden>Added to your list: <output data-bench-marker="list-added"></output></p>
+  </article>
+  <section id="missing" class="panel" hidden>
+    <h1>Product not found</h1>
+    <p>That product is not in the catalog. <a href="index.html">Search again</a>.</p>
+  </section>
+</main>
+<script src="../_shared/bench.js"></script>
+<script src="catalog.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const params = new URLSearchParams(location.search);
+    const sku = params.get('sku') || '';
+    const query = (params.get('q') || '').trim();
+    const item = CATALOG.find((entry) => entry.sku === sku);
+    if (query) {
+      const back = document.getElementById('back-link');
+      back.href = `results.html?${new URLSearchParams({ q: query })}`;
+      back.textContent = 'Back to results';
+    }
+    if (!item) {
+      document.getElementById('missing').hidden = false;
+      return;
+    }
+    document.title = `${item.name} - Trailhead Outfitters`;
+    document.getElementById('product-name').textContent = item.name;
+    document.getElementById('product-sku').textContent = item.sku;
+    document.getElementById('product-category').textContent = item.category;
+    document.getElementById('product-price').textContent = formatPrice(item.price);
+    document.getElementById('product-waterproof').textContent = item.waterproof ? 'Yes' : 'No';
+    document.getElementById('product').hidden = false;
+
+    const button = document.getElementById('add');
+    const error = document.getElementById('add-error');
+    const status = document.getElementById('add-status');
+    let busy = false;
+    let added = false;
+    button.addEventListener('click', async () => {
+      if (busy || added) return;
+      busy = true;
+      button.disabled = true;
+      error.hidden = true;
+      try {
+        await benchPost('add', { sku: item.sku });
+        added = true;
+        button.textContent = 'Added to list';
+        setView({ sku: item.sku, view: 'added' });
+        setMarker('list-added', item.sku);
+        status.hidden = false;
+      } catch {
+        error.textContent = 'The product could not be added. Try again.';
+        error.hidden = false;
+      } finally {
+        busy = false;
+        button.disabled = added;
+      }
+    });
+  })();
+</script>
+</body>
+</html>
