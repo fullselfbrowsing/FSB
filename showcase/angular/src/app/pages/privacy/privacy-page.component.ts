@@ -1,7 +1,10 @@
-import { Component, OnInit, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnInit, Renderer2, ViewChild, afterNextRender, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
+import { DepthEndComponent } from '../../layout/depth/depth-end.component';
+import { DepthRailComponent, type DepthRailItem } from '../../layout/depth/depth-rail.component';
+import { DepthStageDirective } from '../../layout/depth/depth-stage.directive';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { PrivacyHistoryArchiveComponent } from './privacy-history-archive.component';
 
@@ -13,7 +16,7 @@ const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 @Component({
   selector: 'app-privacy-page',
   standalone: true,
-  imports: [PrivacyHistoryArchiveComponent, RouterLink],
+  imports: [PrivacyHistoryArchiveComponent, RouterLink, DepthStageDirective, DepthRailComponent, DepthEndComponent],
   templateUrl: './privacy-page.component.html',
   styleUrl: './privacy-page.component.scss',
 })
@@ -52,4 +55,36 @@ export class PrivacyPageComponent implements OnInit {
     this.meta.updateTag({ name: 'twitter:image:alt', content: OG_IMAGE_ALT });
     emitLocaleHead(this.renderer, this.doc, this.localeId, ROUTE_PATH);
   }
+
+  /* Depth page wiring. The policy is one plane that scrolls inside itself; once
+     it is rendered, the rail lists each of its sections by heading (read from the
+     page, so every locale gets its own titles). */
+  @ViewChild(DepthStageDirective) private readonly stage?: DepthStageDirective;
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly cdr = inject(ChangeDetectorRef);
+  readonly railLabel = PRIVACY_RAIL_ARIA;
+  rail: readonly DepthRailItem[] = [
+    { label: PRIVACY_RAIL_OVERVIEW, layer: 0 },
+    { label: PRIVACY_RAIL_POLICY, layer: 1 },
+    { label: PRIVACY_RAIL_INDEX, layer: 2 },
+  ];
+
+  constructor() {
+    afterNextRender(() => {
+      const headings = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('h2[data-depth-anchor]'));
+      const sections = headings
+        .map((h, sec) => ({ label: (h.textContent || '').replace(/\s+/g, ' ').trim(), layer: 1, sec }))
+        .filter((item) => item.label);
+      if (!sections.length) return;
+      this.rail = [{ label: PRIVACY_RAIL_OVERVIEW, layer: 0 }, ...sections, { label: PRIVACY_RAIL_INDEX, layer: 2 }];
+      this.cdr.detectChanges();
+      this.stage?.refreshRail();
+    });
+  }
 }
+
+/* Depth page: the planes of this page in order. */
+const PRIVACY_RAIL_ARIA = $localize`:@@privacy.depth.rail.aria:FSB privacy policy sections`;
+const PRIVACY_RAIL_OVERVIEW = $localize`:@@privacy.depth.rail.overview:Overview`;
+const PRIVACY_RAIL_POLICY = $localize`:@@privacy.depth.rail.policy:Policy`;
+const PRIVACY_RAIL_INDEX = $localize`:@@depth.rail.index:Index`;

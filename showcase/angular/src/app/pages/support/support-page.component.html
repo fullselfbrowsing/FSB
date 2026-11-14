@@ -1,102 +1,190 @@
-<section class="support-page">
-  <div class="container">
-    <div class="support-header reveal">
-      <h1 i18n="@@support.hero.title">Support</h1>
-      <p i18n="@@support.hero.subtitle">Find answers to common questions, troubleshoot issues, or reach out for help.</p>
-    </div>
+<!-- Depth page: each section is a plane along the z axis (layout/depth). -->
+<div class="fsb-depth-root" appDepthStage>
+<div class="fsb-depth" data-depth-stage tabindex="0" role="region" i18n-aria-label="@@support.depth.aria" aria-label="FSB support. Scroll, swipe or use the arrow keys to move between sections.">
 
-    <!-- FAQ -->
-    <div class="faq-section">
-      <h2 class="reveal" i18n="@@support.faq.title">Frequently Asked Questions</h2>
-      <div class="faq-list">
-        @for (faq of faqs; track faq.id) {
-          <div class="faq-item reveal" [class.active]="expandedFaqs.has(faq.id)">
-            <h3>
-              <button class="faq-question" type="button" (click)="toggleFaq(faq.id)"
-                [attr.aria-expanded]="expandedFaqs.has(faq.id)" [attr.aria-controls]="'faq-' + faq.id">
-                <span>{{ faq.q }}</span>
-                <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
-              </button>
-            </h3>
-            <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="expandedFaqs.has(faq.id) ? null : ''">
-              <div class="faq-answer-inner">
-                <p>{{ faq.a }}</p>
-                <div class="faq-resources">
-                  @switch (faq.id) {
-                    @case ('install') {
-                      <a href="https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.store }}</a>
-                      <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.github }}</a>
-                    }
-                    @case ('reportBug') {
-                      <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.issues }}</a>
-                    }
-                    @case ('mcp') {
-                      <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
-                    }
-                    @case ('openclawInstall') {
-                      <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.clawhub }}</a>
-                      <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
-                    }
-                    @case ('remote') {
-                      <a routerLink="/dashboard" i18n="@@support.faq.links.dashboard">Remote Dashboard</a>
-                    }
-                  }
+  <!-- Header and the first questions -->
+  <div class="fsb-depth-layer" style="z-index: 60">
+    <div class="fsb-depth-fit">
+      <section class="support-page">
+        <div class="container">
+          <div class="support-header reveal" data-di="0">
+            <h1 i18n="@@support.hero.title">Support</h1>
+            <p i18n="@@support.hero.subtitle">Find answers to common questions, troubleshoot issues, or reach out for help.</p>
+          </div>
+
+          <!-- FAQ -->
+          <div class="faq-section">
+            <h2 class="reveal" data-di="0.25" i18n="@@support.faq.title">Frequently Asked Questions</h2>
+            <div class="faq-list">
+              @for (faq of faqsLead; track faq.id) {
+                <div class="faq-item reveal" [class.active]="expandedFaqs.has(faq.id)" [attr.data-di]="(40 + $index * 5) / 100">
+                  <h3>
+                    <button class="faq-question" type="button" (click)="toggleFaq(faq.id)"
+                      [attr.aria-expanded]="expandedFaqs.has(faq.id)" [attr.aria-controls]="'faq-' + faq.id">
+                      <span>{{ faq.q }}</span>
+                      <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
+                    </button>
+                  </h3>
+                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="expandedFaqs.has(faq.id) ? null : ''">
+                    <div class="faq-answer-inner">
+                      <p>{{ faq.a }}</p>
+                      <div class="faq-resources">
+                        @switch (faq.id) {
+                          @case ('install') {
+                            <a href="https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.store }}</a>
+                            <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.github }}</a>
+                          }
+                          @case ('reportBug') {
+                            <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.issues }}</a>
+                          }
+                          @case ('mcp') {
+                            <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
+                          }
+                          @case ('openclawInstall') {
+                            <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.clawhub }}</a>
+                            <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
+                          }
+                          @case ('remote') {
+                            <a routerLink="/dashboard" i18n="@@support.faq.links.dashboard">Remote Dashboard</a>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- More questions -->
+  <div class="fsb-depth-layer" style="z-index: 59">
+    <div class="fsb-depth-fit">
+      <section class="support-page">
+        <div class="container">
+          <div class="faq-section">
+            <div class="faq-list">
+              @for (faq of faqsMore; track faq.id) {
+                <div class="faq-item reveal" [class.active]="expandedFaqs.has(faq.id)" [attr.data-di]="($index * 5) / 100">
+                  <h3>
+                    <button class="faq-question" type="button" (click)="toggleFaq(faq.id)"
+                      [attr.aria-expanded]="expandedFaqs.has(faq.id)" [attr.aria-controls]="'faq-' + faq.id">
+                      <span>{{ faq.q }}</span>
+                      <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
+                    </button>
+                  </h3>
+                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="expandedFaqs.has(faq.id) ? null : ''">
+                    <div class="faq-answer-inner">
+                      <p>{{ faq.a }}</p>
+                      <div class="faq-resources">
+                        @switch (faq.id) {
+                          @case ('install') {
+                            <a href="https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.store }}</a>
+                            <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.github }}</a>
+                          }
+                          @case ('reportBug') {
+                            <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.issues }}</a>
+                          }
+                          @case ('mcp') {
+                            <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
+                          }
+                          @case ('openclawInstall') {
+                            <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.clawhub }}</a>
+                            <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
+                          }
+                          @case ('remote') {
+                            <a routerLink="/dashboard" i18n="@@support.faq.links.dashboard">Remote Dashboard</a>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Troubleshooting -->
+  <div class="fsb-depth-layer" style="z-index: 58">
+    <div class="fsb-depth-fit">
+      <section class="support-page">
+        <div class="container">
+          <!-- Troubleshooting -->
+          <div class="troubleshooting-section">
+            <h2 class="reveal" data-di="0" i18n="@@support.trouble.title">Common Issues</h2>
+            <div class="troubleshooting-grid" data-di="0.3">
+              <div class="trouble-card reveal delay-1">
+                <div class="trouble-icon"><i class="fa-solid fa-plug-circle-xmark"></i></div>
+                <h3 i18n="@@support.trouble.apiFailed.title">API Connection Failed</h3>
+                <p i18n="@@support.trouble.apiFailed.desc">The extension cannot reach the AI provider's API endpoint.</p>
+                <div class="trouble-fix">
+                  <div class="trouble-fix-label" i18n="@@support.trouble.fixLabel">Fix</div>
+                  <p i18n="@@support.trouble.apiFailed.fix">Verify your API key in Options. Check that the correct provider and model are selected. Ensure you have internet connectivity and the provider's service is not experiencing downtime.</p>
+                </div>
+              </div>
+              <div class="trouble-card reveal delay-2">
+                <div class="trouble-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
+                <h3 i18n="@@support.trouble.notResponding.title">Extension Not Responding</h3>
+                <p i18n="@@support.trouble.notResponding.desc">The <span [attr.translate]="'no'">FSB</span> icon is grayed out or clicking it does nothing.</p>
+                <div class="trouble-fix">
+                  <div class="trouble-fix-label" i18n="@@support.trouble.fixLabel">Fix</div>
+                  <p i18n="@@support.trouble.notResponding.fix">Go to <code [attr.translate]="'no'">chrome://extensions</code>, find <span [attr.translate]="'no'">FSB</span>, and click the refresh button. If that does not work, remove and re-load the extension. Make sure you are not on a <code [attr.translate]="'no'">chrome://</code> or <code [attr.translate]="'no'">edge://</code> page.</p>
+                </div>
+              </div>
+              <div class="trouble-card reveal delay-3">
+                <div class="trouble-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <h3 i18n="@@support.trouble.actionsNotWorking.title">Actions Not Working</h3>
+                <p i18n="@@support.trouble.actionsNotWorking.desc"><span [attr.translate]="'no'">FSB</span> clicks or types but nothing happens on the page.</p>
+                <div class="trouble-fix">
+                  <div class="trouble-fix-label" i18n="@@support.trouble.fixLabel">Fix</div>
+                  <p i18n="@@support.trouble.actionsNotWorking.fix">Some websites use dynamic rendering that changes element selectors. Try refreshing the page and re-running the task. Enable Debug Mode in Options to see detailed action logs. Some sites with heavy anti-bot measures may block automated interactions.</p>
                 </div>
               </div>
             </div>
           </div>
-        }
-      </div>
-    </div>
-
-    <!-- Troubleshooting -->
-    <div class="troubleshooting-section">
-      <h2 class="reveal" i18n="@@support.trouble.title">Common Issues</h2>
-      <div class="troubleshooting-grid">
-        <div class="trouble-card reveal delay-1">
-          <div class="trouble-icon"><i class="fa-solid fa-plug-circle-xmark"></i></div>
-          <h3 i18n="@@support.trouble.apiFailed.title">API Connection Failed</h3>
-          <p i18n="@@support.trouble.apiFailed.desc">The extension cannot reach the AI provider's API endpoint.</p>
-          <div class="trouble-fix">
-            <div class="trouble-fix-label" i18n="@@support.trouble.fixLabel">Fix</div>
-            <p i18n="@@support.trouble.apiFailed.fix">Verify your API key in Options. Check that the correct provider and model are selected. Ensure you have internet connectivity and the provider's service is not experiencing downtime.</p>
-          </div>
         </div>
-        <div class="trouble-card reveal delay-2">
-          <div class="trouble-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
-          <h3 i18n="@@support.trouble.notResponding.title">Extension Not Responding</h3>
-          <p i18n="@@support.trouble.notResponding.desc">The <span [attr.translate]="'no'">FSB</span> icon is grayed out or clicking it does nothing.</p>
-          <div class="trouble-fix">
-            <div class="trouble-fix-label" i18n="@@support.trouble.fixLabel">Fix</div>
-            <p i18n="@@support.trouble.notResponding.fix">Go to <code [attr.translate]="'no'">chrome://extensions</code>, find <span [attr.translate]="'no'">FSB</span>, and click the refresh button. If that does not work, remove and re-load the extension. Make sure you are not on a <code [attr.translate]="'no'">chrome://</code> or <code [attr.translate]="'no'">edge://</code> page.</p>
-          </div>
-        </div>
-        <div class="trouble-card reveal delay-3">
-          <div class="trouble-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-          <h3 i18n="@@support.trouble.actionsNotWorking.title">Actions Not Working</h3>
-          <p i18n="@@support.trouble.actionsNotWorking.desc"><span [attr.translate]="'no'">FSB</span> clicks or types but nothing happens on the page.</p>
-          <div class="trouble-fix">
-            <div class="trouble-fix-label" i18n="@@support.trouble.fixLabel">Fix</div>
-            <p i18n="@@support.trouble.actionsNotWorking.fix">Some websites use dynamic rendering that changes element selectors. Try refreshing the page and re-running the task. Enable Debug Mode in Options to see detailed action logs. Some sites with heavy anti-bot measures may block automated interactions.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Contact -->
-    <div class="contact-section reveal">
-      <h2 i18n="@@support.contact.title">Need More Help?</h2>
-      <p i18n="@@support.contact.body">If you cannot find an answer here, reach out through <span [attr.translate]="'no'">GitHub</span>.</p>
-      <div class="contact-links">
-         
-        <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@support.contact.reportIssue">
-          <i class="fa-solid fa-bug"></i> Report an Issue
-        </a>
-         
-        <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-outline" i18n="@@support.contact.viewRepo">
-          <i class="fa-brands fa-github"></i> View Repository
-        </a>
-      </div>
+      </section>
     </div>
   </div>
-</section>
+
+  <!-- Contact -->
+  <div class="fsb-depth-layer" style="z-index: 57">
+    <div class="fsb-depth-fit">
+      <section class="support-page">
+        <div class="container">
+          <!-- Contact -->
+          <div class="contact-section reveal" data-di="0">
+            <h2 i18n="@@support.contact.title">Need More Help?</h2>
+            <p i18n="@@support.contact.body">If you cannot find an answer here, reach out through <span [attr.translate]="'no'">GitHub</span>.</p>
+            <div class="contact-links">
+         
+              <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@support.contact.reportIssue">
+                <i class="fa-solid fa-bug"></i> Report an Issue
+              </a>
+         
+              <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-outline" i18n="@@support.contact.viewRepo">
+                <i class="fa-brands fa-github"></i> View Repository
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Site index -->
+  <div class="fsb-depth-layer" data-full style="z-index: 56">
+    <div class="fsb-depth-fit">
+      <app-depth-end></app-depth-end>
+    </div>
+  </div>
+</div>
+<app-depth-rail [items]="rail" [label]="railLabel"></app-depth-rail>
+</div>

@@ -80,69 +80,6 @@
   flex-wrap: wrap;
 }
 
-@keyframes cuePull {
-  0%, 26%, 84%, 100% { transform: translateY(0); }
-  46%, 64% { transform: translateY(-6px); }
-}
-
-@keyframes cueText {
-  0%, 26%, 84%, 100% {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-
-  46%, 64% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes cuePulse {
-  0%, 26%, 84%, 100% { color: var(--text-muted); }
-  46%, 64% { color: rgba(255, 107, 53, 0.85); }
-}
-
-.scroll-cue {
-  position: absolute;
-  left: 50%;
-  bottom: 30px;
-  transform: translateX(-50%);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 9px;
-  color: var(--text-muted);
-  text-decoration: none;
-  cursor: pointer;
-  transition: opacity 0.3s ease;
-  will-change: opacity;
-  animation: cuePulse 3s ease-in-out infinite;
-}
-
-.cue-text {
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  text-align: center;
-  opacity: 0;
-  animation: cueText 3s ease-in-out infinite;
-}
-
-.cue-line {
-  width: 100%;
-  height: 1.5px;
-  background: currentColor;
-  border-radius: 2px;
-  transform-origin: center top;
-  animation: cuePull 3s ease-in-out infinite;
-}
-
-.scroll-cue:hover {
-  color: var(--primary);
-}
-
 /* --- Install Widget --- */
 .install-widget {
   width: 100%;
@@ -308,13 +245,6 @@
   transform: translateY(8px) scale(0.94);
 }
 
-.install-fan-down {
-  top: calc(100% + 14px);
-  flex-direction: column;
-  transform-origin: top right;
-  transform: translateY(-8px) scale(0.94);
-}
-
 .install-fan.open::after {
   content: '';
   position: absolute;
@@ -325,10 +255,6 @@
 
 .install-fan-up.open::after {
   bottom: -16px;
-}
-
-.install-fan-down.open::after {
-  top: -16px;
 }
 
 .install-fan.open {
@@ -717,11 +643,6 @@
   text-align: center;
   transition: all var(--transition-base);
   opacity: 0.7;
-}
-
-.competitor-card:hover {
-  opacity: 1;
-  border-color: var(--border-hover);
 }
 
 .competitor-logo {
@@ -1461,9 +1382,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero-bg,
-  .scroll-cue,
-  .cue-text,
-  .cue-line,
   .install-mark.is-morphing .install-glyph,
   .cap-track,
   .lb-row-fsb .lb-bar,
@@ -1477,10 +1395,6 @@
   .eng-panel.is-active .eng-wire,
   .eng-tab.on::after {
     animation: none;
-  }
-
-  .cue-text {
-    opacity: 1;
   }
 
   .cap-marquee-row {
@@ -1539,10 +1453,6 @@
     width: 100%;
     max-width: 280px;
     text-align: center;
-  }
-
-  .scroll-cue {
-    display: none;
   }
 
   .competitors-row {
@@ -1635,10 +1545,6 @@
 }
 
 @media (max-width: 480px) {
-  .competitors-row {
-    grid-template-columns: 1fr;
-  }
-
   .competitor-card {
     padding: 16px 12px;
   }
@@ -1726,11 +1632,6 @@
     padding: 14px 24px;
   }
 
-  .scroll-cue {
-    display: flex;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-  }
-
   .features {
     scroll-margin-top: var(--nav-height);
   }
@@ -1751,5 +1652,278 @@
 
   .install-fan-item:hover {
     transform: none;
+  }
+}
+
+/* =============================================
+   Depth page (layout/depth): each section is a plane.
+   ============================================= */
+
+/* The leaderboard is the tallest plane; tighter spacing keeps it at full size
+   on a desktop-height window instead of scaling it down. */
+.fsb-depth-layer section.features .section-header {
+  margin-bottom: 24px;
+}
+
+.fsb-depth-layer section.features .section-header h2 {
+  margin-bottom: 10px;
+}
+
+.fsb-depth-layer section.features .section-header p {
+  margin-bottom: 2px;
+  margin-top: 0;
+  max-width: 780px;
+}
+
+.fsb-depth-layer section.features .lb {
+  padding-bottom: 18px;
+  padding-top: 22px;
+}
+
+.fsb-depth-layer section.features .lb-head {
+  margin-bottom: 12px;
+}
+
+.fsb-depth-layer section.features .lb-rows {
+  gap: 2px;
+}
+
+.fsb-depth-layer section.features .lb-row {
+  padding-bottom: 5px;
+  padding-top: 5px;
+}
+
+.fsb-depth-layer section.features .lb-track {
+  height: 24px;
+}
+
+.fsb-depth-layer section.features .lb-notes {
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+/* Dot grid behind the leaderboard plane (shown by the engine while it is in view). */
+.fsb-ambient-dots {
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text-muted) 22%, transparent) 1px, transparent 1.2px);
+  background-size: 18px 18px;
+}
+
+/* A fan entry keeps its place in the arc while it leans toward the pointer. */
+.install-fan-item[data-tilt] {
+  transform: translateX(var(--dx, 0)) rotate(var(--rot, 0deg)) perspective(600px) translateZ(calc(var(--tilt-z, 0) * 1px)) rotateX(calc(var(--tilt-x, 0) * 1deg)) rotateY(calc(var(--tilt-y, 0) * 1deg)) scale(calc(1 + var(--tilt-z, 0) * .004)) !important;
+}
+
+@media (max-width: 768px) {
+  .install-fan-item[data-tilt] {
+    transform: perspective(600px) translateZ(calc(var(--tilt-z, 0) * 1px)) rotateX(calc(var(--tilt-x, 0) * 1deg)) rotateY(calc(var(--tilt-y, 0) * 1deg)) !important;
+  }
+}
+
+/* Phones: a plane has one screen and no scrolling of its own, so each section is
+   set more tightly here than a scrolling page would need. */
+@media (max-width: 600px) {
+  /* Leaderboard. The card's own header already names the benchmark and the
+     metric, so the two lines above it go. */
+  .fsb-depth-layer section.features .section-header {
+    margin-bottom: 14px;
+  }
+
+  .fsb-depth-layer section.features .section-header h2 {
+    margin-bottom: 0;
+  }
+
+  .fsb-depth-layer section.features .section-header p {
+    display: none;
+  }
+
+  .fsb-depth-layer section.features .lb {
+    padding: 14px 12px 12px;
+  }
+
+  .fsb-depth-layer section.features .lb-head {
+    gap: 2px 12px;
+    margin-bottom: 8px;
+  }
+
+  .fsb-depth-layer section.features .lb-title {
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+
+  .fsb-depth-layer section.features .lb-rows {
+    gap: 0;
+  }
+
+  /* Each row is a name with its value at the end of the same line, over a thin
+     bar: ten of them fit where five stacked rows did. */
+  .fsb-depth-layer section.features .lb-row {
+    padding: 4px 6px;
+    row-gap: 3px;
+  }
+
+  .fsb-depth-layer section.features .lb-name {
+    font-size: 0.82rem;
+    padding-right: 64px;
+  }
+
+  .fsb-highlight-wordmark.lb-wordmark {
+    font-size: 1.05rem;
+  }
+
+  .fsb-depth-layer section.features .lb-track {
+    height: 6px;
+    margin-right: 0;
+    background-color: color-mix(in srgb, var(--border-color) 55%, transparent);
+    background-image: none;
+    border-radius: 3px;
+  }
+
+  .lb-bar {
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+  }
+
+  .lb-value {
+    top: -11px;
+    right: 0;
+    left: auto;
+  }
+
+  .lb-axis {
+    display: none;
+  }
+
+  .fsb-depth-layer section.features .lb-notes {
+    gap: 2px;
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+
+  .lb-notes p {
+    font-size: 0.68rem;
+    line-height: 1.4;
+  }
+
+  .lb-notes .lb-tested {
+    margin-top: 2px;
+    font-size: 0.66rem;
+  }
+
+  /* Competitors stay two by two. */
+  .competitors-row {
+    gap: 10px;
+    margin-bottom: 0;
+  }
+
+  .competitor-card {
+    padding: 14px 10px;
+  }
+
+  /* FSB card: the three numbers side by side. */
+  .fsb-highlight-card {
+    margin-bottom: 16px;
+    padding: 18px 14px;
+  }
+
+  .fsb-highlight-desc {
+    margin-bottom: 14px;
+    font-size: 0.85rem;
+  }
+
+  .fsb-stats {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .fsb-stat {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .fsb-stat-value {
+    font-size: 1.05rem;
+  }
+
+  .fsb-stat-label {
+    font-size: 0.68rem;
+  }
+
+  .fsb-stat-vs {
+    display: block;
+  }
+
+  .mcp-callout {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .mcp-callout-content p {
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  /* Engine: three equal tabs showing their number and kind; the title and the
+     detail of the chosen one are in the panel below. */
+  .eng-tabs {
+    gap: 4px;
+    padding: 8px;
+    overflow: visible;
+  }
+
+  .eng-tab {
+    flex: 1 1 0;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .eng-kind {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .eng-tab-title,
+  .eng-tab-meta {
+    display: none;
+  }
+
+  .eng-stage {
+    padding: 16px 14px;
+  }
+
+  .eng-flow {
+    margin-bottom: 14px;
+  }
+
+  .eng-panel h3 {
+    margin-bottom: 6px;
+    font-size: 1.1rem;
+  }
+
+  .eng-desc {
+    font-size: 0.84rem;
+    line-height: 1.5;
+  }
+
+  .eng-facts {
+    gap: 6px;
+    margin: 10px 0 12px;
+  }
+
+  .eng-fact {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+  }
+
+  .eng-chips {
+    gap: 6px;
+    padding-top: 12px;
+  }
+
+  .eng-chip {
+    gap: 6px;
+    padding: 4px 9px;
+    font-size: 0.72rem;
   }
 }

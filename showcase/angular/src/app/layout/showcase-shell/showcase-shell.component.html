@@ -1,5 +1,5 @@
 @if (!shellless) {
-  <nav class="nav" [class.scrolled]="navScrolled">
+  <nav class="nav" [class.scrolled]="navScrolled" [class.nav--depth]="depthPage">
     <div class="nav-inner">
       <a routerLink="/" class="nav-brand" (click)="closeMobileMenu()">
         <span class="fsb-mark" i18n-aria-label="@@shell.nav.brand.aria" aria-label="FSB">
@@ -12,6 +12,7 @@
           </span>
         </span>
       </a>
+      @if (!depthPage) {
       <div class="nav-links">
         <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" i18n="@@shell.nav.desktop.home">Home</a>
         <a routerLink="/about" routerLinkActive="active" i18n="@@shell.nav.desktop.about">About</a>
@@ -20,18 +21,46 @@
         <a routerLink="/privacy" routerLinkActive="active" i18n="@@shell.nav.desktop.privacy">Privacy</a>
         <a routerLink="/support" routerLinkActive="active" i18n="@@shell.nav.desktop.support">Support</a>
       </div>
+      } @else {
+      <!-- Depth pages: the page list lives in a cue at the bottom edge and opens upward. -->
+      <div class="fsb-navcue" [class.is-open]="cueOpen" (mouseleave)="closeCue()">
+        <button class="fsb-navcue-trigger" type="button" aria-controls="fsb-navcue-list" [attr.aria-expanded]="cueOpen" (click)="toggleCue()">
+          <span class="fsb-navcue-text">
+            @switch (depthPage) {
+              @case ('about') { <ng-container i18n="@@shell.nav.desktop.about">About</ng-container> }
+              @case ('agents') { <ng-container i18n="@@shell.nav.desktop.agents">Agents</ng-container> }
+              @case ('privacy') { <ng-container i18n="@@shell.nav.desktop.privacy">Privacy</ng-container> }
+              @case ('support') { <ng-container i18n="@@shell.nav.desktop.support">Support</ng-container> }
+              @default { <ng-container i18n="@@shell.nav.desktop.home">Home</ng-container> }
+            }
+          </span>
+          <span class="fsb-navcue-line" aria-hidden="true"></span>
+        </button>
+        <ul class="fsb-navcue-list" id="fsb-navcue-list" style="--n: 5" i18n-aria-label="@@shell.footer.col.pages.title" aria-label="Pages">
+          <li [class.is-current]="depthPage === 'home'" [style.--i]="cueSlot('home')"><a routerLink="/" routerLinkActive="is-current" [routerLinkActiveOptions]="{exact: true}" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.nav.desktop.home">Home</span></a></li>
+          <li [class.is-current]="depthPage === 'about'" [style.--i]="cueSlot('about')"><a routerLink="/about" routerLinkActive="is-current" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.nav.desktop.about">About</span></a></li>
+          <li [class.is-current]="depthPage === 'agents'" [style.--i]="cueSlot('agents')"><a routerLink="/agents" routerLinkActive="is-current" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.nav.desktop.agents">Agents</span></a></li>
+          <li [style.--i]="cueSlot('dashboard')"><a routerLink="/dashboard"><span i18n="@@shell.nav.desktop.dashboard">Dashboard</span></a></li>
+          <li [class.is-current]="depthPage === 'privacy'" [style.--i]="cueSlot('privacy')"><a routerLink="/privacy" routerLinkActive="is-current" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.nav.desktop.privacy">Privacy</span></a></li>
+          <li [class.is-current]="depthPage === 'support'" [style.--i]="cueSlot('support')"><a routerLink="/support" routerLinkActive="is-current" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.nav.desktop.support">Support</span></a></li>
+        </ul>
+      </div>
+      }
       <div class="nav-actions">
         <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-sm btn-github" i18n="@@shell.nav.desktop.github" [attr.translate]="'no'">
           <i class="fa-brands fa-github"></i> GitHub
         </a>
       </div>
+      @if (!depthPage) {
       <button class="nav-toggle" [class.active]="mobileMenuOpen" i18n-aria-label="@@shell.nav.toggle.aria" aria-label="Toggle navigation" (click)="toggleMobileMenu()">
         <span></span>
         <span></span>
         <span></span>
       </button>
+      }
     </div>
   </nav>
+  @if (!depthPage) {
   <div class="nav-mobile" [class.active]="mobileMenuOpen">
     <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.home">Home</a>
     <a routerLink="/about" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.about">About</a>
@@ -41,13 +70,14 @@
     <a routerLink="/support" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.support">Support</a>
     <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.github" [attr.translate]="'no'"><i class="fa-brands fa-github"></i> GitHub</a>
   </div>
+  }
 }
 
 <main [class.shellless-main]="shellless">
   <ng-content></ng-content>
 </main>
 
-@if (!shellless && initialNavigationComplete) {
+@if (!shellless && !depthPage && initialNavigationComplete) {
   <footer class="footer">
     <div class="container">
       <div class="footer-inner">

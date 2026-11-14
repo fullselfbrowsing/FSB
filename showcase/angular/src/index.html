@@ -25,6 +25,18 @@
     })();
   </script>
 
+  <!-- Without JavaScript the depth pages (layout/depth) cannot move between their
+       planes, so they fall back to one ordinary scrolling column. -->
+  <noscript>
+    <style>
+      html:has(.fsb-depth), html:has(.fsb-depth) body { height: auto !important; overflow: auto !important; }
+      .fsb-depth { position: static !important; overflow: visible !important; }
+      .fsb-depth-layer { position: relative !important; inset: auto !important; min-height: 100vh; visibility: visible !important; pointer-events: auto !important; }
+      .fsb-depth-layer[data-scroll] { overflow: visible !important; -webkit-mask-image: none; mask-image: none; }
+      .fsb-depth-rail, .fsb-depth-ambient { display: none !important; }
+    </style>
+  </noscript>
+
   <link rel="icon" type="image/png" href="/assets/icon48.png">
   <!-- Organization JSON-LD (LD-01, D-10..D-12). Inherited by every prerendered route via index.html template. Payload is hand-authored single-line strict JSON; no field contains '<' so no \u003c escape pass is needed. Pattern: PITFALLS.md P4. Threat: T-LD-01 (XSS via JSON-LD injection). -->
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","@id":"https://full-selfbrowsing.com/#org","name":"FSB","alternateName":["Full Self-Browsing","Full Self Browsing"],"url":"https://full-selfbrowsing.com","logo":"https://full-selfbrowsing.com/assets/fsb_logo_dark.png","sameAs":["https://github.com/fullselfbrowsing/FSB","https://www.youtube.com/@parzival5707"]}</script>

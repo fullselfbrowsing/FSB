@@ -927,3 +927,122 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Phones: a plane has one screen and no scrolling of its own. Card groups become
+   rows swiped sideways (data-depth-swipe, styles/depth.scss) and everything else
+   is set more tightly. */
+@media (max-width: 600px) {
+  .agents-hero h1 {
+    margin-bottom: 12px;
+  }
+
+  .agents-hero p {
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+  }
+
+  .agents-hero-badge {
+    margin-bottom: 16px;
+  }
+
+  /* The space under the flow strip separated it from the next section of a
+     scrolling page; a plane ends there. */
+  .ag-flow-wrap {
+    padding-bottom: 0;
+  }
+
+  .ag-agent {
+    gap: 10px;
+    padding: 18px 18px 16px;
+  }
+
+  .ag-agent p {
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+
+  /* The other hosts sit on one line swiped sideways, label first. */
+  .ag-more {
+    margin-top: 16px;
+  }
+
+  .ag-more-label {
+    width: auto;
+    margin: 0 4px 0 0;
+    white-space: nowrap;
+  }
+
+  /* Two by two, sharing the dividers as the wider layouts do. */
+  .power-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .power-card {
+    padding: 14px 12px;
+    border-right: 1px solid var(--border-color);
+    border-bottom: 0;
+  }
+
+  .power-card-stat {
+    margin-bottom: 8px;
+  }
+
+  .power-card h3 {
+    margin-bottom: 6px;
+    font-size: 0.92rem;
+  }
+
+  .power-card p {
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+
+  .power-card code {
+    overflow-wrap: anywhere;
+  }
+
+  .skill-feature-card {
+    padding: 18px;
+  }
+
+  .skill-feature-icon {
+    margin-bottom: 10px;
+  }
+
+  .skill-feature-card p {
+    font-size: 0.86rem;
+    line-height: 1.55;
+  }
+
+  .ag-connect {
+    gap: 14px;
+    padding: 18px 16px;
+  }
+
+  .ag-connect p {
+    font-size: 0.86rem;
+  }
+
+  /* The host chips are a line swiped sideways inside the card, so the line runs
+     to the card's own edges. */
+  .ag-hosts {
+    --swipe-gutter: 16px;
+    --swipe-end: 16px;
+    --swipe-gap: 6px;
+  }
+
+  .prompt-card {
+    padding: 16px;
+  }
+
+  .prompt-card-body {
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+
+  .autopilot-rule {
+    margin-top: 16px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+  }
+}

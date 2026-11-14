@@ -80,7 +80,8 @@
               }
             ],
             "styles": [
-              "src/styles.scss"
+              "src/styles.scss",
+              "src/styles/depth.scss"
             ],
             "server": "src/main.server.ts",
             "security": {
@@ -159,7 +160,8 @@
               }
             ],
             "styles": [
-              "src/styles.scss"
+              "src/styles.scss",
+              "src/styles/depth.scss"
             ]
           }
         }
