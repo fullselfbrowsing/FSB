@@ -5492,6 +5492,10 @@
       return this._projectionSnapshot;
     }
 
+    getSnapshot() {
+      return Object.freeze({ attention: this._attention });
+    }
+
     getControlledTestRoot(token) {
       if (this._disposed || !this._mounted || !this._allowControlledFixture ||
           !this._fixtureToken || token !== this._fixtureToken) return null;

@@ -455,12 +455,47 @@
       } catch (_error) {
         // The router returns the closed route-malformed failure.
       }
+      // Under the Drive and Docs profile the route carries the same URL
+      // evidence the adapter registry routes on. Without an identity the
+      // router can only answer uncertain, and the contract view never opens.
+      const evidence = adapterEvidenceForUrl(rawUrl).filter(function (item) {
+        return item.signal !== 'visible-label';
+      });
+      const identity = routeIdentityFromEvidence(evidence);
+      if (!identity) {
+        return {
+          url: rawUrl,
+          contextKind: contextKind,
+          semanticIdentity: null,
+          evidence: []
+        };
+      }
       return {
         url: rawUrl,
-        contextKind: contextKind,
-        semanticIdentity: null,
-        evidence: []
+        contextKind: identity.contextKind,
+        semanticIdentity: { kind: identity.kind, id: identity.id },
+        evidence: evidence
       };
+    }
+
+    function routeIdentityFromEvidence(evidence) {
+      function valueOf(signal) {
+        const item = evidence.find(function (candidate) { return candidate.signal === signal; });
+        return item ? item.value : null;
+      }
+      const contextKind = valueOf('trusted-context-kind');
+      const docsId = valueOf('docs-document-id');
+      const driveId = valueOf('drive-item-id');
+      if (contextKind === 'agreement-reading' && docsId) {
+        return { contextKind: contextKind, kind: 'docs-document', id: docsId };
+      }
+      if (contextKind === 'vendor-folder' && driveId) {
+        return { contextKind: contextKind, kind: 'drive-folder', id: driveId };
+      }
+      if (contextKind === 'focused-ask' && driveId) {
+        return { contextKind: contextKind, kind: 'drive-file', id: driveId };
+      }
+      return null;
     }
 
     function routeUntrustedUrl(rawUrl, reason) {
@@ -690,8 +725,10 @@
     }
 
     function withdrawContractProjection() {
-      const owned = state.pendingContractToken !== null || state.contractViewToken !== null ||
-        state.contractAskState !== 'idle';
+      // Only a rendered view can be left behind. While a request is still
+      // pending nothing is on screen, so the shell's false means there was
+      // nothing to withdraw, not a failed withdrawal.
+      const owned = state.contractViewToken !== null || state.contractAskState !== 'idle';
       cancelContractAskBestEffort();
       const revokeClaim = contractRevokeClaim(
         state.contractViewToken,
@@ -1998,6 +2035,19 @@
         response.status === 'cancelled' && response.reason === 'cancelled';
     }
 
+    function leaveConsequenceGate() {
+      const restored = !!state.shell && state.shell.back() === true;
+      const shellSnapshot = restored && typeof state.shell.getSnapshot === 'function'
+        ? state.shell.getSnapshot()
+        : null;
+      if (!restored || !shellSnapshot || shellSnapshot.attention !== 'focused') {
+        requestKill('unsafe-layout');
+        return false;
+      }
+      state.attention = 'focused';
+      return true;
+    }
+
     async function finishConsequence(action, options) {
       const pending = state.pendingConsequence;
       const restoreFocused = action === 'skopeo:consequence-cancel' &&
@@ -2031,17 +2081,11 @@
       state.pendingConsequenceAction = null;
       if (action === 'skopeo:consequence-cancel') {
         if (!restoreFocused) return true;
-        const restored = state.shell && state.shell.back() === true;
-        const shellSnapshot = restored && typeof state.shell.getSnapshot === 'function'
-          ? state.shell.getSnapshot()
-          : null;
-        if (!restored || !shellSnapshot || shellSnapshot.attention !== 'focused') {
-          requestKill('unsafe-layout');
-          return false;
-        }
-        state.attention = 'focused';
-        return true;
+        return leaveConsequenceGate();
       }
+      // The shell only accepts a Focused result after Focused, so leave the
+      // gate before rendering what the confirmed action did.
+      if (!leaveConsequenceGate()) return false;
       const success = !!response && response.success === true;
       const typed = success
         ? deepFreeze({
@@ -2726,6 +2770,23 @@
       requestKill('navigation');
     }
 
+    // The shell projects a new route only from Ambient. An in-page navigation
+    // can arrive while the HUD is Anchored or Focused, so collapse it first;
+    // composeAndRender('initial') re-anchors on the new context.
+    function returnShellToAmbient() {
+      if (!state.shell) return false;
+      const shellSnapshot = typeof state.shell.getSnapshot === 'function'
+        ? state.shell.getSnapshot()
+        : null;
+      const attention = shellSnapshot && typeof shellSnapshot.attention === 'string'
+        ? shellSnapshot.attention
+        : state.attention;
+      if (attention === 'ambient') return true;
+      if (typeof state.shell.render !== 'function' || state.shell.render('ambient', {}) !== true) return false;
+      state.attention = 'ambient';
+      return true;
+    }
+
     function handleRouteChange(message) {
       if (!isExactRouteChange(message) || message.generation !== state.generation ||
           !isLive(state.generation) || state.phase !== 'active' || !state.mounted) {
@@ -2744,7 +2805,7 @@
       state.pendingConsequence = null;
       state.pendingConsequenceAction = null;
       invalidatePendingArguments();
-      if (!routeUntrustedUrl(message.url, 'navigation') ||
+      if (!returnShellToAmbient() || !routeUntrustedUrl(message.url, 'navigation') ||
           !resolveAdaptiveContext(message.url) || !composeAndRender('initial', null, null, [])) {
         requestKill('navigation');
         return false;

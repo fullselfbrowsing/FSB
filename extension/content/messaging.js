@@ -1233,6 +1233,13 @@
 
   // Named message handler function - allows Chrome to dedupe on re-injection
   function handleBackgroundMessage(request, sender, sendResponse) {
+    // The Skopeo runtime shares this isolated world and answers skopeo:*
+    // itself. Chrome keeps the first sendResponse, so this listener must stay
+    // silent for those actions or its 'Unknown action' reply wins.
+    if (request && typeof request.action === 'string' && request.action.indexOf('skopeo:') === 0) {
+      return false;
+    }
+
     // Store sessionId from any incoming message for logging
     if (request.sessionId) {
       FSB.sessionId = request.sessionId;

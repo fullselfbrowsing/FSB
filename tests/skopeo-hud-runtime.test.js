@@ -2439,6 +2439,75 @@ async function testContentRuntimeAdmissionMatrix(runtimeSource) {
   assertNoContentPrivilege(runtimeSource);
 }
 
+// The fixture router above ignores identity and evidence. These cases route
+// through the production context router and a shell whose withdrawCorpus()
+// answers like the real one (false when nothing is mounted).
+async function testContentRuntimeProductionRouterAndClosedContract() {
+  const productionRouter = require('../extension/content/skopeo-context-router.js');
+  function useProductionRouter(harness) {
+    const fixture = harness.window.FSBSkopeoContextRouter;
+    harness.window.FSBSkopeoContextRouter = {
+      createRouter(options) {
+        // The fixture router still runs so the fixture resolver's shared
+        // context epoch advances in step; the production answer is returned.
+        const fixtureRouter = fixture.createRouter(options);
+        const router = productionRouter.createRouter(options);
+        return {
+          route(input) { fixtureRouter.route(input); return router.route(input); },
+          dispose() { fixtureRouter.dispose(); return router.dispose(); }
+        };
+      }
+    };
+  }
+  function withdrawLikeRealShell(shell) {
+    let mounted = false;
+    const render = shell.renderContractView;
+    shell.renderContractView = function (model, onAction) {
+      const rendered = render.call(this, model, onAction);
+      if (rendered) mounted = true;
+      return rendered;
+    };
+    shell.withdrawCorpus = function () {
+      this.withdrawals += 1;
+      if (this.destroyed) return false;
+      const had = mounted;
+      mounted = false;
+      return had;
+    };
+  }
+
+  for (const [url, mode] of [
+    ['https://docs.google.com/document/d/agreement-A/edit', 'reading'],
+    ['https://drive.google.com/drive/folders/vendor-root-A', 'folder']
+  ]) {
+    const harness = createContentRuntimeHarness({
+      url,
+      hudResponses: [message => contentProjection(message, mode)]
+    });
+    useProductionRouter(harness);
+    const started = harness.start();
+    await flushContentRuntime();
+    assert.strictEqual(started.committed, true, `${mode}: production routing commits`);
+    assert.strictEqual(harness.hudMessages().length, 1,
+      `${mode}: the production router recognizes the route, so the contract view is requested`);
+    assert.deepStrictEqual(started.shell.renderedContracts.map(model => model.mode), [mode],
+      `${mode}: the requested contract view renders`);
+  }
+
+  for (const label of ['contract-closed', 'null response']) {
+    const harness = createContentRuntimeHarness({
+      hudResponses: [label === 'null response' ? null : message => contentProjection(message, 'contract-closed')]
+    });
+    const started = harness.start();
+    withdrawLikeRealShell(started.shell);
+    await flushContentRuntime();
+    const snapshot = harness.api.getSnapshot();
+    assert.strictEqual(started.shell.destroyed, false,
+      `${label}: nothing was rendered yet, so withdrawing it does not destroy the shell`);
+    assert.strictEqual(snapshot.phase, 'active', `${label}: Skopeo stays active`);
+  }
+}
+
 async function testContentRuntimeReplacementAndActions() {
   const staleProjection = deferred();
   const staleHarness = createContentRuntimeHarness({
@@ -3641,6 +3710,7 @@ async function runHudRuntimeContract() {
     testContentRuntimeStaticContract(sources);
     await testContentRuntimeAdmissionMatrix(sources.runtime);
     await testContentRuntimeReplacementAndActions();
+    await testContentRuntimeProductionRouterAndClosedContract();
     await testContentAskRuntimeLifecycle();
     await testContentAskConfirmationRouting();
     await testContentAlertConfirmationRouting();

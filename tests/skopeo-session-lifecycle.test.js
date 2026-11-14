@@ -2604,10 +2604,147 @@ function testRuntimeLeavesForeignMessagesUnanswered() {
   assert.equal(probeReplies, 1, 'skopeo:probe is still answered');
 }
 
+// The reverse direction: FSB's own content listener shares the isolated world
+// and is often registered first. Chrome keeps the first sendResponse, so it
+// must stay silent for skopeo:* or its 'Unknown action' reply wins.
+function testFsbListenerLeavesSkopeoMessagesUnanswered() {
+  const source = fs.readFileSync(path.join(__dirname, '../extension/content/messaging.js'), 'utf8');
+  const start = source.indexOf('  function handleBackgroundMessage(');
+  const end = source.indexOf('\n  // Register the named function', start);
+  assert.ok(start !== -1 && end > start, 'messaging.js exposes handleBackgroundMessage');
+  const sandbox = {
+    FSB: { sessionId: null },
+    logger: { logComm() {}, error() {}, warn() {}, debug() {}, info() {}, log() {} },
+    handleAsyncMessage() {},
+    console
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(source.slice(start, end) + '\nthis.handleBackgroundMessage = handleBackgroundMessage;', sandbox);
+  for (const action of [
+    'skopeo:configure', 'skopeo:prepare', 'skopeo:commit',
+    'skopeo:probe', 'skopeo:terminate', 'skopeo:route-change'
+  ]) {
+    let replies = 0;
+    const result = sandbox.handleBackgroundMessage({ action, generation: 1 }, { id: 'ext' }, () => { replies += 1; });
+    assert.equal(replies, 0, `${action}: FSB's listener leaves the reply to the Skopeo runtime`);
+    assert.equal(result, false, `${action}: FSB's listener keeps no response channel open`);
+  }
+  let unknownReply = null;
+  sandbox.handleBackgroundMessage({ action: 'not-a-real-action' }, { id: 'ext' }, (value) => { unknownReply = value; });
+  assert.deepEqual(plain(unknownReply), { error: 'Unknown action' }, 'other unknown actions still get the default reply');
+}
+
+// The real shell accepts a Focused render only after Focused, Anchored or
+// Ambient. After a confirmed write the runtime must leave the gate first.
+async function testRuntimeConfirmLeavesGateBeforeResult() {
+  const url = 'https://app.notion.com/workspace';
+  const generation = 34;
+  const token = 'sg1_' + 'f'.repeat(64);
+  const harness = createRuntimeHarness({
+    url,
+    runtimeResponder(message) {
+      if (message.action === 'skopeo:consequence-open') {
+        return {
+          status: 'open',
+          actionToken: token,
+          confirmation: {
+            actionSlug: 'notion.update_page',
+            actionLabel: 'Update page',
+            target: 'Page ID: reviewed-page',
+            effect: 'Update one page',
+            parameterSummary: 'Page title: Ordinary review.',
+            gerund: 'Updating one page'
+          }
+        };
+      }
+      if (message.action === 'skopeo:consequence-confirm') return { success: true };
+      return undefined;
+    }
+  });
+  const api = harness.evaluate();
+  const projection = CAPABILITY_PROJECTOR.createProjection({ tabId: 134, generation, url }, PROFILE_INDEX);
+  assert.equal(api.configure({
+    action: 'skopeo:configure', generation, projection: harness.toContent(projection)
+  }), true);
+  assert.equal(api.prepare({ action: 'skopeo:prepare', generation }), true);
+  assert.equal(api.commit({ action: 'skopeo:commit', generation }), true);
+  const shell = harness.shells[0];
+  const fakeRenderAdaptive = shell.renderAdaptive;
+  shell.renderAdaptive = function (model, atoms) {
+    if (model && model.attention === 'focused' &&
+        !['ambient', 'anchored', 'focused'].includes(this.attention)) return false;
+    return fakeRenderAdaptive.call(this, model, atoms);
+  };
+  const group = projection.capabilityGroups.find(candidate => candidate.capabilities.some(
+    row => row.slug === 'notion.update_page'
+  ));
+  const row = group.capabilities.find(candidate => candidate.slug === 'notion.update_page');
+  const selected = currentAdaptivePayload(projection, {
+    kind: 'select-action',
+    groupId: group.id,
+    actionSlug: row.slug,
+    sideEffectClass: row.sideEffectClass
+  });
+  assert.equal(shell.adaptiveAction(harness.toContent(selected)), true);
+  const collectionEpoch = shell.adaptiveModels.at(-1).argumentCollection.collectionEpoch;
+  await shell.adaptiveAction(harness.toContent(Object.assign({}, selected, {
+    kind: 'submit-arguments',
+    collectionEpoch,
+    values: boundaryValues(row.argumentContract, false)
+  })));
+  await drainRuntimeWork();
+  assert.equal(shell.attention, 'interstitial', 'accepted values open the gate');
+
+  shell.adaptiveAction(harness.toContent(Object.assign({}, selected, { kind: 'confirm-consequence' })));
+  await drainRuntimeWork();
+  assert.equal(harness.outbound.filter(message => message.action === 'skopeo:consequence-confirm').length, 1,
+    'the confirmed action is sent once');
+  assert.equal(shell.backCalls, 1, 'the runtime leaves the gate exactly once');
+  assert.equal(shell.destroyed, false, 'a confirmed action keeps Skopeo running');
+  assert.equal(shell.attention, 'focused', 'the result renders in Focused attention');
+  assert.equal(shell.adaptiveModels.at(-1).rendererRequest.resultStatus, 'success',
+    'the confirmed result is what the shell shows');
+  assert.equal(api.getSnapshot().attention, 'focused', 'runtime attention agrees with the shell');
+}
+
+// The real shell projects a new route only from Ambient. An in-page
+// navigation that arrives while the HUD is Anchored must not kill Skopeo.
+function testRuntimeRouteChangeFromAnchored() {
+  const harness = createRuntimeHarness();
+  const api = harness.evaluate();
+  prepareAndCommit(harness, 9);
+  const shell = harness.shells[0];
+  const fakeProjectContext = shell.projectContext;
+  shell.projectContext = function (model) {
+    if (this.attention !== 'ambient') return false;
+    return fakeProjectContext.call(this, model);
+  };
+  shell.render = function (attention) {
+    this.renderCalls += 1;
+    if (this.destroyed || !this.mounted) return false;
+    if (attention !== 'ambient' && !this.fixtureEnabled) return false;
+    this.attention = attention;
+    return true;
+  };
+  shell.attention = 'anchored';
+  const routed = harness.deliver({
+    action: 'skopeo:route-change',
+    generation: 9,
+    url: 'https://drive.google.com/drive/u/0/folders/folder-E'
+  });
+  assert.ok(routed && routed.success === true, 'route change from Anchored reroutes in place');
+  assert.equal(shell.destroyed, false, 'route change from Anchored keeps the shell');
+  assert.equal(shell.contextProjections.length, 2, 'the new route is projected once');
+  assert.equal(api.getSnapshot().phase, 'active', 'Skopeo stays active after the route change');
+}
+
 async function testRuntimeIntegration() {
   testRealProjectionConfigureLifecycle();
   testRuntimePrepareCommitAndProbe();
   testRuntimeLeavesForeignMessagesUnanswered();
+  testFsbListenerLeavesSkopeoMessagesUnanswered();
+  await testRuntimeConfirmLeavesGateBeforeResult();
+  testRuntimeRouteChangeFromAnchored();
   await testRuntimeCancelsUnrenderableConsequence();
   await testTrustedAndSyntheticEscapeBoundary();
   testRuntimeContextAndAnchorAuthority();
