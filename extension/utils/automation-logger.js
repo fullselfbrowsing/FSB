@@ -66,10 +66,23 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.LOG_REPLACE, logs: boundedLogs });
   }
 
-  function trustedLoadAutomationLogs() {
-    const store = getTrustedFeatureStore();
+  // In the service worker the trusted store is published by an async boot.
+  // Before it lands the sendMessage fallback cannot help: a worker never
+  // receives its own runtime messages. Other contexts have no boot promise
+  // and keep using sendMessage.
+  async function trustedFeatureStoreAfterBoot() {
+    const existing = getTrustedFeatureStore();
+    if (existing) return existing;
+    const boot = globalThis.fsbTrustedLocalBootPromise;
+    if (!boot || typeof boot.then !== 'function') return null;
+    try { await boot; } catch (_error) { /* a failed boot leaves the store unset */ }
+    return getTrustedFeatureStore();
+  }
+
+  async function trustedLoadAutomationLogs() {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.loadAutomationLogs === 'function') {
-      return Promise.resolve(store.loadAutomationLogs());
+      return store.loadAutomationLogs();
     }
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.LOG_LOAD });
   }
@@ -731,6 +744,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       this.storageMode = 'full';
       this.actionRecords = [];
       this._persistTimer = null;
+      this._pendingLogLoad = null;
       // Session history and MCP-retention both mutate the same three storage
       // keys. Keep every read-modify-write cycle on one chain so simultaneous
       // MCP closes cannot replace each other's saves.
@@ -1274,6 +1288,12 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     async _persistLogsUnlocked() {
       // Guard against invalidated extension context (service worker killed mid-timer)
       if (typeof chrome === 'undefined' || !chrome.runtime?.id) return;
+      // The store can appear before the boot promise settles. Writing the tail
+      // before the wake-time load has merged would replace the previous
+      // worker's entries with this worker's alone.
+      if (this._pendingLogLoad) {
+        try { await this._pendingLogLoad; } catch (_error) { /* load reports its own failure */ }
+      }
       try {
         const recentLogs = filterPersistedSessionLogs(this.logs)
           .slice(-AUTOMATION_LOGS_PERSISTED_TAIL);
@@ -1290,6 +1310,16 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     async loadLogs() {
       // Guard against invalidated extension context (service worker killed or extension reloaded)
       if (typeof chrome === 'undefined' || !chrome.runtime?.id) return;
+      const loading = this._mergePersistedLogs();
+      this._pendingLogLoad = loading;
+      try {
+        await loading;
+      } finally {
+        if (this._pendingLogLoad === loading) this._pendingLogLoad = null;
+      }
+    }
+
+    async _mergePersistedLogs() {
       try {
         const result = await trustedLoadAutomationLogs();
         const persisted = result && Array.isArray(result.logs) ? result.logs : [];

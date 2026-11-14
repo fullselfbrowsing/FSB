@@ -473,6 +473,64 @@ async function adopt(options) {
       'persisted tail is large enough to hold a short run');
   }
 
+  // 6b. The real wake order: background calls loadLogs during top-level
+  // evaluation, before its trusted-store boot has published the store. A
+  // worker's sendMessage never reaches its own listener, so the load has to
+  // wait for the boot, and a persist must not replace the tail before the
+  // merge lands.
+  console.log('\n--- automation logger: wake load waits for the trusted-store boot ---');
+  {
+    const loggerSource = fs.readFileSync(path.resolve(__dirname, '../extension/utils/automation-logger.js'), 'utf8');
+    let storedTail = [
+      { timestamp: '2026-08-22T07:45:52.000Z', level: 'info', message: 'previous worker: run finished', data: {} }
+    ];
+    let sendMessageCalls = 0;
+    let finishBoot;
+    const store = {
+      async loadAutomationLogs() { return { ok: true, logs: storedTail.slice() }; },
+      async replaceAutomationLogs(logs) { storedTail = logs.slice(); return { ok: true }; }
+    };
+    const context = vm.createContext({
+      globalThis: null,
+      console: { log() {}, warn() {}, error() {} },
+      setTimeout, clearTimeout, setInterval, clearInterval, Date, Math, JSON, Promise, Set, Map, Array, Object, Number, String,
+      TextEncoder,
+      chrome: {
+        runtime: {
+          id: 'ext',
+          lastError: null,
+          sendMessage(_message, callback) {
+            sendMessageCalls += 1;
+            context.chrome.runtime.lastError = { message: 'Receiving end does not exist.' };
+            callback(undefined);
+            context.chrome.runtime.lastError = null;
+          }
+        }
+      }
+    });
+    context.globalThis = context;
+    context.fsbTrustedLocalBootPromise = new Promise((resolve) => { finishBoot = resolve; });
+    vm.runInContext(loggerSource, context);
+    const logger = context.automationLogger;
+    logger.logs = [{ timestamp: '2026-08-22T07:47:44.000Z', level: 'info', message: 'new worker: boot', data: {} }];
+
+    const wake = logger.loadLogs();
+    await Promise.resolve();
+    // The boot publishes the store before its promise settles (the corpus
+    // boundary still runs), and a debounced persist can fire in that window.
+    context.fsbTrustedLocalFeatureStore = store;
+    const earlyPersist = logger.persistLogs();
+    await new Promise((resolve) => setImmediate(resolve));
+    finishBoot(store);
+    await wake;
+    await earlyPersist;
+    check(sendMessageCalls === 0, 'the wake load waits for the boot instead of a sendMessage that cannot arrive');
+    check(logger.logs.map((entry) => entry.message).join('|') === 'previous worker: run finished|new worker: boot',
+      'the previous worker tail is merged on wake');
+    check(storedTail.map((entry) => entry.message).join('|') === 'previous worker: run finished|new worker: boot',
+      'a persist during the boot window keeps the previous worker tail');
+  }
+
   // -------------------------------------------------------------------------
   // 7. The terminal answer is delivered on hydrated renders too, exactly once.
   //    A raced tab-surface sync can leave the panel unsubscribed while the run
