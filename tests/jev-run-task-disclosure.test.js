@@ -402,11 +402,17 @@ async function queryStringsNeverSent() {
       && r.client.calls[0].request.page && r.client.calls[0].request.page.path === '/r/' + token + '/fixtures/checklist/index.html',
     'query strings never sent (' + token.length + '-character token): the goal is "Tick Alpha." and the page travels as origin and path only');
   }
-  // Recorded for M-70-09: a URL inside the task text that is not a page-matching Open sentence stays part of the task text.
-  const offPage = 'Open https://shop.example/cart?q=1. Tick Alpha.';
+  // M-70-09: a URL inside the task text that is not a page-matching Open
+  // sentence stays part of the task text, but only as origin and path. The
+  // privacy disclosure promises query strings and fragments are never sent.
+  const offPage = 'Open https://shop.example/cart?q=1#frag. Tick Alpha.';
   const r = await runTaskAttempt(offPage, fixtureUrl(TOKEN_24));
   const goal = r.client.calls.length === 1 ? r.client.calls[0].request.goal : null;
-  console.log('  INFO (M-70-09): an Open URL for another page stays in the task text, query included: goal = ' + JSON.stringify(goal));
+  const wire = r.client.calls.length === 1 ? String(r.client.calls[0].init.body) : '';
+  check(goal === 'Open https://shop.example/cart. Tick Alpha.',
+    'an Open URL for another page keeps origin and path only: goal = ' + JSON.stringify(goal));
+  check(wire.length > 0 && wire.indexOf('q=1') === -1 && wire.indexOf('frag') === -1,
+    'the off-page query and fragment never reach the wire');
 }
 
 async function secretStillSendsNothing() {

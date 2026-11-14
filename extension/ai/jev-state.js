@@ -679,6 +679,29 @@
     return { origin: parsed.origin, path: reducedPath };
   }
 
+  // An http(s) URL inside free text runs up to whitespace, quotes or brackets;
+  // sentence punctuation right after it belongs to the prose, not the URL.
+  var GOAL_URL_RE = /\bhttps?:\/\/[^\s<>"'`]+/gi;
+  var URL_TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}]+$/;
+
+  /**
+   * Reduce each http(s) URL in the task text that carries a query, fragment or
+   * userinfo to its origin and path, the same rule page.path follows (D-20).
+   * The privacy disclosure promises query strings and fragments never reach
+   * FSB's server, and a URL can sit anywhere in the goal. A URL that does not
+   * parse keeps only what precedes '?' or '#'. Other text is unchanged.
+   */
+  function reduceGoalUrls(goal) {
+    if (typeof goal !== 'string') return goal;
+    return goal.replace(GOAL_URL_RE, function reduceOne(match) {
+      var trailing = (match.match(URL_TRAILING_PUNCTUATION_RE) || [''])[0];
+      var url = trailing ? match.slice(0, match.length - trailing.length) : match;
+      if (!/[?#@]/.test(url)) return match;
+      var reduced = toOriginPath(url);
+      return (reduced ? reduced.origin + reduced.path : url.split(/[?#]/)[0]) + trailing;
+    });
+  }
+
   var DROPPED_INPUT_TYPES = ['password', 'hidden', 'file'];
   var DROPPED_AUTOCOMPLETE_TOKENS = ['one-time-code', 'current-password', 'new-password'];
 
@@ -848,7 +871,9 @@
     }
     actions = actions.slice(Math.max(0, actions.length - CAPS.recentActions));
 
-    var goal = truncateCodePoints(input.goal, CAPS.goalChars);
+    // D-19 checked the raw goal for secrets above; now drop URL queries and
+    // fragments before it is cut and sent.
+    var goal = truncateCodePoints(reduceGoalUrls(input.goal), CAPS.goalChars);
     var page = {
       origin: reduced.origin,
       path: truncateCodePoints(reduced.path, CAPS.pathChars),
@@ -952,6 +977,7 @@
     validateGatewayResponse: validateGatewayResponse,
     buildRequest: buildRequest,
     toOriginPath: toOriginPath,
+    reduceGoalUrls: reduceGoalUrls,
     utf8ByteLength: utf8ByteLength,
     codePointLength: codePointLength
   };

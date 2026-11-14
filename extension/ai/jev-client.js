@@ -153,9 +153,12 @@
    * the text, title, labels and roles are scrubbed and filtered, and the
    * origin + path are exactly what toOriginPath reduces them to (no query,
    * fragment, dot segment or unscrubbed segment). The goal is checked by
-   * validateRequest (sensitive_goal).
+   * validateRequest (sensitive_goal), and any URL inside it must already be
+   * reduced to origin + path (no query or fragment).
    */
   function isSanitizedRequest(state, request) {
+    if (typeof state.reduceGoalUrls !== 'function' ||
+        state.reduceGoalUrls(request.goal) !== request.goal) return false;
     var page = request.page;
     if (!isSanitizedText(state, page.text) || !isSanitizedText(state, page.title)) return false;
     for (var i = 0; i < request.elements.length; i += 1) {
