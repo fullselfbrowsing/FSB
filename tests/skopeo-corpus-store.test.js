@@ -1138,6 +1138,51 @@ async function testTombstoneFirstSourceAndPartitionPurge(contracts) {
   check(true, 'tombstone-first purge verifies all seven future participant categories absent');
 }
 
+// A partition key can be enrolled again after a purge. Its completed purge
+// journal must not stand in for the next purge, or the re-enrolled sources and
+// participant data survive a purge that reports success.
+async function testRepeatedPartitionPurgeAfterReEnrollment(contracts) {
+  const harness = createCorpusHarness(contracts);
+  const { AX } = harness.fixtures.partitions;
+  const source1 = harness.fixtures.SOURCE_1;
+  const source2 = harness.fixtures.SOURCE_2;
+  await activateCorpus(harness, AX, [source1], 'checkpoint-first-enrollment');
+  const first = await mutate(harness.store,
+    (guard) => harness.store.purgePartition(AX, 'user-withdrawn', guard));
+  assert.equal(first && first.ok, true, 'first partition purge completes');
+  assert.equal(harness.future.countPartition(AX), 0, 'first purge empties the partition');
+
+  await activateCorpus(harness, AX, [source2], 'checkpoint-second-enrollment');
+  // Participants (fragments, citations, alerts...) own data for the new source.
+  harness.future.seed(AX, source2);
+  assert.equal(harness.future.countPartition(AX) > 0, true, 're-enrollment owns new partition data');
+  harness.controller.reset();
+  const second = await mutate(harness.store,
+    (guard) => harness.store.purgePartition(AX, 'user-withdrawn', guard));
+  assert.equal(second && second.ok, true, 'second partition purge completes');
+  for (const name of PURGE_PARTICIPANTS) {
+    assert.ok(harness.controller.trace.some((entry) => entry.timing === 'before' &&
+      entry.type === `participant.${name}.purgePartition`),
+    `${name} purges the re-enrolled partition`);
+  }
+  assert.equal(harness.future.countPartition(AX), 0,
+    'the second purge removes everything the re-enrollment created');
+  const sourceKey = contracts.schema.makeSourceKey({ ...AX, sourceFileId: source2 });
+  // The source's own purge journal legitimately stays; the record must not.
+  assert.equal(Object.keys(harness.values).some((key) =>
+    key.endsWith(':source:' + sourceKey) && !key.includes(':journal:')), false,
+  'the re-enrolled source record is gone');
+
+  harness.controller.reset();
+  const repeat = await mutate(harness.store,
+    (guard) => harness.store.purgePartition(AX, 'user-withdrawn', guard));
+  assert.equal(repeat && repeat.ok, true, 'repeating a purge of a purged partition still succeeds');
+  assert.equal(harness.controller.trace.some((entry) => entry.timing === 'before' &&
+    entry.type.endsWith('.purgePartition')), false,
+  'a purge of an already-purged partition is still an idempotent no-op');
+  check(true, 'a re-enrolled partition is purged again in full');
+}
+
 async function testClosedInputCorruptionAndConcurrency(contracts) {
   const { schema } = contracts;
   const invalidHarness = createCorpusHarness(contracts, { register: false });
@@ -1937,6 +1982,7 @@ async function runCorpusStoreContract() {
   await testMetadataMinimizedHiddenSourceStates(contracts);
   await testProcessedInvalidationRetainsPendingState(contracts);
   await testTombstoneFirstSourceAndPartitionPurge(contracts);
+  await testRepeatedPartitionPurgeAfterReEnrollment(contracts);
   await testClosedInputCorruptionAndConcurrency(contracts);
   await testParticipantAuthorizationBridge(contracts);
   await testAuthorityEpochBoundPublication(contracts);

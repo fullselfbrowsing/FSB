@@ -1012,6 +1012,39 @@ async function testOpaqueRemovalAndAuthoritativeMissing(Reconciler) {
   assertNoDurableBodyOrAuthority(harness.store);
 }
 
+// The changes feed covers the whole Drive account. A file outside the corpus
+// root that changes during a scan, or between scans, was never a source and
+// must not be stored, or it is carried forward as 'missing' on every rescan.
+async function testOutsideCorpusHintsAreNeverStored(Reconciler) {
+  const external = () => [{
+    fileId: 'external-target', removed: false, time: null,
+    file: clone(baseGraph().get('external-target'))
+  }];
+  const harness = createHarness(Reconciler, { transportOptions: {
+    hiddenUntilChanges: [],
+    changePages: [external()]
+  } });
+  const built = await harness.reconciler.buildInitialInventory(exactContext());
+  assert.equal(built.ok, true, 'inventory completes with an outside file in the change feed');
+  assert.equal(sourceById(harness.store, 'external-target'), null,
+    'an outside file hinted during the initial scan is not stored');
+
+  harness.transport.changePages = [external()];
+  const reconciled = await harness.reconciler.reconcileChanges(exactContext());
+  assert.equal(reconciled.ok, true, 'incremental changes complete with an outside file in the feed');
+  assert.equal(sourceById(harness.store, 'external-target'), null,
+    'an outside file hinted between scans is not stored');
+
+  harness.transport.changePages = [[]];
+  const noToken = createHarness(Reconciler, {
+    transport: harness.transport, authority: harness.authority, store: harness.store, trace: harness.trace
+  });
+  const resumed = await noToken.reconciler.resume(exactContext());
+  assert.equal(resumed.ok, true);
+  assert.equal(sourceById(harness.store, 'external-target'), null,
+    'a later full rescan has nothing outside the root to carry forward');
+}
+
 async function testChangePaginationDedupAndRecovery(Reconciler) {
   const harness = createHarness(Reconciler, { transportOptions: { hiddenUntilChanges: [], changePages: [[]] } });
   assert.equal((await harness.reconciler.buildInitialInventory(exactContext())).ok, true);
@@ -1477,6 +1510,7 @@ async function main() {
   await testHintReproofAndFingerprintDecisions(Reconciler);
   await testHashFallbackRenameAndMovePreserveParticipants(Reconciler);
   await testOpaqueRemovalAndAuthoritativeMissing(Reconciler);
+  await testOutsideCorpusHintsAreNeverStored(Reconciler);
   await testChangePaginationDedupAndRecovery(Reconciler);
   await testIncompleteCyclesBoundsAndIdentityDrift(Reconciler);
   await testCapabilityBoundReadGateAndCommitRaces(Reconciler);

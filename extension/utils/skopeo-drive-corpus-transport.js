@@ -363,6 +363,15 @@
 
     function mintResourceKey(sourceFileId, rawResourceKey) {
       var previous = currentResourceKeys.get(sourceFileId);
+      // Keep the handle while the key is unchanged. Every getFile republishes
+      // the file, and re-minting here would stale a handle the authority
+      // already holds for this file, failing its next read as unsupported.
+      var previousRecord = previous ? resourceKeyRecords.get(previous) : null;
+      if (previousRecord && rawResourceKey !== null &&
+          previousRecord.sourceFileId === sourceFileId &&
+          previousRecord.rawResourceKey === rawResourceKey) {
+        return previous;
+      }
       if (previous) resourceKeyRecords.delete(previous);
       currentResourceKeys.delete(sourceFileId);
       if (rawResourceKey === null) return null;

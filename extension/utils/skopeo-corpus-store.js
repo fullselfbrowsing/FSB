@@ -1552,7 +1552,9 @@
       var partitionKey = partitionStorageKey(parsed.partitionKey);
       var partitionResult = await readPartition(parsed.partitionKey, mutation);
       var partitionEpoch = partitionResult.record ? partitionResult.record.partitionEpoch + 1 : 1;
-      if (!partitionResult.record || partitionResult.record.lifecycle !== 'purged') {
+      var partitionWasPurged = !!partitionResult.record &&
+        partitionResult.record.lifecycle === 'purged';
+      if (!partitionWasPurged) {
         await writeOne(
           partitionKey,
           partitionRecord(schema, parsed.tuple, parsed.partitionKey, 'purging', partitionEpoch),
@@ -1566,12 +1568,18 @@
         ? parsePartitionJournal(schema, journalEntry.value)
         : null;
       if (journalEntry.present && !existingJournal) return failed('recovery-pending');
+      // A complete journal only stands for this partition while it is still
+      // purged. A partition re-enrolled under the same key has new sources and
+      // participant data, so its next purge starts a fresh journal. A crash
+      // between 'complete' and the 'purged' write just repeats idempotent work.
+      var reuseJournal = !!existingJournal &&
+        (existingJournal.state !== 'complete' || partitionWasPurged);
       var journal = partitionJournal(
         parsed.tuple,
         parsed.partitionKey,
-        existingJournal ? existingJournal.reason : reason,
-        existingJournal && existingJournal.state === 'complete' ? 'complete' : 'pending',
-        existingJournal ? existingJournal.cursor : 0
+        reuseJournal ? existingJournal.reason : reason,
+        reuseJournal && existingJournal.state === 'complete' ? 'complete' : 'pending',
+        reuseJournal ? existingJournal.cursor : 0
       );
 
       if (journal.state !== 'complete') {

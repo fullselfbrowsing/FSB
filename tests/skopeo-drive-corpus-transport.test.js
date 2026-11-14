@@ -633,6 +633,14 @@ async function testBackgroundTransport(transportModule) {
     'raw resourceKey cannot escape trusted transport metadata');
   assertNoRawProviderLeak(file, 'wrapped file');
 
+  // Every getFile republishes the file. With the same raw key the handle must
+  // survive, or a handle the authority already holds fails its next read.
+  queue.push({ kind: 'ok', status: 200, data: makeFile() });
+  const republished = await transport.getFile({ fileId: 'file-1' });
+  assert.equal(republished.kind, 'ok');
+  assert.strictEqual(republished.value.resourceKey, file.value.resourceKey,
+    'an unchanged resourceKey keeps its opaque handle across reads');
+
   queue.push({ kind: 'ok', status: 200, data: makeFile({ resourceKey: null }) });
   const keyedFile = await transport.getFile({
     fileId: 'file-1', resourceKey: file.value.resourceKey

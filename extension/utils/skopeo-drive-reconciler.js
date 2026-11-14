@@ -977,6 +977,16 @@
         sameCanonical(schema, membership, certificate.membershipFingerprint);
     }
 
+    // The Drive changes feed covers the whole account. A hinted file with no
+    // record in this run or the stored corpus that the authority will not
+    // certify under the root was never a source; staging it would carry it
+    // forward as 'missing' on every rescan until the source cap is hit.
+    // Pending decisions still stage, so a transient failure is retried.
+    function hintNeverInCorpus(previous, decision) {
+      return previous === null && !!decision && decision.ok === true &&
+        decision.uncertified === true;
+    }
+
     function withheldDecision(context, sourceFileId, previous, decisionKind) {
       if (decisionKind === 'closed') return failed('closed', false);
       var state = decisionKind === 'inaccessible' ? 'inaccessible' : 'pending';
@@ -1063,12 +1073,18 @@
         stopOperation(operation);
       }
       if (!result || result.decision !== 'admitted') {
-        return withheldDecision(
+        var withheld = withheldDecision(
           context,
           sourceFileId,
           previous,
           result && result.decision ? result.decision : 'pending'
         );
+        // The authority would not certify this file under the corpus root.
+        // Change-feed callers use this to drop files that were never sources.
+        if (withheld.ok && result && result.decision === 'inaccessible') {
+          withheld.uncertified = true;
+        }
+        return withheld;
       }
       return result.value && typeof result.value.ok === 'boolean'
         ? result.value
@@ -1475,6 +1491,7 @@
             budget
           );
           if (!hinted.ok) return hinted;
+          if (hintNeverInCorpus(prior, hinted)) continue;
           var replaced = await replaceStagedRecord(context, stagedSnapshot.handle, prior, hinted);
           if (!replaced.ok) return replaced;
           records.set(hintedId, hinted.record);
@@ -1592,16 +1609,18 @@
         var sourceIds = Array.from(drained.hints.keys()).sort();
         for (var index = 0; index < sourceIds.length; index += 1) {
           var sourceFileId = sourceIds[index];
+          var previousRecord = previousRecords.get(sourceFileId) || null;
           var decision = await reconcileOneCertified(
             context,
             sourceFileId,
-            previousRecords.get(sourceFileId) || null,
+            previousRecord,
             budget
           );
           if (!decision.ok) {
             if (decision.folder) return fullRescan(context, 'full-rescan');
             return decision;
           }
+          if (hintNeverInCorpus(previousRecord, decision)) continue;
           records.set(sourceFileId, decision.record);
           decisions.set(sourceFileId, decision);
         }
