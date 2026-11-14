@@ -29,6 +29,19 @@
     'Do not return URLs, source identities, action identifiers, scores, tools, prose, or markdown.'
   ].join(' ');
 
+  // Providers report the model that served a call, and an alias commonly comes
+  // back as a dated snapshot or variant (gpt-4o -> gpt-4o-2024-08-06,
+  // grok-4-1-fast -> grok-4-1-fast-reasoning). Accept the configured id and
+  // its dash-suffixed variants; anything else means the call reached a model
+  // other than the one bound for this run.
+  function servedModelMatches(configuredModelId, servedModelId) {
+    if (typeof configuredModelId !== 'string' || configuredModelId.length === 0 ||
+        typeof servedModelId !== 'string') return false;
+    return servedModelId === configuredModelId ||
+      (servedModelId.length > configuredModelId.length + 1 &&
+        servedModelId.indexOf(configuredModelId + '-') === 0);
+  }
+
   function own(value, key) {
     return Object.prototype.hasOwnProperty.call(value, key);
   }
@@ -278,11 +291,12 @@
       else historyCount += 1;
       evidence.push(parsed);
     }
-    if (evidence.length <= LIMITS.MAX_EVIDENCE &&
-        (governingCount > schema.LIMITS.MAX_GOVERNING ||
-          historyCount > schema.LIMITS.MAX_HISTORY)) {
-      return { status: 'invalid-input' };
-    }
+    // A set that a cited answer cannot show in full, by total or by role, is
+    // over cap: it abstains with the gap rather than failing outright, the
+    // same as a set with too many sources (58-UI-SPEC).
+    var overCap = evidence.length > LIMITS.MAX_EVIDENCE ||
+      governingCount > schema.LIMITS.MAX_GOVERNING ||
+      historyCount > schema.LIMITS.MAX_HISTORY;
     evidence.sort(function(left, right) {
       return left.evidenceKey < right.evidenceKey ? -1 : left.evidenceKey > right.evidenceKey ? 1 : 0;
     });
@@ -302,7 +316,7 @@
       conflicts: canonicalDetails(typed.conflicts),
       gaps: canonicalDetails(typed.gaps),
       acknowledgeNoStorage: fields.acknowledgeNoStorage,
-      overCap: evidence.length > LIMITS.MAX_EVIDENCE
+      overCap: overCap
     };
   }
 
@@ -637,7 +651,8 @@
         if (aborted(operationSignal)) return { result: status('cancelled') };
         parsed = provider.parseResponse(wire);
         if (aborted(operationSignal)) return { result: status('cancelled') };
-        if (parsed && typeof parsed.model === 'string' && parsed.model !== state.binding.modelId) {
+        if (parsed && typeof parsed.model === 'string' &&
+            !servedModelMatches(state.binding.modelId, parsed.model)) {
           return { result: status('provider-binding-changed') };
         }
         raw = parsed && parsed.content;

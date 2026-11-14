@@ -576,6 +576,22 @@ if (process.env.SKOPEO_HUD_EXPECT_PROJECTOR_RED === '1') {
       'distinct stable owner identities never collapse through a display label');
     assert.equal(gapTypes(acme).includes('owner-gap'), false,
       'ambiguous owner evidence is not converted into an absence claim');
+
+    // Graph labels are admitted up to MAX_TEXT_LENGTH, but the schema shows an
+    // owner at MAX_LABEL_LENGTH. A long owner name must shorten, not close
+    // the whole folder view.
+    const maxLabel = schema.LIMITS.MAX_LABEL_LENGTH;
+    for (const [label, expected] of [
+      ['Alex ' + 'x'.repeat(395), 'Alex ' + 'x'.repeat(maxLabel - 5)],
+      ['x'.repeat(maxLabel - 1) + '\u{1F600}tail', 'x'.repeat(maxLabel - 1)]
+    ]) {
+      const longOwner = fixture('folder');
+      longOwner.graph.records.find((item) => item.recordToken === 'record:owner:a').label = label;
+      const longOutput = create(longOwner, 'owner label longer than the display bound');
+      const longAcme = vendorsByToken(longOutput).get('vendor:a');
+      assert.deepEqual(plain(longAcme.owner), { state: 'assigned', label: expected },
+        'a long owner label is shortened on a code point boundary');
+    }
   }
 
   function testSummaryCapsOverflowAndStableTieOrder() {

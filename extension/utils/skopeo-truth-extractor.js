@@ -30,6 +30,19 @@
     'Return no prose, markdown fence, explanation, confidence, durable identity, or unknown field.'
   ].join(' ');
 
+  // Providers report the model that served a call, and an alias commonly comes
+  // back as a dated snapshot or variant (gpt-4o -> gpt-4o-2024-08-06,
+  // grok-4-1-fast -> grok-4-1-fast-reasoning). Accept the configured id and
+  // its dash-suffixed variants; anything else means the call reached a model
+  // other than the one bound for this run.
+  function servedModelMatches(configuredModelId, servedModelId) {
+    if (typeof configuredModelId !== 'string' || configuredModelId.length === 0 ||
+        typeof servedModelId !== 'string') return false;
+    return servedModelId === configuredModelId ||
+      (servedModelId.length > configuredModelId.length + 1 &&
+        servedModelId.indexOf(configuredModelId + '-') === 0);
+  }
+
   function own(value, key) {
     return Object.prototype.hasOwnProperty.call(value, key);
   }
@@ -1071,7 +1084,7 @@
         }
         rawResponse = parsedResponse && parsedResponse.content;
         if (parsedResponse && typeof parsedResponse.model === 'string' &&
-            parsedResponse.model !== state.invariants.modelId) {
+            !servedModelMatches(state.invariants.modelId, parsedResponse.model)) {
           var modelFailure = failure('provider-binding-changed', false, ['/model']);
           closeFailure(state, modelFailure, batch, false);
           return preparedStep(

@@ -159,6 +159,21 @@
       !/(?:https?|file|chrome):\/\//i.test(value);
   }
 
+  // Shorten admitted text to a display bound without splitting a surrogate
+  // pair. Graph labels are admitted up to MAX_TEXT_LENGTH, while the HUD
+  // schema shows some of them (the owner) at MAX_LABEL_LENGTH.
+  function boundedLabel(value, maximum) {
+    if (typeof value !== 'string' || value.length <= maximum) return value;
+    var points = Array.from(value);
+    var out = '';
+    for (var index = 0; index < points.length; index += 1) {
+      if (out.length + points[index].length > maximum) break;
+      out += points[index];
+    }
+    var trimmed = out.replace(/\s+$/, '');
+    return trimmed.length > 0 ? trimmed : out;
+  }
+
   function validToken(value) {
     var maximum = schema && schema.LIMITS
       ? schema.LIMITS.MAX_OPAQUE_TOKEN_LENGTH
@@ -1029,7 +1044,7 @@
 
     var evidence = graphEvidenceForScope(scope, graph, manifest);
     var owner = evidence.owners.length === 1
-      ? { state: 'assigned', label: evidence.owners[0] }
+      ? { state: 'assigned', label: boundedLabel(evidence.owners[0], schema.LIMITS.MAX_LABEL_LENGTH) }
       : evidence.owners.length === 0
         ? { state: 'unassigned', label: null }
         : { state: 'not-evaluated', label: null };

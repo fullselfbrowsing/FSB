@@ -373,6 +373,16 @@ if (process.env.SKOPEO_ASK_EXPECT_ENGINE_RED === '1') {
     const model = await answer(modelFixture, (await prepare(modelFixture)).prepared);
     assert.equal(model.status, 'provider-binding-changed');
 
+    // An alias often comes back as a dated snapshot of the configured model.
+    const snapshotFixture = harness({ responseModel: 'configured-model-2024-08-06' });
+    const snapshot = await answer(snapshotFixture, (await prepare(snapshotFixture)).prepared);
+    assert.equal(snapshot.outcome, 'answered',
+      'a dated snapshot of the configured model keeps the provider binding');
+    const prefixFixture = harness({ responseModel: 'configured-modelx' });
+    const prefix = await answer(prefixFixture, (await prepare(prefixFixture)).prepared);
+    assert.equal(prefix.status, 'provider-binding-changed',
+      'a different model that only shares a prefix is still a binding change');
+
     const noStorageFixture = harness();
     const noStorageValue = input({
       acknowledgeNoStorage: async () => Object.freeze({
@@ -455,6 +465,22 @@ if (process.env.SKOPEO_ASK_EXPECT_ENGINE_RED === '1') {
     assert.equal(over.conclusion, null);
     assert.equal(calls(overFixture.state, 'send').length, 0,
       'over-cap exact set does not send a usable prefix');
+
+    // Ten unrelated agreements each govern their own lineage: within the total
+    // cap, but more governing sources than a cited answer can show.
+    const roleOverFixture = harness();
+    const roleOverEvidence = Array.from({ length: 10 }, (_, index) => evidence(200 + index, {
+      evidenceRole: 'governing',
+      actionToken: 'citation:role-over:' + index
+    }));
+    const roleOverPrepared = (await prepare(roleOverFixture, input({ evidence: roleOverEvidence }))).prepared;
+    assert.notEqual(roleOverPrepared.status, 'invalid-input',
+      'more governing sources than an answer can cite is not invalid input');
+    const roleOver = await answer(roleOverFixture, roleOverPrepared);
+    assert.equal(roleOver.outcome, 'abstained', 'role overflow within the total cap abstains');
+    assert.equal(roleOver.conclusion, null);
+    assert.equal(calls(roleOverFixture.state, 'send').length, 0,
+      'role overflow does not send a usable prefix');
 
     const saturatedGaps = [
       { type: 'source-inaccessible', detail: 'Source A is inaccessible.' },

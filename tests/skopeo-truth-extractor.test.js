@@ -919,6 +919,19 @@ async function runContract(Extractor) {
   }
 
   {
+    // Providers echo the model that served the call; an alias often comes
+    // back as a dated snapshot of the configured model.
+    const fixture = harness(Extractor, {
+      responseModel: 'configured-model-2024-08-06',
+      responses: [JSON.stringify(emptyEnvelope())]
+    });
+    const source = await prepare(Extractor, { fixture });
+    const step = await next(fixture, source.prepared.session);
+    check(!(step.outcome && step.outcome.status === 'provider-binding-changed'),
+      'a dated snapshot of the configured model keeps the provider binding');
+  }
+
+  {
     const source = await prepare(Extractor, {
       responses: ['not-json REJECTED_RAW_PRIVATE', JSON.stringify(emptyEnvelope())]
     });

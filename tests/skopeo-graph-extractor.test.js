@@ -188,7 +188,7 @@ function makeRecordedProvider(settings, state) {
       return {
         content: response.content,
         usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-        model: settings.modelName
+        model: state.responseModel || settings.modelName
       };
     }
   };
@@ -199,6 +199,7 @@ function harness(options) {
   const state = {
     settings: Object.assign({ modelProvider: 'xai', modelName: 'configured-model' }, values.settings),
     responses: Array.from(values.responses || []),
+    responseModel: values.responseModel || null,
     calls: [],
     nonces: 0
   };
@@ -511,6 +512,24 @@ async function next(fixture, session, certOverrides) {
     );
     check(noReuse.status === 'content-fingerprint-unavailable',
       'reuse remains unavailable when fresh authority exposes no exact fingerprint');
+  }
+
+  // Providers echo the model that served the call; an alias often comes back
+  // as a dated snapshot. Only a different model is a binding change.
+  {
+    const fixture = harness({ responseModel: 'configured-model-2024-08-06', responses: [emptyEnvelope()] });
+    const source = await prepare(fixture, 'snapshot model');
+    const step = await next(fixture, source.prepared.session);
+    check(step.outcome && step.outcome.status === 'validated-batch',
+      'a dated snapshot of the configured model keeps the provider binding');
+  }
+
+  {
+    const fixture = harness({ responseModel: 'configured-modelx', responses: [emptyEnvelope()] });
+    const source = await prepare(fixture, 'other model');
+    const step = await next(fixture, source.prepared.session);
+    check(step.outcome && step.outcome.status === 'provider-binding-changed',
+      'a response from a different model is a provider binding change');
   }
 
   {
