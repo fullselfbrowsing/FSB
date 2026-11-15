@@ -21,7 +21,9 @@
      [data-depth-anchor]         section starts inside a scrolling plane
      [data-depth-own]            gestures that start here belong to the element
      [data-depth-rigid]          a plane that keeps its own width when it is fitted
-     .fsb-depth-rail [data-depth-go="i"][data-depth-sec="j"]  the plane index */
+     .fsb-depth-rail [data-depth-go="i"][data-depth-sec="j"]  the plane index; a
+                                 finger sliding along it runs through the entries,
+                                 and the rail carries [data-sliding] while it does */
 
 export interface DepthEngine {
   readonly root: HTMLElement;
@@ -86,6 +88,12 @@ const TICK_MS = 15;
    last event, so together this matches the 400ms pause that starts a new swipe. */
 const SWALLOW_MS = 240;
 
+/* A finger that slides only a few pixels along the rail can still count as a tap,
+   and the browser then clicks the entry it came down on. A click on the rail this
+   soon after a slide is that one, and the slide has already gone where the finger
+   was. */
+const SLID_CLICK_MS = 350;
+
 export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions = {}): DepthEngine {
   const doc = root.ownerDocument;
   const win = (doc.defaultView || window) as Window & typeof globalThis;
@@ -122,7 +130,15 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let gesturing = false;
   let scrolled = false;
   let idle = 0;
-  let touch: { x: number; y: number; mode: 'native' | 'depth' | null } | null = null;
+  // The finger being followed; `onRail` if it came down on the rail, `onEntry` if on
+  // one of its buttons rather than the space around them.
+  let touch: { x: number; y: number; mode: 'native' | 'depth' | 'rail' | null; onRail: boolean; onEntry: boolean } | null = null;
+  // A finger sliding along the rail. The rail shows the entry under it (`pinned`),
+  // and keeps showing it after the finger lifts, until the camera gets there.
+  let sliding = false;
+  let pinned: HTMLElement | null = null;
+  let middles: number[] = [];
+  let slidEnd = -1e9;
   let edgeT = 0;
   let lastAbs = 0;
   let steady = 0;
@@ -226,16 +242,19 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     markRail();
   }
   function markRail(): void {
+    // The finger's entry stays marked until the camera has arrived there, or until
+    // another gesture takes the camera.
+    if (pinned && !sliding && (gesturing || (p === target && layers.every((L) => L._st == null)))) pinned = null;
     const a = clamp(Math.round(p), 0, N - 1);
     const L = layers[a];
-    const sec = isScroll(L) ? secAt(L) : -1;
-    const key = a + ':' + sec;
+    const sec = !pinned && isScroll(L) ? secAt(L) : -1;
+    const key = pinned ? 'pin:' + rail.indexOf(pinned) : a + ':' + sec;
     if (key === railKey) return;
     railKey = key;
     for (const b of rail) {
       const gi = parseInt(b.getAttribute('data-depth-go') || '0', 10);
       const sj = b.getAttribute('data-depth-sec');
-      const on = gi === a && (sj === null || parseInt(sj, 10) === sec);
+      const on = pinned ? b === pinned : gi === a && (sj === null || parseInt(sj, 10) === sec);
       b.classList.toggle('is-active', on);
       if (on) b.setAttribute('aria-current', 'step');
       else b.removeAttribute('aria-current');
@@ -688,6 +707,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     }
   }
   function go(i: number): void {
+    // Anything but the slide itself that moves the camera takes the rail back.
+    if (!sliding) pinned = null;
     const from = anchor;
     anchor = clamp(Math.round(i), 0, N - 1);
     if (anchor !== from) tick();
@@ -870,16 +891,79 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     } else return;
     e.preventDefault();
   }
+  // Opens what a rail entry points at: a plane, or a section of a plane that scrolls.
+  function openEntry(b: HTMLElement): void {
+    if (!sliding) pinned = null;
+    const gi = parseInt(b.getAttribute('data-depth-go') || '0', 10) || 0;
+    const sj = b.getAttribute('data-depth-sec');
+    if (sj === null) {
+      go(gi);
+      return;
+    }
+    const L = layers[gi];
+    const y = secTop(L, parseInt(sj, 10) || 0);
+    // Already reading this plane: glide to the section. Arriving from another plane: open at it.
+    if (anchor === gi && Math.abs(target - gi) < 0.01) {
+      L._st = y;
+      kick();
+    } else {
+      go(gi);
+      L._st = null;
+      L.scrollTop = y;
+    }
+  }
+  // The middle of each rail entry, as a height on the screen.
+  const railMiddles = (): number[] =>
+    rail.map((b) => {
+      const r = b.getBoundingClientRect();
+      return r.top + r.height / 2;
+    });
+  function entryAt(y: number, mids: readonly number[]): HTMLElement | null {
+    let k = -1;
+    for (let j = 0; j < mids.length; j++) if (k < 0 || Math.abs(mids[j] - y) < Math.abs(mids[k] - y)) k = j;
+    return k < 0 ? null : rail[k];
+  }
+  // A finger sliding along the rail runs through its entries, the way a phone's A-Z
+  // index runs through contacts: the entry nearest the finger opens as it gets there,
+  // with a tick for each. The rail stays put while it slides, so it is measured once.
+  function startSlide(): void {
+    sliding = true;
+    middles = railMiddles();
+    pinned = rail.find((b) => b.classList.contains('is-active')) || null;
+    railEl?.setAttribute('data-sliding', '');
+  }
+  function slideTo(y: number): void {
+    lastTouch = win.performance.now();
+    const b = entryAt(y, middles);
+    if (!b || b === pinned) return;
+    pinned = b;
+    const from = anchor;
+    openEntry(b);
+    // go() ticks when the plane changes; another section of the same plane ticks here.
+    if (anchor === from) tick();
+    markRail();
+  }
+  function endSlide(): void {
+    sliding = false;
+    slidEnd = win.performance.now();
+    railEl?.removeAttribute('data-sliding');
+    markRail();
+  }
   function onTouchStart(e: TouchEvent): void {
     lastTouch = win.performance.now();
     // A touch already being followed means another finger landed: finish that
-    // swipe on a plane before letting it go, or the camera stays between two.
+    // swipe on a plane before letting it go, or the camera stays between two. A
+    // slide along the rail is already on one, and stops where it is.
     if (touch?.mode === 'depth') settle();
+    if (sliding) endSlide();
     if (e.touches.length !== 1 || owns(e)) {
       touch = null;
       return;
     }
-    touch = { x: e.touches[0].clientX, y: e.touches[0].clientY, mode: null };
+    const t = e.target as Element | null;
+    const bar = t?.closest?.('.fsb-depth-rail');
+    const onRail = !!bar && root.contains(bar);
+    touch = { x: e.touches[0].clientX, y: e.touches[0].clientY, mode: null, onRail, onEntry: onRail && !!t?.closest?.('[data-depth-go]') };
   }
   function onTouchMove(e: TouchEvent): void {
     if (!touch) return;
@@ -887,47 +971,52 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     if (!touch.mode) {
       const dx = touch.x - e.touches[0].clientX;
       if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-      const L = layers[Math.round(target)];
-      // A sideways swipe belongs to whatever scrolls sideways under it, as with the wheel.
-      touch.mode = Math.abs(dx) > Math.abs(dy) || (isScroll(L) && canScroll(L, dy)) ? 'native' : 'depth';
-      if (touch.mode === 'depth') {
-        anchor = Math.round(target);
-        gesturing = true;
-        touch.y = e.touches[0].clientY;
-        dy = 0;
+      if (touch.onRail) {
+        // Up or down the rail runs through it. A sideways swipe from it is not ours:
+        // it is how a phone goes back, from the edge of the screen.
+        touch.mode = Math.abs(dx) > Math.abs(dy) ? 'native' : 'rail';
+        if (touch.mode === 'rail') startSlide();
+      } else {
+        const L = layers[Math.round(target)];
+        // A sideways swipe belongs to whatever scrolls sideways under it, as with the wheel.
+        touch.mode = Math.abs(dx) > Math.abs(dy) || (isScroll(L) && canScroll(L, dy)) ? 'native' : 'depth';
+        if (touch.mode === 'depth') {
+          anchor = Math.round(target);
+          gesturing = true;
+          touch.y = e.touches[0].clientY;
+          dy = 0;
+        }
       }
     }
     if (touch.mode === 'native') return;
     e.preventDefault();
+    if (touch.mode === 'rail') {
+      slideTo(e.touches[0].clientY);
+      return;
+    }
     target = clamp(anchor + dy / (stage!.clientHeight * 0.5), Math.max(-0.15, anchor - 1), Math.min(N - 0.85, anchor + 1));
     kick();
   }
-  function onTouchEnd(): void {
+  function onTouchEnd(e: TouchEvent): void {
     lastTouch = win.performance.now();
     if (!touch) return;
-    const m = touch.mode;
+    const t = touch;
     touch = null;
-    if (m === 'depth') settle();
+    if (t.mode === 'depth') settle();
+    else if (t.mode === 'rail') endSlide();
+    // A tap on the rail beside its buttons (at the screen edge, between two ticks)
+    // opens the entry nearest to it; a tap on a button is its click.
+    else if (!t.mode && t.onRail && !t.onEntry && e.type === 'touchend') {
+      const b = entryAt(t.y, railMiddles());
+      if (b) openEntry(b);
+    }
   }
   function onClick(e: MouseEvent): void {
     const b = (e.target as Element | null)?.closest?.<HTMLElement>('[data-depth-go]');
     if (!b || !root.contains(b)) return;
     e.preventDefault();
-    const gi = parseInt(b.getAttribute('data-depth-go') || '0', 10) || 0;
-    const sj = b.getAttribute('data-depth-sec');
-    if (sj !== null) {
-      const L = layers[gi];
-      const y = secTop(L, parseInt(sj, 10) || 0);
-      // Already reading this plane: glide to the section. Arriving from another plane: open at it.
-      if (anchor === gi && Math.abs(target - gi) < 0.01) {
-        L._st = y;
-        kick();
-      } else {
-        go(gi);
-        L._st = null;
-        L.scrollTop = y;
-      }
-    } else go(gi);
+    if (win.performance.now() - slidEnd < SLID_CLICK_MS) return;
+    openEntry(b);
     try {
       stage!.focus({ preventScroll: true });
     } catch {
@@ -1021,6 +1110,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       mo?.disconnect();
       win.removeEventListener('load', rescan);
       cueEl?.style.removeProperty('--cue');
+      railEl?.removeAttribute('data-sliding');
       stage.removeAttribute('data-depth-live');
     },
   };

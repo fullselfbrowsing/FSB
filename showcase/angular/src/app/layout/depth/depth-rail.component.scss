@@ -1,5 +1,8 @@
 /* Plane index on the right edge. Labels appear on hover or keyboard focus; the
-   current plane's tick grows and turns orange (the engine sets .is-active). */
+   current plane's tick grows and turns orange (the engine sets .is-active). A
+   finger sliding along it runs through the planes (the engine sets
+   [data-sliding] meanwhile), so the browser is told not to scroll or zoom for a
+   touch that starts here. */
 .fsb-depth-rail {
   align-items: flex-end;
   display: flex;
@@ -8,6 +11,7 @@
   position: fixed;
   right: 28px;
   top: 50%;
+  touch-action: none;
   transform: translateY(-50%);
   z-index: 30;
 }
@@ -89,13 +93,43 @@
   outline-offset: 2px;
 }
 
+/* While a finger slides along the rail, the entry under it says which it is. */
+.fsb-depth-rail[data-sliding] .fsb-depth-go.is-active .fsb-depth-lbl {
+  opacity: 1;
+  transform: none;
+}
+
 @media (max-width: 768px) {
+  /* Out to the screen edge, where a thumb lands; the ticks stay where they were. */
   .fsb-depth-rail {
-    right: 6px;
+    padding-right: 6px;
+    right: 0;
+  }
+
+  .fsb-depth-go {
+    position: relative;
   }
 
   .fsb-depth-lbl {
     display: none;
+  }
+
+  /* The name shows left of the thumb, on a chip of its own so it reads over
+     whatever the plane has there, and out of the rail's flow so the entries never
+     shift under the finger. */
+  .fsb-depth-rail[data-sliding] .fsb-depth-go.is-active .fsb-depth-lbl {
+    background: var(--bg-card);
+    border: 1px solid var(--border-hover);
+    border-radius: var(--radius-sm);
+    display: block;
+    margin-right: 6px;
+    padding: 6px 10px;
+    pointer-events: none;
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: none;
   }
 
   .fsb-depth-tick {

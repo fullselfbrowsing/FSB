@@ -18,13 +18,20 @@ describe('createDepthEngine', () => {
     return `<div class="fsb-depth-layer" data-label="${label}" ${attrs}><div class="fsb-depth-fit">${inner}</div></div>`;
   }
 
+  // The rail laid out as the real one is, since its component styles are not loaded
+  // here: a column of entries at the right edge, with a strip of its own beside them.
+  const RAIL_STYLE = 'display:flex;flex-direction:column;padding-right:6px;position:fixed;right:0;top:80px';
+  const entry = (layer: number, sec?: number): string =>
+    `<button class="fsb-depth-go" data-depth-go="${layer}"${sec === undefined ? '' : ` data-depth-sec="${sec}"`}` +
+    ' style="display:block;height:40px;margin:0;padding:0;width:30px"></button>';
+
   // `width` narrows the stage to a phone's, whatever the test window's size.
   function build(planes: PlaneSpec[], width?: number): void {
     root = document.createElement('div');
     const narrow = width ? ` style="right:auto;width:${width}px"` : '';
     root.innerHTML =
       `<div class="fsb-depth" data-depth-stage tabindex="0"${narrow}>${planes.map((h, i) => plane('P' + i, h)).join('')}</div>` +
-      `<nav class="fsb-depth-rail">${planes.map((_, i) => `<button class="fsb-depth-go" data-depth-go="${i}"></button>`).join('')}</nav>`;
+      `<nav class="fsb-depth-rail" style="${RAIL_STYLE}">${planes.map((_, i) => entry(i)).join('')}</nav>`;
     document.body.appendChild(root);
     seen = [];
     engine = createDepthEngine(root, { onActive: (i) => seen.push(i) });
@@ -163,9 +170,9 @@ describe('createDepthEngine', () => {
   describe('touch', () => {
     const canTouch = typeof Touch === 'function' && typeof TouchEvent === 'function';
 
-    // A finger on the page: the event starts on the first plane and bubbles to the document.
-    function touch(type: string, points: readonly (readonly [number, number])[]): TouchEvent {
-      const target = layers()[0];
+    // A finger on the page: the event starts on the first plane (or `target`) and
+    // bubbles to the document. A touch's events all go to where it came down.
+    function touch(type: string, points: readonly (readonly [number, number])[], target: Element = layers()[0]): TouchEvent {
       const touches = points.map(([x, y], identifier) => new Touch({ identifier, target, clientX: x, clientY: y }));
       const e = new TouchEvent(type, { touches, changedTouches: touches, cancelable: true, bubbles: true });
       target.dispatchEvent(e);
@@ -174,6 +181,37 @@ describe('createDepthEngine', () => {
     // A drag of this many pixels moves the camera about 0.3 of a plane: past the
     // point where letting go moves on, short of the point where rounding would.
     const nearDrag = (): number => Math.round(root.querySelector<HTMLElement>('[data-depth-stage]')!.clientHeight * 0.15);
+
+    const bar = (): HTMLElement => root.querySelector<HTMLElement>('.fsb-depth-rail')!;
+    const marked = (): number => rail().findIndex((b) => b.classList.contains('is-active'));
+    // The middle of a rail entry, where a finger on it rests.
+    function mid(i: number): [number, number] {
+      const r = rail()[i].getBoundingClientRect();
+      return [r.left + r.width / 2, r.top + r.height / 2];
+    }
+    // A finger comes down on entry `from`, slides a few pixels to get going, then to
+    // the middle of each entry in `to` in turn, and lifts.
+    function slide(from: number, to: readonly number[]): void {
+      const start = rail()[from];
+      const [x, y] = mid(from);
+      touch('touchstart', [[x, y]], start);
+      touch('touchmove', [[x, y + (to[0] < from ? -6 : 6)]], start);
+      for (const i of to) touch('touchmove', [[x, mid(i)[1]]], start);
+      touch('touchend', [], start);
+    }
+    // A plane that scrolls through three sections, a screen each, with a rail entry
+    // for each section and none for the planes around it.
+    function buildSections(): void {
+      const h = window.innerHeight;
+      const sections = [0, 1, 2].map((j) => `<section data-depth-anchor style="height:${h}px;margin:0">S${j}</section>`).join('');
+      build([120, { html: sections, attrs: 'data-scroll' }, 120]);
+      bar().innerHTML = [0, 1, 2].map((j) => entry(1, j)).join('');
+      engine!.refreshRail();
+    }
+    async function until(done: () => boolean, ms = 3000): Promise<void> {
+      const end = Date.now() + ms;
+      while (Date.now() < end && !done()) await new Promise((r) => setTimeout(r, 30));
+    }
 
     beforeEach(() => {
       if (!canTouch) pending('This browser has no Touch constructor');
@@ -208,6 +246,107 @@ describe('createDepthEngine', () => {
       touch('touchstart', [[300, 590 - nearDrag()], [380, 500]]);
       touch('touchend', []);
       await settle(1);
+    });
+
+    describe('along the rail', () => {
+      it('runs through the planes as a finger slides down it, and back up', async () => {
+        build([120, 120, 120, 120, 120]);
+        const start = rail()[0];
+        const [x, y] = mid(0);
+        touch('touchstart', [[x, y]], start);
+        const first = touch('touchmove', [[x, y + 6]], start);
+        expect(first.defaultPrevented).toBeTrue();
+        expect(bar().hasAttribute('data-sliding')).toBeTrue();
+        touch('touchmove', [[x, mid(1)[1]]], start);
+        expect(marked()).toBe(1);
+        touch('touchmove', [[x, mid(3)[1]]], start);
+        expect(marked()).toBe(3);
+        touch('touchend', [], start);
+        expect(bar().hasAttribute('data-sliding')).toBeFalse();
+        await settle(3);
+
+        slide(3, [2, 1]);
+        await settle(1);
+        expect(marked()).toBe(1);
+      });
+
+      it('keeps following the finger once it drifts off the rail', async () => {
+        build([120, 120, 120, 120, 120]);
+        const start = rail()[0];
+        const [x, y] = mid(0);
+        touch('touchstart', [[x, y]], start);
+        touch('touchmove', [[x, y + 6]], start);
+        touch('touchmove', [[x - 240, mid(4)[1]]], start);
+        expect(marked()).toBe(4);
+        touch('touchend', [], start);
+        await settle(4);
+      });
+
+      it('keeps the entry where the finger lifted marked while the camera catches up', async () => {
+        build([120, 120, 120, 120, 120]);
+        slide(0, [4]);
+        // The camera has hardly left the first plane, and would pass 2 and 3 on the rail.
+        expect(layers()[4].hasAttribute('inert')).toBeTrue();
+        expect(marked()).toBe(4);
+        await new Promise((r) => setTimeout(r, 150));
+        expect(marked()).toBe(4);
+        await settle(4);
+        expect(marked()).toBe(4);
+      });
+
+      it('leaves a sideways swipe from the rail alone', () => {
+        // That is how a phone goes back, from the edge of the screen.
+        build([120, 120, 120]);
+        const start = rail()[1];
+        const [x, y] = mid(1);
+        touch('touchstart', [[x, y]], start);
+        const move = touch('touchmove', [[x - 12, y + 2]], start);
+        touch('touchmove', [[x - 60, y + 5]], start);
+        touch('touchend', [], start);
+        expect(move.defaultPrevented).toBeFalse();
+        expect(bar().hasAttribute('data-sliding')).toBeFalse();
+        expect(seen).toEqual([0]);
+        expect(marked()).toBe(0);
+      });
+
+      it('ignores the click a short slide can still send, then takes taps again', async () => {
+        build([120, 120, 120]);
+        // From the foot of the first entry a few pixels into the second: short enough
+        // for a browser to still count it as a tap on the first.
+        const start = rail()[0];
+        const foot = start.getBoundingClientRect().bottom;
+        const x = mid(0)[0];
+        touch('touchstart', [[x, foot - 1]], start);
+        touch('touchmove', [[x, foot + 4]], start);
+        touch('touchend', [], start);
+        start.click();
+        await settle(1);
+        await new Promise((r) => setTimeout(r, 400));
+        expect(seen[seen.length - 1]).toBe(1);
+        rail()[2].click();
+        await settle(2);
+      });
+
+      it('opens the entry nearest a tap beside its buttons', async () => {
+        build([120, 120, 120]);
+        const edge = bar().getBoundingClientRect().right - 2;
+        // A touch the phone takes back is not a tap.
+        touch('touchstart', [[edge, mid(1)[1]]], bar());
+        touch('touchcancel', [], bar());
+        expect(seen).toEqual([0]);
+        touch('touchstart', [[edge, mid(2)[1]]], bar());
+        touch('touchend', [], bar());
+        await settle(2);
+      });
+
+      it('runs through the sections of a plane that scrolls', async () => {
+        buildSections();
+        slide(0, [1, 2]);
+        await settle(1);
+        await until(() => layers()[1].scrollTop > window.innerHeight * 1.5);
+        expect(layers()[1].scrollTop).toBeGreaterThan(window.innerHeight * 1.5);
+        expect(marked()).toBe(2);
+      });
     });
 
     describe('haptics', () => {
@@ -258,6 +397,32 @@ describe('createDepthEngine', () => {
         engine!.go(1);
         await settle(1);
         expect(vibrate).not.toHaveBeenCalled();
+      });
+
+      it('ticks once for each entry a finger slides past on the rail', async () => {
+        tapped(true);
+        build([120, 120, 120, 120, 120]);
+        const start = rail()[0];
+        const [x, y] = mid(0);
+        touch('touchstart', [[x, y]], start);
+        touch('touchmove', [[x, y + 6]], start);
+        // Still on the entry it came down on.
+        expect(vibrate).not.toHaveBeenCalled();
+        for (let i = 1; i <= 4; i++) touch('touchmove', [[x, mid(i)[1]]], start);
+        touch('touchend', [], start);
+        expect(vibrate).toHaveBeenCalledTimes(4);
+        await settle(4);
+        expect(vibrate).toHaveBeenCalledTimes(4);
+      });
+
+      it('ticks for each section a finger slides past in a plane that scrolls', async () => {
+        tapped(true);
+        buildSections();
+        // Into the plane (one tick), then two more of its sections.
+        slide(0, [1, 2]);
+        expect(vibrate).toHaveBeenCalledTimes(3);
+        await settle(1);
+        expect(vibrate).toHaveBeenCalledTimes(3);
       });
     });
   });
