@@ -4006,6 +4006,15 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
       manifest.checkpoint.kind === 'inventory-complete';
   }
 
+  // The manifest lists only active sources. The checkpoint count also covers
+  // pending, missing and inaccessible records, so a folder is empty only when
+  // that count is zero too.
+  function hudFolderInventoryEmpty(manifest) {
+    return hudManifestInventoryComplete(manifest) &&
+      Array.isArray(manifest.sources) && manifest.sources.length === 0 &&
+      manifest.checkpoint.sourceCount === 0;
+  }
+
   async function visibleHudManifest() {
     const boundary = await awaitCorpusBoundary();
     const claim = boundary && boundary.currentClaim;
@@ -5015,11 +5024,11 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     });
     if (sources.map(function(source) { return source.sourceFileId; }).join('\u0000') !==
         args.binding.sourceFileIds.join('\u0000')) return null;
-    // A published manifest is an inventory-complete checkpoint, so an empty
-    // source list here means the enrolled folder really has no sources. The
-    // manifest carries no digests, so derive them the way the truth path does.
+    // Only an inventory with no records at all, active or not, is an empty
+    // folder. The manifest carries no digests, so derive them the way the
+    // truth path does.
     if (args.binding.mode === 'folder' && sources.length === 0 &&
-        hudManifestInventoryComplete(visible.manifest)) {
+        hudFolderInventoryEmpty(visible.manifest)) {
       const digest = args.binding.sourceSetDigest;
       const civilDate = args.evaluationContext && args.evaluationContext.asOfCivilDate;
       let contextDigest = null;
@@ -5407,11 +5416,17 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     return typeof value === 'string' ? value : null;
   }
 
+  // The Ask engine admits single-line text only: no control or bidi
+  // characters and no outer whitespace. Document text has line breaks, so
+  // fold every control character and whitespace run into one space.
   function hudAskScalarPrefix(value, maximum) {
     if (typeof value !== 'string') return null;
-    const normalized = value.trim();
+    const normalized = value
+      .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!normalized) return null;
-    return Array.from(normalized).slice(0, maximum).join('');
+    return Array.from(normalized).slice(0, maximum).join('').trim();
   }
 
   function hudAskProviderAcknowledgement(step) {
@@ -5845,7 +5860,8 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
         typedValue || hudAskScalarPrefix(excerpt, 512),
         512
       );
-      const citationLabel = safeHudText(metadata.name, 256);
+      const citationLabel = safeHudText(
+        typeof metadata.name === 'string' ? metadata.name.trim() : null, 256);
       if (!actionToken || !claim || !value || !citationLabel) {
         complete = false;
         continue;

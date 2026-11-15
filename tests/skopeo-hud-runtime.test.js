@@ -3618,6 +3618,66 @@ function testContentRuntimeStaticContract(sources) {
   }), 'complete content projection routing interface is installed');
 }
 
+function namedBackgroundFunction(backgroundSource, name) {
+  const start = backgroundSource.indexOf(`\n  function ${name}(`);
+  assert.ok(start >= 0, `${name} is defined in background.js`);
+  const end = backgroundSource.indexOf('\n  }\n', start);
+  assert.ok(end > start, `${name} has a closing brace`);
+  return backgroundSource.slice(start, end + 4);
+}
+
+async function testHudFolderEmptyAndAskText(backgroundSource) {
+  const helpers = vm.runInNewContext([
+    'hudManifestInventoryComplete', 'hudFolderInventoryEmpty', 'hudAskScalarPrefix'
+  ].map((name) => namedBackgroundFunction(backgroundSource, name)).join('\n') +
+    '\n({ hudFolderInventoryEmpty, hudAskScalarPrefix });');
+  const checkpoint = (sourceCount, kind = 'inventory-complete') =>
+    ({ version: 1, kind, cursor: 'inventory_1', sourceCount });
+  assert.strictEqual(helpers.hudFolderInventoryEmpty({ checkpoint: checkpoint(0), sources: [] }), true,
+    'an inventory with no records is an empty folder');
+  assert.strictEqual(helpers.hudFolderInventoryEmpty({ checkpoint: checkpoint(3), sources: [] }), false,
+    'pending, missing or inaccessible records mean the folder is not known to be empty');
+  assert.strictEqual(helpers.hudFolderInventoryEmpty({ checkpoint: checkpoint(0, 'partial'), sources: [] }), false,
+    'only an inventory-complete checkpoint can prove an empty folder');
+  assert.strictEqual(helpers.hudFolderInventoryEmpty(null), false, 'no manifest is not an empty folder');
+
+  const raw = '\uFEFFMASTER SERVICES AGREEMENT\r\n\r\nSection 12\tNotice is due 90 days\u202e before expiry.  ';
+  const excerpt = helpers.hudAskScalarPrefix(raw, 2000);
+  assert.strictEqual(excerpt, 'MASTER SERVICES AGREEMENT Section 12 Notice is due 90 days before expiry.',
+    'document text folds to one line with no control, bidi or outer whitespace');
+  assert.strictEqual(helpers.hudAskScalarPrefix('alpha beta gamma', 6), 'alpha',
+    'a prefix cut on a space carries no trailing whitespace');
+  assert.strictEqual(helpers.hudAskScalarPrefix(' \r\n\t ', 10), null, 'whitespace-only text has no excerpt');
+
+  const AskSchema = require('../extension/utils/skopeo-ask-schema.js');
+  const AskEngine = require('../extension/utils/skopeo-ask-engine.js');
+  let nonce = 0;
+  const engine = AskEngine.create({
+    askSchema: AskSchema,
+    providerFactory: () => ({}),
+    readSettings: async () => ({ modelProvider: 'xai', modelName: 'grok-4' }),
+    nonceFactory: () => 'skopeo_ask_' + String(++nonce).padStart(32, '0'),
+    byteLength: (value) => Buffer.byteLength(value),
+    now: Date.now
+  });
+  const prepared = await engine.prepare({
+    question: { text: 'What notice period governs?' },
+    scope: { kind: 'agreement', scopeDigest: 'scope:current' },
+    authority: { accountKey: 'a', corpusKey: 'c', sourceSetDigest: 's', revisionDigest: 'r' },
+    complete: true,
+    evidence: [{
+      evidenceKey: 'evidence:000', scopeDigest: 'scope:current', revisionDigest: 'r',
+      evidenceRole: 'governing', claim: 'renewal', value: '90 days', trustState: 'extracted',
+      citationLabel: 'MSA.docx', actionToken: 'answer_tok_1', excerpt
+    }],
+    conflicts: [],
+    gaps: [],
+    acknowledgeNoStorage: async () => null
+  }, new AbortController().signal);
+  assert.ok(prepared && prepared.session,
+    'the Ask engine admits an excerpt built from a multi-line document');
+}
+
 async function runHudRuntimeContract() {
   try {
     const sources = loadSources();
@@ -3751,6 +3811,7 @@ async function runHudRuntimeContract() {
     testPolicyMemoJoin(sources.background);
     testHudAbsenceJoin(sources.background);
     testProductionJoin(sources.background);
+    await testHudFolderEmptyAndAskText(sources.background);
     testContentRuntimeStaticContract(sources);
     await testContentRuntimeAdmissionMatrix(sources.runtime);
     await testContentRuntimeReplacementAndActions();
