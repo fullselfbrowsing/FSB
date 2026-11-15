@@ -931,6 +931,23 @@ async function runContract(Extractor) {
       'a dated snapshot of the configured model keeps the provider binding');
   }
 
+  // A sibling model that only extends the configured name is a binding change.
+  for (const [served, accepted] of [
+    ['configured-model-20250929', true], ['configured-model-0709', true],
+    ['configured-model-001', true], ['configured-model-latest', true],
+    ['configured-model-reasoning', true], ['configured-model-mini', false],
+    ['configured-model-lite', false], ['configured-model-non-reasoning', false]
+  ]) {
+    const fixture = harness(Extractor, {
+      responseModel: served,
+      responses: [JSON.stringify(emptyEnvelope())]
+    });
+    const source = await prepare(Extractor, { fixture });
+    const step = await next(fixture, source.prepared.session);
+    check(!(step.outcome && step.outcome.status === 'provider-binding-changed') === accepted,
+      `${served} ${accepted ? 'keeps' : 'changes'} the provider binding`);
+  }
+
   {
     const source = await prepare(Extractor, {
       responses: ['not-json REJECTED_RAW_PRIVATE', JSON.stringify(emptyEnvelope())]

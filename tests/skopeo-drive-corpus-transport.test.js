@@ -835,6 +835,19 @@ async function testBackgroundTransport(transportModule) {
   assert.equal(missingSink.kind, 'unsupported', 'missing sink is rejected');
   assert.equal(harness.calls.length, callsBeforeSinkReplay);
 
+  // Docs text exports start with a UTF-8 BOM. The text keeps it, so it still
+  // re-encodes to exactly the byte length the extractors compare against.
+  const bomBytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('Docs export\r\n', 'utf8')]);
+  queue.push(pageContentResult(bomBytes));
+  let bomPayload = null;
+  const bomRead = await transport.readContent({
+    fileId: 'file-1', mimeType: TEXT_MIME
+  }, async function bomSink(payload) { bomPayload = payload; });
+  assert.equal(bomRead.kind, 'ok');
+  assert.equal(bomPayload.text.charCodeAt(0), 0xfeff, 'a leading BOM stays in the decoded text');
+  assert.equal(Buffer.byteLength(bomPayload.text, 'utf8'), bomPayload.exactByteLength,
+    'BOM-prefixed text re-encodes to its exact byte length');
+
   for (const mimeType of [
     'application/pdf',
     'application/vnd.google-apps.spreadsheet',

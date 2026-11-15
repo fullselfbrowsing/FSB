@@ -34,16 +34,19 @@
   ].join(' ');
 
   // Providers report the model that served a call, and an alias commonly comes
-  // back as a dated snapshot or variant (gpt-4o -> gpt-4o-2024-08-06,
-  // grok-4-1-fast -> grok-4-1-fast-reasoning). Accept the configured id and
-  // its dash-suffixed variants; anything else means the call reached a model
-  // other than the one bound for this run.
+  // back as a dated snapshot or a resolved variant (gpt-4o -> gpt-4o-2024-08-06,
+  // claude-sonnet-4-5 -> claude-sonnet-4-5-20250929, grok-4 -> grok-4-0709,
+  // grok-4-1-fast -> grok-4-1-fast-reasoning). Accept the configured id plus
+  // one such suffix. A sibling model that only extends the name (gpt-4o-mini,
+  // gemini-2.5-flash-lite, grok-4-1-fast-non-reasoning) is a different model.
+  var SERVED_MODEL_SUFFIX = /^(?:\d{3,4}|\d{8}|\d{4}-\d{2}-\d{2}|latest|reasoning)$/;
+
   function servedModelMatches(configuredModelId, servedModelId) {
     if (typeof configuredModelId !== 'string' || configuredModelId.length === 0 ||
         typeof servedModelId !== 'string') return false;
-    return servedModelId === configuredModelId ||
-      (servedModelId.length > configuredModelId.length + 1 &&
-        servedModelId.indexOf(configuredModelId + '-') === 0);
+    if (servedModelId === configuredModelId) return true;
+    return servedModelId.indexOf(configuredModelId + '-') === 0 &&
+      SERVED_MODEL_SUFFIX.test(servedModelId.slice(configuredModelId.length + 1));
   }
 
   function own(value, key) {
@@ -246,10 +249,6 @@
       ['providerId', providerId],
       ['modelId', modelId]
     ]);
-  }
-
-  function normalizeSource(text) {
-    return text.replace(/\r\n?/g, '\n');
   }
 
   function segmentSource(text, Encoder) {
@@ -924,15 +923,17 @@
         return status('content-fingerprint-changed');
       }
       var effectiveFingerprint = content.byteHash;
-      var normalized = normalizeSource(content.text);
+      // Segment the exact text. Locator byte offsets must match the source
+      // bytes the truth side reads, so line endings are not rewritten here.
+      var exactText = content.text;
       payload = null;
       content = null;
-      if (normalized.length > LIMITS.MAX_CHARACTERS_PER_GENERATION) {
-        normalized = null;
+      if (exactText.length > LIMITS.MAX_CHARACTERS_PER_GENERATION) {
+        exactText = null;
         return status('budget-exceeded');
       }
-      var excerptBatches = segmentSource(normalized, global.TextEncoder);
-      normalized = null;
+      var excerptBatches = segmentSource(exactText, global.TextEncoder);
+      exactText = null;
       if (!excerptBatches) return status('budget-exceeded');
       var invariants = frozenRecord([
         ['partitionKey', certified.values.partitionKey],

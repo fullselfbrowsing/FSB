@@ -201,14 +201,16 @@
     return typeof value === 'string' && new RegExp('^' + prefix + '[0-9a-f]{64}$').test(value);
   }
 
+  // Same rule as the extractor's settings binding: model ids such as
+  // OpenRouter's openai/gpt-4o or LM Studio's qwen/qwen3-8b carry a '/'.
   function validBindingId(value) {
     return typeof value === 'string' && value.length > 0 && value.length <= 128 &&
-      /^[A-Za-z0-9._-]+$/.test(value);
+      !/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>]/.test(value);
   }
 
   function validDiagnosticBindingId(value) {
     return typeof value === 'string' && value.length > 0 && value.length <= 128 &&
-      /^[a-z0-9][a-z0-9._-]*$/.test(value);
+      /^[a-z0-9][a-z0-9._/-]*$/.test(value);
   }
 
   function validValidatorPath(value) {

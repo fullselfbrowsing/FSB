@@ -382,6 +382,18 @@ if (process.env.SKOPEO_ASK_EXPECT_ENGINE_RED === '1') {
     const prefix = await answer(prefixFixture, (await prepare(prefixFixture)).prepared);
     assert.equal(prefix.status, 'provider-binding-changed',
       'a different model that only shares a prefix is still a binding change');
+    for (const [served, accepted] of [
+      ['configured-model-20250929', true], ['configured-model-0709', true],
+      ['configured-model-001', true], ['configured-model-latest', true],
+      ['configured-model-reasoning', true], ['configured-model-mini', false],
+      ['configured-model-lite', false], ['configured-model-non-reasoning', false]
+    ]) {
+      const fixture = harness({ responseModel: served });
+      const result = await answer(fixture, (await prepare(fixture)).prepared);
+      assert.equal(accepted ? result.outcome : result.status,
+        accepted ? 'answered' : 'provider-binding-changed',
+        `${served} ${accepted ? 'keeps' : 'changes'} the provider binding`);
+    }
 
     const noStorageFixture = harness();
     const noStorageValue = input({

@@ -459,6 +459,27 @@ async function testSurfaceAndPointerLast() {
   return { harness, fixture };
 }
 
+// OpenRouter and LM Studio model ids carry a '/', and the settings binding the
+// extractor accepts must also open a staging replacement.
+async function testSlashedModelBinding() {
+  for (const [providerId, modelId] of [
+    ['openrouter', 'openai/gpt-4o'],
+    ['lmstudio', 'qwen/qwen3-8b']
+  ]) {
+    const harness = createHarness();
+    const result = await mutate(harness.store, (guard) => harness.store.beginReplacement({
+      schemaVersion: graphSchema.VERSION,
+      promptVersion: graphSchema.PROMPT_VERSION,
+      partitionKey: PARTITION,
+      sourceFileId: SOURCE_A,
+      contentFingerprint: FINGERPRINT_A,
+      providerId,
+      modelId
+    }, guard));
+    assert.equal(result.status, 'staging', `${providerId} ${modelId} opens a staging replacement`);
+  }
+}
+
 async function testTruthInvalidatorContract() {
   const marker = ['skopeo', 'graph', 'store', 'truth', 'invalidator', 'contract'].join(' ');
   const probe = createHarness();
@@ -1224,6 +1245,7 @@ async function testParticipantBindersAndCacheOwner() {
 async function run() {
   console.log('--- Phase 55 Plan 02: skopeo graph store contract ---');
   const started = Date.now();
+  await testSlashedModelBinding();
   await testTruthInvalidatorContract();
   await testSurfaceAndPointerLast();
   await testConditionalStaleWithdrawal();

@@ -776,7 +776,9 @@
         if (recomputed !== data.byteHash) return failure('malformed', 200);
         try {
           if (!global.TextDecoder) return failure('malformed', 200);
-          text = new global.TextDecoder('utf-8', { fatal: true }).decode(bytes);
+          // Keep a leading BOM (Docs text exports start with one) so the text
+          // still re-encodes to exactly exactByteLength.
+          text = new global.TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
         } catch (_decodeError) {
           return failure('malformed', 200);
         }

@@ -342,7 +342,7 @@ async function next(fixture, session, certOverrides) {
       'derived label survives only in the validated authoritative record');
     check(preparedStep.outcome.batch.records[0].evidence[0].sourceByteStart === 0 &&
       preparedStep.outcome.batch.records[0].evidence[0].sourceByteEnd === 2,
-    'evidence locator resolves the normalized UTF-8 byte range exactly');
+    'evidence locator resolves the exact UTF-8 byte range');
     exactKeys(preparedStep.outcome.batch.records[0], [
       'schemaVersion', 'partitionKey', 'sourceFileId', 'contentFingerprint',
       'fragmentGenerationId', 'kind', 'label', 'evidence',
@@ -358,12 +358,14 @@ async function next(fixture, session, certOverrides) {
       'recordKinds', 'relationPredicates', 'priorCandidates'
     ], 'normal user envelope has only inert extraction data');
     check(envelope.excerpts.length === 1, 'short source produces one excerpt');
-    assert.strictEqual(envelope.excerpts[0].text, `αgreement\nclause ${secret}`);
+    // The excerpt keeps the source's exact bytes, CRLF included, so its byte
+    // offsets match the ones the truth side reads.
+    assert.strictEqual(envelope.excerpts[0].text, `αgreement\r\nclause ${secret}`);
     passed += 1;
-    check(envelope.excerpts[0].sourceByteStart === 0, 'normalized excerpt starts at byte zero');
+    check(envelope.excerpts[0].sourceByteStart === 0, 'exact excerpt starts at byte zero');
     check(envelope.excerpts[0].sourceByteEnd ===
       Buffer.byteLength(envelope.excerpts[0].text, 'utf8'),
-    'normalized excerpt has an exact UTF-8 ending offset');
+    'exact excerpt has an exact UTF-8 ending offset');
     check(!containsMarker(envelope, 'source-alpha'), 'provider envelope omits source identity');
     check(!containsMarker(envelope, ACCOUNT), 'provider envelope omits account identity');
     check(!containsMarker(envelope, 'METADATA_PRIVATE_MARKER'),
@@ -514,6 +516,24 @@ async function next(fixture, session, certOverrides) {
       'reuse remains unavailable when fresh authority exposes no exact fingerprint');
   }
 
+  // Evidence after a CRLF must resolve to the exact source bytes the truth
+  // side reads, not to offsets in a line-ending-normalized copy.
+  {
+    const text = 'Line one\r\nAcme Supply Agreement\r\nLine three';
+    const start = text.indexOf('Acme');
+    const end = start + 'Acme Supply Agreement'.length;
+    const fixture = harness({ responses: [oneRecordEnvelope({ start, end })] });
+    const source = await prepare(fixture, text);
+    const step = await next(fixture, source.prepared.session);
+    const evidence = step.outcome && step.outcome.status === 'validated-batch'
+      ? step.outcome.batch.records[0].evidence[0]
+      : null;
+    check(!!evidence &&
+      evidence.sourceByteStart === Buffer.byteLength(text.slice(0, start), 'utf8') &&
+      evidence.sourceByteEnd === Buffer.byteLength(text.slice(0, end), 'utf8'),
+    'evidence after a CRLF resolves to its exact source byte range');
+  }
+
   // Providers echo the model that served the call; an alias often comes back
   // as a dated snapshot. Only a different model is a binding change.
   {
@@ -530,6 +550,21 @@ async function next(fixture, session, certOverrides) {
     const step = await next(fixture, source.prepared.session);
     check(step.outcome && step.outcome.status === 'provider-binding-changed',
       'a response from a different model is a provider binding change');
+  }
+
+  // A snapshot or resolved-alias suffix keeps the binding; a sibling model that
+  // only extends the configured name does not.
+  for (const [served, accepted] of [
+    ['configured-model-20250929', true], ['configured-model-0709', true],
+    ['configured-model-001', true], ['configured-model-latest', true],
+    ['configured-model-reasoning', true], ['configured-model-mini', false],
+    ['configured-model-lite', false], ['configured-model-non-reasoning', false]
+  ]) {
+    const fixture = harness({ responseModel: served, responses: [emptyEnvelope()] });
+    const source = await prepare(fixture, 'model ' + served);
+    const step = await next(fixture, source.prepared.session);
+    check((step.outcome && step.outcome.status === 'validated-batch') === accepted,
+      `${served} ${accepted ? 'keeps' : 'changes'} the provider binding`);
   }
 
   {
