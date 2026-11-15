@@ -1,0 +1,429 @@
+{
+  "generator": "showcase/angular/scripts/build-icon-fonts.mjs",
+  "fontTools": "4.63.0",
+  "upstream": {
+    "fontAwesome": {
+      "name": "Font Awesome Free",
+      "version": "6.6.0",
+      "files": {
+        "upstream/font-awesome/all.min.css": {
+          "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css",
+          "bytes": 96518,
+          "sha256": "e5e202e3c899507992952533f57b634722b69b34241d271963559d31aa33ef81"
+        },
+        "upstream/font-awesome/fa-solid-900.woff2": {
+          "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/webfonts/fa-solid-900.woff2",
+          "bytes": 157192,
+          "sha256": "1f0189e087fcefbf654fad74a3a06668b782c01353a61d5c0b7f0bf23e33c020"
+        },
+        "upstream/font-awesome/fa-regular-400.woff2": {
+          "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/webfonts/fa-regular-400.woff2",
+          "bytes": 25464,
+          "sha256": "c732f106e91bc618767fbac8e2c7b27e5c736d477b2bb4fb83f597a43198c33c"
+        },
+        "upstream/font-awesome/fa-brands-400.woff2": {
+          "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/webfonts/fa-brands-400.woff2",
+          "bytes": 118072,
+          "sha256": "c411f11975d26eb04cd2aa3c071181d4b18e489f1fb97060d4176a3531dfb36e"
+        },
+        "upstream/font-awesome/LICENSE.txt": {
+          "url": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.6.0/LICENSE.txt",
+          "bytes": 7427,
+          "sha256": "9b914eae88817d63b576eab5aafde7068c7a1abae125d7cdfb034f1da43a9afc"
+        }
+      }
+    },
+    "phosphor": {
+      "name": "Phosphor Icons",
+      "version": "2.1.1",
+      "files": {
+        "upstream/phosphor/style.css": {
+          "url": "https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css",
+          "bytes": 78131,
+          "sha256": "873761b8711147dc516b6102936e9ad005f3a3015349efcde1a496f0326f1051"
+        },
+        "upstream/phosphor/Phosphor.woff2": {
+          "url": "https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/Phosphor.woff2",
+          "bytes": 147380,
+          "sha256": "c2ea45ea05ff5c7df1936770c104725f2a68f43fd343f35f3da23a30b27de32a"
+        },
+        "upstream/phosphor/LICENSE": {
+          "url": "https://unpkg.com/@phosphor-icons/web@2.1.1/LICENSE",
+          "bytes": 1097,
+          "sha256": "81bb1bfd8e3730c19a3895ff4a82839980933504725960c52b1c207b29398f07"
+        }
+      }
+    }
+  },
+  "libraries": {
+    "fontAwesome": {
+      "icons": {
+        "fa-arrow-left": "f060",
+        "fa-arrow-right": "f061",
+        "fa-arrow-right-long": "f178",
+        "fa-arrow-up-right-from-square": "f08e",
+        "fa-arrows-rotate": "f021",
+        "fa-arrows-up-down": "f07d",
+        "fa-bell": "f0f3",
+        "fa-bolt": "f0e7",
+        "fa-box": "f466",
+        "fa-boxes-packing": "e4c7",
+        "fa-boxes-stacked": "f468",
+        "fa-brain": "f5dc",
+        "fa-brave": "e63c",
+        "fa-bug": "f188",
+        "fa-camera": "f030",
+        "fa-caret-up": "f0d8",
+        "fa-chart-simple": "e473",
+        "fa-check": "f00c",
+        "fa-chevron-down": "f078",
+        "fa-chrome": "f268",
+        "fa-circle-check": "f058",
+        "fa-circle-info": "f05a",
+        "fa-circle-nodes": "e4e2",
+        "fa-circle-question": "f059",
+        "fa-clock": "f017",
+        "fa-code": "f121",
+        "fa-code-branch": "f126",
+        "fa-comments": "f086",
+        "fa-compass": "f14e",
+        "fa-compass-drafting": "f568",
+        "fa-compress": "f066",
+        "fa-copy": "f0c5",
+        "fa-crosshairs": "f05b",
+        "fa-cube": "f1b2",
+        "fa-desktop": "f390",
+        "fa-diagram-project": "f542",
+        "fa-display": "e163",
+        "fa-down-left-and-up-right-to-center": "f422",
+        "fa-edge": "f282",
+        "fa-exclamation-triangle": "f071",
+        "fa-expand": "f065",
+        "fa-eye": "f06e",
+        "fa-file-arrow-up": "f574",
+        "fa-file-signature": "f573",
+        "fa-fingerprint": "f577",
+        "fa-firefox-browser": "e007",
+        "fa-github": "f09b",
+        "fa-globe": "f0ac",
+        "fa-hand": "f256",
+        "fa-hand-pointer": "f25a",
+        "fa-hashtag": "23",
+        "fa-house": "f015",
+        "fa-id-badge": "f2c1",
+        "fa-js": "f3b8",
+        "fa-key": "f084",
+        "fa-keyboard": "f11c",
+        "fa-layer-group": "f5fd",
+        "fa-list": "f03a",
+        "fa-list-check": "f0ae",
+        "fa-lock": "f023",
+        "fa-magnifying-glass": "f002",
+        "fa-message": "f27a",
+        "fa-network-wired": "f6ff",
+        "fa-node-js": "f3d3",
+        "fa-npm": "f3d4",
+        "fa-opera": "f26a",
+        "fa-palette": "f53f",
+        "fa-pause": "f04c",
+        "fa-pen-nib": "f5ad",
+        "fa-photo-film": "f87c",
+        "fa-play": "f04b",
+        "fa-plug": "f1e6",
+        "fa-plug-circle-xmark": "e560",
+        "fa-plus": "2b",
+        "fa-puzzle-piece": "f12e",
+        "fa-qrcode": "f029",
+        "fa-react": "f41b",
+        "fa-receipt": "f543",
+        "fa-right-from-bracket": "f2f5",
+        "fa-robot": "f544",
+        "fa-rotate": "f2f1",
+        "fa-rotate-right": "f2f9",
+        "fa-route": "f4d7",
+        "fa-safari": "f267",
+        "fa-scale-balanced": "f24e",
+        "fa-scissors": "f0c4",
+        "fa-screwdriver-wrench": "f7d9",
+        "fa-shapes": "f61f",
+        "fa-shield-halved": "f3ed",
+        "fa-sitemap": "f0e8",
+        "fa-stop": "f04d",
+        "fa-tag": "f02b",
+        "fa-terminal": "f120",
+        "fa-tower-broadcast": "f519",
+        "fa-triangle-exclamation": "f071",
+        "fa-up-right-and-down-left-from-center": "f424",
+        "fa-user-secret": "f21b",
+        "fa-user-shield": "f505",
+        "fa-users": "f0c0",
+        "fa-users-gear": "f509",
+        "fa-vial": "f492",
+        "fa-video": "f03d",
+        "fa-wave-square": "f83e",
+        "fa-window-maximize": "f2d0",
+        "fa-window-restore": "f2d2",
+        "fa-wrench": "f0ad",
+        "fa-x-twitter": "e61b",
+        "fa-xmark": "f00d",
+        "fa-yandex": "f413"
+      },
+      "classes": [
+        "sr-only"
+      ],
+      "styleCodepoints": [
+        "e61b"
+      ],
+      "faces": [
+        {
+          "family": "Font Awesome 6 Brands",
+          "weight": "400",
+          "full": "upstream/font-awesome/fa-brands-400.woff2",
+          "fullUnicodeRange": "U+0-1F,U+21-10FFFF",
+          "subset": "fa-brands-400.subset.woff2",
+          "codepoints": [
+            "23",
+            "2b",
+            "e007",
+            "e61b",
+            "e63c",
+            "f09b",
+            "f267",
+            "f268",
+            "f26a",
+            "f282",
+            "f3b8",
+            "f3d3",
+            "f3d4",
+            "f413",
+            "f41b"
+          ],
+          "unicodeRange": "U+20,U+23,U+2B,U+E007,U+E61B,U+E63C,U+F09B,U+F267,U+F268,U+F26A,U+F282,U+F3B8,U+F3D3,U+F3D4,U+F413,U+F41B"
+        },
+        {
+          "family": "Font Awesome 6 Free",
+          "weight": "400",
+          "full": "upstream/font-awesome/fa-regular-400.woff2",
+          "fullUnicodeRange": "U+0-1F,U+21-10FFFF",
+          "subset": "fa-regular-400.subset.woff2",
+          "codepoints": [
+            "23",
+            "2b",
+            "f017",
+            "f058",
+            "f059",
+            "f06e",
+            "f086",
+            "f0c5",
+            "f0f3",
+            "f11c",
+            "f14e",
+            "f256",
+            "f25a",
+            "f27a",
+            "f2c1",
+            "f2d0",
+            "f2d2"
+          ],
+          "unicodeRange": "U+20,U+23,U+2B,U+F017,U+F058,U+F059,U+F06E,U+F086,U+F0C5,U+F0F3,U+F11C,U+F14E,U+F256,U+F25A,U+F27A,U+F2C1,U+F2D0,U+F2D2"
+        },
+        {
+          "family": "Font Awesome 6 Free",
+          "weight": "900",
+          "full": "upstream/font-awesome/fa-solid-900.woff2",
+          "fullUnicodeRange": "U+0-1F,U+21-10FFFF",
+          "subset": "fa-solid-900.subset.woff2",
+          "codepoints": [
+            "23",
+            "2b",
+            "e163",
+            "e473",
+            "e4c7",
+            "e4e2",
+            "e560",
+            "f002",
+            "f00c",
+            "f00d",
+            "f015",
+            "f017",
+            "f021",
+            "f023",
+            "f029",
+            "f02b",
+            "f030",
+            "f03a",
+            "f03d",
+            "f04b",
+            "f04c",
+            "f04d",
+            "f058",
+            "f059",
+            "f05a",
+            "f05b",
+            "f060",
+            "f061",
+            "f065",
+            "f066",
+            "f06e",
+            "f071",
+            "f078",
+            "f07d",
+            "f084",
+            "f086",
+            "f08e",
+            "f0ac",
+            "f0ad",
+            "f0ae",
+            "f0c0",
+            "f0c4",
+            "f0c5",
+            "f0d8",
+            "f0e7",
+            "f0e8",
+            "f0f3",
+            "f11c",
+            "f120",
+            "f121",
+            "f126",
+            "f12e",
+            "f14e",
+            "f178",
+            "f188",
+            "f1b2",
+            "f1e6",
+            "f21b",
+            "f24e",
+            "f256",
+            "f25a",
+            "f27a",
+            "f2c1",
+            "f2d0",
+            "f2d2",
+            "f2f1",
+            "f2f5",
+            "f2f9",
+            "f390",
+            "f3ed",
+            "f422",
+            "f424",
+            "f466",
+            "f468",
+            "f492",
+            "f4d7",
+            "f505",
+            "f509",
+            "f519",
+            "f53f",
+            "f542",
+            "f543",
+            "f544",
+            "f568",
+            "f573",
+            "f574",
+            "f577",
+            "f5ad",
+            "f5dc",
+            "f5fd",
+            "f61f",
+            "f6ff",
+            "f7d9",
+            "f83e",
+            "f87c"
+          ],
+          "unicodeRange": "U+20,U+23,U+2B,U+E163,U+E473,U+E4C7,U+E4E2,U+E560,U+F002,U+F00C,U+F00D,U+F015,U+F017,U+F021,U+F023,U+F029,U+F02B,U+F030,U+F03A,U+F03D,U+F04B,U+F04C,U+F04D,U+F058,U+F059,U+F05A,U+F05B,U+F060,U+F061,U+F065,U+F066,U+F06E,U+F071,U+F078,U+F07D,U+F084,U+F086,U+F08E,U+F0AC,U+F0AD,U+F0AE,U+F0C0,U+F0C4,U+F0C5,U+F0D8,U+F0E7,U+F0E8,U+F0F3,U+F11C,U+F120,U+F121,U+F126,U+F12E,U+F14E,U+F178,U+F188,U+F1B2,U+F1E6,U+F21B,U+F24E,U+F256,U+F25A,U+F27A,U+F2C1,U+F2D0,U+F2D2,U+F2F1,U+F2F5,U+F2F9,U+F390,U+F3ED,U+F422,U+F424,U+F466,U+F468,U+F492,U+F4D7,U+F505,U+F509,U+F519,U+F53F,U+F542,U+F543,U+F544,U+F568,U+F573,U+F574,U+F577,U+F5AD,U+F5DC,U+F5FD,U+F61F,U+F6FF,U+F7D9,U+F83E,U+F87C"
+        }
+      ]
+    },
+    "phosphor": {
+      "icons": {
+        "ph-arrow-left": "e058",
+        "ph-bell-ringing": "e5e8",
+        "ph-chart-line-up": "e156",
+        "ph-clipboard-text": "e198",
+        "ph-globe": "e288",
+        "ph-headset": "e584",
+        "ph-info": "e2ce",
+        "ph-list-checks": "eadc",
+        "ph-stethoscope": "e7ea",
+        "ph-storefront": "e470",
+        "ph-target": "e47c",
+        "ph-tray": "e4aa"
+      },
+      "classes": [],
+      "styleCodepoints": [],
+      "faces": [
+        {
+          "family": "Phosphor",
+          "weight": "normal",
+          "full": "upstream/phosphor/Phosphor.woff2",
+          "fullUnicodeRange": "U+0-1F,U+21-10FFFF",
+          "subset": "Phosphor.subset.woff2",
+          "codepoints": [
+            "e058",
+            "e156",
+            "e198",
+            "e288",
+            "e2ce",
+            "e470",
+            "e47c",
+            "e4aa",
+            "e584",
+            "e5e8",
+            "e7ea",
+            "eadc"
+          ],
+          "unicodeRange": "U+20,U+E058,U+E156,U+E198,U+E288,U+E2CE,U+E470,U+E47C,U+E4AA,U+E584,U+E5E8,U+E7EA,U+EADC"
+        }
+      ]
+    }
+  },
+  "dynamic": [
+    {
+      "file": "src/app/pages/home/home-page.component.html",
+      "expression": "'fa-brands ' + browserIconClass",
+      "values": [
+        "fa-brave",
+        "fa-edge",
+        "fa-opera",
+        "fa-yandex",
+        "fa-firefox-browser",
+        "fa-chrome",
+        "fa-safari"
+      ]
+    }
+  ],
+  "files": {
+    "fa-brands-400.subset.woff2": {
+      "bytes": 4208,
+      "sha256": "0c6e326893093bfec159667e5d0f4612e3afd9d726427843c8bf9a27dcc8bc85"
+    },
+    "fa-regular-400.subset.woff2": {
+      "bytes": 3104,
+      "sha256": "f1668b2a9d586f127c9b7bba42de2dee58875806a61b0dee815747e8ea9e567f"
+    },
+    "fa-solid-900.subset.woff2": {
+      "bytes": 10628,
+      "sha256": "f928defa03f8af3f1774ba5b258a4011d0fea2c72ccc936dfe244af9c51c2b3c"
+    },
+    "Phosphor.subset.woff2": {
+      "bytes": 2608,
+      "sha256": "a5aa03d091a8673b838ea6fcefa65dbb9e9ce69d9f5571b09283265467cdd05d"
+    },
+    "icons.generated.css": {
+      "bytes": 9666,
+      "sha256": "b20f8d2e69bf75015e19d756caa5e58ee918bcce5a547ee0385e01a962f51889"
+    }
+  },
+  "licenses": {
+    "public/licenses/font-awesome-free.txt": {
+      "from": "upstream/font-awesome/LICENSE.txt",
+      "bytes": 7427,
+      "sha256": "9b914eae88817d63b576eab5aafde7068c7a1abae125d7cdfb034f1da43a9afc"
+    },
+    "public/licenses/phosphor-icons.txt": {
+      "from": "upstream/phosphor/LICENSE",
+      "bytes": 1097,
+      "sha256": "81bb1bfd8e3730c19a3895ff4a82839980933504725960c52b1c207b29398f07"
+    }
+  }
+}

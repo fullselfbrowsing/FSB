@@ -3,6 +3,9 @@ import { Component, OnDestroy, OnInit, PLATFORM_ID, Renderer2, inject, DOCUMENT,
 import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
+import { DepthEndComponent } from '../../layout/depth/depth-end.component';
+import { DepthRailComponent, type DepthRailItem } from '../../layout/depth/depth-rail.component';
+import { DepthStageDirective } from '../../layout/depth/depth-stage.directive';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { PageJsonLdService } from '../../core/seo/page-json-ld.service';
 
@@ -14,7 +17,7 @@ const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 @Component({
   selector: 'app-agents-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, DepthStageDirective, DepthRailComponent, DepthEndComponent],
   templateUrl: './agents-page.component.html',
   styleUrl: './agents-page.component.scss',
 })
@@ -66,7 +69,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     // tokens (FSB, OpenClaw, Claude, Codex, Cursor, MCP, Chrome) are preserved verbatim
     // by translators per showcase/angular/src/locale/DO-NOT-TRANSLATE.md.
     const t = $localize`:@@agents.meta.title:FSB for AI Agents | MCP Browser Automation`;
-    const d = $localize`:@@agents.meta.description:Connect Codex, Claude Code, Cursor, OpenClaw, and Hermes to your real Chrome session with FSB. Install the MCP bridge and verify it with doctor.`;
+    const d = $localize`:@@agents.meta.description:Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.`;
     this.applyMeta(t, d, url);
     this.injectAgentsPageJsonLd();
 
@@ -138,7 +141,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     if (this.prefersReducedMotion || this.cycleTimer !== null || this.doc.visibilityState === 'hidden') {
       return;
     }
-    this.cycleTimer = window.setInterval(() => this.advanceToken(), 3000);
+    this.cycleTimer = setZoneFreeInterval(() => this.advanceToken(), 3000);
   }
 
   private handleVisibilityChange(): void {
@@ -162,7 +165,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   private advanceToken(): void {
-    if (this.isCycling || this.paused || !isPlatformBrowser(this.platformId)) {
+    if (this.activePlane !== TOKEN_PLANE || this.isCycling || this.paused || !isPlatformBrowser(this.platformId)) {
       return;
     }
     const next = AGENT_TOKENS[(this.tokenIndex + 1) % AGENT_TOKENS.length];
@@ -336,6 +339,16 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     this.pageJsonLd.set('agents-page', payload);
   }
 
+
+  /* Depth page wiring. The agent name in the hero cycles only while the hero is
+     the plane in view. */
+  readonly rail: readonly DepthRailItem[] = AGENTS_RAIL_LABELS.map((label, layer) => ({ label, layer }));
+  readonly railLabel = AGENTS_RAIL_ARIA;
+  private activePlane = 0;
+
+  onDepthActive(index: number): void {
+    this.activePlane = index;
+  }
 }
 
 /* Page data lives in the module tail rather than beside ROUTE_PATH at the top on
@@ -420,3 +433,20 @@ const CTA_LOGOS: readonly string[] = [
   'claude.svg',
   'cursor.svg',
 ];
+
+/* Depth page: the planes of this page in order; the rotating agent name sits on
+   the first. */
+const TOKEN_PLANE = 0;
+const AGENTS_RAIL_ARIA = $localize`:@@agents.depth.rail.aria:FSB for agents sections`;
+const AGENTS_RAIL_LABELS: readonly string[] = [
+  $localize`:@@depth.rail.intro:Intro`,
+  $localize`:@@agents.depth.rail.yourAgents:Your agents`,
+  $localize`:@@agents.depth.rail.power:Power`,
+  $localize`:@@agents.depth.rail.skillConnect:Skill + connect`,
+  $localize`:@@agents.depth.rail.useCases:Use cases`,
+  $localize`:@@agents.depth.rail.getStarted:Get started`,
+  $localize`:@@depth.rail.index:Index`,
+];
+
+// Imported here, below every $localize call, so the line numbers messages.xlf pins do not move.
+import { setZoneFreeInterval } from '../../core/zone/zone-free-interval';

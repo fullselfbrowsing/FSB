@@ -148,6 +148,7 @@ export function verifyPage({ html, locale, page, catalog, reviewedCopy, locales,
     const howTo = one(graph.filter(node => node['@type'] === 'HowTo'), `${label}: HowTo`);
     assert.equal(howTo['@id'], `${url}#install-howto`, `${label}: localized HowTo identity`);
     assert.equal(howTo.url, `${url}#install-howto`, `${label}: localized HowTo URL`);
+    assert.ok(/\sid="install-howto"/.test(html), `${label}: the HowTo's #install-howto fragment is an element on the page`);
     assert.equal(howTo.inLanguage, locale, `${label}: HowTo language`);
     assert.equal(howTo.name, expected('agents.schema.howTo.name'), `${label}: HowTo title`);
     assert.equal(howTo.description, expected('agents.schema.howTo.description'), `${label}: HowTo description`);

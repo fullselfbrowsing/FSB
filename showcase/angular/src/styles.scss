@@ -1,6 +1,3 @@
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css');
-@import url('https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css');
-
 /* Shared showcase foundation: tokens, reset, typography, and utilities only.
  * color-scheme is required so native form controls (the footer <select> especially)
  * use a dark Field palette instead of light-on-light in Blink/Gecko. */
@@ -77,6 +74,9 @@
 html {
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
+  /* Phone browsers flash a tinted box over whatever is tapped (blue in Chrome on
+     Android). The controls show their own pressed and focus states instead. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (prefers-reduced-motion: no-preference) {

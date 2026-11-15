@@ -33,7 +33,7 @@ module.exports = tseslint.config(
         checkAttributes: true,
         ignoreAttributes: [
           // Machine tokens -- never visible to end users
-          'rel', 'href', 'src', 'srcset', 'loading', 'decoding', 'referrerpolicy',
+          'rel', 'href', 'src', 'srcset', 'loading', 'decoding', 'fetchpriority', 'referrerpolicy',
           'allow', 'allowfullscreen', 'sandbox',
           // SVG geometry / class hooks
           'd', 'stroke-linejoin', 'stroke-linecap', 'fill', 'viewBox', 'preserveAspectRatio',
@@ -42,8 +42,9 @@ module.exports = tseslint.config(
           // Routing (Angular router takes literal strings, not translations)
           'routerLink', 'routerLinkActive',
           // ARIA structural attributes (not user-facing text)
-          // aria-live / aria-busy are politeness/busy tokens (e.g. "polite"), not copy
-          'aria-controls', 'aria-expanded', 'aria-hidden', 'aria-live', 'aria-busy',
+          // aria-live / aria-busy are politeness/busy tokens (e.g. "polite"), not copy;
+          // aria-controls / aria-labelledby hold the id of another element
+          'aria-controls', 'aria-labelledby', 'aria-expanded', 'aria-hidden', 'aria-live', 'aria-busy',
           // Image / element MIME-style flags
           'type', 'role'
         ]

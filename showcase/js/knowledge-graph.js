@@ -10,6 +10,7 @@
  *   KnowledgeGraph.refresh()                    - Rebuild data, preserve camera
  *   KnowledgeGraph.setDetailLevel(level)        - 'simple' or 'full'
  *   KnowledgeGraph.highlight(query)             - Dim non-matching, emphasize matches
+ *   KnowledgeGraph.pause() / resume()           - Stop and restart the animation
  */
 
 if (typeof window !== 'undefined' && !window.KnowledgeGraph) {
@@ -541,9 +542,10 @@ const KnowledgeGraph = (function () {
 
   function getDefaultZoom(container, detailLevel) {
     if (!container || !container.getBoundingClientRect) return 1;
-    var rect = container.getBoundingClientRect();
-    var w = rect.width || container.clientWidth || 940;
-    var h = rect.height || container.clientHeight || 520;
+    // Layout size, not the bounding box: on the about page the graph sits on a
+    // depth plane that may be scaled down to fit, which the box would include.
+    var w = container.clientWidth || 940;
+    var h = container.clientHeight || 520;
     var expanded = detailLevel === 'full';
 
     // Desktop keeps the reference framing. Smaller viewports pull the 3D
@@ -715,11 +717,13 @@ const KnowledgeGraph = (function () {
       hideTooltip(state);
     });
 
-    // Scroll zoom
+    // Pinch or Cmd/Ctrl + scroll zooms (a trackpad pinch arrives as a ctrl+wheel).
+    // A plain scroll is left alone so it can move the page past the graph.
     canvas.addEventListener('wheel', function (e) {
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      var delta = e.deltaY > 0 ? -0.08 : 0.08;
-      state.zoom = Math.max(0.3, Math.min(3.0, state.zoom + delta));
+      var d = Math.max(-60, Math.min(60, e.deltaY));
+      state.zoom = Math.max(0.3, Math.min(3.0, state.zoom * Math.exp(-d * 0.0045)));
       state.userZoomed = true;
     }, { passive: false });
 
@@ -763,9 +767,12 @@ const KnowledgeGraph = (function () {
   function handleHover(state, e) {
     if (!state.projected || state.projected.length === 0) return;
 
+    // Pointer position in layout pixels: the canvas may be drawn scaled.
     var rect = state.canvas.getBoundingClientRect();
-    var mx = e.clientX - rect.left;
-    var my = e.clientY - rect.top;
+    var kx = rect.width ? state.canvas.clientWidth / rect.width : 1;
+    var ky = rect.height ? state.canvas.clientHeight / rect.height : 1;
+    var mx = (e.clientX - rect.left) * kx;
+    var my = (e.clientY - rect.top) * ky;
 
     // Find nearest node within hit radius
     var best = null;
@@ -820,9 +827,12 @@ const KnowledgeGraph = (function () {
     tooltip.style.display = 'block';
 
     var containerRect = state.container.getBoundingClientRect();
-    var tx = e.clientX - containerRect.left + 14;
-    var ty = e.clientY - containerRect.top - 12;
-    if (tx + 280 > containerRect.width) tx = e.clientX - containerRect.left - 290;
+    var ks = containerRect.width ? state.container.clientWidth / containerRect.width : 1;
+    var lx = (e.clientX - containerRect.left) * ks;
+    var ly = (e.clientY - containerRect.top) * ks;
+    var tx = lx + 14;
+    var ty = ly - 12;
+    if (tx + 280 > state.container.clientWidth) tx = lx - 290;
     if (ty < 0) ty = 10;
     tooltip.style.left = tx + 'px';
     tooltip.style.top = ty + 'px';
@@ -860,9 +870,8 @@ const KnowledgeGraph = (function () {
 
     // Sync the pixel buffer to the actual rendered size
     function syncCanvasSize() {
-      var rect = canvas.getBoundingClientRect();
-      var bw = Math.round(rect.width * dpr);
-      var bh = Math.round(rect.height * dpr);
+      var bw = Math.round((canvas.clientWidth || 0) * dpr);
+      var bh = Math.round((canvas.clientHeight || 0) * dpr);
       if (canvas.width !== bw || canvas.height !== bh) {
         canvas.width = bw;
         canvas.height = bh;
@@ -964,6 +973,22 @@ const KnowledgeGraph = (function () {
     _state.highlightQuery = (query || '').trim();
   }
 
+  // Stop drawing while the graph is out of view; resume picks up where it left off.
+  function pause() {
+    if (!_state || !_state.running) return;
+    _state.running = false;
+    if (_state.animId) cancelAnimationFrame(_state.animId);
+    _state.isDragging = false;
+    hideTooltip(_state);
+  }
+
+  function resume() {
+    if (!_state || _state.running) return;
+    _state.running = true;
+    if (_state._resizeHandler) _state._resizeHandler();
+    animate(_state);
+  }
+
   function setTaskMemories(memories) {
     _taskMemories = memories || [];
     if (_state) refresh(); // auto-refresh if already rendered
@@ -975,6 +1000,8 @@ const KnowledgeGraph = (function () {
     refresh: refresh,
     setDetailLevel: setDetailLevel,
     highlight: highlight,
+    pause: pause,
+    resume: resume,
     setTaskMemories: setTaskMemories
   };
 })();

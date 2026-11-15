@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 // Phase 216 prebuild: regenerate sitemap.xml, llms.txt, llms-full.txt, and version.ts.
 // Wired via showcase/angular/package.json "prebuild" -- runs automatically before `ng build`.
-// Per CRAWL-05: zero new npm dependencies (node:fs + node:path + node:url only).
+// Per CRAWL-05: zero new npm dependencies (Node built-ins only).
+//
+// `--check` (or SITEMAP_LASTMOD_CHECK=1) writes nothing and exits 1 when
+// sitemap-lastmod.json or the committed sitemap.xml is out of date.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildLocalizedMarketingIndex } from './crawler-locale-summaries.mjs';
+import { computeRouteHashes, resolveLastmods } from './sitemap-lastmod.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,13 +21,21 @@ const REPO_ROOT = resolve(ANGULAR_ROOT, '..', '..');
 const PUBLIC_DIR = join(ANGULAR_ROOT, 'public');
 const SCRIPTS_DIR = __dirname;
 const SERVER_ROUTES_PATH = join(ANGULAR_ROOT, 'src', 'app', 'app.routes.server.ts');
+const SITEMAP_PATH = join(PUBLIC_DIR, 'sitemap.xml');
+const LASTMOD_PATH = join(SCRIPTS_DIR, 'sitemap-lastmod.json');
+
+const CHECK_ONLY = process.argv.includes('--check') || process.env.SITEMAP_LASTMOD_CHECK === '1';
+// A CI checkout is thrown away, so a stale entry is reported there, not rewritten.
+const IN_CI = Boolean(process.env.CI) && process.env.CI !== '0' && process.env.CI !== 'false';
+const REGENERATE_HINT = 'run `node scripts/build-crawler-files.mjs` in showcase/angular, then commit scripts/sitemap-lastmod.json and public/sitemap.xml';
 
 const HOST = 'https://full-selfbrowsing.com';
 const TRAILER_VIDEO = JSON.parse(readFileSync(
   join(ANGULAR_ROOT, 'src', 'app', 'core', 'seo', 'trailer-video.json'), 'utf8'
 ));
 // PRE-03 locked, /dashboard excluded. changefreq/priority hint relative importance
-// to crawlers; lastmod is regenerated per build (see generateSitemap).
+// to crawlers; lastmod is the date the route's content last changed (see
+// sitemap-lastmod.mjs).
 const ROUTES = [
   { path: '/',               changefreq: 'weekly',  priority: '1.0' },
   { path: '/about',          changefreq: 'weekly',  priority: '0.9' },
@@ -76,7 +88,7 @@ function assertSitemapRoutesMatchPrerenderRoutes() {
 }
 
 function todayIsoDate() {
-  // Build-date lastmod per D-07: ISO 8601 short form YYYY-MM-DD, UTC.
+  // Build date per D-07: ISO 8601 short form YYYY-MM-DD, UTC.
   const d = new Date();
   const yyyy = d.getUTCFullYear();
   const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
@@ -143,15 +155,39 @@ function localizedTrailerCopy(locale) {
   };
 }
 
-function generateSitemap() {
-  const lastmod = todayIsoDate();
-  const { locales, subpaths, sourceLocale } = readLocaleRegistry();
+function readCommittedLastmods() {
+  if (!existsSync(LASTMOD_PATH)) return {};
+  const committed = JSON.parse(readFileSync(LASTMOD_PATH, 'utf8'));
+  if (!committed || typeof committed !== 'object' || Array.isArray(committed)) {
+    throw new Error('sitemap-lastmod.json must be an object keyed by route');
+  }
+  return committed;
+}
+
+function resolveSitemapLastmods({ locales, sourceLocale }) {
+  const routePaths = ROUTES.map((route) => route.path);
+  const hashes = computeRouteHashes({
+    angularRoot: ANGULAR_ROOT,
+    routePaths,
+    // English copy lives in the hashed templates and sources themselves.
+    locales: locales.filter((locale) => locale !== sourceLocale),
+  });
+  return resolveLastmods({ routePaths, hashes, committed: readCommittedLastmods(), today: todayIsoDate() });
+}
+
+function describeStale(stale) {
+  return stale.map(({ route, reason }) => `  ${route} -- ${reason}`).join('\n');
+}
+
+function renderSitemap({ locales, subpaths, sourceLocale }, lastmods) {
   const lines = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">');
   for (const route of ROUTES) {
     // Every locale variant is its own <url>, and each carries the full
     // alternate set -- Google requires the reciprocal links on each variant.
+    // The variants share the route's lastmod.
+    const { lastmod } = lastmods[route.path];
     for (const locale of locales) {
       lines.push('  <url>');
       lines.push(`    <loc>${localeUrl(subpaths[locale], route.path)}</loc>`);
@@ -178,9 +214,35 @@ function generateSitemap() {
   }
   lines.push('</urlset>');
   lines.push(''); // trailing newline
-  const body = lines.join('\n');
-  writeFileSync(join(PUBLIC_DIR, 'sitemap.xml'), body, 'utf8');
-  console.log(`[build-crawler-files] sitemap.xml written (${body.length} bytes, ${ROUTES.length * locales.length} urls, lastmod=${lastmod})`);
+  return lines.join('\n');
+}
+
+function checkSitemapLastmods(stale, sitemap) {
+  if (stale.length > 0) {
+    console.error(`[build-crawler-files] sitemap-lastmod.json is stale for ${stale.length} route(s):\n${describeStale(stale)}`);
+    console.error(`[build-crawler-files] ${REGENERATE_HINT}`);
+    process.exit(1);
+  }
+  if (!existsSync(SITEMAP_PATH) || readFileSync(SITEMAP_PATH, 'utf8') !== sitemap) {
+    console.error(`[build-crawler-files] public/sitemap.xml is not what the generator writes; ${REGENERATE_HINT}`);
+    process.exit(1);
+  }
+  console.log(`[build-crawler-files] sitemap lastmod check passed (${ROUTES.length} routes, public/sitemap.xml up to date)`);
+}
+
+function writeSitemap(registry, { entries, stale }, sitemap) {
+  if (stale.length > 0) {
+    console.warn(`[build-crawler-files] sitemap-lastmod.json is stale for ${stale.length} route(s):\n${describeStale(stale)}`);
+    if (IN_CI) {
+      console.warn(`[build-crawler-files] left as committed under CI; this sitemap dates those routes ${todayIsoDate()}. To refresh, ${REGENERATE_HINT}`);
+    } else {
+      writeFileSync(LASTMOD_PATH, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
+      console.warn(`[build-crawler-files] sitemap-lastmod.json rewritten (changed routes dated ${todayIsoDate()}); commit it with public/sitemap.xml`);
+    }
+  }
+  writeFileSync(SITEMAP_PATH, sitemap, 'utf8');
+  const newest = Object.values(entries).map((entry) => entry.lastmod).sort().at(-1);
+  console.log(`[build-crawler-files] sitemap.xml written (${sitemap.length} bytes, ${ROUTES.length * registry.locales.length} urls, newest lastmod=${newest})`);
 }
 
 function copyCrawlerTextFile(sourceName, outputName, maxBytes, localizedIndex) {
@@ -199,8 +261,7 @@ function copyCrawlerTextFile(sourceName, outputName, maxBytes, localizedIndex) {
   console.log(`[build-crawler-files] ${outputName} written (${bytes} bytes)`);
 }
 
-function copyLlmsFiles() {
-  const registry = readLocaleRegistry();
+function copyLlmsFiles(registry) {
   const localizedIndex = buildLocalizedMarketingIndex({
     ...registry,
     host: HOST,
@@ -239,8 +300,15 @@ function writeVersion() {
 
 async function main() {
   assertSitemapRoutesMatchPrerenderRoutes();
-  generateSitemap();
-  copyLlmsFiles();
+  const registry = readLocaleRegistry();
+  const lastmods = resolveSitemapLastmods(registry);
+  const sitemap = renderSitemap(registry, lastmods.entries);
+  if (CHECK_ONLY) {
+    checkSitemapLastmods(lastmods.stale, sitemap);
+    return;
+  }
+  writeSitemap(registry, lastmods, sitemap);
+  copyLlmsFiles(registry);
   writeVersion();
   console.log('[build-crawler-files] all crawler-file artifacts regenerated');
 }
