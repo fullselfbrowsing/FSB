@@ -214,7 +214,51 @@ ring._resetRing();
     assert.strictEqual(trustedClear.entries.length, 1, 'trusted clear returns the durable entry');
     assert.strictEqual(trustedClear.clearedAt, 13579, 'trusted clear timestamp comes from the store');
     assert.deepStrictEqual(durable[ring.STORAGE_KEY], [], 'trusted clear empties durable storage');
+    console.log('  PASS: trusted storage is durable, context-minimized, and bridge-secret scrubbed');
+
+    // In the service worker the store is published by an async boot, and a
+    // worker never receives its own runtime messages. An entry appended or
+    // read during that window must wait for the store instead.
+    console.log('--- LOG-04 worker calls during the trusted boot ---');
+    const bootStore = globalThis.fsbTrustedLocalFeatureStore;
+    delete globalThis.fsbTrustedLocalFeatureStore;
+    let finishBoot;
+    globalThis.fsbTrustedLocalBootPromise = new Promise((resolve) => { finishBoot = resolve; });
+    let bootMessages = 0;
+    globalThis.chrome = {
+      runtime: {
+        lastError: null,
+        sendMessage(_message, callback) {
+          bootMessages += 1;
+          globalThis.chrome.runtime.lastError = { message: 'Receiving end does not exist.' };
+          callback(undefined);
+          globalThis.chrome.runtime.lastError = null;
+        }
+      }
+    };
+    durable[ring.STORAGE_KEY] = [{
+      ts: 555, level: 'warn', prefix: 'SW', category: 'boot', message: 'from the previous worker', redactedContext: {}
+    }];
+    ring._resetRing();
+    const appendDuringBoot = ring.appendDiagnosticEntry({
+      ts: 777, level: 'warn', prefix: 'SW', category: 'boot', message: 'appended during boot'
+    });
+    const readDuringBoot = ring.getDiagnosticEntries({});
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.strictEqual(bootMessages, 0, 'no diagnostic call falls back to a sendMessage the worker cannot receive');
+    globalThis.fsbTrustedLocalFeatureStore = bootStore;
+    finishBoot(bootStore);
+    await appendDuringBoot;
+    const bootRead = await readDuringBoot;
+    assert.strictEqual(bootMessages, 0, 'diagnostic calls during the boot use the published store');
+    assert.deepStrictEqual(durable[ring.STORAGE_KEY].map((item) => item.message),
+      ['from the previous worker', 'appended during boot'],
+      'an entry appended during the boot reaches durable storage');
+    assert.strictEqual(bootRead.entries[0] && bootRead.entries[0].message, 'from the previous worker',
+      'a read during the boot returns durable entries the in-memory ring never held');
+    console.log('  PASS: diagnostic calls during the boot wait for the trusted store');
   } finally {
+    delete globalThis.fsbTrustedLocalBootPromise;
     if (originalChrome === undefined) delete globalThis.chrome;
     else globalThis.chrome = originalChrome;
     if (originalTrustedStore === undefined) delete globalThis.fsbTrustedLocalFeatureStore;
@@ -222,7 +266,6 @@ ring._resetRing();
     if (originalSharedScrubber === undefined) delete globalThis.redactBridgeSecretsInString;
     else globalThis.redactBridgeSecretsInString = originalSharedScrubber;
   }
-  console.log('  PASS: trusted storage is durable, context-minimized, and bridge-secret scrubbed');
 
   console.log('\nAll assertions passed.');
 })().catch((err) => { console.error('test failed:', err); process.exit(1); });

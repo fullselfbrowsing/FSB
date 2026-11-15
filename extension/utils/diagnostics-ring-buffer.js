@@ -69,6 +69,19 @@
     return store && typeof store === 'object' ? store : null;
   }
 
+  // In the service worker the store is published by an async boot, and a
+  // worker never receives its own runtime messages, so the sendMessage
+  // fallback cannot help there. Other contexts have no boot promise and keep
+  // using sendMessage.
+  async function _trustedStoreAfterBoot() {
+    var existing = _trustedStore();
+    if (existing) return existing;
+    var boot = typeof globalThis !== 'undefined' ? globalThis.fsbTrustedLocalBootPromise : null;
+    if (!boot || typeof boot.then !== 'function') return null;
+    try { await boot; } catch (_error) { /* a failed boot leaves the store unset */ }
+    return _trustedStore();
+  }
+
   function _sendFixed(message) {
     if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
       return Promise.resolve(null);
@@ -88,24 +101,29 @@
     });
   }
 
-  function appendDiagnosticEntry(entry) {
+  async function appendDiagnosticEntry(entry) {
     var safe = _safeEntry(entry);
-    if (!safe) return Promise.resolve();
+    if (!safe) return;
     _inMemoryRing.push(safe);
     if (_inMemoryRing.length > MAX_ENTRIES) {
       _inMemoryRing.splice(0, _inMemoryRing.length - MAX_ENTRIES);
     }
 
-    var store = _trustedStore();
+    var store = await _trustedStoreAfterBoot();
     if (store && typeof store.appendDiagnosticEntry === 'function') {
-      return Promise.resolve(store.appendDiagnosticEntry(safe)).then(function() {}, function() {});
+      try {
+        await store.appendDiagnosticEntry(safe);
+      } catch (_error) {
+        // The in-memory ring above already holds the entry.
+      }
+      return;
     }
-    return _sendFixed({ action: DIAGNOSTIC_APPEND, entry: safe }).then(function() {});
+    await _sendFixed({ action: DIAGNOSTIC_APPEND, entry: safe });
   }
 
   async function getDiagnosticEntries(options) {
     var clear = !!(options && options.clear === true);
-    var store = _trustedStore();
+    var store = await _trustedStoreAfterBoot();
     if (store && typeof store.getDiagnosticEntries === 'function') {
       try {
         return await store.getDiagnosticEntries({ clear: clear });

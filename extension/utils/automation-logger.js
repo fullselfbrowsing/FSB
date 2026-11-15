@@ -87,10 +87,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.LOG_LOAD });
   }
 
-  function trustedSaveAutomationSession(sessionId, session, snapshots) {
-    const store = getTrustedFeatureStore();
+  async function trustedSaveAutomationSession(sessionId, session, snapshots) {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.saveAutomationSession === 'function') {
-      return Promise.resolve(store.saveAutomationSession(sessionId, session, snapshots));
+      return store.saveAutomationSession(sessionId, session, snapshots);
     }
     return sendTrustedFeatureMessage({
       action: TRUSTED_MESSAGE.SESSION_SAVE,
@@ -100,42 +100,42 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     });
   }
 
-  function trustedLoadAutomationSession(sessionId) {
-    const store = getTrustedFeatureStore();
+  async function trustedLoadAutomationSession(sessionId) {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.loadAutomationSession === 'function') {
-      return Promise.resolve(store.loadAutomationSession(sessionId));
+      return store.loadAutomationSession(sessionId);
     }
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_LOAD, sessionId });
   }
 
-  function trustedListAutomationSessions() {
-    const store = getTrustedFeatureStore();
+  async function trustedListAutomationSessions() {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.listAutomationSessions === 'function') {
-      return Promise.resolve(store.listAutomationSessions());
+      return store.listAutomationSessions();
     }
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_LIST });
   }
 
-  function trustedDeleteAutomationSession(sessionId) {
-    const store = getTrustedFeatureStore();
+  async function trustedDeleteAutomationSession(sessionId) {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.deleteAutomationSession === 'function') {
-      return Promise.resolve(store.deleteAutomationSession(sessionId));
+      return store.deleteAutomationSession(sessionId);
     }
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_DELETE, sessionId });
   }
 
-  function trustedClearAutomationSessions() {
-    const store = getTrustedFeatureStore();
+  async function trustedClearAutomationSessions() {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.clearAutomationSessions === 'function') {
-      return Promise.resolve(store.clearAutomationSessions());
+      return store.clearAutomationSessions();
     }
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_CLEAR });
   }
 
-  function trustedUpdateAutomationSessionOutcome(sessionId, outcome) {
-    const store = getTrustedFeatureStore();
+  async function trustedUpdateAutomationSessionOutcome(sessionId, outcome) {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.updateAutomationSessionOutcome === 'function') {
-      return Promise.resolve(store.updateAutomationSessionOutcome(sessionId, outcome));
+      return store.updateAutomationSessionOutcome(sessionId, outcome);
     }
     return sendTrustedFeatureMessage({
       action: TRUSTED_MESSAGE.SESSION_UPDATE_OUTCOME,
@@ -144,10 +144,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     });
   }
 
-  function trustedPruneMcpAutomationSessions(retentionDays) {
-    const store = getTrustedFeatureStore();
+  async function trustedPruneMcpAutomationSessions(retentionDays) {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.pruneMcpAutomationSessions === 'function') {
-      return Promise.resolve(store.pruneMcpAutomationSessions(retentionDays));
+      return store.pruneMcpAutomationSessions(retentionDays);
     }
     return sendTrustedFeatureMessage({
       action: TRUSTED_MESSAGE.SESSION_PRUNE_MCP,
@@ -155,10 +155,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     });
   }
 
-  function trustedLoadAutomationDOMSnapshots(sessionId) {
-    const store = getTrustedFeatureStore();
+  async function trustedLoadAutomationDOMSnapshots(sessionId) {
+    const store = await trustedFeatureStoreAfterBoot();
     if (store && typeof store.loadAutomationDOMSnapshots === 'function') {
-      return Promise.resolve(store.loadAutomationDOMSnapshots(sessionId));
+      return store.loadAutomationDOMSnapshots(sessionId);
     }
     return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SNAPSHOT_LOAD, sessionId });
   }

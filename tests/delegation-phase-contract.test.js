@@ -136,6 +136,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-sidepanel-tab-follow.test.js',
   'node tests/mcp-session-recorder.test.js',
   'node tests/automation-logger-mcp-retention.test.js',
+  'node tests/automation-logger-trusted-bridge.test.js',
   'node tests/mcp-session-settings-ui.test.js',
   'node tests/knowledge-graph-dedup.test.js',
   'node tests/telemetry-registry-bootstrap.test.js',

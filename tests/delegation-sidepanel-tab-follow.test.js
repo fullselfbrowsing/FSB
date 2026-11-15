@@ -531,6 +531,114 @@ async function adopt(options) {
       'a persist during the boot window keeps the previous worker tail');
   }
 
+  // 6c. Session history calls made by the worker during the same boot window
+  // (list_sessions, get_session_detail, a save at run end, MCP retention)
+  // have the same problem: the sendMessage fallback cannot reach the worker,
+  // so each one has to wait for the boot and then use the published store.
+  console.log('\n--- automation logger: session calls wait for the trusted-store boot ---');
+  {
+    const loggerSource = fs.readFileSync(path.resolve(__dirname, '../extension/utils/automation-logger.js'), 'utf8');
+    let sendMessageCalls = 0;
+    let finishBoot;
+    const storeCalls = [];
+    const storedSession = {
+      id: 'session_boot', task: 'stored run', status: 'completed', mode: 'mcp-agent',
+      startTime: 1, endTime: 2, logs: [], actionHistory: []
+    };
+    const store = {
+      async listAutomationSessions() {
+        storeCalls.push('list');
+        return { ok: true, sessions: [storedSession] };
+      },
+      async loadAutomationSession(sessionId) {
+        storeCalls.push('load:' + sessionId);
+        return { ok: true, session: sessionId === 'session_boot' ? storedSession : null };
+      },
+      async loadAutomationDOMSnapshots(sessionId) {
+        storeCalls.push('snapshots:' + sessionId);
+        return { ok: true, snapshots: [{ origin: 'https://example.test', timestamp: 3, iteration: 1, elementCount: 4 }] };
+      },
+      async saveAutomationSession(sessionId) {
+        storeCalls.push('save:' + sessionId);
+        return { ok: true, evictedIds: [], prunedIds: [] };
+      },
+      async updateAutomationSessionOutcome(sessionId) {
+        storeCalls.push('outcome:' + sessionId);
+        return { ok: true };
+      },
+      async pruneMcpAutomationSessions(retentionDays) {
+        storeCalls.push('prune:' + retentionDays);
+        return { ok: true, removed: 1, ids: ['session_expired'] };
+      },
+      async deleteAutomationSession(sessionId) {
+        storeCalls.push('delete:' + sessionId);
+        return { ok: true };
+      },
+      async clearAutomationSessions() {
+        storeCalls.push('clear');
+        return { ok: true };
+      }
+    };
+    const context = vm.createContext({
+      globalThis: null,
+      console: { log() {}, warn() {}, error() {} },
+      setTimeout, clearTimeout, setInterval, clearInterval, Date, Math, JSON, Promise, Set, Map, Array, Object, Number, String,
+      TextEncoder,
+      chrome: {
+        runtime: {
+          id: 'ext',
+          lastError: null,
+          sendMessage(_message, callback) {
+            sendMessageCalls += 1;
+            context.chrome.runtime.lastError = { message: 'Receiving end does not exist.' };
+            callback(undefined);
+            context.chrome.runtime.lastError = null;
+          }
+        }
+      }
+    });
+    context.globalThis = context;
+    context.fsbTrustedLocalBootPromise = new Promise((resolve) => { finishBoot = resolve; });
+    vm.runInContext(loggerSource, context);
+    const logger = context.automationLogger;
+    logger.logs = [{
+      timestamp: '2026-08-22T07:47:44.000Z', level: 'info', message: 'run finished', data: { sessionId: 'session_new' }
+    }];
+
+    const listed = logger.listSessions();
+    const loaded = logger.loadSession('session_boot');
+    const snapshots = logger.getDOMSnapshots('session_boot');
+    const saved = logger.saveSession('session_new', { status: 'completed', mode: 'mcp-agent' });
+    const updated = logger.updateSessionOutcome('session_new', { status: 'completed', outcome: 'success' });
+    const pruned = logger.pruneMcpSessions(30);
+    const deleted = logger.deleteSession('session_boot');
+    const cleared = logger.clearAllSessions();
+    await new Promise((resolve) => setImmediate(resolve));
+    check(sendMessageCalls === 0, 'no session call falls back to a sendMessage the worker cannot receive');
+    context.fsbTrustedLocalFeatureStore = store;
+    finishBoot(store);
+    const [listResult, loadResult, snapshotResult, saveResult, updateResult, pruneResult, deleteResult, clearResult] =
+      await Promise.all([listed, loaded, snapshots, saved, updated, pruned, deleted, cleared]);
+    check(sendMessageCalls === 0, 'session calls made during the boot reach the published store, not sendMessage');
+    check(listResult.length === 1 && listResult[0].id === 'session_boot',
+      'listSessions during the boot returns the stored session');
+    check(!!loadResult && loadResult.id === 'session_boot' && loadResult.task === 'stored run',
+      'loadSession during the boot returns the stored session');
+    check(snapshotResult.length === 1 && snapshotResult[0].elementCount === 4,
+      'getDOMSnapshots during the boot returns the stored snapshots');
+    check(saveResult === true, 'saveSession during the boot is acknowledged by the store');
+    check(updateResult === true, 'updateSessionOutcome during the boot is acknowledged by the store');
+    check(pruneResult.removed === 1 && Array.from(pruneResult.ids).join(',') === 'session_expired',
+      'pruneMcpSessions during the boot returns the store removal');
+    check(deleteResult === true && clearResult === true,
+      'deleteSession and clearAllSessions during the boot are acknowledged by the store');
+    check(storeCalls.join('|') === [
+      'list', 'load:session_boot', 'snapshots:session_boot',
+      'load:session_new', 'save:session_new', 'outcome:session_new', 'prune:30',
+      'delete:session_boot', 'clear'
+    ].join('|'), 'every session call reaches the store once, in call order');
+  }
+
   // -------------------------------------------------------------------------
   // 7. The terminal answer is delivered on hydrated renders too, exactly once.
   //    A raced tab-surface sync can leave the panel unsubscribed while the run
