@@ -723,7 +723,9 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       startUrlState: getSafePersistedText(tab?.startUrlState || 'missing', 16)
     }));
     return {
-      version: getSafePersistedText(replay.version || '1.0', 16),
+      // Replay only trusts a record whose version is exactly
+      // 'fsb-lattice-replay/v1', so the bound must not cut it.
+      version: getSafePersistedText(replay.version || '1.0', 64),
       integrity: getSafePersistedText(replay.integrity || 'pending', 16),
       provenance: getSafePersistedText(replay.provenance || 'capture', 32),
       manifest: {

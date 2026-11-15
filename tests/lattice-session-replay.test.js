@@ -150,25 +150,39 @@ function manifest() {
 function createTrustedSessionStore() {
   const values = {};
   const copy = (value) => JSON.parse(JSON.stringify(value));
-  const store = trustedStoreApi.create({
-    chrome: {
-      runtime: { id: 'fsb-replay-test-extension' },
-      storage: {
-        local: {
-          async get(keys) {
-            const selected = {};
-            for (const key of (Array.isArray(keys) ? keys : [keys])) {
-              if (Object.prototype.hasOwnProperty.call(values, key)) selected[key] = copy(values[key]);
-            }
-            return selected;
-          },
-          async set(update) { Object.assign(values, copy(update)); },
-          async remove(keys) { for (const key of (Array.isArray(keys) ? keys : [keys])) delete values[key]; }
-        }
+  const local = {
+    async get(keys) {
+      const selected = {};
+      for (const key of (Array.isArray(keys) ? keys : [keys])) {
+        if (Object.prototype.hasOwnProperty.call(values, key)) selected[key] = copy(values[key]);
       }
-    }
+      return selected;
+    },
+    async set(update) { Object.assign(values, copy(update)); },
+    async remove(keys) { for (const key of (Array.isArray(keys) ? keys : [keys])) delete values[key]; }
+  };
+  const store = trustedStoreApi.create({
+    chrome: { runtime: { id: 'fsb-replay-test-extension' }, storage: { local } }
   });
-  return { store, values };
+  return { store, values, local };
+}
+
+// The replay module reads sessions straight from chrome.storage.local and
+// asks the offscreen host over runtime messages, as it does in the worker.
+async function withReplayRuntime(local, harness, work) {
+  const previous = globalThis.chrome;
+  globalThis.chrome = {
+    runtime: {
+      id: 'fsb-replay-test-extension',
+      sendMessage(message) { return harness.dispatch(message.type, message.payload); }
+    },
+    storage: { local }
+  };
+  try {
+    return await work();
+  } finally {
+    globalThis.chrome = previous;
+  }
 }
 
 function loadLoggerWithStore(store) {
@@ -581,6 +595,71 @@ async function main() {
     assert.notEqual(driftedCheckpoint.resultHash, sealed.manifest.steps[0].resultHash);
     assert.equal(verifiedDriftedCheckpoint.ok, true);
     assert.equal(verifiedDriftedCheckpoint.body.parentReceiptCid, checkpoint.receiptCid);
+  });
+
+  // Replay only trusts a stored record whose version is the replay schema
+  // version; anything else is rebuilt from the session's action history,
+  // which keeps no call arguments. The store and the logger must keep that
+  // version intact, or every saved capture is replaced by such a rebuild.
+  const versionHistory = createTrustedSessionStore();
+  const versionSessionId = 'session_version_round_trip';
+  const versionTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'content'
+  };
+  const versionCapture = replayHelpers.createReplayRecord({
+    sessionId: versionSessionId,
+    task: 'Version round trip',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'navigate',
+    requestPayload: { params: { url: 'https://example.com/start' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 2000,
+    replayContext: Object.assign({}, versionTarget, { routeFamily: 'background' })
+  }, {
+    tool: 'click',
+    requestPayload: { params: { selector: '#continue' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 1000,
+    replayContext: versionTarget
+  }], 'capture');
+  await versionHistory.store.saveAutomationSession(versionSessionId, {
+    id: versionSessionId,
+    task: 'Version round trip',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay: versionCapture
+  }, []);
+  const storedVersion = (await versionHistory.store.loadAutomationSession(versionSessionId)).session.replay.version;
+  const versionLogger = loadLoggerWithStore(versionHistory.store);
+  versionLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'capture attached',
+    data: { sessionId: versionSessionId }
+  }];
+  await versionLogger.saveSession(versionSessionId, { status: 'completed', mode: 'mcp-agent', replay: versionCapture });
+  const loggerVersion = versionHistory.values.fsbSessionLogs[versionSessionId].replay.version;
+  const versionPrepared = await withReplayRuntime(versionHistory.local, second,
+    () => replayHelpers.prepareReplay(versionSessionId));
+  check('a saved capture keeps its replay schema version and is replayed as captured', () => {
+    assert.equal(versionCapture.version, replayHelpers.REPLAY_SCHEMA_VERSION);
+    assert.equal(storedVersion, replayHelpers.REPLAY_SCHEMA_VERSION);
+    assert.equal(loggerVersion, replayHelpers.REPLAY_SCHEMA_VERSION);
+    assert.equal(versionPrepared.verified, true);
+    assert.equal(versionPrepared.replay.provenance, 'capture');
+    assert.deepEqual(versionPrepared.steps.map((step) => step.arguments),
+      versionCapture.manifest.steps.map((step) => step.arguments));
   });
 
   // A sealed record is written back to storage as sealed, but every later

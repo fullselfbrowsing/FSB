@@ -477,7 +477,9 @@
         };
       });
     return {
-      version: redactText(value.version || '1.0', 16),
+      // Replay only trusts a record whose version is exactly
+      // 'fsb-lattice-replay/v1', so the bound must not cut it.
+      version: redactText(value.version || '1.0', 64),
       integrity: redactText(value.integrity || 'pending', 16),
       provenance: redactText(value.provenance || 'capture', 32),
       manifest: {
