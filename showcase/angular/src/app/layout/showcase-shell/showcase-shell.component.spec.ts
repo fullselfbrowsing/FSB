@@ -241,6 +241,18 @@ describe('Showcase shell on depth pages', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('leaves no tinted flash on a tapped control', async () => {
+    // Chrome on Android paints a translucent blue box over anything tapped unless
+    // the page says otherwise; the controls have their own pressed and focus states.
+    const el = await open('/');
+    const transparent = 'rgba(0, 0, 0, 0)';
+    const tapped = [document.documentElement, el.querySelector('.fsb-navcue-trigger'), el.querySelector('.fsb-navcue-list a')];
+    expect(tapped.every((node) => node instanceof Element)).toBeTrue();
+    for (const node of tapped) {
+      expect(getComputedStyle(node as Element).getPropertyValue('-webkit-tap-highlight-color')).toBe(transparent);
+    }
+  });
+
   it('opens on hover only where the pointer can hover', async () => {
     // A tap leaves :hover stuck on a touch screen, so every rule that opens the cue
     // on hover (here and in styles/depth.scss) must sit behind (hover: hover).
