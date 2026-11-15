@@ -19,6 +19,8 @@
     "test:translation-tools": "node --test scripts/verify-translation-tools.test.mjs",
     "verify:video-seo": "node scripts/verify-video-seo.mjs",
     "test:video-sitemap": "node --test scripts/validate-video-sitemap.test.mjs",
+    "verify:sitemap-lastmod": "node scripts/build-crawler-files.mjs --check",
+    "test:sitemap-lastmod": "node --test scripts/sitemap-lastmod.test.mjs",
     "verify:marketing-i18n-seo": "node scripts/verify-marketing-i18n-seo.mjs",
     "verify:hydration": "node scripts/verify-hydration-markers.mjs",
     "test:marketing-i18n-seo": "node --test scripts/verify-marketing-i18n-seo.test.mjs scripts/crawler-locale-summaries.test.mjs"
