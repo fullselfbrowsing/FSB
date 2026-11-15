@@ -33,7 +33,7 @@ module.exports = tseslint.config(
         checkAttributes: true,
         ignoreAttributes: [
           // Machine tokens -- never visible to end users
-          'rel', 'href', 'src', 'srcset', 'loading', 'decoding', 'referrerpolicy',
+          'rel', 'href', 'src', 'srcset', 'loading', 'decoding', 'fetchpriority', 'referrerpolicy',
           'allow', 'allowfullscreen', 'sandbox',
           // SVG geometry / class hooks
           'd', 'stroke-linejoin', 'stroke-linecap', 'fill', 'viewBox', 'preserveAspectRatio',

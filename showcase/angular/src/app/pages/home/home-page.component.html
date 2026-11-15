@@ -114,14 +114,14 @@
           <div class="competitors-row reveal">
             <div class="competitor-card" data-di="0.3">
               <div class="competitor-logo">
-                <img src="/assets/providers/google.png" alt="Google" width="36" height="36" loading="lazy" decoding="async" i18n-alt="@@home.comparison.competitor.mariner.logo.alt">
+                <img src="/assets/providers/google.png" alt="Google" width="36" height="36" loading="lazy" decoding="async" fetchpriority="low" i18n-alt="@@home.comparison.competitor.mariner.logo.alt">
               </div>
               <h4 i18n="@@home.comparison.competitor.mariner" [attr.translate]="'no'">Project Mariner</h4>
               <span class="competitor-tag" i18n="@@home.comparison.competitor.tag.vision"><i class="fa-solid fa-eye"></i> Vision</span>
             </div>
             <div class="competitor-card" data-di="0.4">
               <div class="competitor-logo">
-                <img src="/assets/providers/anthropic.webp" alt="Anthropic" width="36" height="36" loading="lazy" decoding="async" i18n-alt="@@home.comparison.competitor.computerUse.logo.alt">
+                <img src="/assets/providers/anthropic.webp" alt="Anthropic" width="36" height="36" loading="lazy" decoding="async" fetchpriority="low" i18n-alt="@@home.comparison.competitor.computerUse.logo.alt">
               </div>
               <h4 i18n="@@home.comparison.competitor.computerUse" [attr.translate]="'no'">Computer Use</h4>
               <span class="competitor-tag" i18n="@@home.comparison.competitor.tag.vision"><i class="fa-solid fa-eye"></i> Vision</span>
@@ -135,7 +135,7 @@
             </div>
             <div class="competitor-card" data-di="0.6">
               <div class="competitor-logo">
-                <img src="/assets/providers/openclaw.svg" alt="OpenClaw" width="36" height="36" loading="lazy" decoding="async" i18n-alt="@@home.comparison.competitor.openclaw.logo.alt">
+                <img src="/assets/providers/openclaw.svg" alt="OpenClaw" width="36" height="36" loading="lazy" decoding="async" fetchpriority="low" i18n-alt="@@home.comparison.competitor.openclaw.logo.alt">
               </div>
               <h4 i18n="@@home.comparison.competitor.openclaw" [attr.translate]="'no'">OpenClaw</h4>
               <span class="competitor-tag" i18n="@@home.comparison.competitor.tag.vision"><i class="fa-solid fa-eye"></i> Vision</span>
@@ -243,13 +243,13 @@
               <div class="cap-track">
                 @for (app of capRow1; track trackCapability($index, app)) {
                   <span class="cap-logo">
-                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" [alt]="app.name" width="22" height="22" loading="lazy" decoding="async">
+                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" [alt]="app.name" width="22" height="22" loading="lazy" decoding="async" fetchpriority="low">
                     <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
                   </span>
                 }
                 @for (app of capRow1; track trackCapability($index, app)) {
                   <span class="cap-logo" aria-hidden="true">
-                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" alt="" width="22" height="22" loading="lazy" decoding="async">
+                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" alt="" width="22" height="22" loading="lazy" decoding="async" fetchpriority="low">
                     <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
                   </span>
                 }
@@ -259,13 +259,13 @@
               <div class="cap-track">
                 @for (app of capRow2; track trackCapability($index, app)) {
                   <span class="cap-logo">
-                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" [alt]="app.name" width="22" height="22" loading="lazy" decoding="async">
+                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" [alt]="app.name" width="22" height="22" loading="lazy" decoding="async" fetchpriority="low">
                     <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
                   </span>
                 }
                 @for (app of capRow2; track trackCapability($index, app)) {
                   <span class="cap-logo" aria-hidden="true">
-                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" alt="" width="22" height="22" loading="lazy" decoding="async">
+                    <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" alt="" width="22" height="22" loading="lazy" decoding="async" fetchpriority="low">
                     <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
                   </span>
                 }
@@ -276,7 +276,7 @@
           <div class="cap-credit-wrap" data-di="0.5">
             <a class="cap-credit" href="https://github.com/opentabs-dev/opentabs" target="_blank" rel="noopener">
               <span i18n="@@home.capabilities.credit.prefix">Inspired by</span>
-              <img class="cap-credit-logo" src="/assets/opentabs.svg" alt="" width="18" height="18" decoding="async">
+              <img class="cap-credit-logo" src="/assets/opentabs.svg" alt="" width="18" height="18" decoding="async" fetchpriority="low">
               <span class="cap-credit-name" i18n="@@home.capabilities.credit.opentabs" [attr.translate]="'no'">OpenTabs</span>
             </a>
           </div>
