@@ -363,10 +363,13 @@ class MockElement extends MockEventTarget {
     return false;
   }
 
+  // By default this oracle sees into shadow roots. Real browsers do not, so
+  // createHarness(api, { containsCrossesShadow: false }) reproduces them.
   contains(node) {
     if (node === this) return true;
     for (const child of this.childNodes) if (child.contains && child.contains(node)) return true;
-    if (this._shadowInternal && this._shadowInternal.contains(node)) return true;
+    if (this._shadowInternal && this.ownerDocument.options.containsCrossesShadow !== false &&
+        this._shadowInternal.contains(node)) return true;
     return false;
   }
 
@@ -488,14 +491,22 @@ class MockDocument extends MockEventTarget {
   _clearFocusWithin(node) {
     if (!node) return;
     const shadowActive = this._activeShadowRoot && this._activeShadowRoot.activeElement;
-    if (shadowActive && (node === shadowActive || (typeof node.contains === 'function' && node.contains(shadowActive)))) {
+    if (shadowActive && composedContains(node, shadowActive)) {
       this._clearActiveFocus();
       return;
     }
-    if (this.activeElement && (node === this.activeElement || (typeof node.contains === 'function' && node.contains(this.activeElement)))) {
+    if (this.activeElement && composedContains(node, this.activeElement)) {
       this._clearActiveFocus();
     }
   }
+}
+
+// Removing a node drops focus held anywhere beneath it, shadow trees
+// included, whatever contains() reports.
+function composedContains(root, node) {
+  if (root === node) return true;
+  for (const child of root.childNodes || []) if (composedContains(child, node)) return true;
+  return !!(root._shadowInternal && composedContains(root._shadowInternal, node));
 }
 
 function querySelectorAllFrom(root, selector, includeShadow) {

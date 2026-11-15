@@ -550,6 +550,64 @@ function testFocusRestorationAndFallback(api) {
   assert.notStrictEqual(disabled.document.activeElement, disabled.document.body);
 }
 
+function mountFocusedFixture(api, options = {}) {
+  const { harness, origin } = mountFixture(api, options);
+  harness.shell.enableControlledFixture(harness.fixtureToken);
+  harness.shell.render('anchored', {});
+  origin.focus({ preventScroll: true });
+  harness.shell.render('focused', {});
+  const title = harness.shadow().querySelector('.skopeo-focused-title');
+  assertShadowFocus(harness, title, 'Focused fixture');
+  return { harness, origin, title };
+}
+
+function testDestroyLeavesFocusTheUserMoved(api) {
+  const { harness, origin } = mountFocusedFixture(api);
+  const elsewhere = harness.addHostControl(
+    { left: 40, top: 640, width: 160, height: 32 },
+    { tagName: 'input', id: 'host-elsewhere', 'aria-label': 'Another page field' }
+  );
+  elsewhere.focus({ preventScroll: true });
+  const originFocusCalls = origin._focusCalls.length;
+  const elsewhereFocusCalls = elsewhere._focusCalls.length;
+  harness.shell.destroy('user-moved-focus');
+  assert.strictEqual(harness.document.activeElement, elsewhere, 'destroy leaves focus on the page field the user moved to');
+  assert.strictEqual(origin._focusCalls.length, originFocusCalls, 'destroy does not pull focus back to the old origin');
+  assert.strictEqual(elsewhere._focusCalls.length, elsewhereFocusCalls, 'destroy performs no focus write');
+
+  for (const [label, release] of [
+    ['body', document => document.body.focus()],
+    ['documentElement', document => document.documentElement.focus()],
+    ['no active element', document => document._clearActiveFocus()]
+  ]) {
+    const fallen = mountFocusedFixture(api);
+    release(fallen.harness.document);
+    assert.strictEqual(fallen.harness.shadow().activeElement, null, label + ': focus has left the HUD');
+    fallen.harness.shell.destroy('focus-fell-to-page');
+    assert.strictEqual(fallen.harness.document.activeElement, fallen.origin,
+      label + ': focus that fell to the page itself is restored to the origin');
+  }
+}
+
+function testDestroyOwnsClosedShadowNodes(api) {
+  const { harness, origin, title } = mountFocusedFixture(api, { containsCrossesShadow: false });
+  assert.strictEqual(harness.host().contains(title), false, 'oracle: host.contains() does not see into the shadow root');
+  harness.shell.destroy('closed-shadow-focus');
+  assert.strictEqual(harness.document.activeElement, origin, 'focus inside the closed shadow root is restored to the origin');
+
+  const detached = mountFocusedFixture(api, { containsCrossesShadow: false });
+  let blurs = 0;
+  const blur = detached.title.blur;
+  detached.title.blur = function () {
+    blurs += 1;
+    return blur.call(this);
+  };
+  detached.origin.remove();
+  detached.harness.shell.destroy('closed-shadow-no-origin');
+  assert.strictEqual(blurs, 1, 'with nothing to restore, destroy releases focus held by its own control');
+  assert.strictEqual(detached.harness.document.activeElement, null, 'no detached HUD control keeps focus');
+}
+
 function testFailedFocusPostconditionUsesFallback(api) {
   const { harness } = mountFixture(api);
   harness.shell.enableControlledFixture(harness.fixtureToken);
@@ -653,6 +711,8 @@ function runProductionContract(api) {
   testEscapeWindowExpiry(api);
   testFieldKeysStayInHud(api);
   testFocusRestorationAndFallback(api);
+  testDestroyLeavesFocusTheUserMoved(api);
+  testDestroyOwnsClosedShadowNodes(api);
   testFailedFocusPostconditionUsesFallback(api);
   testExactCopyAndStyles();
   console.log('skopeo-accessibility: PASS');

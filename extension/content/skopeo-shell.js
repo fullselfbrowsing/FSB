@@ -2351,7 +2351,11 @@
     }
 
     _ownsNode(node) {
-      return !!(node && this._host && typeof this._host.contains === 'function' && this._host.contains(node));
+      if (!node || !this._host) return false;
+      // host.contains() does not see into the closed shadow root, so a
+      // control rendered there is recognised by the root it lives in.
+      if (this._shadow && typeof node.getRootNode === 'function' && node.getRootNode() === this._shadow) return true;
+      return typeof this._host.contains === 'function' && this._host.contains(node);
     }
 
     _deepActiveElement() {
@@ -5636,6 +5640,12 @@
     }
 
     _restoreFocusForDestroy() {
+      // Focus is the HUD's to hand back only while it is inside the HUD or has
+      // fallen to the page itself. If the user has since moved to another page
+      // control, closing the HUD leaves it there.
+      const current = this._deepActiveElement();
+      if (current && current !== this.document.body && current !== this.document.documentElement &&
+          !this._ownsNode(current)) return false;
       const origin = this._focusOrigin;
       if (origin && !this._ownsNode(origin) && this._safeFocus(origin)) return true;
       const ambientOrigin = this._ambientFocusOrigin;
