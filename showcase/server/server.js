@@ -19,6 +19,7 @@ const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-
 const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-language');
 const { createLegacyHtmlRedirectHandler } = require('./src/middleware/legacy-html-redirects');
 const { createShowcaseRouteFallback } = require('./src/middleware/showcase-route-fallback');
+const { createStaticCachePolicy } = require('./src/middleware/static-cache-policy');
 const { createGlobalJsonParser } = require('./src/middleware/global-json-parser');
 const { LOCALES, SOURCE_LOCALE, LOCALE_SUBPATHS } = require('./src/utils/locale-constants');
 
@@ -174,6 +175,10 @@ app.use(createAcceptLanguageMiddleware({
 }));
 
 if (staticPath) {
+  const staticCacheControlFor = createStaticCachePolicy({
+    staticRoot: staticPath,
+    localeSubpaths: LOCALES.filter(l => l !== SOURCE_LOCALE).map(l => LOCALE_SUBPATHS[l]).filter(Boolean),
+  });
   app.use(express.static(staticPath, {
     maxAge: 0,
     etag: true,
@@ -181,18 +186,11 @@ if (staticPath) {
     // does NOT 301 to /about/ before our custom middleware can serve about/index.html.
     // The custom middleware below handles marketing routes explicitly via path.join.
     redirect: false,
+    // Content-hashed bundles are kept forever, pages and fixed-name scripts are
+    // checked on every load, crawler files for an hour: see static-cache-policy.js.
     setHeaders: function(res, filePath) {
-      // Phase 216 SRV-03 / D-11: crawler files cache for 1 hour at the edge.
-      // The .txt/.xml branch must come first and short-circuit so a future stray
-      // filename (e.g. foo.html.txt) does not double-fire and pick up the no-cache header.
-      if (filePath.endsWith('.txt') || filePath.endsWith('.xml')) {
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        return;
-      }
-      // Existing policy: prevent stale JS/CSS/HTML -- dashboard updates must take effect immediately.
-      if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-      }
+      const cacheControl = staticCacheControlFor(filePath);
+      if (cacheControl) res.setHeader('Cache-Control', cacheControl);
     }
   }));
 }
@@ -274,6 +272,9 @@ app.use((req, res) => {
   const copyLocale = NOT_FOUND_COPY[locale] ? locale : SOURCE_LOCALE;
   const copy = NOT_FOUND_COPY[copyLocale];
   const homeHref = LOCALE_SUBPATHS[locale] ? `/${LOCALE_SUBPATHS[locale]}` : '/';
+  // A bundle requested by a tab left open across a deploy lands here; the miss
+  // must not be remembered under a name that is otherwise kept forever.
+  res.setHeader('Cache-Control', 'no-store');
   res.status(404).type('html').send(
     `<!doctype html><html lang="${escapeHtml(copyLocale)}"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width,initial-scale=1">` +

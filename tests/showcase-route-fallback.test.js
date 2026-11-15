@@ -122,6 +122,36 @@ async function verifyRealServerOrdering() {
     const trailing = await request(origin, '/stats/');
     assert.strictEqual(trailing.status, 308);
     assert.strictEqual(trailing.headers.location, '/stats');
+
+    // Pages are checked on every visit; the content-hashed bundles they name are
+    // kept forever, in the root build and in each locale's copy alike.
+    assert.strictEqual(stats.headers['cache-control'], 'no-cache, must-revalidate');
+    const home = await request(origin, '/');
+    assert.strictEqual(home.headers['cache-control'], 'no-cache, must-revalidate');
+    const about = await request(origin, '/about');
+    assert.strictEqual(about.headers['cache-control'], 'no-cache, must-revalidate');
+    const bundle = (home.body.match(/\bmain-[A-Z0-9]{8}\.js\b/) || [])[0];
+    assert.ok(bundle, 'the home page names its main bundle');
+    const forever = 'public, max-age=31536000, immutable';
+    const rootBundle = await request(origin, '/' + bundle, 'HEAD');
+    assert.strictEqual(rootBundle.status, 200);
+    assert.strictEqual(rootBundle.headers['cache-control'], forever);
+    const localeHome = await request(origin, '/es');
+    const localeBundle = (localeHome.body.match(/\bmain-[A-Z0-9]{8}\.js\b/) || [])[0];
+    assert.ok(localeBundle, 'the Spanish home page names its main bundle');
+    const esBundle = await request(origin, '/es/' + localeBundle, 'HEAD');
+    assert.strictEqual(esBundle.status, 200);
+    assert.strictEqual(esBundle.headers['cache-control'], forever);
+    const fixedName = await request(origin, '/assets/knowledge-graph.js', 'HEAD');
+    assert.strictEqual(fixedName.headers['cache-control'], 'no-cache, must-revalidate');
+    const image = await request(origin, '/assets/icon48.png', 'HEAD');
+    assert.strictEqual(image.headers['cache-control'], 'public, max-age=604800, stale-while-revalidate=2592000');
+    const robots = await request(origin, '/robots.txt', 'HEAD');
+    assert.strictEqual(robots.headers['cache-control'], 'public, max-age=3600');
+    // A bundle that is gone (tab left open across a deploy) must not be remembered.
+    const missing = await request(origin, '/chunk-ZZZZZZZZ.js');
+    assert.strictEqual(missing.status, 404);
+    assert.strictEqual(missing.headers['cache-control'], 'no-store');
   } finally {
     await stopServer(child);
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -170,6 +200,8 @@ async function run() {
       assert.strictEqual(about.status, 200);
       assert.match(about.body, /<title>ABOUT<\/title>/);
       assert.strictEqual(about.headers['x-robots-tag'], undefined);
+      assert.strictEqual(about.headers['cache-control'], 'no-cache, must-revalidate');
+      assert.strictEqual(stats.headers['cache-control'], 'no-cache, must-revalidate');
 
       const nested = await request(server, '/stats/private');
       assert.strictEqual(nested.status, 404);
