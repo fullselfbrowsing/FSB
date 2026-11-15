@@ -373,6 +373,7 @@ function stubEl(o) {
     shadowRoot: opts.shadowRoot || null,
     _rects: opts.rects != null ? opts.rects : [{ width: 10, height: 10 }],
     _visibility: opts.visibility || 'visible',
+    _display: opts.display || 'block',
     getAttribute(n) {
       if (Object.prototype.hasOwnProperty.call(attrs, n)) return attrs[n];
       if (n === 'id' && this.id) return this.id;
@@ -417,7 +418,7 @@ function stubPage(o) {
   }
   const win = {
     location: { href: opts.url || 'https://example.com/' },
-    getComputedStyle: (el) => ({ visibility: (el && el._visibility) || 'visible' })
+    getComputedStyle: (el) => ({ visibility: (el && el._visibility) || 'visible', display: (el && el._display) || 'block' })
   };
   if (opts.FSB) win.FSB = opts.FSB;
   return { win, doc };
@@ -504,6 +505,73 @@ check('text checks include open shadow-root text', () => {
   ]);
   assert.equal(obsOf(r, 0).holds, true);
   assert.equal(obsOf(r, 1).holds, false);
+});
+
+check('a shadow host with no box is not read, and neither are the shadow roots inside it', () => {
+  // display:none on the host or an ancestor leaves no client rects (a closed modal, a [hidden] toast).
+  const nested = stubEl({
+    tag: 'X-INNER',
+    shadowRoot: { childNodes: [{ nodeType: 3, textContent: 'Nested secret' }], querySelectorAll: () => [] },
+  });
+  const hiddenHost = stubEl({
+    tag: 'X-DIALOG',
+    rects: [],
+    shadowRoot: {
+      childNodes: [{ nodeType: 1, tagName: 'DIV', innerText: 'Delete your account?', textContent: 'Delete your account?' }],
+      querySelectorAll: () => [nested],
+    },
+  });
+  const invisibleHost = stubEl({
+    tag: 'X-TOAST',
+    visibility: 'hidden',
+    shadowRoot: { childNodes: [{ nodeType: 3, textContent: 'Saved successfully' }], querySelectorAll: () => [] },
+  });
+  const r = runProbe({ bodyText: 'Light text', all: [hiddenHost, invisibleHost] }, [
+    { kind: 'text_visible', expected: 'Delete your account?' },
+    { kind: 'text_gone', expected: 'Delete your account?' },
+    { kind: 'text_gone', expected: 'Nested secret' },
+    { kind: 'text_gone', expected: 'Saved successfully' },
+    { kind: 'text_visible', expected: 'Light text' }
+  ]);
+  assert.equal(obsOf(r, 0).holds, false, 'hidden shadow text is not visible');
+  assert.equal(obsOf(r, 1).holds, true);
+  assert.equal(obsOf(r, 2).holds, true, 'shadow roots nested in a hidden host are skipped too');
+  assert.equal(obsOf(r, 3).holds, true, 'a visibility:hidden host is skipped');
+  assert.equal(obsOf(r, 4).holds, true);
+  assert.equal(r.textTruncated, false);
+});
+
+check('a display:contents shadow host has no box of its own but is still read', () => {
+  const host = stubEl({
+    tag: 'X-WRAP',
+    rects: [],
+    display: 'contents',
+    shadowRoot: { childNodes: [{ nodeType: 3, textContent: 'Wrapped notice' }], querySelectorAll: () => [] },
+  });
+  const r = runProbe({ bodyText: '', all: [host] }, [
+    { kind: 'text_visible', expected: 'wrapped notice' },
+    { kind: 'text_gone', expected: 'wrapped notice' }
+  ]);
+  assert.equal(obsOf(r, 0).holds, true);
+  assert.equal(obsOf(r, 1).holds, false);
+});
+
+check('a hidden element inside a visible shadow root is skipped; its visible siblings are read', () => {
+  // innerText of an element with no box falls back to its full textContent, so it must be skipped first.
+  const hiddenChild = Object.assign(stubEl({ tag: 'DIV', rects: [], text: 'Error: payment failed' }), { nodeType: 1 });
+  const shownChild = Object.assign(stubEl({ tag: 'DIV', text: 'Payment received' }), { nodeType: 1 });
+  const host = stubEl({
+    tag: 'X-STATUS',
+    shadowRoot: { childNodes: [hiddenChild, shownChild], querySelectorAll: () => [] },
+  });
+  const r = runProbe({ bodyText: '', all: [host] }, [
+    { kind: 'text_visible', expected: 'payment failed' },
+    { kind: 'text_gone', expected: 'payment failed' },
+    { kind: 'text_visible', expected: 'payment received' }
+  ]);
+  assert.equal(obsOf(r, 0).holds, false);
+  assert.equal(obsOf(r, 1).holds, true);
+  assert.equal(obsOf(r, 2).holds, true);
 });
 
 check('text_gone holds when absent; a truncated scan without a match is text_budget_exhausted', () => {

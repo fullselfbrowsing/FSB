@@ -370,6 +370,55 @@ test('an FSB ref selector without window.FSB is uncertain (ref_unavailable)', { 
   assert.deepEqual(result.checks, [{ kind: 'state', expected: 'visible', observed: null, status: 'uncertain' }]);
 });
 
+test('text checks skip shadow text the page does not render', { skip }, async () => {
+  ready();
+  // A closed modal (display:none ancestor), a [hidden] toast, a visible card with
+  // a hidden banner, and a display:contents wrapper, all with open shadow roots.
+  await evaluate(ws, `(() => {
+    const zone = document.createElement('div');
+    zone.id = 'shadow-zone';
+    zone.innerHTML = '<div style="display:none"><x-fsb-dialog></x-fsb-dialog></div><x-fsb-toast hidden></x-fsb-toast>'
+      + '<x-fsb-card></x-fsb-card><x-fsb-wrap style="display:contents"></x-fsb-wrap>';
+    document.body.appendChild(zone);
+    const attach = (name, html) => { zone.querySelector(name).attachShadow({ mode: 'open' }).innerHTML = html; };
+    attach('x-fsb-dialog', '<div class="body">Delete your account?</div>');
+    attach('x-fsb-toast', '<div>Saved successfully</div>');
+    attach('x-fsb-card', '<p>Card heading</p><p hidden>Card error banner</p>');
+    attach('x-fsb-wrap', '<span>Wrapped notice</span>');
+    return true;
+  })()`);
+  try {
+    const checks = [
+      { kind: 'text_visible', expected: 'Delete your account?' },
+      { kind: 'text_gone', expected: 'Saved successfully' },
+      { kind: 'text_visible', expected: 'Card error banner' },
+      { kind: 'text_visible', expected: 'Card heading' },
+      { kind: 'text_visible', expected: 'Wrapped notice' },
+    ];
+    const probe = await deps.executeProbe(TAB_ID, av._fsbExpectProbeInPage, [{
+      checks,
+      textScanMax: av.EXPECT_TEXT_SCAN_MAX_CHARS,
+      shadowHostBudget: av.EXPECT_SHADOW_HOST_BUDGET,
+      observedMax: av.EXPECT_OBSERVED_MAX,
+      redacted: av.EXPECT_REDACTED,
+      sensitiveNameSource: av.EXPECT_SENSITIVE_NAME_SOURCE,
+    }]);
+    assert.equal(probe.ok, true, dump(probe));
+    assert.equal(probe.result.ok, true, dump(probe));
+    assert.deepEqual(probe.result.observations.map((entry, index) => [checks[index].expected, entry.holds]), [
+      ['Delete your account?', false],
+      ['Saved successfully', true],
+      ['Card error banner', false],
+      ['Card heading', true],
+      ['Wrapped notice', true],
+    ], dump(probe.result));
+    const gone = await run({ text_gone: 'Saved successfully' });
+    assert.equal(gone.status, 'verified', `a hidden toast does not hold text_gone open: ${dump(gone)}`);
+  } finally {
+    await evaluate(ws, `(document.getElementById('shadow-zone') && document.getElementById('shadow-zone').remove(), true)`);
+  }
+});
+
 // Last on purpose: it replaces the document (every case above re-arms or reads
 // static state, so order does not change their verdicts).
 test('refresh: judged only after the commit, on the new document', { skip }, async () => {

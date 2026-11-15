@@ -1063,9 +1063,30 @@ function _fsbExpectProbeInPage(probeSpec) {
       }
       return true;
     }
+    // Whether the page renders an element, for the shadow-text scan. An element
+    // with no client rects is display:none (itself or an ancestor), unless it is
+    // display:contents, which has no box of its own but renders its children
+    // (a <slot> is display:contents by default). This matters because innerText
+    // of an element that is not rendered falls back to its full textContent.
+    // Objects without getClientRects count as rendered.
+    function rendered(el) {
+      if (!el) return false;
+      let cs = null;
+      if (win && typeof win.getComputedStyle === 'function') {
+        try { cs = win.getComputedStyle(el); } catch (e) { cs = null; }
+      }
+      if (typeof el.getClientRects === 'function') {
+        let rects = null;
+        try { rects = el.getClientRects(); } catch (e) { rects = null; }
+        if ((!rects || rects.length === 0) && !(cs && cs.display === 'contents')) return false;
+      }
+      if (cs && (cs.visibility === 'hidden' || cs.visibility === 'collapse')) return false;
+      return true;
+    }
 
-    // Text: body innerText plus open shadow-root text, bounded by textScanMax
-    // characters and hostBudget shadow roots. Computed once per probe.
+    // Text: body innerText plus the text of open shadow roots whose host is
+    // rendered, bounded by textScanMax characters and hostBudget shadow roots.
+    // Computed once per probe.
     let textCache = null;
     function shadowText(root) {
       let out = '';
@@ -1078,6 +1099,7 @@ function _fsbExpectProbeInPage(probeSpec) {
         } else if (k.nodeType === 1) {
           const tag = lower(k.tagName);
           if (tag === 'style' || tag === 'script' || tag === 'template') continue;
+          if (!rendered(k)) continue;
           out += ' ' + ((typeof k.innerText === 'string') ? k.innerText : (k.textContent || ''));
         }
       }
@@ -1111,6 +1133,8 @@ function _fsbExpectProbeInPage(probeSpec) {
         for (let i = 0; i < all.length; i++) {
           const sr = all[i] && all[i].shadowRoot;
           if (!sr) continue;
+          // A host that is not rendered hides its whole shadow tree, nested roots included.
+          if (!rendered(all[i])) continue;
           if (hosts >= hostBudget) { truncated = true; break; }
           hosts++;
           add(shadowText(sr));
