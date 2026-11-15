@@ -1153,7 +1153,7 @@
 }
 
 .eng-panel.is-active {
-  visibility: visible;
+  visibility: inherit;
   pointer-events: auto;
   animation: engIn 320ms ease-out both;
 }
