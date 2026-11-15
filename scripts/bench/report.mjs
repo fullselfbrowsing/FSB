@@ -40,6 +40,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { costPerCompleted, jevCostSplitPerCompleted } from './lib/cost.mjs';
 import { COST_LABEL_LIST_PRICE } from './lib/host-stream.mjs';
 import {
   CONDITIONS,
@@ -203,7 +204,8 @@ function costFor(counted, completedCount) {
   if (labelNames.length === 1) label = labelNames[0];
   else if (labelNames.length > 1) label = `mixed: ${labelNames.join('; ')}`;
   return {
-    usd: completedCount > 0 && withCost.length > 0 ? total / completedCount : null,
+    // Unavailable unless every counted run has a cost, the same rule as the gate.
+    usd: costPerCompleted(counted, completedCount, (row) => row.cost.usd),
     totalUsd: withCost.length ? total : null,
     runsWithCost: withCost.length,
     runsWithoutCost: counted.length - withCost.length,
@@ -355,10 +357,7 @@ function distinctSorted(lists) {
 function exposureFor(counted, completedCount) {
   const exposureSources = Object.fromEntries([...JEV_SOURCES, EXPOSURE_UNKNOWN].map((source) => [source, 0]));
   for (const row of counted) exposureSources[JEV_SOURCES.includes(row.jev.source) ? row.jev.source : EXPOSURE_UNKNOWN] += 1;
-  const jevCost = (key) => {
-    const total = sumOrNull(counted.map((row) => row.jev.usd[key]));
-    return total !== null && completedCount > 0 ? total / completedCount : null;
-  };
+  const jevCost = jevCostSplitPerCompleted(counted, completedCount);
   const typedOutcomes = {};
   for (const outcome of [...FAST_MODE_ROW_OUTCOMES, NO_TYPED_OUTCOME]) {
     const matching = counted.filter((row) => (row.fastMode ? row.fastMode.outcome : NO_TYPED_OUTCOME) === outcome);
@@ -373,7 +372,7 @@ function exposureFor(counted, completedCount) {
     servedModels: distinctSorted(counted.map((row) => row.jev.servedModels)),
     instrumentVersions: distinctSorted(counted.map((row) => row.jev.instrumentVersions)),
     missingMeasurement: counted.filter((row) => row.flags.includes('jev_measurement_missing')).length,
-    jevCostPerCompletedTask: { provider: jevCost('provider'), estimate: jevCost('estimate'), label: JEV_COST_LABEL },
+    jevCostPerCompletedTask: { provider: jevCost.provider, estimate: jevCost.estimate, label: JEV_COST_LABEL },
     typedOutcomes,
   };
 }

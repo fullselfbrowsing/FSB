@@ -996,6 +996,23 @@ test('buildSummary: per-task medians and p90 over completed runs, the geometric 
   assert.equal(summary.sets.core.arms.claude.costPerCompletedTask.label, 'list-price estimate, not billed');
 });
 
+test('buildSummary: cost per completed task is n/a unless every counted run has a cost (10 counted, 8 completed, 5 with a cost)', async () => {
+  const { buildSummary } = await loadReport();
+  const rows = Array.from({ length: 10 }, (_, index) => reportRow({
+    taskId: 'core-alpha-one', round: index + 1, arm: 'autopilot', order: index + 1, wallMs: 40000 + index,
+    pass: index < 8, costUsd: index < 5 ? 0.1 : null,
+  }));
+  const cost = buildSummary({ identity: null, runs: rows }, { iterations: 50, seed: 66 }).sets.core.arms.autopilot.costPerCompletedTask;
+  assert.equal(cost.usd, null, 'five uncosted runs would make 0.50 / 8 look like the cost of a completed task');
+  assert.ok(Math.abs(cost.totalUsd - 0.5) < 1e-12, 'the total still sums the runs that have a cost');
+  assert.equal(cost.runsWithCost, 5);
+  assert.equal(cost.runsWithoutCost, 5);
+
+  const costed = rows.map((row) => ({ ...row, cost: { ...row.cost, usd: 0.1 } }));
+  const full = buildSummary({ identity: null, runs: costed }, { iterations: 50, seed: 66 }).sets.core.arms.autopilot.costPerCompletedTask;
+  assert.ok(Math.abs(full.usd - (10 * 0.1) / 8) < 1e-12, 'with every counted run costed the figure is back');
+});
+
 test('buildSummary: the A/A noise floor comes from stats.aaNoiseFloor over completed runs by round', async () => {
   const { buildSummary } = await loadReport();
   const rows = baselineRows();
@@ -1296,9 +1313,16 @@ test('71-03 report: groups with v2 rows carry descriptive exposure, cost, typed 
   assert.equal(on.exposure.missingMeasurement, 4);
   const jevCost = on.exposure.jevCostPerCompletedTask;
   assert.deepEqual(Object.keys(jevCost), ['provider', 'estimate', 'label']);
-  assert.ok(Math.abs(jevCost.provider - (8 * measured.jev.usd.provider) / 21) < 1e-15);
+  // The summary rows made Jev calls but carry no cost, so the per-completed figure is unavailable.
+  assert.equal(jevCost.provider, null);
   assert.equal(jevCost.estimate, null);
   assert.equal(jevCost.label, 'Jev cost (FSB-borne), reported beside the LLM cost and never added to it');
+  // Measured runs plus runs that made no Jev call (which cost zero) give a figure over every completed run.
+  const priced = rows.filter((row) => row.condition === 'on' && (row.jev.source === 'measurement' || row.jev.jevCalls === 0));
+  const pricedOn = buildSummary({ identity: V2_IDENTITY, runs: priced }, { iterations: 50, seed: 71 }).sets.core.arms['autopilot/on'];
+  assert.equal(pricedOn.completed, 14);
+  assert.ok(Math.abs(pricedOn.exposure.jevCostPerCompletedTask.provider - (8 * measured.jev.usd.provider) / 14) < 1e-15);
+  assert.equal(pricedOn.exposure.jevCostPerCompletedTask.estimate, 0, 'no run reported an estimate');
   assert.ok(Math.abs(on.costPerCompletedTask.usd - (23 * 0.03) / 21) < 1e-12, 'the LLM cost is unchanged and kept apart');
   assert.deepEqual(on.exposure.typedOutcomes, { done: { pass: 13, fail: 2 }, ambiguous: { pass: 4, fail: 0 }, none: { pass: 4, fail: 0 } });
   assert.deepEqual(on.safety, {
