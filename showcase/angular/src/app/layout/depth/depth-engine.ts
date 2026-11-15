@@ -47,9 +47,6 @@ interface DepthLayer extends HTMLElement {
   _w?: number;
   /** The window and height the width was last worked out for. */
   _key?: string;
-  /** Frames the content has held still since it began changing height; unset while
-      the plane is not being followed. */
-  _still?: number;
 }
 
 interface DepthItem {
@@ -80,6 +77,8 @@ interface Ambient {
 const MIN_SCALE_WIDE = 0.6;
 const MIN_SCALE_NARROW = 0.45;
 const NARROW_MAX_WIDTH = 600;
+/* A plane this close to full size is left at its own width. */
+const WIDEN_BELOW = 0.97;
 const FIT_EASE = 'transform .35s cubic-bezier(.16,1,.3,1)';
 /* The length of the tick a phone gives when a swipe lands on another plane. */
 const TICK_MS = 15;
@@ -426,10 +425,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   }
   // Finds the width at which a narrow plane needs to shrink least: the largest
   // scale s for which the plane, laid out 1 / s times as wide as the window, is no
-  // taller than the room once scaled. Laid out that wide it fills the window's width
-  // once scaled, even when widening gains it nothing (a list of one-line rows). Left
-  // at its own width, such a plane would switch to filling the width partway through
-  // an answer opening inside it, and jump.
+  // taller than the room once scaled.
   function solve(L: DepthLayer, fit: HTMLElement, room: number, W: number): void {
     const at = (factor: number): number => {
       setWide(L, fit, factor);
@@ -438,7 +434,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const h1 = at(1);
     const plain = h1 > 0 ? Math.min(1, room / h1) : 1;
     let factor = 1;
-    if (plain < 1) {
+    if (plain < WIDEN_BELOW) {
       let lo = plain;
       let hi = 1;
       for (let k = 0; k < 6; k++) {
@@ -447,9 +443,9 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
         else hi = mid;
       }
       // A picture or video that keeps its proportions grows taller as its plane
-      // widens, and the plane would have to shrink further: it stays at its own width.
+      // widens, and gains nothing: such a plane stays at its own width.
       const h = at(1 / lo);
-      if (h > 0 && Math.min(lo, room / h) >= plain - 0.001) factor = 1 / lo;
+      if (h > 0 && Math.min(lo, room / h) > plain + 0.005) factor = 1 / lo;
     }
     L._key = W + '|' + room + '|' + at(factor);
   }
@@ -485,32 +481,6 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       if (alive) widen();
     }, delay);
   }
-  // A narrow plane whose content is changing height (an answer opening) is laid out
-  // again on every frame until it holds still, and its scale is set, not eased. It
-  // stays fitted at the window's width throughout, and the content's own transition
-  // is the only motion. Eased toward each new height and widened only once the
-  // content had stopped, it trailed its content out of the room, then jumped.
-  function follow(L: DepthLayer): void {
-    (L.firstElementChild as HTMLElement).style.transition = 'none';
-    L._still = 0;
-    kick();
-  }
-  // One frame of following; true while the plane still needs another.
-  function refit(L: DepthLayer): boolean {
-    const fit = L.firstElementChild as HTMLElement;
-    const W = stage!.clientWidth;
-    const H = stage!.clientHeight;
-    if (W <= NARROW_MAX_WIDTH && !L._auto && sized === W + 'x' + H) {
-      fit.style.transition = 'none';
-      const key = L._key;
-      solve(L, fit, H - navHeight() - 84 - 24, W);
-      L._still = L._key === key ? (L._still || 0) + 1 : 0;
-      if (L._still < 2) return true;
-    }
-    L._still = undefined;
-    fit.style.transition = eased ? FIT_EASE : '';
-    return false;
-  }
 
   function layout(): void {
     const H = stage!.clientHeight;
@@ -532,12 +502,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
         const h = fit.offsetHeight;
         const widens = narrow && !L._auto && !L.hasAttribute('data-depth-rigid');
         const settled = widens ? L._key === W + '|' + room + '|' + h : !L._w;
-        // In a window the widths were worked out for, the plane's own content has
-        // changed height: it is followed.
-        if (!settled) {
-          if (widens && sized === W + 'x' + H) follow(L);
-          else stale = true;
-        }
+        if (!settled) stale = true;
         // A widened plane is exactly as wide as the window once scaled by 1 / _w.
         s = h > 0 ? Math.min(1, room / h, 1 / (L._w || 1)) : 1;
         // A plane whose width is still to be worked out may yet fit: it is asked first.
@@ -559,8 +524,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       if (fit.style.transform !== tf) fit.style.transform = tf;
       L._s = s;
     }
-    // A turned or resized window is refitted at once. A plane that went to scrolling
-    // inside itself gets its own width back once its content has stopped moving.
+    // A turned or resized window is refitted at once; a plane whose content is
+    // still changing height (an answer opening) waits until it has stopped.
     if (stale) askWiden(sized === W + 'x' + H ? 120 : 0);
     if (changed) collect();
     const sr = stage!.getBoundingClientRect();
@@ -585,7 +550,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       laidOut = true;
       timers.push(win.setTimeout(() => {
         eased = true;
-        for (const L of layers) if (L._still === undefined) (L.firstElementChild as HTMLElement).style.transition = FIT_EASE;
+        for (const L of layers) (L.firstElementChild as HTMLElement).style.transition = FIT_EASE;
       }, 600));
     }
   }
@@ -677,7 +642,6 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const dt = clamp(t - lastT, 0, 64) || 16.67;
     lastT = t;
     let moving = false;
-    for (const L of layers) if (L._still !== undefined && refit(L)) moving = true;
     const a0 = 1 - Math.pow(1 - BASE, dt / 16.67);
     p += (target - p) * a0;
     if (Math.abs(target - p) < 0.0005) p = target;

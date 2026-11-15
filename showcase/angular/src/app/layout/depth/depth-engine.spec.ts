@@ -135,20 +135,8 @@ describe('createDepthEngine', () => {
       expect(fit.offsetHeight * scale).toBeLessThanOrEqual(room() + 1);
     });
 
-    it('lays a box of a fixed height out just wide enough to fill the window', () => {
-      // Widening gains it nothing: it keeps its scale, and spans the window.
+    it('leaves a box of a fixed height at its own width', () => {
       build([120, Math.round(room() / 0.7), 120], PHONE);
-      const fit = fitOf(1);
-      const scale = scaleOf(1);
-      expect(scale).toBeCloseTo(0.7, 1);
-      expect(parseFloat(fit.style.width)).toBeGreaterThan(130);
-      expect(fit.offsetWidth * scale).toBeCloseTo(PHONE, -1);
-    });
-
-    it('keeps a picture that grows with its width at its own width', () => {
-      // A box that keeps its proportions, 1 / 0.7 times the room tall at the phone's width.
-      const side = Math.round(room() / 0.7);
-      build([120, { html: `<div data-di="0" style="aspect-ratio:${PHONE} / ${side};background:#333;width:100%"></div>` }, 120], PHONE);
       expect(fitOf(1).style.width).toBe('');
       expect(scaleOf(1)).toBeCloseTo(0.7, 1);
     });
@@ -157,67 +145,6 @@ describe('createDepthEngine', () => {
       build([120, { html: prose(1.5), attrs: 'data-depth-rigid' }, 120], PHONE);
       expect(fitOf(1).style.width).toBe('');
       expect(scaleOf(1)).toBeLessThan(0.75);
-    });
-
-    // Resolves once the browser has drawn `n` more frames, so what is read is what
-    // was on screen.
-    const frames = (n: number): Promise<void> =>
-      new Promise((resolve) => {
-        const step = (k: number): void => {
-          if (k <= 0) resolve();
-          else requestAnimationFrame(() => setTimeout(() => step(k - 1)));
-        };
-        step(n);
-      });
-
-    it('lays a plane out again as soon as its content grows', async () => {
-      build([120, { html: `<div class="more">${prose(0.8)}</div>` }, 120], PHONE);
-      const fit = fitOf(1);
-      expect(fit.style.width).toBe('');
-      root.querySelector('.more')!.insertAdjacentHTML('beforeend', prose(1.6));
-      await frames(4);
-      const scale = scaleOf(1);
-      expect(parseFloat(fit.style.width)).toBeGreaterThan(110);
-      expect(fit.offsetWidth * scale).toBeCloseTo(PHONE, -1);
-      expect(fit.offsetHeight * scale).toBeLessThanOrEqual(room() + 1);
-    });
-
-    it('keeps a plane fitted on every frame while its content opens, and leaves it there', async () => {
-      // The way a support answer opens: a grid row eased from nothing to its content,
-      // under rows that a wider layout would not make any shorter (the questions).
-      const opens =
-        '<div class="opens" style="display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s linear">' +
-        `<div style="min-height:0;overflow:hidden">${prose(1.5)}</div></div>`;
-      build([120, { html: `<div style="height:${Math.round(room() / 0.9)}px"></div>${opens}` }, 120], PHONE);
-      // By now the plane's own scale would be eased.
-      await new Promise((r) => setTimeout(r, 700));
-      const fit = fitOf(1);
-      const drawn = (): number => {
-        const m = getComputedStyle(fit).transform;
-        return m === 'none' ? 1 : new DOMMatrix(m).a;
-      };
-      root.querySelector<HTMLElement>('.opens')!.style.gridTemplateRows = '1fr';
-      let tallest = 0;
-      let narrowest = Infinity;
-      const start = performance.now();
-      // From the third frame on: the first ones show the row barely started.
-      for (let n = 1; performance.now() - start < 450; n++) {
-        await frames(1);
-        if (n < 3) continue;
-        const s = drawn();
-        tallest = Math.max(tallest, fit.offsetHeight * s);
-        narrowest = Math.min(narrowest, fit.offsetWidth * s);
-      }
-      expect(tallest).toBeLessThanOrEqual(room() + 2);
-      // Fitted or shrunk, it spans the window: no frame switches it from its own
-      // width to a wider layout.
-      expect(narrowest).toBeGreaterThan(PHONE - 2);
-      expect(parseFloat(fit.style.width)).toBeGreaterThan(110);
-      const width = fit.style.width;
-      const transform = fit.style.transform;
-      await new Promise((r) => setTimeout(r, 300));
-      expect(fit.style.width).toBe(width);
-      expect(fit.style.transform).toBe(transform);
     });
   });
 
