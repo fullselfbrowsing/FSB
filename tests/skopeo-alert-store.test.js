@@ -98,6 +98,22 @@ const candidate = {
   assert.equal((await store.transition({
     partition, alertKey: candidate.alertKey, from: 'attempted', to: 'delivered', reason: null
   })).ok, true);
+  const delivered = await store.schedule(candidate, 1803999600000);
+  assert.equal(delivered.unchanged, true, 'a delivered alert is not scheduled again');
+  assert.equal(delivered.entry.state, 'delivered');
+  assert.equal((await store.transition({
+    partition, alertKey: candidate.alertKey, from: 'delivered', to: 'superseded',
+    reason: 'evidence-superseded'
+  })).ok, true);
+  assert.equal((await store.transition({
+    partition, alertKey: candidate.alertKey, from: 'superseded', to: 'scheduled', reason: null
+  })).ok, false, 'superseded stays terminal for transitions');
+  const revived = await store.schedule(candidate, 1803999600000);
+  assert.equal(revived.ok, true);
+  assert.equal(revived.unchanged, false,
+    'the same alert derived again after it was superseded is a replacement');
+  assert.equal(revived.entry.state, 'scheduled');
+  assert.equal((await store.list(partition)).length, 1, 'the replacement reuses the key');
 
   harness.setFailRead(true);
   assert.deepEqual(await store.unbindOwner(partition, binding.ownerStableRecordId), { ok: false },

@@ -261,7 +261,13 @@
         var partition = ensurePartition(envelope, candidate.partition);
         if (!partition) return failure();
         var existing = partition.alerts[candidate.alertKey];
-        if (existing) return ok({ entry: schema.parseEntry(existing), unchanged: true });
+        var existingEntry = existing ? schema.parseEntry(existing) : null;
+        // The key no longer changes from day to day, so a superseded alert can
+        // be derived again under the same key. That is a replacement, not a
+        // transition out of superseded, which stays terminal.
+        if (existing && !(existingEntry && existingEntry.state === 'superseded')) {
+          return ok({ entry: existingEntry, unchanged: true });
+        }
         var now;
         try { now = fields.now(); } catch (_error) { return failure(); }
         var entry = schema.parseEntry({

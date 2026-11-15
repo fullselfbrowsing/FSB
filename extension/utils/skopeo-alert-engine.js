@@ -256,14 +256,15 @@
         input.evidence.citationId,
         input.evidence.sourceFileId,
         input.evidence.sourceRevision,
-        input.evidence.contentFingerprint,
-        input.sourceSetDigest,
-        input.revisionDigest,
-        input.accessDigest
+        input.evidence.contentFingerprint
         // truthGenerationId and evaluationContextDigest stay on the candidate
         // but out of the key: both change every civil day (the evaluation
         // context carries today's date), and a key that changes daily
-        // supersedes the alert before its alarm can fire.
+        // supersedes the alert before its alarm can fire. The source set,
+        // revision and access digests cover the whole corpus, so an edit to
+        // any other document would supersede a delivered alert. They stay on
+        // the candidate, and delivery still re-derives it from the current
+        // source set first.
       ];
       var hash;
       try { hash = await fields.digest(material); } catch (_error) { hash = null; }

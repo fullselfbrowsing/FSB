@@ -104,6 +104,19 @@ const input = {
   });
   assert.notEqual(revisedEvidence.candidate && revisedEvidence.candidate.alertKey, eligible.candidate.alertKey,
     'a change to the alert evidence still yields a new key');
+  // The source set, revision and access digests cover every document in the
+  // corpus, so an edit to another document must not re-key this alert.
+  const otherDocumentEdited = await engine.derive({
+    ...input,
+    sourceSetDigest: `sha256:${'1'.repeat(64)}`,
+    revisionDigest: `sha256:${'2'.repeat(64)}`,
+    accessDigest: `sha256:${'3'.repeat(64)}`
+  });
+  assert.equal(otherDocumentEdited.candidate && otherDocumentEdited.candidate.alertKey,
+    eligible.candidate.alertKey,
+    'a change elsewhere in the corpus keeps the alert key');
+  assert.equal(otherDocumentEdited.candidate.sourceSetDigest, `sha256:${'1'.repeat(64)}`,
+    'the candidate still records the current source set digest');
 
   const absent = await engine.derive({ ...input, mapping: null });
   assert.equal(absent.disposition, 'not-locally-deliverable');
