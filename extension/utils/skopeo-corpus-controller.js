@@ -532,6 +532,12 @@
         currentStatus = 'fail-quiet';
         return result(false, 'fail-quiet');
       }
+      // The claim's corpus is visible, so staging is over. The reconciler
+      // commits under its own handle, so activateEnrollment never retires the
+      // one enroll issued. Left in place, it made this root report
+      // 'validating' and every other folder 'fail-quiet'.
+      if (currentHandle) handleIdentities.delete(currentHandle);
+      currentHandle = null;
       currentStatus = 'active';
       return result(true, 'active');
     }

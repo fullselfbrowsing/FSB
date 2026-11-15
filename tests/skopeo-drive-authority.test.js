@@ -8,6 +8,7 @@ const ROOT = path.resolve(__dirname, '..');
 const AUTHORITY_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-drive-authority.js');
 const CONTROLLER_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-corpus-controller.js');
 const SCHEMA_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-corpus-schema.js');
+const CORPUS_STORE_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-corpus-store.js');
 
 const DRIVE_ORIGIN = 'https://drive.google.com';
 const DOCS_ORIGIN = 'https://docs.google.com';
@@ -1502,6 +1503,76 @@ async function testControllerExactRootStatus(Controller) {
   }
 }
 
+function createMemoryStorageArea() {
+  const values = new Map();
+  return {
+    async get(keys) {
+      const output = {};
+      if (keys === null) {
+        values.forEach((value, key) => { output[key] = structuredClone(value); });
+        return output;
+      }
+      for (const key of Array.isArray(keys) ? keys : [keys]) {
+        if (values.has(key)) output[key] = structuredClone(values.get(key));
+      }
+      return output;
+    },
+    async set(update) {
+      for (const [key, value] of Object.entries(update || {})) values.set(key, structuredClone(value));
+    },
+    async remove(keys) {
+      for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key);
+    }
+  };
+}
+
+// The background enrolls with enroll -> reconciler.buildInitialInventory ->
+// revalidate. The reconciler commits its own staging handle, so
+// activateEnrollment never runs, and the handle from enroll must not outlive
+// the enrollment: a stale one made the root report 'validating' forever and
+// every other folder 'fail-quiet'.
+async function testControllerEnrollmentClearsStagingHandle(Controller) {
+  const schema = require(SCHEMA_PATH);
+  const CorpusStore = require(CORPUS_STORE_PATH);
+  const store = CorpusStore.create({
+    storageArea: createMemoryStorageArea(),
+    schema,
+    now: () => Date.now()
+  });
+  const harness = createControllerHarness(Controller, { store });
+  const claim = { accountPermissionId: 'permission-1', corpusRootFileId: 'root-1' };
+  async function mutate(work) {
+    const guard = store.issueMutation(new AbortController().signal);
+    try {
+      return await work(guard);
+    } finally {
+      store.finishMutation(guard);
+    }
+  }
+
+  const enrollment = await harness.controller.enroll({ folderFileId: 'root-1' });
+  assert.equal(enrollment.status, 'validating');
+  const handle = await mutate((guard) => store.beginReplacement(claim, guard));
+  const committed = await mutate((guard) => store.commitInventory(handle, {
+    version: CHECKPOINT_VERSION,
+    kind: 'inventory-complete',
+    cursor: 'inventory_1',
+    sourceCount: 0
+  }, guard, null));
+  assert.equal(committed.ok, true, 'the reconciler-style commit publishes the corpus');
+  assert.deepEqual(await harness.controller.revalidate(), { ok: true, status: 'active' });
+
+  assert.deepEqual(await harness.controller.getRootStatus({ folderFileId: 'root-1' }),
+    { ok: true, status: 'active' }, 'the enrolled root reports active once revalidated');
+  harness.live.entityId = 'root-2';
+  assert.deepEqual(await harness.controller.getRootStatus({ folderFileId: 'root-2' }),
+    { ok: true, status: 'unconfigured' },
+    'another folder is an enrollment candidate, not fail-quiet');
+  assert.deepEqual(harness.controller.getCurrentClaim(), claim,
+    'checking another folder keeps the enrolled root');
+  assert.ok(await store.getVisibleManifest(claim), 'the enrolled corpus stays visible');
+}
+
 async function testControllerClosure(Controller) {
   {
     const claim = { accountPermissionId: 'permission-1', corpusRootFileId: 'root-1' };
@@ -1725,6 +1796,7 @@ async function main() {
   await testFinalCurrentnessAndDisplay(Authority);
   await testControllerSurface(Controller);
   await testControllerExactRootStatus(Controller);
+  await testControllerEnrollmentClearsStagingHandle(Controller);
   await testControllerClosure(Controller);
 
   const authoritySource = fs.readFileSync(AUTHORITY_PATH, 'utf8');
