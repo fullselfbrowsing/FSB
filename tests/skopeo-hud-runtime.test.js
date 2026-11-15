@@ -20,6 +20,8 @@ const HUD_SCHEMA_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-hud-schema
 const HUD_PROJECTOR_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-hud-projector.js');
 const ALERT_SCHEMA_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-alert-schema.js');
 const ASK_SCHEMA_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-ask-schema.js');
+const ADJUDICATOR_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-lineage-adjudicator.js');
+const DEADLINE_ENGINE_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-deadline-engine.js');
 const RUNTIME_PATH = path.join(ROOT, 'extension', 'content', 'skopeo-runtime.js');
 const COMPOSER_PATH = path.join(ROOT, 'extension', 'content', 'skopeo-adaptive-composer.js');
 const SHELL_PATH = path.join(ROOT, 'extension', 'content', 'skopeo-shell.js');
@@ -4014,6 +4016,245 @@ async function testHudFolderEmptyAndAskText(backgroundSource) {
     'the Ask engine admits an excerpt built from a multi-line document');
 }
 
+// Everything from the end of the truth helper region through
+// hudTruthProjection is plain function declarations, so load it whole and let
+// the projection call whichever helpers it needs.
+function loadHudTruthJoin(backgroundSource, dependencies = {}) {
+  const start = backgroundSource.indexOf(HELPER_END);
+  assert.ok(start >= 0, `${HELPER_END} exists`);
+  const projection = namedBackgroundFunction(backgroundSource, 'hudTruthProjection');
+  const end = backgroundSource.indexOf(projection, start);
+  assert.ok(end > start, 'hudTruthProjection follows the truth helper region');
+  return new Function('dependencies', [
+    'const global = dependencies.global;',
+    'const fsbSkopeoAlertStoreFacade = dependencies.alertStore || null;',
+    'const fsbSkopeoAlertEngineFacade = dependencies.alertEngine || null;',
+    backgroundSource.slice(start + HELPER_END.length, end + projection.length),
+    namedBackgroundFunction(backgroundSource, 'hudAskCitationProof'),
+    'return { hudTruthProjection, hudAskCitationProof, deriveCurrentHudAlertCandidates };'
+  ].join('\n'))(dependencies);
+}
+
+// Real adjudicator output over the adjudicator contract's graph fixtures.
+async function adjudicatedHudFixture(spec) {
+  const TruthSchema = require(SCHEMA_PATH);
+  const DeadlineEngine = require(DEADLINE_ENGINE_PATH);
+  const Adjudicator = require(ADJUDICATOR_PATH);
+  const { makeInput } = require('./skopeo-lineage-adjudicator.test.js');
+  const fixture = await makeInput(spec);
+  const adjudicator = Adjudicator.create({
+    truthSchema: TruthSchema,
+    deadlineEngine: DeadlineEngine,
+    byteLength: (value) => Buffer.byteLength(String(value), 'utf8')
+  });
+  const result = await adjudicator.adjudicateExactSet(fixture.input);
+  assert.strictEqual(result.status, 'adjudicated', 'fixture adjudicates');
+  return { fixture, input: fixture.input, result };
+}
+
+function hudTruthJoinInput(adjudicated, overrides = {}) {
+  let actionCount = 0;
+  return {
+    truth: {
+      outputGenerationId: 'generation-1',
+      evaluationContextDigest: 'a'.repeat(64),
+      families: adjudicated.result.families,
+      authorizedSetDigest: adjudicated.result.authorizedSetDigest,
+      blockerCodes: []
+    },
+    sourceTokens: overrides.sourceTokens,
+    graphSnapshot: adjudicated.input.graphSnapshot,
+    focusSourceId: null,
+    mode: 'folder',
+    metadataBySource: new Map(Array.from(overrides.sourceTokens.keys(), (id) => [id, { headRevisionId: 'rev1' }])),
+    mintActionId: () => `action:${actionCount++}`,
+    evaluationContext: adjudicated.input.evaluationContext,
+    alertStatusByFamily: new Map(),
+    ...overrides
+  };
+}
+
+function hudJoinProjection(adjudicated, truth, { mode, focusSourceBinding, sources, vendorLabels }) {
+  require(HUD_SCHEMA_PATH);
+  const projector = require(HUD_PROJECTOR_PATH);
+  return projector.createProjection({
+    mode,
+    focus: mode === 'folder'
+      ? { sourceBinding: null, documentLabel: null }
+      : { sourceBinding: focusSourceBinding, documentLabel: 'Agreement' },
+    manifest: {
+      state: 'complete',
+      authorizedSetDigest: adjudicated.result.authorizedSetDigest,
+      totalSources: sources.length,
+      sourceOverflow: 0,
+      totalVendors: vendorLabels.length,
+      vendorOverflow: 0,
+      sources
+    },
+    graph: {
+      state: 'complete',
+      authorizedSetDigest: adjudicated.result.authorizedSetDigest,
+      records: [],
+      relations: []
+    },
+    truth,
+    vendorLabels: { state: 'current', entries: vendorLabels },
+    evaluationContext: {
+      civilDate: adjudicated.input.evaluationContext.asOfCivilDate,
+      digest: truth.evaluationContextDigest
+    },
+    authority: {
+      generation: 1,
+      exactOrigin: mode === 'folder' ? 'https://drive.google.com' : 'https://docs.google.com',
+      profileVersion: 'p1',
+      contextEpoch: 1,
+      semanticEntityToken: 'entity:1',
+      requestActionToken: 'request:1',
+      projectionToken: 'projection:1'
+    }
+  });
+}
+
+async function testHudFamiliesKeepTheirOwnSources(backgroundSource) {
+  const { baseSource } = require('./skopeo-lineage-adjudicator.test.js');
+  const vendorFacts = (expiration) => [
+    { type: 'expiration-date', value: { kind: 'civil-date', value: expiration }, clause: 'notice' },
+    {
+      type: 'notice-window',
+      value: {
+        kind: 'notice-window', amount: 90, unit: 'calendar-days', relation: 'before',
+        anchorAssertionType: 'expiration-date', boundary: 'exclusive'
+      },
+      clause: 'notice'
+    }
+  ];
+  const noticeRule = {
+    clause: 'notice', operator: 'subtract-calendar-days', anchorAssertionType: 'expiration-date',
+    amount: 90, boundary: 'exclusive', timezone: 'America/Chicago', calendarHandle: null
+  };
+  const adjudicated = await adjudicatedHudFixture({
+    sources: [
+      baseSource({ facts: vendorFacts('2027-02-03'), rules: [noticeRule] }),
+      baseSource({
+        key: 'other', label: 'Other Vendor Agreement',
+        facts: vendorFacts('2028-02-03'), rules: [noticeRule]
+      })
+    ]
+  });
+  const { fixture, input, result } = adjudicated;
+  const sourceIds = ['source_base', 'source_other'];
+  const baseDocument = fixture.byKey.get('base').byRef.get('document');
+  const otherDocument = fixture.byKey.get('other').byRef.get('document');
+  assert.deepStrictEqual([baseDocument.sourceFileId, otherDocument.sourceFileId], sourceIds);
+  assert.strictEqual(result.families.length, 2, 'two unrelated agreements are two families');
+  for (const family of result.families) {
+    assert.deepStrictEqual(family.sourceBindings.map((binding) => binding.sourceFileId), sourceIds,
+      'each family proof still binds the whole adjudicated set, which decides its currentness');
+  }
+  const baseFamily = result.families.find((family) =>
+    family.documentStableIds.includes(baseDocument.stableRecordId));
+  const otherFamily = result.families.find((family) =>
+    family.documentStableIds.includes(otherDocument.stableRecordId));
+  assert.ok(baseFamily && otherFamily && baseFamily !== otherFamily);
+
+  const join = loadHudTruthJoin(backgroundSource, { global: { crypto: require('crypto').webcrypto } });
+  const sourceTokens = new Map(sourceIds.map((id) => [id, `source:${id}`]));
+  const folder = join.hudTruthProjection(hudTruthJoinInput(adjudicated, { sourceTokens }));
+  assert.deepStrictEqual(folder.truth.families.map((family) => family.sourceBindings).sort(),
+    [['source:source_base'], ['source:source_other']],
+    'each HUD family spans only the sources of its own documents');
+  for (const family of folder.truth.families) {
+    assert.deepStrictEqual(family.readingStates.map((state) => state.sourceBinding), family.sourceBindings,
+      'reading states cover the family sources only');
+  }
+  const folderView = hudJoinProjection(adjudicated, folder.truth, {
+    mode: 'folder',
+    sources: sourceIds.map((id, index) => ({
+      sourceBinding: sourceTokens.get(id), vendorScopeFileId: `scope:${index}`,
+      state: 'ready', indexState: 'complete'
+    })),
+    vendorLabels: [
+      { vendorScopeFileId: 'scope:0', vendorToken: 'vendor:0', label: 'Acme' },
+      { vendorScopeFileId: 'scope:1', vendorToken: 'vendor:1', label: 'Borealis' }
+    ]
+  });
+  assert.strictEqual(folderView && folderView.mode, 'folder',
+    `two vendors render a folder view (got ${folderView && folderView.body && folderView.body.reason})`);
+  assert.strictEqual(folderView.body.vendors.length, 2);
+
+  const reading = join.hudTruthProjection(hudTruthJoinInput(adjudicated, {
+    sourceTokens, mode: 'reading', focusSourceId: 'source_base'
+  }));
+  const focused = reading.truth.families.filter((family) => family.facts.length > 0);
+  assert.deepStrictEqual(focused.map((family) => family.sourceBindings), [['source:source_base']],
+    'reading one agreement focuses its own family only');
+  assert.ok(focused[0].facts.every((fact) => fact.sourceBinding === 'source:source_base'),
+    'reading one agreement shows none of the other vendor\'s facts');
+  const readingView = hudJoinProjection(adjudicated, reading.truth, {
+    mode: 'reading',
+    focusSourceBinding: 'source:source_base',
+    sources: sourceIds.map((id) => ({
+      sourceBinding: sourceTokens.get(id), vendorScopeFileId: null, state: 'ready', indexState: 'complete'
+    })),
+    vendorLabels: []
+  });
+  assert.strictEqual(readingView && readingView.mode, 'reading',
+    `reading one of two agreements renders (got ${readingView && readingView.body && readingView.body.reason})`);
+
+  const withoutOtherDocument = {
+    ...input.graphSnapshot,
+    records: input.graphSnapshot.records.filter((record) =>
+      record.stableRecordId !== otherDocument.stableRecordId)
+  };
+  const partial = join.hudTruthProjection(hudTruthJoinInput(adjudicated, {
+    sourceTokens, graphSnapshot: withoutOtherDocument
+  }));
+  assert.deepStrictEqual(partial.truth.families.map((family) => family.sourceBindings),
+    [['source:source_base']], 'a family whose document has no graph record stays closed');
+
+  // The other vendor's source is still pending; that must not hold back the
+  // alert for an agreement whose own source is ready.
+  const AlertSchema = require(ALERT_SCHEMA_PATH);
+  const alertJoin = loadHudTruthJoin(backgroundSource, {
+    global: { crypto: require('crypto').webcrypto, FsbSkopeoAlertSchema: AlertSchema },
+    alertStore: Object.freeze({}),
+    alertEngine: Object.freeze({})
+  });
+  const assessments = await alertJoin.deriveCurrentHudAlertCandidates({
+    binding: {
+      sourceFileIds: sourceIds,
+      sourceSetDigest: `sha256:${'1'.repeat(64)}`,
+      revisionDigest: `sha256:${'2'.repeat(64)}`,
+      accessDigest: `sha256:${'3'.repeat(64)}`
+    },
+    visible: {
+      manifest: { partitionKey: input.graphSnapshot.partitionKey },
+      claim: { accountPermissionId: 'account-lineage', corpusRootFileId: 'corpus-lineage' }
+    },
+    kernel: Object.freeze({}),
+    proof: { complete: true },
+    certificates: [
+      { sourceFileId: 'source_base', sourceState: 'ready', contentFingerprint: `sha256:${'b'.repeat(64)}` },
+      { sourceFileId: 'source_other', sourceState: 'pending', contentFingerprint: null }
+    ],
+    truth: {
+      status: 'current',
+      families: result.families,
+      authorizedSetDigest: input.graphSnapshot.authorizedSetDigest,
+      outputGenerationId: 'generation-1',
+      evaluationContextDigest: 'a'.repeat(64)
+    },
+    graphSnapshot: input.graphSnapshot,
+    evaluationContext: input.evaluationContext,
+    operationSignal: new AbortController().signal
+  });
+  assert.deepStrictEqual(
+    assessments.map((assessment) => [assessment.familyId, assessment.result.disposition]),
+    [[baseFamily.familyId, 'not-locally-deliverable']],
+    'only the agreement with a pending source of its own is held back from alerts'
+  );
+}
+
 async function runHudRuntimeContract() {
   try {
     const sources = loadSources();
@@ -4148,6 +4389,7 @@ async function runHudRuntimeContract() {
     testHudAbsenceJoin(sources.background);
     testProductionJoin(sources.background);
     await testHudFolderEmptyAndAskText(sources.background);
+    await testHudFamiliesKeepTheirOwnSources(sources.background);
     testContentRuntimeStaticContract(sources);
     await testContentRuntimeAdmissionMatrix(sources.runtime);
     await testContentRuntimeReplacementAndActions();

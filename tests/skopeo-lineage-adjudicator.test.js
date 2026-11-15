@@ -32,10 +32,15 @@ const TEST_CRYPTO = Object.freeze({
   })
 });
 
-Object.defineProperty(globalThis, 'crypto', {
-  configurable: true,
-  value: TEST_CRYPTO
-});
+// Run directly, the adjudicator gets a digest-only crypto, which proves it
+// needs nothing else. Required for its fixture builders, the caller keeps its
+// own crypto.
+if (require.main === module) {
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: TEST_CRYPTO
+  });
+}
 if (!globalThis.CfworkerJsonSchema) {
   vm.runInThisContext(fs.readFileSync(VALIDATOR_PATH, 'utf8'), {
     filename: VALIDATOR_PATH
@@ -2299,7 +2304,15 @@ async function main() {
   process.stdout.write('skopeo lineage adjudicator contract: PASS\n');
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error && error.stack ? error.stack : String(error)}\n`);
-  process.exitCode = 1;
-});
+module.exports = {
+  amendmentSource,
+  baseSource,
+  makeInput
+};
+
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(`${error && error.stack ? error.stack : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

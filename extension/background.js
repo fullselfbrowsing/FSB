@@ -4099,6 +4099,29 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
       : value && typeof value.sourceFileId === 'string' ? value.sourceFileId : null;
   }
 
+  // A family proof binds every source in the adjudicated set, because any of
+  // them can make it stale. On the HUD a family covers only its own
+  // documents, so map each document back to its source through the graph
+  // snapshot records. A document with no record, or one whose source the
+  // proof does not bind, yields null and the family stays closed.
+  function hudFamilySourceIds(family, graphSnapshot) {
+    if (!family || !Array.isArray(family.documentStableIds) ||
+        family.documentStableIds.length === 0 || !Array.isArray(family.sourceBindings) ||
+        !graphSnapshot || !Array.isArray(graphSnapshot.records)) return null;
+    const boundSourceIds = new Set(family.sourceBindings.map(hudSourceId).filter(Boolean));
+    const recordByStableId = new Map(graphSnapshot.records.map(function(record) {
+      return [record && record.stableRecordId, record];
+    }));
+    const sourceFileIds = new Set();
+    for (const stableRecordId of family.documentStableIds) {
+      const record = recordByStableId.get(stableRecordId);
+      const sourceFileId = record && record.sourceFileId;
+      if (typeof sourceFileId !== 'string' || !boundSourceIds.has(sourceFileId)) return null;
+      sourceFileIds.add(sourceFileId);
+    }
+    return Array.from(sourceFileIds).sort();
+  }
+
   function hudAxisValue(axis) {
     return axis && typeof axis.value === 'string'
       ? axis.value
@@ -4293,7 +4316,7 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     for (const family of args.truth.families) {
       if (!family || !Array.isArray(family.sourceBindings) || !Array.isArray(family.citations) ||
           !Array.isArray(family.assertions) || !Array.isArray(family.deadlineResults)) continue;
-      const sourceFileIds = family.sourceBindings.map(hudSourceId).filter(Boolean).sort();
+      const sourceFileIds = hudFamilySourceIds(family, args.graphSnapshot) || [];
       const sourceSet = new Set(sourceFileIds);
       if (sourceFileIds.length === 0 || sourceSet.size !== sourceFileIds.length ||
           sourceFileIds.some(function(sourceFileId) {
@@ -4798,9 +4821,7 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     const contextDigest = 'sha256:' + truth.evaluationContextDigest;
     for (let familyIndex = 0; familyIndex < truth.families.length; familyIndex += 1) {
       const rawFamily = truth.families[familyIndex];
-      const rawSourceIds = Array.isArray(rawFamily.sourceBindings)
-        ? rawFamily.sourceBindings.map(hudSourceId).filter(Boolean)
-        : [];
+      const rawSourceIds = hudFamilySourceIds(rawFamily, input.graphSnapshot) || [];
       const familySourceTokens = rawSourceIds.map(function(sourceFileId) {
         return sourceTokens.get(sourceFileId);
       }).filter(Boolean);
@@ -5133,9 +5154,8 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     let readingScopeSourceIds = null;
     if (args.binding.mode === 'reading') {
       const relevantFamily = args.truth.families.find(function(family) {
-        return (family.sourceBindings || []).some(function(binding) {
-          return hudSourceId(binding) === exactCurrent.live.entityId;
-        });
+        const familySourceIds = hudFamilySourceIds(family, graphSnapshot);
+        return !!familySourceIds && familySourceIds.indexOf(exactCurrent.live.entityId) !== -1;
       });
       const relevantSourceIds = new Set([exactCurrent.live.entityId]);
       if (relevantFamily) {
