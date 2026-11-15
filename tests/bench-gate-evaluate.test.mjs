@@ -1250,6 +1250,14 @@ test('claims: the cost sentence needs a cost on every counted run, labels estima
   assert.equal(valueOf(noLlm, 'llmOff'), null);
   assert.ok(valueOf(noLlm, 'llmOn') > 0);
   assert.match(noLlm.text, /^LLM cost per completed task was unavailable with fast mode off and \$/);
+  // The gate report applies the same rule, so it never prints a figure biased
+  // low next to the claim.
+  const noLlmTables = buildTables({
+    ...input,
+    autopilot: withRows(input.autopilot, (runs) => { rowById(runs, offId).cost.usd = null; })
+  }, result);
+  assert.equal(noLlmTables.groups.autopilotOff.llmCostPerCompleted, null);
+  assert.ok(noLlmTables.groups.autopilotOn.llmCostPerCompleted > 0);
 
   // Called fast runs with no Jev figure ('summary' rows of jev_measurement_missing runs): the Jev figure is unavailable.
   const missing = autopilotCampaign({ jev: { missingRate: 0.1 } });
@@ -1257,6 +1265,10 @@ test('claims: the cost sentence needs a cost on every counted run, labels estima
   const noJev = costOf(withAutopilot(missing));
   assert.equal(valueOf(noJev, 'jevOn'), null);
   assert.ok(noJev.text.includes('with it on was unavailable (provider-reported)'), noJev.text);
+  assert.deepEqual(buildTables({ ...input, autopilot: missing }, result).groups.autopilotOn.jevCostPerCompleted,
+    { provider: null, estimate: null }, 'the report shows the Jev split as unavailable too');
+  const fullJev = buildTables(input, result).groups.autopilotOn.jevCostPerCompleted;
+  assert.ok(Math.abs(fullJev.provider - expectedJev) < 1e-15, `${fullJev.provider} vs ${expectedJev}`);
 
   // Runs with no Jev call (no_block) cost FSB nothing and keep the figure available.
   const noBlock = autopilotCampaign({ jev: { noBlockRate: 0.1 } });

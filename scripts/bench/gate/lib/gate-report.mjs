@@ -141,16 +141,42 @@ function wallPerCompleted(rows) {
   return medians.length ? Math.exp(medians.reduce((sum, value) => sum + Math.log(value), 0) / medians.length) : null;
 }
 
+// A per-completed-task cost divides the summed cost of every counted run by the
+// completed ones, so a counted run without a cost would bias it low. As in
+// decision.mjs (WR-01), the figure is unavailable unless every counted run has one.
 function costPerCompleted(counted, completed, pick) {
-  const values = counted.map(pick).map(finite).filter((value) => value !== null);
-  return completed > 0 && values.length ? values.reduce((sum, value) => sum + value, 0) / completed : null;
+  const values = counted.map(pick).map(finite);
+  return completed > 0 && values.length > 0 && values.every((value) => value !== null)
+    ? values.reduce((sum, value) => sum + value, 0) / completed
+    : null;
+}
+
+// The Jev split follows decision.mjs's jevRowCost: a run that made no gateway
+// call costs zero, and a counted run that reports neither a provider nor an
+// estimate figure makes both figures unavailable.
+function jevCostSplitPerCompleted(counted, completed) {
+  const unavailable = { provider: null, estimate: null };
+  if (completed === 0 || counted.length === 0) return unavailable;
+  let provider = 0;
+  let estimate = 0;
+  for (const row of counted) {
+    const jev = isPlainObject(row.jev) ? row.jev : null;
+    if (jev === null) return unavailable;
+    if (jev.jevCalls === 0) continue;
+    const usd = isPlainObject(jev.usd) ? jev.usd : {};
+    const rowProvider = finite(usd.provider);
+    const rowEstimate = finite(usd.estimate);
+    if (rowProvider === null && rowEstimate === null) return unavailable;
+    provider += rowProvider === null ? 0 : rowProvider;
+    estimate += rowEstimate === null ? 0 : rowEstimate;
+  }
+  return { provider: provider / completed, estimate: estimate / completed };
 }
 
 function groupStats(rows) {
   const counted = rows.filter(isCounted);
   const completed = counted.filter((row) => row.pass === true).length;
   const v2 = rows.some((row) => row.schemaVersion === 2);
-  const jevUsd = (key) => (row) => (isPlainObject(row.jev) && isPlainObject(row.jev.usd) ? row.jev.usd[key] : null);
   return {
     runs: rows.length,
     counted: counted.length,
@@ -162,9 +188,7 @@ function groupStats(rows) {
     wallPerCompletedMs: wallPerCompleted(rows),
     llmCostPerCompleted: costPerCompleted(counted, completed, (row) => (isPlainObject(row.cost) ? row.cost.usd : null)),
     llmCostLabels: countBy(counted.map((row) => (isPlainObject(row.cost) ? row.cost.label : null))),
-    jevCostPerCompleted: v2
-      ? { provider: costPerCompleted(counted, completed, jevUsd('provider')), estimate: costPerCompleted(counted, completed, jevUsd('estimate')) }
-      : null,
+    jevCostPerCompleted: v2 ? jevCostSplitPerCompleted(counted, completed) : null,
   };
 }
 
