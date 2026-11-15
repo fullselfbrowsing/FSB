@@ -188,6 +188,26 @@ test('#156 execute_js still acts on enabled controls and pages that enable their
 
   assert.equal(await evaluate(`EventTarget.prototype.dispatchEvent.toString().includes('[native code]')
     && HTMLElement.prototype.click.toString().includes('[native code]')
+    && Document.prototype.execCommand.toString().includes('[native code]')
+    && HTMLFormElement.prototype.reset.toString().includes('[native code]')
+    && Element.prototype.setAttribute.toString().includes('[native code]')
     && Object.getOwnPropertyDescriptor(HTMLButtonElement.prototype, 'disabled').set.toString().includes('[native code]')`),
   true, 'the guard restores every patched API');
+});
+
+test('#156 execute_js leaves page code it runs indirectly unchecked', { skip: !chrome }, async () => {
+  // Typing through execCommand fires the coupon field's input listener, which
+  // enables Apply. That is the page's own code, not the script re-enabling it.
+  const typed = await runPageScript(`const c = document.querySelector('#coupon'); c.focus();
+    document.execCommand('insertText', false, 'SAVE'); document.querySelector('#apply').click(); 'typed'`);
+  assert.equal(typed.blocked, undefined, JSON.stringify(typed));
+  assert.equal(await evaluate('applyClicks'), 1);
+
+  const reset = await runPageScript(`document.querySelector('#filters').reset(); document.querySelector('#clear').disabled`);
+  assert.equal(reset.blocked, undefined, JSON.stringify(reset));
+  assert.equal(reset.result, 'false', 'the reset listener enabled Clear filters');
+
+  const accepted = await runPageScript(`document.querySelector('#terms').setAttribute('accepted', ''); document.querySelector('#continue').disabled`);
+  assert.equal(accepted.blocked, undefined, JSON.stringify(accepted));
+  assert.equal(accepted.result, 'false', 'the custom element enabled Continue');
 });

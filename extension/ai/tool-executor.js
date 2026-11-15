@@ -97,9 +97,12 @@ function autopilotTriggerHadEffect(toolName, response) {
  * reported, and so is an attempt to re-enable one (the disabled property, the
  * disabled or aria-disabled attribute). Refusing the re-enable matters as much
  * as refusing the click: a button the script enabled would stay enabled for
- * the next tool call. Page listeners that run inside the script's calls are
- * never checked, so a page that enables its own button in response to the
- * script keeps working. Everything else the code does runs unchanged.
+ * the next tool call. Page code that runs inside the script's own calls is not
+ * checked, so a page that enables its own button in response to the script
+ * keeps working. That covers listeners for events the script dispatches,
+ * clicks on enabled controls, focus and blur, typing through execCommand,
+ * form reset, and custom-element callbacks run by the script's attribute
+ * writes. Everything else the code does runs unchanged.
  *
  * Passed as chrome.scripting.executeScript({ func }), so it is serialized and
  * must stay self-contained. Only synchronous work is covered: the guard comes
@@ -212,9 +215,17 @@ function fsbRunGuardedPageScript(__fsbCode, __fsbMode) {
         };
       });
     });
-    ['focus', 'blur'].forEach(function(name) {
-      patchMethod(HTMLElement.prototype, name, function(original) {
-        return function() { return passThrough(original, this, arguments); };
+    // Other calls that run page listeners synchronously: focus changes, typing
+    // through execCommand (beforeinput/input), and form reset (reset).
+    [
+      [HTMLElement.prototype, ['focus', 'blur']],
+      [Document.prototype, ['execCommand']],
+      [HTMLFormElement.prototype, ['reset']]
+    ].forEach(function(entry) {
+      entry[1].forEach(function(name) {
+        patchMethod(entry[0], name, function(original) {
+          return function() { return passThrough(original, this, arguments); };
+        });
       });
     });
 
@@ -237,20 +248,20 @@ function fsbRunGuardedPageScript(__fsbCode, __fsbMode) {
       return function(name) {
         var attr = isDisableAttr(name);
         if (attr && refuseEnable(this, attr, true)) return undefined;
-        return original.apply(this, arguments);
+        return passThrough(original, this, arguments);
       };
     });
     patchMethod(Element.prototype, 'removeAttributeNode', function(original) {
       return function(node) {
         var attr = node && isDisableAttr(node.name);
         if (attr && refuseEnable(this, attr, true)) return node;
-        return original.apply(this, arguments);
+        return passThrough(original, this, arguments);
       };
     });
     patchMethod(Element.prototype, 'setAttribute', function(original) {
       return function(name, value) {
         if (isDisableAttr(name) === 'aria-disabled' && refuseEnable(this, 'aria-disabled', String(value) !== 'true')) return undefined;
-        return original.apply(this, arguments);
+        return passThrough(original, this, arguments);
       };
     });
     patchMethod(Element.prototype, 'toggleAttribute', function(original) {
@@ -260,7 +271,7 @@ function fsbRunGuardedPageScript(__fsbCode, __fsbMode) {
           var removing = force === undefined ? this.hasAttribute(attr) : !force;
           if (refuseEnable(this, attr, removing)) return true;
         }
-        return original.apply(this, arguments);
+        return passThrough(original, this, arguments);
       };
     });
     patchMethod(NamedNodeMap.prototype, 'removeNamedItem', function(original) {
@@ -268,7 +279,7 @@ function fsbRunGuardedPageScript(__fsbCode, __fsbMode) {
         var attr = isDisableAttr(name);
         var owner = attr && this.getNamedItem(name) && this.getNamedItem(name).ownerElement;
         if (owner && refuseEnable(owner, attr, true)) return null;
-        return original.apply(this, arguments);
+        return passThrough(original, this, arguments);
       };
     });
     [HTMLButtonElement, HTMLInputElement, HTMLSelectElement, HTMLTextAreaElement, HTMLFieldSetElement, HTMLOptGroupElement, HTMLOptionElement].forEach(function(Ctor) {
@@ -278,7 +289,7 @@ function fsbRunGuardedPageScript(__fsbCode, __fsbMode) {
       Object.defineProperty(proto, 'disabled', Object.assign({}, desc, {
         set: function(value) {
           if (refuseEnable(this, 'disabled', !value)) return;
-          desc.set.call(this, value);
+          passThrough(desc.set, this, [value]);
         }
       }));
       restorers.push(function() { Object.defineProperty(proto, 'disabled', desc); });
@@ -288,7 +299,7 @@ function fsbRunGuardedPageScript(__fsbCode, __fsbMode) {
       Object.defineProperty(Element.prototype, 'ariaDisabled', Object.assign({}, ariaDesc, {
         set: function(value) {
           if (refuseEnable(this, 'aria-disabled', String(value) !== 'true')) return;
-          ariaDesc.set.call(this, value);
+          passThrough(ariaDesc.set, this, [value]);
         }
       }));
       restorers.push(function() { Object.defineProperty(Element.prototype, 'ariaDisabled', ariaDesc); });

@@ -212,6 +212,54 @@ function _extractMetaTargetKey(call) {
   return null;
 }
 
+// Arguments that tell two calls of the same tool apart, for detectStuck's
+// repetition check. Only these count: every action tool also takes free-text
+// fields such as visual_reason, which differ on each call and would hide a
+// real loop.
+var _STUCK_FINGERPRINT_ARGS = [
+  'url', 'query', 'text', 'value', 'key', 'direction', 'amount',
+  'x', 'y', 'deltaX', 'deltaY', 'startX', 'startY', 'endX', 'endY',
+  'sourceSelector', 'targetSelector', 'attribute', 'tabId'
+];
+
+// Short values verbatim; long ones keep a readable prefix plus a hash of the
+// whole value, so two values that differ late still differ.
+function _stuckFingerprintValue(value) {
+  var str = String(value);
+  if (str.length <= 40) return str;
+  var hash = 5381;
+  for (var i = 0; i < str.length; i++) hash = ((hash * 33) ^ str.charCodeAt(i)) >>> 0;
+  return str.slice(0, 40) + '#' + hash.toString(36);
+}
+
+/**
+ * What one action call did, as detectStuck compares it. Two calls are the
+ * same action only when tool, element, and identifying values all match, so
+ * visiting five pages or typing five different queries is not a repeat. A
+ * scroll also records where it left the page: scrolling down a long page
+ * moves on each time, while scrolling at its end repeats.
+ *
+ * @param {{name: string, args?: Object, result?: Object}} tr - One tool result
+ * @returns {string} Element, then `key=value` details; the element alone
+ *   when the call has no identifying values
+ */
+function _stuckActionTarget(tr) {
+  var args = tr.args || {};
+  var target = args.selector || args.elementId || args.element_id || '';
+  if (!target && args.code) target = _stuckFingerprintValue(args.code);
+  var details = [];
+  for (var i = 0; i < _STUCK_FINGERPRINT_ARGS.length; i++) {
+    var value = args[_STUCK_FINGERPRINT_ARGS[i]];
+    if (value === undefined || value === null || value === '') continue;
+    details.push(_STUCK_FINGERPRINT_ARGS[i] + '=' + _stuckFingerprintValue(value));
+  }
+  var page = tr.result && tr.result.result;
+  if (String(tr.name).indexOf('scroll') === 0 && page && typeof page.scrollY === 'number') {
+    details.push('scrollY=' + Math.round(page.scrollY));
+  }
+  return details.length > 0 ? target + ' ' + details.join(' ') : target;
+}
+
 function _trackMetaAttempt(session, call, iterNum) {
   if (!_META_INTERACT_TOOLS[call.name]) return null;
   var key = _extractMetaTargetKey(call);
@@ -338,20 +386,13 @@ function detectStuck(session, toolResults) {
 
   // --- 2. Action repetition detection ---
   // Build a fingerprint for mutation tools in this iteration.
-  // Fingerprint = sorted list of "toolName:target" for non-read-only tools.
+  // Fingerprint = sorted list of "toolName:target" for non-read-only tools,
+  // where target is the element plus the values that identify the action.
   var mutationParts = [];
   for (var i = 0; i < toolResults.length; i++) {
     var tr = toolResults[i];
     if (READ_ONLY_TOOLS[tr.name]) continue;
-    var target = '';
-    if (tr.args) {
-      target = tr.args.selector || tr.args.elementId || tr.args.element_id || '';
-      if (!target && tr.args.code) {
-        // For execute_js, use first 40 chars of code as fingerprint
-        target = String(tr.args.code).substring(0, 40);
-      }
-    }
-    mutationParts.push(tr.name + ':' + target);
+    mutationParts.push(tr.name + ':' + _stuckActionTarget(tr));
   }
   var fingerprint = mutationParts.sort().join('|') || '_read_only_';
 

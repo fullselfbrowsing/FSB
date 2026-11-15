@@ -172,3 +172,54 @@ test('#157 filling five different fields is not mistaken for a stuck loop', asyn
     assert.equal(r.stopped, false, 'stopped while filling ' + fields[i]);
   }
 });
+
+// Runs `iterations` rounds of makeResults(i) through the real session hooks and
+// returns the iteration that stopped the run, or null.
+async function iterationThatStops(makeResults, iterations) {
+  const { HookPipeline, LIFECYCLE_EVENTS } = require('../extension/ai/hook-pipeline.js');
+  const { createSafetyBreakerHook, createStuckDetectionHook } = require('../extension/ai/hooks/safety-hooks.js');
+  const { detectStuck, checkSafetyBreakers } = require('../extension/ai/agent-loop.js');
+  const createSessionHooks = vm.runInNewContext(
+    sliceFunction(background, 'function createSessionHooks(') + '\ncreateSessionHooks',
+    { HookPipeline, LIFECYCLE_EVENTS, createSafetyBreakerHook, createStuckDetectionHook, detectStuck, checkSafetyBreakers, automationLogger: { debug() {} } }
+  );
+  const pipeline = createSessionHooks('s3');
+  const session = { agentState: { consecutiveNoChangeCount: 0, actionFingerprints: [], stuckWarningCount: 0 }, actionHistory: [] };
+  for (let i = 1; i <= iterations; i++) {
+    session.agentState.iterationCount = i;
+    const r = await pipeline.emit(LIFECYCLE_EVENTS.AFTER_ITERATION, { session, toolResults: makeResults(i), iteration: i });
+    if (r.stopped) return i;
+  }
+  return null;
+}
+
+test('#157 visiting several pages or scrolling a long page is not mistaken for a stuck loop', async () => {
+  const visits = await iterationThatStops(i => [
+    { callId: 'n' + i, name: 'navigate', args: { url: 'https://shop.example/item/' + i, visual_reason: 'open item ' + i }, result: { success: true, hadEffect: true, result: { navigatingTo: 'https://shop.example/item/' + i } } },
+    { callId: 'r' + i, name: 'read_page', args: {}, result: { success: true, hadEffect: false } }
+  ], 6);
+  assert.equal(visits, null, 'stopped while visiting pages, at iteration ' + visits);
+
+  const scrolls = await iterationThatStops(i => [
+    { callId: 's' + i, name: 'scroll', args: { direction: 'down' }, result: { success: true, hadEffect: true, result: { scrollY: 700 * i, atBottom: false } } }
+  ], 6);
+  assert.equal(scrolls, null, 'stopped while scrolling a long page, at iteration ' + scrolls);
+
+  // Same 40-character prefix, different row each time.
+  const scripts = await iterationThatStops(i => [
+    { callId: 'j' + i, name: 'execute_js', args: { code: "const rows = document.querySelectorAll('.result-row'); rows[" + i + '].click()' }, result: { success: true, hadEffect: true } }
+  ], 6);
+  assert.equal(scripts, null, 'stopped while running different scripts, at iteration ' + scripts);
+});
+
+test('#157 repeats are still caught when only the free-text reason changes or the page stops moving', async () => {
+  const atBottom = await iterationThatStops(() => [
+    { callId: 's', name: 'scroll', args: { direction: 'down' }, result: { success: true, hadEffect: true, result: { scrollY: 4200, atBottom: true } } }
+  ], 10);
+  assert.equal(atBottom, 5, 'scrolling that no longer moves the page stops at iteration 5');
+
+  const retries = await iterationThatStops(i => [
+    { callId: 't' + i, name: 'type_text', args: { selector: '#name', text: 'Ada', visual_reason: 'attempt ' + i }, result: { success: false, hadEffect: false } }
+  ], 10);
+  assert.equal(retries, 5, 'the same typing retried with a new visual_reason stops at iteration 5');
+});

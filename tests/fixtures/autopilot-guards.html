@@ -10,6 +10,11 @@
 <!-- Control: the page enables Apply itself once a coupon is typed. -->
 <label>Coupon <input id="coupon"></label>
 <button id="apply" disabled>Apply</button>
+<!-- Controls: page code the script runs indirectly (a reset listener, a
+     custom element's attributeChangedCallback) enables these buttons. -->
+<form id="filters"><label>Color <input id="color" value="red"></label><button type="button" id="clear" disabled>Clear filters</button></form>
+<fsb-terms id="terms"></fsb-terms>
+<button id="continue" disabled>Continue</button>
 <script>
 // Just enough of the extension APIs for the real content scripts to load in a
 // plain page. Messages go straight to messaging.js's own listeners.
@@ -30,6 +35,13 @@ document.getElementById("place").addEventListener("click", () => { window.orderC
 document.getElementById("apply").addEventListener("click", () => { window.applyClicks++; });
 document.getElementById("coupon").addEventListener("input", event => {
   document.getElementById("apply").disabled = !event.target.value;
+});
+document.getElementById("filters").addEventListener("reset", () => {
+  document.getElementById("clear").disabled = false;
+});
+customElements.define("fsb-terms", class extends HTMLElement {
+  static get observedAttributes() { return ["accepted"]; }
+  attributeChangedCallback() { document.getElementById("continue").removeAttribute("disabled"); }
 });
 document.getElementById("contact").addEventListener("submit", event => {
   event.preventDefault();
