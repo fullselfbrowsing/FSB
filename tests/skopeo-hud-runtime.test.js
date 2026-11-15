@@ -609,6 +609,63 @@ async function testExplicitTruthDedupe(backgroundSource) {
   blocker(await blockedHelper.ensure(exactTuple, { evaluationContext: context }), 'source-inaccessible');
   assert.strictEqual(blockedRecompute, 0, 'non-missing/stale blockers never start provider work');
 
+  // The stored proof carries the civil date it was built for, so the first
+  // read after midnight finds it bound to yesterday. Recomputing with the
+  // caller's context is what clears that.
+  const nextDay = TruthSchema.parseEvaluationContext({ ...context, asOfCivilDate: '2026-07-25' });
+  const rolloverControllers = new Map();
+  installEntry(rolloverControllers, exactTuple);
+  const rolloverCalls = [];
+  let rolledOver = false;
+  const rolloverHelper = loadTruthHelper(backgroundSource, {
+    controllers: rolloverControllers,
+    global: Object.freeze({ FsbSkopeoTruthSchema: TruthSchema }),
+    facade: Object.freeze({
+      async inspectDisplaySnapshot(_receivedTuple, request) {
+        rolloverCalls.push(['inspect', request.evaluationContext.asOfCivilDate]);
+        return rolledOver
+          ? Object.freeze({ version: 'skopeo-truth-engine/1', status: 'current', blockerCodes: Object.freeze([]) })
+          : Object.freeze({
+            version: 'skopeo-truth-engine/1', status: 'review-required',
+            blockerCodes: Object.freeze(['evaluation-context-mismatch'])
+          });
+      },
+      async recompute(_receivedTuple, request) {
+        rolloverCalls.push(['recompute', request.evaluationContext.asOfCivilDate]);
+        rolledOver = true;
+        return Object.freeze({ version: 'skopeo-truth-engine/1', status: 'published', blockerCodes: Object.freeze([]) });
+      }
+    })
+  });
+  const rolled = await rolloverHelper.ensure(exactTuple, { evaluationContext: nextDay });
+  assert.strictEqual(rolled && rolled.status, 'current',
+    'the first read after a date rollover recomputes and renders');
+  assert.deepStrictEqual(rolloverCalls, [
+    ['inspect', '2026-07-25'], ['recompute', '2026-07-25'], ['inspect', '2026-07-25']
+  ], 'the recompute runs once, with the caller\'s new-day context');
+  assert.strictEqual(rolloverHelper.inflight.size, 0);
+
+  const mixedControllers = new Map();
+  installEntry(mixedControllers, exactTuple);
+  let mixedRecompute = 0;
+  const mixedHelper = loadTruthHelper(backgroundSource, {
+    controllers: mixedControllers,
+    global: Object.freeze({ FsbSkopeoTruthSchema: TruthSchema }),
+    facade: Object.freeze({
+      async inspectDisplaySnapshot() {
+        return Object.freeze({
+          version: 'skopeo-truth-engine/1', status: 'review-required',
+          blockerCodes: Object.freeze(['evaluation-context-mismatch', 'source-inaccessible'])
+        });
+      },
+      async recompute() { mixedRecompute += 1; throw new Error('must not run'); }
+    })
+  });
+  const mixed = await mixedHelper.ensure(exactTuple, { evaluationContext: nextDay });
+  assert.deepStrictEqual(mixed.blockerCodes, ['evaluation-context-mismatch', 'source-inaccessible']);
+  assert.strictEqual(mixedRecompute, 0,
+    'a rollover next to an inaccessible source still never starts provider work');
+
   const distinctControllers = new Map();
   installEntry(distinctControllers, exactTuple);
   let distinctRecomputes = 0;

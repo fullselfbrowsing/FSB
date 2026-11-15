@@ -3926,8 +3926,11 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
       }
       const blockers = result && result.status === 'review-required' &&
         Array.isArray(result.blockerCodes) ? result.blockerCodes : [];
+      // A context mismatch is a stored proof bound to an earlier civil date;
+      // recompute runs with the caller's context and validates it first.
       const recomputable = blockers.length === 1 &&
-        (blockers[0] === 'fact-missing' || blockers[0] === 'snapshot-stale');
+        (blockers[0] === 'fact-missing' || blockers[0] === 'snapshot-stale' ||
+          blockers[0] === 'evaluation-context-mismatch');
       if (!recomputable) return result || hudTruthBlocked('snapshot-stale');
 
       const currentContext = schema.parseEvaluationContext(request.evaluationContext);
