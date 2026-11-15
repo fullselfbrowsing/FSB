@@ -6,8 +6,19 @@ import { SupportPageComponent } from './support-page.component';
 describe('Support FAQ layout', () => {
   let fixture: ComponentFixture<SupportPageComponent>;
   let host: HTMLElement;
+  let flatten: HTMLStyleElement;
 
   beforeEach(async () => {
+    // These cases measure the accordion against the host's width. The page's depth
+    // planes are fixed to the window and scaled to fit, which would decouple both,
+    // so lay the planes out in normal flow here.
+    flatten = document.createElement('style');
+    flatten.textContent = `
+      .fsb-depth, .fsb-depth-layer { position: static !important; visibility: visible !important; }
+      .fsb-depth-fit { transform: none !important; }
+    `;
+    document.head.appendChild(flatten);
+
     await TestBed.configureTestingModule({
       imports: [SupportPageComponent],
       providers: [provideRouter([])],
@@ -25,7 +36,10 @@ describe('Support FAQ layout', () => {
     });
   });
 
-  afterEach(() => fixture.destroy());
+  afterEach(() => {
+    fixture.destroy();
+    flatten.remove();
+  });
 
   function answer(id: string): HTMLElement {
     return host.querySelector<HTMLElement>(`#faq-${id}`)!;
@@ -59,6 +73,14 @@ describe('Support FAQ layout', () => {
     });
     return bounds.height;
   }
+
+  it('marks every answer as content that opens on demand', () => {
+    // The depth engine fits a plane without it, so opening an answer never shrinks
+    // the plane; it scrolls inside itself instead while the answer does not fit.
+    const answers = Array.from(host.querySelectorAll('.faq-answer'));
+    expect(answers.length).toBe(15);
+    expect(answers.every(a => a.hasAttribute('data-depth-grows'))).toBeTrue();
+  });
 
   it('collapses every answer completely and makes its contents inert', () => {
     host.querySelectorAll<HTMLElement>('.faq-answer').forEach(element => {
@@ -102,22 +124,26 @@ describe('Support FAQ layout', () => {
     expect(expectFullyVisible('mcp')).toBeLessThan(longerHeight);
   });
 
-  it('keeps multiple answers independently expanded', () => {
+  it('keeps one answer open at a time', () => {
     toggle('install');
     toggle('mcp');
-    expectFullyVisible('install');
     expectFullyVisible('mcp');
-    expect(question('install').getAttribute('aria-expanded')).toBe('true');
     expect(question('mcp').getAttribute('aria-expanded')).toBe('true');
-    expect(answer('install').inert).toBeFalse();
     expect(answer('mcp').inert).toBeFalse();
-
-    toggle('install');
     expect(answer('install').getBoundingClientRect().height).toBe(0);
+    expect(question('install').getAttribute('aria-expanded')).toBe('false');
     expect(answer('install').inert).toBeTrue();
-    expect(question('mcp').getAttribute('aria-expanded')).toBe('true');
-    expect(answer('mcp').inert).toBeFalse();
-    expectFullyVisible('mcp');
+
+    // The questions are split across two planes; one open answer covers both.
+    toggle('remote');
+    expectFullyVisible('remote');
+    expect(answer('mcp').getBoundingClientRect().height).toBe(0);
+    expect(answer('mcp').inert).toBeTrue();
+
+    toggle('remote');
+    expect(answer('remote').getBoundingClientRect().height).toBe(0);
+    expect(host.querySelectorAll('.faq-item.active').length).toBe(0);
+    expect(host.querySelectorAll('.faq-question[aria-expanded="true"]').length).toBe(0);
   });
 
   it('allows focus on a resource link only while its answer is expanded', () => {

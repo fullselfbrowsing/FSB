@@ -292,7 +292,7 @@ check('has exactly one id="jev-fast-mode" anchor',
   (html.match(/id="jev-fast-mode"/g) || []).length === 1,
   'the fast-mode section anchor is missing or repeated');
 check('the fast-mode heading is an h2 with @@privacy.section.jevFastMode.title',
-  /<h2 id="jev-fast-mode" i18n="@@privacy\.section\.jevFastMode\.title">/.test(html),
+  /<h2 (?:data-depth-anchor="\d+" )?id="jev-fast-mode" i18n="@@privacy\.section\.jevFastMode\.title">/.test(html),
   'the jev-fast-mode h2 must carry the title unit');
 check('the fast-mode section comes right after External Services',
   html.indexOf('@@privacy.section.external.title') >= 0 &&
@@ -406,6 +406,25 @@ const forbiddenOnCard = FACTS.FORBIDDEN_PATTERNS.filter((re) => re.test(cardText
 check('the control_panel.html card matches no FORBIDDEN_PATTERNS entry',
   cardText.length > 0 && forbiddenOnCard.length === 0,
   `matched: ${forbiddenOnCard.map(String).join(' | ')}`);
+
+// The date under the heading and the dateModified the page's structured data reports
+// are written in two places; a policy change that updates one must update the other.
+{
+  const componentTs = fs.readFileSync(
+    path.join(ROOT, 'showcase/angular/src/app/pages/privacy/privacy-page.component.ts'), 'utf8');
+  const visible = (html.match(/i18n="@@privacy\.header\.updated">Last updated: ([A-Z][a-z]+ \d{1,2}, \d{4})</) || [])[1];
+  const declared = (componentTs.match(/const PRIVACY_LAST_UPDATED = '(\d{4}-\d{2}-\d{2})';/) || [])[1];
+  check('visible "Last updated" date found', Boolean(visible), 'privacy.header.updated line not found');
+  check('PRIVACY_LAST_UPDATED constant found', Boolean(declared), 'constant missing from privacy-page.component.ts');
+  const parsed = visible ? new Date(`${visible} UTC`) : null;
+  const iso = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : null;
+  check('structured-data dateModified matches the visible "Last updated" date',
+    Boolean(iso) && iso === declared,
+    `page shows ${visible} (${iso}), PRIVACY_LAST_UPDATED is ${declared}`);
+  check('privacy page emits page-level structured data',
+    componentTs.includes("this.pageJsonLd.set('privacy-page'") && componentTs.includes('dateModified: PRIVACY_LAST_UPDATED'),
+    'WebPage JSON-LD with dateModified missing');
+}
 
 console.log(`\n=== showcase-privacy-page.test results: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

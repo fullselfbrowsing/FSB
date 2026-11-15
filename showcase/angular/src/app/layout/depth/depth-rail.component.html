@@ -1,0 +1,8 @@
+<nav class="fsb-depth-rail" [attr.aria-label]="label">
+  @for (item of items; track $index) {
+    <button class="fsb-depth-go" type="button" [attr.data-depth-go]="item.layer" [attr.data-depth-sec]="item.sec ?? null" [attr.aria-label]="goTo(item.label)">
+      <span class="fsb-depth-lbl">{{ item.label }}</span>
+      <span class="fsb-depth-tick" aria-hidden="true"></span>
+    </button>
+  }
+</nav>

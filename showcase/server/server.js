@@ -19,6 +19,7 @@ const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-
 const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-language');
 const { createLegacyHtmlRedirectHandler } = require('./src/middleware/legacy-html-redirects');
 const { createShowcaseRouteFallback } = require('./src/middleware/showcase-route-fallback');
+const { createStaticCachePolicy } = require('./src/middleware/static-cache-policy');
 const { createGlobalJsonParser } = require('./src/middleware/global-json-parser');
 const { loadJevConfig } = require('./src/jev/config');
 const createJevRouter = require('./src/routes/jev');
@@ -47,15 +48,16 @@ app.disable('x-powered-by');
 // CSP keeps 'unsafe-inline' for scripts/styles because the showcase ships
 // inline JSON-LD scripts (per page), an inline theme-bootstrap script in
 // index.html, and Angular's component-scoped <style> emissions. Nonces are
-// not viable without per-request server rendering. CDN allowlist covers
-// Font Awesome (cdnjs) + Phosphor (unpkg) icon CSS and the dashboard's
-// lazy-loaded html5-qrcode/lz-string from unpkg.
+// not viable without per-request server rendering. The only outside host left
+// is unpkg, for the dashboard's lazy-loaded html5-qrcode/lz-string scripts:
+// the icon fonts (Font Awesome, Phosphor) and the capability logos are served
+// from this origin, so styles, fonts and images need no CDN allowance.
 // NOTE: script-src-attr is intentionally NOT set to 'none' here. Angular 20
 // emits the lazy-CSS pattern `<link rel="stylesheet" media="print"
 // onload="this.media='all'">` for the global styles bundle; setting
 // script-src-attr to 'none' blocks that onload handler, leaving the bundle
-// stuck at media="print" so its @import for Font Awesome / Phosphor never
-// applies to screen rendering -- icons disappear. Without an explicit
+// stuck at media="print" so everything outside the inlined critical CSS never
+// applies to screen rendering. Without an explicit
 // script-src-attr, it falls back to script-src which permits 'unsafe-inline'.
 // connect-src is restricted to 'self'; same-origin endpoint
 // /api/public-stats/github/:endpoint_id serves cached GitHub stats so the
@@ -64,12 +66,10 @@ app.disable('x-powered-by');
 const SHOWCASE_CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://unpkg.com",
-  "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com",
-  "font-src 'self' data: https://cdnjs.cloudflare.com https://unpkg.com",
-  // cdn.simpleicons.org serves the brand/tech logos in the home capability
-  // marquee (home-page.component simpleIcon()); i.ytimg.com is the /about
-  // YouTube thumbnails. Without simpleicons here every catalog logo is blocked.
-  "img-src 'self' data: blob: https://i.ytimg.com https://cdn.simpleicons.org",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  // i.ytimg.com is the /about YouTube thumbnails.
+  "img-src 'self' data: blob: https://i.ytimg.com",
   "media-src 'self' blob:",
   // raw.githubusercontent.com serves the Natural Earth land GeoJSON the stats
   // globe fetches once per session (globe-visualization.service); without it the
@@ -191,6 +191,10 @@ app.use(createAcceptLanguageMiddleware({
 }));
 
 if (staticPath) {
+  const staticCacheControlFor = createStaticCachePolicy({
+    staticRoot: staticPath,
+    localeSubpaths: LOCALES.filter(l => l !== SOURCE_LOCALE).map(l => LOCALE_SUBPATHS[l]).filter(Boolean),
+  });
   app.use(express.static(staticPath, {
     maxAge: 0,
     etag: true,
@@ -198,18 +202,11 @@ if (staticPath) {
     // does NOT 301 to /about/ before our custom middleware can serve about/index.html.
     // The custom middleware below handles marketing routes explicitly via path.join.
     redirect: false,
+    // Content-hashed bundles are kept forever, pages and fixed-name scripts are
+    // checked on every load, crawler files for an hour: see static-cache-policy.js.
     setHeaders: function(res, filePath) {
-      // Phase 216 SRV-03 / D-11: crawler files cache for 1 hour at the edge.
-      // The .txt/.xml branch must come first and short-circuit so a future stray
-      // filename (e.g. foo.html.txt) does not double-fire and pick up the no-cache header.
-      if (filePath.endsWith('.txt') || filePath.endsWith('.xml')) {
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        return;
-      }
-      // Existing policy: prevent stale JS/CSS/HTML -- dashboard updates must take effect immediately.
-      if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-      }
+      const cacheControl = staticCacheControlFor(filePath);
+      if (cacheControl) res.setHeader('Cache-Control', cacheControl);
     }
   }));
 }
@@ -291,6 +288,9 @@ app.use((req, res) => {
   const copyLocale = NOT_FOUND_COPY[locale] ? locale : SOURCE_LOCALE;
   const copy = NOT_FOUND_COPY[copyLocale];
   const homeHref = LOCALE_SUBPATHS[locale] ? `/${LOCALE_SUBPATHS[locale]}` : '/';
+  // A bundle requested by a tab left open across a deploy lands here; the miss
+  // must not be remembered under a name that is otherwise kept forever.
+  res.setHeader('Cache-Control', 'no-store');
   res.status(404).type('html').send(
     `<!doctype html><html lang="${escapeHtml(copyLocale)}"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width,initial-scale=1">` +

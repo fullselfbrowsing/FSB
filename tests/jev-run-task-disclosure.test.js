@@ -168,7 +168,7 @@ function noPanelOnlyLimit() {
   section('no panel-only limit (D-23)');
   check(CARD_BLOCK.startsWith('<div class="settings-card" id="fsbJevFastModeCard">') && CARD_TEXT.length > 0,
     'no panel-only limit: the card block is found (id="fsbJevFastModeCard" .. <!-- /fsbJevFastModeCard -->)');
-  check(/^<h2 id="jev-fast-mode"/.test(PRIVACY_SECTION) && PRIVACY_TEXT.length > 0,
+  check(/^<h2 (?:data-depth-anchor="\d+" )?id="jev-fast-mode"/.test(PRIVACY_SECTION) && PRIVACY_TEXT.length > 0,
     'no panel-only limit: the privacy fast-mode section is found (h2 id="jev-fast-mode" up to the next h2)');
   for (const [label, text] of [['card', CARD_TEXT], ['privacy', PRIVACY_TEXT]]) {
     const sentences = sentencesOf(text);

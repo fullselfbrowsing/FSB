@@ -61,6 +61,8 @@ for (const locale of locales) {
   const iframe = html.match(/<iframe\b[^>]*>/)?.[0] || '';
   assert.ok(iframe.includes(`src="${video.embedUrl}"`), `${locale}: player present in initial HTML`);
   assert.ok(iframe.includes('loading="eager"'), `${locale}: no interaction required to load player`);
+  const fragment = video['@id'].split('#')[1];
+  assert.ok(html.includes(` id="${fragment}"`), `${locale}: the video's #${fragment} fragment is an element on the page`);
   assert.equal(text(html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/)[1]), video.name);
   const copy = html.match(/class="video-demo-copy"[^>]*>([\s\S]*?)<\/div>/)[1];
   assert.equal(text(copy.match(/<p[^>]*>([\s\S]*?)<\/p>/)[1]), video.description);

@@ -6,7 +6,6 @@ import {
   OnDestroy,
   OnInit,
   Renderer2,
-  ViewChild,
   inject,
   DOCUMENT,
   LOCALE_ID,
@@ -15,6 +14,9 @@ import { RouterLink } from '@angular/router';
 import { Title, Meta } from '@angular/platform-browser';
 
 import { PixelLoaderComponent } from '../../components/pixel-loader/pixel-loader.component';
+import { DepthEndComponent } from '../../layout/depth/depth-end.component';
+import { DepthRailComponent, type DepthRailItem } from '../../layout/depth/depth-rail.component';
+import { DepthStageDirective } from '../../layout/depth/depth-stage.directive';
 import { CAPABILITY_ROW_1, CAPABILITY_ROW_2, type CapabilityApp } from '../../core/capabilities/capability-apps';
 import { APP_VERSION } from '../../core/seo/version';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
@@ -47,13 +49,12 @@ const ROTATE_MS = 1800;
 @Component({
   selector: 'app-home-page',
   standalone: true,
-  imports: [RouterLink, PixelLoaderComponent],
+  imports: [RouterLink, PixelLoaderComponent, DepthStageDirective, DepthRailComponent, DepthEndComponent],
   templateUrl: './home-page.component.html',
   styleUrl: './home-page.component.scss',
 })
 export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('scrollCue') private scrollCue?: ElementRef<HTMLElement>;
-
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly pageJsonLd = inject(PageJsonLdService);
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
@@ -62,13 +63,12 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly localeId = inject(LOCALE_ID);
   private readonly themeService = inject(ThemeService);
 
-  private rollTimer?: ReturnType<typeof setInterval>;
+  private rollTimer?: number;
   private hoverTimer?: ReturnType<typeof setTimeout>;
   private fanCloseTimer?: ReturnType<typeof setTimeout>;
   private copiedTimer?: ReturnType<typeof setTimeout>;
   private rafId?: number;
-  private removeScrollListener?: () => void;
-  private engTimer?: ReturnType<typeof setInterval>;
+  private engTimer?: number;
   private engSwapTimer?: ReturnType<typeof setTimeout>;
   private engHover = false;
   private engReducedMotion = false;
@@ -138,20 +138,14 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.themeService.isDark() ? 'dark' : 'light';
   }
 
-  get fanItemsUp(): FanClient[] {
-    const half = Math.ceil(this.allClients.length / 2);
-    return this.buildFanItems(this.allClients.slice(0, half), -1);
-  }
-
-  get fanItemsDown(): FanClient[] {
-    const half = Math.ceil(this.allClients.length / 2);
-    return this.buildFanItems(this.allClients.slice(half), 1);
+  get fanItems(): FanClient[] {
+    return this.buildFanItems(this.allClients);
   }
 
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
     const t = $localize`:@@home.meta.title:Full Self-Browsing | 92.3% on Online-Mind2Web | AI Browser Automation & MCP`;
-    const d = $localize`:@@home.meta.description:FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.`;
+    const d = $localize`:@@home.meta.description:FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Open-source Chrome automation that reads the actual DOM instead of relying on vision, calls APIs when it can, and connects AI agents through MCP.`;
     this.applyMeta(t, d, url);
     this.injectSoftwareApplicationJsonLd();
     if (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string') {
@@ -161,9 +155,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     if (typeof window === 'undefined') return;
-    this.rollTimer = setInterval(() => this.advance(), ROTATE_MS);
-    this.removeScrollListener = this.renderer.listen('window', 'scroll', () => this.updateScrollCue());
-    this.updateScrollCue();
+    this.rollTimer = setZoneFreeInterval(() => this.advance(), ROTATE_MS);
     // Read once, not subscribed: under reduced motion the engine panel never auto-rotates.
     this.engReducedMotion =
       typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -181,7 +173,6 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.rafId !== undefined && typeof window !== 'undefined') {
       window.cancelAnimationFrame(this.rafId);
     }
-    this.removeScrollListener?.();
   }
 
   logoMask(logo: string): string {
@@ -201,6 +192,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.hoverTimer) clearTimeout(this.hoverTimer);
     if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
     this.hoverTimer = setTimeout(() => {
+      this.fitFan();
       this.fanOpen = true;
     }, 500);
   }
@@ -216,6 +208,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onCopyClick(): void {
     if (this.coarsePointer) {
+      if (!this.fanOpen) this.fitFan();
       this.fanOpen = !this.fanOpen;
       return;
     }
@@ -317,7 +310,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       subjectOf: { '@id': `${HOST}/#online-mind2web` },
       featureList: [
         $localize`:@@home.schema.feature.benchmark:Online-Mind2Web: AI-reviewed result (277/300), 92.3%`,
-        $localize`:@@home.schema.feature.mcp:MCP server for Claude Code, Codex, Cursor, Antigravity, and OpenClaw`,
+        $localize`:@@home.schema.feature.mcp:MCP server with 70 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes`,
         $localize`:@@home.schema.feature.browser:Real browser automation through a local Chrome extension`,
         $localize`:@@home.schema.feature.triggers:Trigger watchers for reactive DOM monitoring`,
         $localize`:@@home.schema.feature.capabilities:Native first-party API capability catalog with guarded invoke_capability calls`,
@@ -352,6 +345,15 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
         unitText: 'percent',
       },
     };
+    // Tells search engines what to call the site; the home page is where it is declared.
+    const site = {
+      '@type': 'WebSite',
+      '@id': `${HOST}/#site`,
+      url: HOST,
+      name: 'FSB',
+      alternateName: ['Full Self-Browsing', 'Full Self Browsing'],
+      publisher: { '@id': `${HOST}/#org` },
+    };
     this.pageJsonLd.set('software-application', {
       '@context': 'https://schema.org',
       '@graph': [
@@ -362,9 +364,11 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
           inLanguage: this.localeId,
           name: this.title.getTitle(),
           description: this.meta.getTag('name="description"')?.content,
+          isPartOf: { '@id': site['@id'] },
           mainEntity: { '@id': software['@id'] },
           publisher: { '@id': `${HOST}/#org` },
         },
+        site,
         software,
         benchmark,
       ],
@@ -372,7 +376,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private advance(): void {
-    if (this.paused || this.fanOpen || this.morphing) return;
+    if (this.activePlane !== INSTALL_PLANE || this.paused || this.fanOpen || this.morphing) return;
     const next = (this.iconIndex + 1) % this.rollClients.length;
     this.scramble(next);
   }
@@ -440,8 +444,8 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private startEngCycle(): void {
     if (this.engTimer) clearInterval(this.engTimer);
-    this.engTimer = setInterval(() => {
-      if (this.engHover || this.engKeyFocus || this.doc.hidden) return;
+    this.engTimer = setZoneFreeInterval(() => {
+      if (this.activePlane !== ENGINE_PLANE || this.engHover || this.engKeyFocus || this.doc.hidden) return;
       this.engGo(nextEngMode(this.engMode));
     }, ENG_CYCLE_MS);
   }
@@ -469,25 +473,43 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     }, ENG_SWAP_MS);
   }
 
-  private updateScrollCue(): void {
-    if (typeof window === 'undefined') return;
-    const el = this.scrollCue?.nativeElement;
-    if (!el) return;
-    const fade = Math.min(1, window.scrollY / 320);
-    el.style.opacity = String(1 - fade);
-    el.style.pointerEvents = fade > 0.9 ? 'none' : 'auto';
+  /* The fan opens upward from the copy button. On a short window it shrinks
+     until it fits between the bar and the nav, never below 55%. The plane may
+     itself be scaled to fit, which the bounding box includes and offsetHeight
+     does not, so both sides are measured in screen pixels. */
+  private fitFan(): void {
+    const root = this.host.nativeElement;
+    const fan = root.querySelector<HTMLElement>('.install-fan-up');
+    const wrap = root.querySelector<HTMLElement>('.install-copy-wrap');
+    if (!fan || !wrap || !wrap.offsetHeight) return;
+    const nav = this.doc.querySelector('nav.nav');
+    const wr = wrap.getBoundingClientRect();
+    const s = wr.height / wrap.offsetHeight || 1;
+    const top = (nav ? nav.getBoundingClientRect().bottom : 0) + 10;
+    const avail = wr.top - 14 * s - top;
+    const need = fan.offsetHeight * s;
+    const k = need > avail && need > 0 ? Math.max(0.55, avail / need) : 1;
+    if (k < 0.999) fan.style.scale = k.toFixed(3);
+    else fan.style.removeProperty('scale');
   }
 
-  private buildFanItems(clients: readonly InstallClient[], direction: number): FanClient[] {
+  private buildFanItems(clients: readonly InstallClient[]): FanClient[] {
     return clients.map((client, index) => {
       const t = clients.length > 1 ? index / (clients.length - 1) : 0;
-      return {
-        ...client,
-        flagLabel: client.flag || this.manualFlagLabel,
-        dx: -Math.round((1 - Math.cos(t * (Math.PI * 0.42))) * 60),
-        rot: Number((direction * t * 6).toFixed(1)),
-      };
+      const [dx, rot] = fanOffset(t);
+      return { ...client, flagLabel: client.flag || this.manualFlagLabel, dx, rot };
     });
+  }
+
+  /* Depth page wiring. The install bar rolls through clients and the engine panel
+     cycles only while their plane is the one in view. */
+  readonly tiltSelector = TILT_SELECTOR;
+  readonly rail: readonly DepthRailItem[] = HOME_RAIL_LABELS.map((label, layer) => ({ label, layer }));
+  readonly railLabel = HOME_RAIL_ARIA;
+  activePlane = 0;
+
+  onDepthActive(index: number): void {
+    this.activePlane = index;
   }
 }
 
@@ -633,3 +655,39 @@ export function buildLeaderboardTicks(localeId: string): LeaderboardTick[] {
   const percent = new Intl.NumberFormat(localeId, { style: 'percent', maximumFractionDigits: 0 });
   return LEADERBOARD_TICKS.map((at) => ({ at, label: percent.format(at / 100) }));
 }
+
+/* Depth page: the planes of this page in order, the buttons that lean toward the
+   pointer, and the planes whose animations run only while in view. */
+const INSTALL_PLANE = 3;
+const ENGINE_PLANE = 5;
+const TILT_SELECTOR = '.btn, .install-copy, .install-fan-item, .eng-tab';
+const HOME_RAIL_ARIA = $localize`:@@home.depth.rail.aria:FSB home sections`;
+const HOME_RAIL_LABELS: readonly string[] = [
+  $localize`:@@depth.rail.intro:Intro`,
+  $localize`:@@home.depth.rail.benchmark:Benchmark`,
+  $localize`:@@home.depth.rail.withoutVision:Without vision`,
+  $localize`:@@home.depth.rail.worksWithAll:Works with all`,
+  $localize`:@@home.depth.rail.nativeApis:Native APIs`,
+  $localize`:@@home.depth.rail.oneEngine:One engine`,
+  $localize`:@@home.depth.rail.openSource:Open source`,
+  $localize`:@@depth.rail.index:Index`,
+];
+
+/* The install fan's curve: [dx px, rotation deg] at evenly spaced points from the
+   entry next to the button (t = 0) to the farthest one (t = 1). Entries in
+   between are interpolated, so the arc keeps its shape for any client count. */
+const FAN_CURVE: readonly (readonly [number, number])[] = [
+  [0, 0], [-3, -1.5], [-13, -3], [-27, -4.5], [-45, -6], [-72, -7.6], [-108, -9.4], [-153, -11.3], [-214, -13.5],
+];
+
+export function fanOffset(t: number): [number, number] {
+  const x = Math.min(1, Math.max(0, t)) * (FAN_CURVE.length - 1);
+  const i = Math.min(FAN_CURVE.length - 2, Math.floor(x));
+  const f = x - i;
+  const [dx0, r0] = FAN_CURVE[i];
+  const [dx1, r1] = FAN_CURVE[i + 1];
+  return [Math.round(dx0 + (dx1 - dx0) * f), Number((r0 + (r1 - r0) * f).toFixed(1))];
+}
+
+// Imported here, below every $localize call, so the line numbers messages.xlf pins do not move.
+import { setZoneFreeInterval } from '../../core/zone/zone-free-interval';

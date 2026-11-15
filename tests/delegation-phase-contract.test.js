@@ -207,6 +207,11 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node scripts/verify-extension-copy.mjs',
   'node tests/benchmark-assets-parity.test.js',
   'node tests/skopeo-hud-locale-coverage.test.js',
+  'node tests/showcase-static-cache-policy.test.js',
+  'node tests/showcase-capability-logos.test.js',
+  'node tests/about-knowledge-categories-parity.test.js',
+  'node tests/showcase-depth-ghost-parity.test.js',
+  'node tests/icon-fonts-parity.test.js',
 ]);
 
 const SKOPEO_ROOT_TEST_COMMANDS = Object.freeze([

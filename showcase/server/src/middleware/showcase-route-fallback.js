@@ -3,6 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// Pages name the bundles to load, so a page is checked against the server on
+// every visit; the bundles themselves are what gets kept (static-cache-policy.js).
+const PAGE_CACHE_CONTROL = 'no-cache, must-revalidate';
+
 function splitLocaleFromPath(reqPath, localeSubpaths) {
   for (const sub of localeSubpaths) {
     if (reqPath === '/' + sub) {
@@ -64,7 +68,8 @@ function createShowcaseRouteFallback(options) {
       const routeDir = canonicalRoute === '/' ? '' : canonicalRoute;
       const candidate = path.join(staticPath, split.localeSubPath, routeDir, 'index.html');
       if (fs.existsSync(candidate)) {
-        res.sendFile(candidate);
+        res.setHeader('Cache-Control', PAGE_CACHE_CONTROL);
+        res.sendFile(candidate, { cacheControl: false });
         return;
       }
       next();
@@ -79,7 +84,8 @@ function createShowcaseRouteFallback(options) {
     if (noIndexClientRoutes.has(canonicalRoute)) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     }
-    res.sendFile(shellCandidate);
+    res.setHeader('Cache-Control', PAGE_CACHE_CONTROL);
+    res.sendFile(shellCandidate, { cacheControl: false });
   };
 }
 
