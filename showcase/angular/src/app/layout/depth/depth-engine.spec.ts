@@ -146,6 +146,65 @@ describe('createDepthEngine', () => {
       expect(fitOf(1).style.width).toBe('');
       expect(scaleOf(1)).toBeLessThan(0.75);
     });
+
+    // Resolves once the browser has drawn `n` more frames, so what is read is what
+    // was on screen.
+    const frames = (n: number): Promise<void> =>
+      new Promise((resolve) => {
+        const step = (k: number): void => {
+          if (k <= 0) resolve();
+          else requestAnimationFrame(() => setTimeout(() => step(k - 1)));
+        };
+        step(n);
+      });
+
+    it('lays a plane out again as soon as its content grows', async () => {
+      build([120, { html: `<div class="more">${prose(0.8)}</div>` }, 120], PHONE);
+      const fit = fitOf(1);
+      expect(fit.style.width).toBe('');
+      root.querySelector('.more')!.insertAdjacentHTML('beforeend', prose(1.6));
+      await frames(4);
+      const scale = scaleOf(1);
+      expect(parseFloat(fit.style.width)).toBeGreaterThan(110);
+      expect(fit.offsetWidth * scale).toBeCloseTo(PHONE, -1);
+      expect(fit.offsetHeight * scale).toBeLessThanOrEqual(room() + 1);
+    });
+
+    it('keeps a plane fitted on every frame while its content opens, and leaves it there', async () => {
+      // The way a support answer opens: a grid row eased from nothing to its content.
+      const opens =
+        '<div class="opens" style="display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s linear">' +
+        `<div style="min-height:0;overflow:hidden">${prose(1.5)}</div></div>`;
+      build([120, { html: prose(0.6) + opens }, 120], PHONE);
+      // By now the plane's own scale would be eased.
+      await new Promise((r) => setTimeout(r, 700));
+      const fit = fitOf(1);
+      const drawn = (): number => {
+        const m = getComputedStyle(fit).transform;
+        return m === 'none' ? 1 : new DOMMatrix(m).a;
+      };
+      root.querySelector<HTMLElement>('.opens')!.style.gridTemplateRows = '1fr';
+      let tallest = 0;
+      let narrowest = Infinity;
+      const start = performance.now();
+      // From the third frame on: the first ones show the row barely started.
+      for (let n = 1; performance.now() - start < 450; n++) {
+        await frames(1);
+        if (n < 3) continue;
+        const s = drawn();
+        tallest = Math.max(tallest, fit.offsetHeight * s);
+        narrowest = Math.min(narrowest, fit.offsetWidth * s);
+      }
+      expect(tallest).toBeLessThanOrEqual(room() + 2);
+      // A plane this close to fitting keeps its own width (WIDEN_BELOW in the engine).
+      expect(narrowest).toBeGreaterThan(PHONE * 0.97 - 1);
+      expect(parseFloat(fit.style.width)).toBeGreaterThan(110);
+      const width = fit.style.width;
+      const transform = fit.style.transform;
+      await new Promise((r) => setTimeout(r, 300));
+      expect(fit.style.width).toBe(width);
+      expect(fit.style.transform).toBe(transform);
+    });
   });
 
   describe('a row that scrolls sideways', () => {

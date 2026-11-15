@@ -47,6 +47,9 @@ interface DepthLayer extends HTMLElement {
   _w?: number;
   /** The window and height the width was last worked out for. */
   _key?: string;
+  /** Frames the content has held still since it began changing height; unset while
+      the plane is not being followed. */
+  _still?: number;
 }
 
 interface DepthItem {
@@ -481,6 +484,32 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       if (alive) widen();
     }, delay);
   }
+  // A narrow plane whose content is changing height (an answer opening) is laid out
+  // again on every frame until it holds still, and its scale is set, not eased. It
+  // stays fitted at the window's width throughout, and the content's own transition
+  // is the only motion. Eased toward each new height and widened only once the
+  // content had stopped, it trailed its content out of the room, then jumped.
+  function follow(L: DepthLayer): void {
+    (L.firstElementChild as HTMLElement).style.transition = 'none';
+    L._still = 0;
+    kick();
+  }
+  // One frame of following; true while the plane still needs another.
+  function refit(L: DepthLayer): boolean {
+    const fit = L.firstElementChild as HTMLElement;
+    const W = stage!.clientWidth;
+    const H = stage!.clientHeight;
+    if (W <= NARROW_MAX_WIDTH && !L._auto && sized === W + 'x' + H) {
+      fit.style.transition = 'none';
+      const key = L._key;
+      solve(L, fit, H - navHeight() - 84 - 24, W);
+      L._still = L._key === key ? (L._still || 0) + 1 : 0;
+      if (L._still < 2) return true;
+    }
+    L._still = undefined;
+    fit.style.transition = eased ? FIT_EASE : '';
+    return false;
+  }
 
   function layout(): void {
     const H = stage!.clientHeight;
@@ -502,7 +531,12 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
         const h = fit.offsetHeight;
         const widens = narrow && !L._auto && !L.hasAttribute('data-depth-rigid');
         const settled = widens ? L._key === W + '|' + room + '|' + h : !L._w;
-        if (!settled) stale = true;
+        // In a window the widths were worked out for, the plane's own content has
+        // changed height: it is followed.
+        if (!settled) {
+          if (widens && sized === W + 'x' + H) follow(L);
+          else stale = true;
+        }
         // A widened plane is exactly as wide as the window once scaled by 1 / _w.
         s = h > 0 ? Math.min(1, room / h, 1 / (L._w || 1)) : 1;
         // A plane whose width is still to be worked out may yet fit: it is asked first.
@@ -524,8 +558,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       if (fit.style.transform !== tf) fit.style.transform = tf;
       L._s = s;
     }
-    // A turned or resized window is refitted at once; a plane whose content is
-    // still changing height (an answer opening) waits until it has stopped.
+    // A turned or resized window is refitted at once. A plane that went to scrolling
+    // inside itself gets its own width back once its content has stopped moving.
     if (stale) askWiden(sized === W + 'x' + H ? 120 : 0);
     if (changed) collect();
     const sr = stage!.getBoundingClientRect();
@@ -550,7 +584,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       laidOut = true;
       timers.push(win.setTimeout(() => {
         eased = true;
-        for (const L of layers) (L.firstElementChild as HTMLElement).style.transition = FIT_EASE;
+        for (const L of layers) if (L._still === undefined) (L.firstElementChild as HTMLElement).style.transition = FIT_EASE;
       }, 600));
     }
   }
@@ -642,6 +676,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const dt = clamp(t - lastT, 0, 64) || 16.67;
     lastT = t;
     let moving = false;
+    for (const L of layers) if (L._still !== undefined && refit(L)) moving = true;
     const a0 = 1 - Math.pow(1 - BASE, dt / 16.67);
     p += (target - p) * a0;
     if (Math.abs(target - p) < 0.0005) p = target;
