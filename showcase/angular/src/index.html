@@ -43,6 +43,8 @@
       .fsb-depth { position: static !important; overflow: visible !important; }
       .fsb-depth-layer { position: relative !important; inset: auto !important; min-height: 100vh; visibility: visible !important; pointer-events: auto !important; }
       .fsb-depth-layer[data-scroll] { overflow: visible !important; -webkit-mask-image: none; mask-image: none; }
+      .fsb-depth-layer[data-depth-ghost] { filter: none !important; opacity: 1 !important; transform: none !important; }
+      .fsb-depth-layer[data-depth-ghost] > .fsb-depth-fit { opacity: 1 !important; }
       .fsb-depth-rail, .fsb-depth-ambient { display: none !important; }
     </style>
   </noscript>

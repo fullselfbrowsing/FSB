@@ -518,6 +518,13 @@
   color: var(--text-secondary);
 }
 
+/* In light mode the engine dims every plane that is not the current one to 30%
+   (depth.scss), with a transition. The trailer plane is drawn before the engine starts
+   (data-depth-ghost), so it starts at that level instead of fading to it. */
+:host-context([data-theme="light"]) .fsb-depth:not([data-depth-live]) .fsb-depth-layer[data-depth-ghost] {
+  opacity: .3;
+}
+
 /* --- Light mode overrides --- */
 /* The theme attribute lives on <html>, outside this view; under emulated
    encapsulation only :host-context can match it. */

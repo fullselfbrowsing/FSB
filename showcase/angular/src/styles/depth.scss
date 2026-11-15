@@ -46,6 +46,31 @@ html:has(.fsb-depth) body {
   pointer-events: auto;
 }
 
+/* A second plane marked data-depth-ghost is drawn, before the engine starts, the way
+   the engine leaves the plane behind the current one at rest (apply() in
+   depth-engine.ts: 900px back under a 1200px perspective, 9% opacity, 12px blur).
+   Its content is then on screen from the first frame instead of appearing when the
+   scripts arrive, which matters when that content is the largest thing on the page.
+   The engine shows nothing there under reduced motion, so neither does this, and it
+   only fits a plane the engine neither widens nor scrolls.
+   tests/showcase-depth-ghost-parity.test.js holds these numbers to the engine's. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  .fsb-depth:not([data-depth-live]) .fsb-depth-layer[data-depth-ghost] {
+    filter: blur(12px);
+    pointer-events: none;
+    transform: scale(calc(1200 / 2100));
+    visibility: visible;
+  }
+
+  .fsb-depth:not([data-depth-live]) .fsb-depth-layer[data-depth-ghost] > .fsb-depth-fit {
+    opacity: .09;
+  }
+
+  .fsb-depth:not([data-depth-live]) .fsb-depth-layer[data-depth-ghost] [data-dfade] {
+    visibility: hidden;
+  }
+}
+
 .fsb-depth-layer[data-full] {
   padding-bottom: 0;
   padding-top: 0;
