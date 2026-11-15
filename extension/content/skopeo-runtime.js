@@ -827,14 +827,18 @@
       return output;
     }
 
+    // The HUD schema refuses a question that holds a link or runs past 2000
+    // UTF-16 units, and the composer declares the same limit. A question they
+    // refuse cannot render as "checking", so it gets the Ask box's own error
+    // here instead.
     function safeContractQuestion(value) {
       if (typeof value !== 'string') return false;
       const question = value.trim();
-      if (question !== value || question.length === 0 ||
-          /[\u0000-\u001f\u007f\u0080-\u009f\u202a-\u202e\u2066-\u2069<>]/.test(question)) {
+      if (question !== value || question.length === 0 || question.length > 2000 ||
+          /[\u0000-\u001f\u007f\u0080-\u009f\u202a-\u202e\u2066-\u2069<>]/.test(question) ||
+          /(?:https?|file|chrome):\/\//i.test(question)) {
         return false;
       }
-      let scalars = 0;
       for (let index = 0; index < question.length; index += 1) {
         const unit = question.charCodeAt(index);
         if (unit >= 0xd800 && unit <= 0xdbff) {
@@ -843,10 +847,8 @@
           if (next < 0xdc00 || next > 0xdfff) return false;
           index += 1;
         } else if (unit >= 0xdc00 && unit <= 0xdfff) return false;
-        scalars += 1;
-        if (scalars > 2000) return false;
       }
-      return scalars > 0;
+      return true;
     }
 
     // Visibility is kept out of the "still current" checks on purpose. Only a
@@ -1278,6 +1280,8 @@
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
       ) || !state.contractAskScope || !['editing', 'error'].includes(state.contractAskState)) return false;
       const question = typeof rawQuestion === 'string' ? rawQuestion.trim() : '';
+      const priorState = state.contractAskState;
+      const priorQuestion = state.contractAskQuestion;
       const requestEpoch = advanceContractAskEpoch();
       state.contractActionIds = Object.freeze([]);
       state.pendingContractActions.clear();
@@ -1294,7 +1298,17 @@
       if (!renderLocalContractAsk(
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, requestEpoch,
         'checking', question, null
-      )) return false;
+      )) {
+        // Nothing replaced the view the user typed into, and its callbacks
+        // still carry the earlier ask epoch. Put that state back so the box
+        // keeps working instead of refusing every later click.
+        if (state.contractAskEpoch === requestEpoch && state.contractAskState === 'checking') {
+          state.contractAskEpoch = askEpoch;
+          state.contractAskState = priorState;
+          state.contractAskQuestion = priorQuestion;
+        }
+        return false;
+      }
       const request = contractAskClaim(
         'skopeo:hud-ask', tuple, entityToken, projectionToken,
         { scopeToken: state.contractAskScope.scopeToken, question: question }

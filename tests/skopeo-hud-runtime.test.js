@@ -3059,6 +3059,78 @@ async function testContentRuntimeHiddenTabReplies() {
   }
 }
 
+// The runtime may admit only a question the composer and HUD schema will also
+// render. Otherwise its "checking" render fails after the ask epoch moved on,
+// and the Ask box on screen stops answering.
+async function testContentAskQuestionRules() {
+  function startAsk() {
+    let requestActionToken = null;
+    const harness = createContentRuntimeHarness({
+      hudResponses: [message => {
+        requestActionToken = message.actionToken;
+        return contentScopedProjection(message, 'reading');
+      }],
+      askResponder(message) {
+        return contentAnswerProjection(message, requestActionToken, 'rules');
+      }
+    });
+    return harness;
+  }
+
+  for (const [label, refusedQuestion] of [
+    ['a URL', 'Does the policy at https://example.com/terms apply?'],
+    // 1500 emoji are 1500 characters but 3000 UTF-16 units, over the 2000 limit.
+    ['an over-long question', '\u{1F600}'.repeat(1500)]
+  ]) {
+    const harness = startAsk();
+    const started = harness.start();
+    await flushContentRuntime();
+    const entry = started.shell.renderedContracts[0].askEntries[0];
+    assert.strictEqual(started.shell.contractCallbacks[0]({
+      kind: 'ask-entry', scopeToken: entry.scopeToken
+    }), true);
+    assert.strictEqual(await started.shell.askCallbacks[0]({
+      kind: 'ask-dispatch', question: refusedQuestion
+    }), true, `${label}: the refusal is shown`);
+    const refused = started.shell.renderedAsks.at(-1);
+    assert.strictEqual(refused.composer.state, 'error', `${label}: the Ask box shows an error`);
+    assert.strictEqual(refused.composer.error.state, 'invalid-question', `${label}: the existing error copy`);
+    assert.strictEqual(harness.askMessages().length, 0, `${label}: nothing is sent`);
+    assert.strictEqual(await started.shell.askCallbacks.at(-1)({
+      kind: 'ask-dispatch', question: 'When does this agreement renew?'
+    }), true, `${label}: a valid question afterwards is asked`);
+    assert.strictEqual(harness.askMessages().length, 1, `${label}: the valid question is sent`);
+    assert.strictEqual(started.shell.renderedAsks.at(-1).mode, 'answer', `${label}: and answered`);
+  }
+
+  // If the "checking" render still fails, the editing view stays on screen
+  // and has to keep working.
+  const harness = startAsk();
+  const started = harness.start();
+  await flushContentRuntime();
+  const entry = started.shell.renderedContracts[0].askEntries[0];
+  started.shell.contractCallbacks[0]({ kind: 'ask-entry', scopeToken: entry.scopeToken });
+  const render = started.shell.renderContractAsk;
+  let refuseChecking = true;
+  started.shell.renderContractAsk = function (model, onAction) {
+    if (refuseChecking && model.composer && model.composer.state === 'checking') {
+      refuseChecking = false;
+      return false;
+    }
+    return render.call(this, model, onAction);
+  };
+  const editingCallback = started.shell.askCallbacks[0];
+  assert.strictEqual(await editingCallback({
+    kind: 'ask-dispatch', question: 'When does this agreement renew?'
+  }), false, 'a refused render reports failure');
+  assert.strictEqual(harness.askMessages().length, 0, 'a refused render sends nothing');
+  assert.strictEqual(await editingCallback({
+    kind: 'ask-dispatch', question: 'When does this agreement renew?'
+  }), true, 'the editing view still on screen can ask again');
+  assert.strictEqual(harness.askMessages().length, 1);
+  assert.strictEqual(started.shell.renderedAsks.at(-1).mode, 'answer');
+}
+
 async function testContentAskConfirmationRouting() {
   let requestActionToken = null;
   let askRequest = null;
@@ -4026,6 +4098,7 @@ async function runHudRuntimeContract() {
     await testContentRuntimeDriveRootsAndAccountPaths();
     await testContentAskRuntimeLifecycle();
     await testContentRuntimeHiddenTabReplies();
+    await testContentAskQuestionRules();
     await testContentAskConfirmationRouting();
     await testContentAlertConfirmationRouting();
     await testSharedSurfaceCompletionOrders();
