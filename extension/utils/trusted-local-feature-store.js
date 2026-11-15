@@ -473,6 +473,105 @@
     return safe;
   }
 
+  var REPLAY_RUN_ATTEMPT_LIMIT = 200;
+  var REPLAY_RUN_POSITION_MAX_MS = 24 * 60 * 60 * 1000;
+
+  function optionalReplayText(maxChars) {
+    return function(value) {
+      return typeof value === 'string' && value ? redactText(value, maxChars) : null;
+    };
+  }
+
+  function optionalReplayNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  function optionalReplayHash(value) {
+    return typeof value === 'string' && REPLAY_STEP_HASH_PATTERN.test(value) ? value : null;
+  }
+
+  function replayRunPosition(value) {
+    return safeNumber(value, 0, 0, REPLAY_RUN_POSITION_MAX_MS);
+  }
+
+  function replayRunOrigin(value) {
+    return safeOrigin(value) || null;
+  }
+
+  // Copies only the fields a value was written with, each through its own
+  // bound, so a stored run keeps exactly the shape background wrote.
+  function copyPresentFields(value, rules) {
+    var copy = {};
+    Object.keys(rules).forEach(function(key) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) copy[key] = rules[key](value[key]);
+    });
+    return copy;
+  }
+
+  var REPLAY_RUN_ATTEMPT_FIELDS = {
+    stepId: optionalReplayText(128),
+    index: function(value) { return safeNumber(value, 0, 0, 99); },
+    tool: optionalReplayText(128),
+    attemptNumber: function(value) { return safeNumber(value, 1, 1, 1000); },
+    status: optionalReplayText(32),
+    success: function(value) { return value !== false; },
+    recordedResultHash: optionalReplayHash,
+    resultHash: optionalReplayHash,
+    match: function(value) { return typeof value === 'boolean' ? value : null; },
+    receipt: function(value) { return isPlainRecord(value) ? safeReplayValue(value, 0) : null; },
+    receiptCid: optionalReplayText(256),
+    completedAt: optionalReplayNumber
+  };
+
+  var REPLAY_RUN_PLAYBACK_FIELDS = {
+    speed: optionalReplayNumber,
+    paused: function(value) { return value === true; },
+    positionMs: replayRunPosition,
+    interpolationTargetMs: replayRunPosition
+  };
+
+  var REPLAY_RUN_TAB_FIELDS = {
+    logicalTab: optionalReplayText(128),
+    tabId: optionalReplayNumber,
+    expectedOrigin: replayRunOrigin
+  };
+
+  var REPLAY_RUN_FIELDS = {
+    id: optionalReplayText(128),
+    manifestHash: optionalReplayText(256),
+    sourceReceiptCid: optionalReplayText(256),
+    previousReceiptCid: optionalReplayText(256),
+    targetTabId: optionalReplayNumber,
+    startedAt: optionalReplayNumber,
+    finishedAt: optionalReplayNumber,
+    status: optionalReplayText(32),
+    nextStep: function(value) { return safeNumber(value, 0, 0, 100); },
+    error: optionalReplayText(512),
+    expectedOrigin: replayRunOrigin,
+    playback: function(value) {
+      return isPlainRecord(value) ? copyPresentFields(value, REPLAY_RUN_PLAYBACK_FIELDS) : null;
+    },
+    logicalTabs: function(value) {
+      return Array.isArray(value)
+        ? value.slice(0, 32).filter(isPlainRecord).map(function(tab) {
+          return copyPresentFields(tab, REPLAY_RUN_TAB_FIELDS);
+        })
+        : null;
+    },
+    steps: function(value) {
+      return (Array.isArray(value) ? value : []).slice(-REPLAY_RUN_ATTEMPT_LIMIT).filter(isPlainRecord)
+        .map(function(attempt) { return copyPresentFields(attempt, REPLAY_RUN_ATTEMPT_FIELDS); });
+    }
+  };
+
+  // A replay writes its run onto the recording when it pauses, fails or
+  // finishes. Background reads it back to offer the pending decision and to
+  // resume after a worker restart, so it has to survive later saves.
+  function safeReplayRun(value) {
+    if (!isPlainRecord(value) || typeof value.id !== 'string' || !value.id) return null;
+    return copyPresentFields(value, REPLAY_RUN_FIELDS);
+  }
+
   function safeReplayRecord(value, now) {
     if (!value || typeof value !== 'object' || Array.isArray(value) ||
         !value.manifest || typeof value.manifest !== 'object') return null;
@@ -491,7 +590,7 @@
           startUrlState: redactText(tab && tab.startUrlState || 'missing', 16)
         };
       });
-    return {
+    var record = {
       // Replay only trusts a record whose version is exactly
       // 'fsb-lattice-replay/v1', so the bound must not cut it.
       version: redactText(value.version || '1.0', 64),
@@ -526,6 +625,8 @@
       counts: safeReplayCounts(value.counts),
       error: value.error == null ? null : redactText(value.error, 512)
     };
+    if (Object.prototype.hasOwnProperty.call(value, 'lastRun')) record.lastRun = safeReplayRun(value.lastRun);
+    return record;
   }
 
   function safeSession(sessionId, session, now) {
@@ -584,6 +685,17 @@
     if (jevMeasurement !== undefined) safe.jevMeasurement = jevMeasurement;
     if (session.totalCostBasis === 'estimate' || session.totalCostBasis === 'unavailable') {
       safe.totalCostBasis = session.totalCostBasis;
+    }
+    // A long replay run's signed step receipts can outgrow the limit. Resume
+    // reads the run's progress and receipt ids but never the receipts, so the
+    // oldest receipts go before any log entry.
+    var runAttempts = safe.replay && safe.replay.lastRun && Array.isArray(safe.replay.lastRun.steps)
+      ? safe.replay.lastRun.steps : [];
+    var excessBytes = runAttempts.length ? byteLength(safe) - LIMITS.SESSION_RESPONSE_BYTES : 0;
+    for (var attempt = 0; attempt < runAttempts.length && excessBytes > 0; attempt++) {
+      if (!runAttempts[attempt].receipt) continue;
+      excessBytes -= byteLength(runAttempts[attempt].receipt) - byteLength(null);
+      runAttempts[attempt].receipt = null;
     }
     while (safe.logs.length && byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) safe.logs.shift();
     // Measurement goes next, oldest first, so a long fast-mode session still

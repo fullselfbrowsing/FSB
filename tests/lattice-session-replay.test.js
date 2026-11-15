@@ -185,6 +185,33 @@ async function withReplayRuntime(local, harness, work) {
   }
 }
 
+function backgroundFunctionSource(name) {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  let start = source.indexOf('async function ' + name + '(');
+  if (start === -1) start = source.indexOf('function ' + name + '(');
+  assert.notEqual(start, -1, 'missing background function ' + name);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  for (let i = open; i < source.length; i++) {
+    const char = source[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') depth++;
+    if (char === '}' && --depth === 0) return source.slice(start, i + 1);
+  }
+  throw new Error('unterminated background function ' + name);
+}
+
 function loadLoggerWithStore(store) {
   const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'utils', 'automation-logger.js'), 'utf8');
   const context = vm.createContext({
@@ -905,6 +932,180 @@ async function main() {
       capabilityHistory.values.fsbSessionLogs[capabilitySessionId].replay.manifest.steps.map((step) => step.capability),
       legacyCapabilityRecord.replay.manifest.steps.map((step) => step.capability)
     );
+  });
+
+  // A replay that stops for a decision writes its run (progress, the signed
+  // step receipts, playback position and owned tabs) onto the recording as
+  // lastRun, and background reads it back to offer the decision and to
+  // resume after a worker restart. A later outcome update or save, which
+  // passes the record through the trusted store, must keep it.
+  const runHistory = createTrustedSessionStore();
+  const runSessionId = 'session_paused_run';
+  const runTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'content'
+  };
+  const runSessionRecord = (sessionId, replay) => ({
+    id: sessionId,
+    task: 'Paused replay run',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay
+  });
+  const runCapture = (sessionId) => replayHelpers.createReplayRecord({
+    sessionId,
+    task: 'Paused replay run',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'click',
+    requestPayload: { params: { selector: '#first' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 2000,
+    replayContext: runTarget
+  }, {
+    tool: 'click',
+    requestPayload: { params: { selector: '#second' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 1000,
+    replayContext: runTarget
+  }], 'capture');
+  await runHistory.store.saveAutomationSession(runSessionId, runSessionRecord(runSessionId, runCapture(runSessionId)), []);
+  const runPrepared = await withReplayRuntime(runHistory.local, second,
+    () => replayHelpers.prepareReplay(runSessionId));
+  const runCheckpoint = await second.dispatch('lattice-replay-checkpoint', {
+    replaySessionId: 'replay_paused_run',
+    manifestHash: runPrepared.replay.manifestHash,
+    sourceReceiptCid: runPrepared.receiptCid,
+    step: runPrepared.steps[0],
+    result: { success: true },
+    success: true
+  });
+  const pausedRun = {
+    id: 'replay_paused_run',
+    manifestHash: runPrepared.replay.manifestHash,
+    sourceReceiptCid: runPrepared.receiptCid,
+    targetTabId: 41,
+    startedAt: Date.now() - 3000,
+    status: 'paused',
+    nextStep: 1,
+    previousReceiptCid: runCheckpoint.receiptCid,
+    steps: [{
+      stepId: runPrepared.steps[0].id,
+      index: 0,
+      tool: 'click',
+      attemptNumber: 1,
+      status: 'executed',
+      success: true,
+      recordedResultHash: runPrepared.steps[0].resultHash,
+      resultHash: runCheckpoint.resultHash,
+      match: runPrepared.steps[0].resultHash === runCheckpoint.resultHash,
+      receipt: runCheckpoint.receipt,
+      receiptCid: runCheckpoint.receiptCid,
+      completedAt: Date.now() - 2000
+    }],
+    error: 'The service worker restarted during a write, so completion cannot be proven.',
+    playback: { speed: 2, paused: true, positionMs: 1500, interpolationTargetMs: 1500 },
+    expectedOrigin: 'https://example.com',
+    logicalTabs: [{ logicalTab: 'primary', tabId: 41, expectedOrigin: 'https://example.com' }]
+  };
+  const runPersisted = await withReplayRuntime(runHistory.local, second,
+    () => replayHelpers.persistReplayRun(runSessionId, pausedRun));
+  const runOutcome = await runHistory.store.updateAutomationSessionOutcome(runSessionId, {
+    status: 'completed', outcome: 'success', reason: 'completed'
+  });
+  const runLogger = loadLoggerWithStore(runHistory.store);
+  runLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'session saved again',
+    data: { sessionId: runSessionId }
+  }];
+  const runLoggerSaved = await runLogger.saveSession(runSessionId, { status: 'completed', mode: 'mcp-agent' });
+  const runPreparedAgain = await withReplayRuntime(runHistory.local, second,
+    () => replayHelpers.prepareReplay(runSessionId));
+  check('a paused replay run survives an outcome update and a later save', () => {
+    assert.ok(runPersisted);
+    assert.equal(runOutcome.ok, true);
+    assert.equal(runLoggerSaved, true);
+    assert.equal(runPreparedAgain.verified, true);
+    assert.equal(runPreparedAgain.replay.manifestHash, pausedRun.manifestHash);
+    assert.deepEqual(runPreparedAgain.replay.lastRun, pausedRun);
+  });
+
+  const replayViewContext = vm.createContext({
+    activeSessions: new Map([[pausedRun.id, {
+      replaySessionId: pausedRun.id,
+      status: 'replay_paused',
+      tabId: 41,
+      currentStep: 1,
+      replaySteps: runPreparedAgain.steps,
+      replayRun: pausedRun
+    }]]),
+    fsbReplayBootstrapTab() { return null; }
+  });
+  vm.runInContext(
+    ['fsbReplayClone', 'fsbReplayIsTruncated', 'fsbReplayTruncatedMessage', 'fsbReplayPublicPreparation']
+      .map(backgroundFunctionSource).join('\n') + '\nthis.publicPreparation = fsbReplayPublicPreparation;',
+    replayViewContext,
+    { filename: 'extension/background.js' }
+  );
+  const replayView = replayViewContext.publicPreparation(runPreparedAgain);
+  check('the replay view still offers the paused decision from the stored run', () => {
+    assert.ok(replayView.pendingDecision, 'pending decision');
+    assert.equal(replayView.pendingDecision.sessionId, pausedRun.id);
+    assert.equal(replayView.pendingDecision.stepId, runPreparedAgain.steps[1].id);
+  });
+
+  // A long run's signed receipts can outgrow a session's byte limit. The
+  // session must still save, giving up the oldest receipts before anything
+  // a resume reads.
+  const longRunSessionId = 'session_long_run';
+  await runHistory.store.saveAutomationSession(longRunSessionId,
+    runSessionRecord(longRunSessionId, runCapture(longRunSessionId)), []);
+  const longRun = {
+    id: 'replay_long_run',
+    status: 'running',
+    nextStep: 1,
+    previousReceiptCid: 'cid-159',
+    steps: Array.from({ length: 160 }, (_, attempt) => ({
+      stepId: attempt % 2 ? 'step-2' : 'step-1',
+      index: attempt % 2,
+      tool: 'click',
+      attemptNumber: Math.floor(attempt / 2) + 1,
+      status: 'executed',
+      success: true,
+      recordedResultHash: null,
+      resultHash: 'c'.repeat(64),
+      match: null,
+      receipt: { payloadType: 'application/vnd.in-toto+json', payload: 'A'.repeat(2000), signatures: [{ sig: 'B'.repeat(88) }] },
+      receiptCid: 'cid-' + attempt,
+      completedAt: Date.now() - 1000
+    }))
+  };
+  await withReplayRuntime(runHistory.local, second, () => replayHelpers.persistReplayRun(longRunSessionId, longRun));
+  const longRunOutcome = await runHistory.store.updateAutomationSessionOutcome(longRunSessionId, {
+    status: 'completed', outcome: 'success'
+  });
+  const storedLongRun = runHistory.values.fsbSessionLogs[longRunSessionId].replay.lastRun;
+  check('a run too large for the session keeps its progress and drops its oldest receipts first', () => {
+    assert.equal(longRunOutcome.ok, true);
+    assert.ok(storedLongRun, 'stored run');
+    assert.equal(storedLongRun.steps.length, 160);
+    assert.equal(storedLongRun.nextStep, 1);
+    assert.equal(storedLongRun.steps[0].receipt, null);
+    assert.deepEqual(storedLongRun.steps[159].receipt, longRun.steps[159].receipt);
+    assert.equal(storedLongRun.steps.every((row, attempt) => row.receiptCid === 'cid-' + attempt), true);
+    assert.ok(Buffer.byteLength(JSON.stringify(runHistory.values.fsbSessionLogs[longRunSessionId])) <=
+      trustedStoreApi.LIMITS.SESSION_RESPONSE_BYTES);
   });
 
   console.log('Summary:', passed, 'passed');
