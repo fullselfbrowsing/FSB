@@ -476,6 +476,15 @@ function scrubSection() {
       { ok: false, reason: 'sensitive_goal' }));
   check('an order-number goal is not a secret',
     S.buildRequest(sampleInput({ goal: 'Open order REC-3 and INV-2024-0042' })).ok === true);
+  // Every 'eyJ' in this run follows a '-', which a word boundary accepts, so
+  // a JWT pattern anchored on \b rescans the rest of the run from each one.
+  {
+    const text = 'eyJ-'.repeat(12000);
+    const started = process.hrtime.bigint();
+    const out = S.scrubText(text);
+    const ms = Number(process.hrtime.bigint() - started) / 1e6;
+    check('scrubText stays linear on 12,000 repeats of eyJ-', out === text && ms < 150, `${ms.toFixed(1)} ms`);
+  }
 
   // The privacy disclosure promises URL query strings and fragments never
   // reach FSB's server, wherever the URL sits in the task text.

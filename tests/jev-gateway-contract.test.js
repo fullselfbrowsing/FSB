@@ -259,6 +259,14 @@ function corpusSection() {
   check('scrubText returns non-strings unchanged',
     scrubText(null) === null && scrubText(undefined) === undefined && scrubText(42) === 42);
   check('matchesSecret is false for non-strings', matchesSecret(null) === false && matchesSecret(42) === false);
+  // The gateway is public and scrubs every text field it is sent. Every 'eyJ'
+  // in this run follows a '-', which a word boundary accepts, so a JWT
+  // pattern anchored on \b rescans the rest of the run from each one.
+  const run = 'eyJ-'.repeat(12000);
+  const started = process.hrtime.bigint();
+  const scrubbed = scrubText(run);
+  const ms = Number(process.hrtime.bigint() - started) / 1e6;
+  check('scrubText stays linear on 12,000 repeats of eyJ-', scrubbed === run && ms < 150, `${ms.toFixed(1)} ms`);
 }
 
 function patternExportSection() {

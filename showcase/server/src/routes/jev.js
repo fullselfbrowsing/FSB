@@ -13,8 +13,8 @@
  *   2. express.json    48 KB, strict; parser errors -> 413 payload_too_large or
  *                      400 invalid_request in the router-local error handler
  *   3. validateRequest exact-key -> 400 invalid_request / sensitive_goal
- *   4. instrument      byte budget -> 413 payload_too_large
- *   5. spend ceiling   -> 503 spend_cap_reached (UTC day, reseeded from the ledger)
+ *   4. spend ceiling   -> 503 spend_cap_reached (UTC day, reseeded from the ledger)
+ *   5. instrument      byte budget -> 413 payload_too_large
  *   6. semaphore       no queue -> 503 busy
  *   7. one upstream attempt -> 502 / 504 typed fallbacks, or
  *   8. calibration + the exact D-15 ok body -> 200
@@ -314,17 +314,18 @@ function createJevRouter({
       }
       request = verdict.request;
 
-      // 4. The server-owned instrument within the byte budget (D-10, D-12).
-      built = buildUpstreamBody(request, { model: config.model, byteBudget: upstreamByteBudget });
-      if (!built.ok) {
-        refuse(res, 'payload_too_large', startedAt);
-        return;
-      }
-
-      // 5. The fleet-wide daily spend ceiling (D-06).
+      // 4. The fleet-wide daily spend ceiling (D-06). Checked before the
+      //    instrument is built, so a spent day refuses without that work.
       dayUtc = dayUtcKey(startedAt);
       if (spendFor(dayUtc).usd >= config.dailyUsdCap) {
         refuse(res, 'spend_cap_reached', startedAt);
+        return;
+      }
+
+      // 5. The server-owned instrument within the byte budget (D-10, D-12).
+      built = buildUpstreamBody(request, { model: config.model, byteBudget: upstreamByteBudget });
+      if (!built.ok) {
+        refuse(res, 'payload_too_large', startedAt);
         return;
       }
 

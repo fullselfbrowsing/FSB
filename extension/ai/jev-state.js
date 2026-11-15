@@ -222,8 +222,11 @@
         replacement: PLACEHOLDERS.pem
       },
       {
+        // Starts only where no token character precedes it. A \b start also
+        // fires after each '-' inside one long run, and every start rescans
+        // the rest of the run, which is quadratic on text such as eyJ-eyJ-...
         name: 'jwt',
-        re: /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g,
+        re: /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g,
         replacement: PLACEHOLDERS.jwt
       },
       {

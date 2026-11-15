@@ -9,8 +9,8 @@
  *   - the open route: no hash key, a malformed key or an unknown key all get
  *     a typed decision; no per-key limit; only hash_key_present is stored;
  *   - the pipeline order and its typed refusals (disabled, not_configured,
- *     the 48 KB parser, the exact-key validator, the byte budget, the daily
- *     spend ceiling, the no-queue semaphore) and the 502/504 upstream map;
+ *     the 48 KB parser, the exact-key validator, the daily spend ceiling,
+ *     the byte budget, the no-queue semaphore) and the 502/504 upstream map;
  *   - the ledger policy: one row and one log line per upstream attempt and
  *     none for any refusal (Pitfall 13), with the spend accrual persisted on
  *     every attempt so a same-day restart reseeds the ceiling (Pitfall 9);
@@ -519,8 +519,25 @@ async function budgetSection() {
   check('no upstream call and no ledger row', counter.calls === 0 && fake.requests.length === 0 && ledgerCount(db) === 0);
   check('the (day, payload_too_large) aggregate counted it', dailyRequests(db, DAY, 'payload_too_large') === 1);
   await gw.close();
-  await fake.close();
   db.close();
+
+  // A spent daily cap refuses before the instrument is built, so a request
+  // over the byte budget gets spend_cap_reached, not payload_too_large.
+  const spentDb = makeDb();
+  spentDb.prepare('INSERT INTO jev_daily (day_utc, outcome, requests, cap_accrued_usd) VALUES (?, ?, 1, ?)').run(DAY, 'ok', 5);
+  const spentCounter = countingFetch();
+  const spent = await startGateway({
+    db: spentDb, config: makeConfig(fake.url), fetchImpl: spentCounter.fetchImpl, now: makeClock().now, log: makeLog().log,
+    upstreamByteBudget: 400,
+  });
+  checkTyped('a request over the byte budget once the daily cap is spent', await decide(spent.port, baseRequest()), 503,
+    'spend_cap_reached');
+  check('it made no upstream call and counted no payload_too_large',
+    spentCounter.calls === 0 && dailyRequests(spentDb, DAY, 'payload_too_large') === 0
+      && dailyRequests(spentDb, DAY, 'spend_cap_reached') === 1);
+  await spent.close();
+  await fake.close();
+  spentDb.close();
 }
 
 async function concurrencySection() {
