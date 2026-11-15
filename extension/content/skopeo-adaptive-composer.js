@@ -2491,10 +2491,27 @@
       value.recovery === 'Reopen the folder or document and invoke Skopeo again.';
   }
 
+  // The question and the conclusion are the only Ask strings allowed past 1024
+  // UTF-16 units, up to the HUD schema's limits. Their own field checks hold
+  // them there. Every other string keeps 1024.
+  var CONTRACT_LONG_TEXT_LIMITS = deepFreeze({
+    'composer.question': 2000,
+    'answer.question': 2000,
+    'answer.conclusion.text': 1200
+  });
+
+  function contractTextLimit(path) {
+    return Object.prototype.hasOwnProperty.call(CONTRACT_LONG_TEXT_LIMITS, path)
+      ? CONTRACT_LONG_TEXT_LIMITS[path]
+      : 1024;
+  }
+
   function contractDataSafe(value, path, seen) {
     if (value === null || typeof value === 'boolean' || typeof value === 'number') return true;
     if (typeof value === 'string') {
-      return path === 'authority.exactOrigin' ? exactHttpsOrigin(value) : contractText(value, 1024);
+      return path === 'authority.exactOrigin'
+        ? exactHttpsOrigin(value)
+        : contractText(value, contractTextLimit(path));
     }
     if (!value || typeof value !== 'object' || seen.has(value)) return false;
     seen.add(value);

@@ -3162,6 +3162,26 @@ async function testContentAskQuestionRules() {
     assert.strictEqual(started.shell.renderedAsks.at(-1).mode, 'answer', `${label}: and answered`);
   }
 
+  // A long question inside the 2000-unit limit renders as "checking" through
+  // the real composer, is sent, and its answer renders.
+  {
+    const longQuestion = 'a'.repeat(1500);
+    const longHarness = startAsk();
+    const longStart = longHarness.start();
+    await flushContentRuntime();
+    const longEntry = longStart.shell.renderedContracts[0].askEntries[0];
+    longStart.shell.contractCallbacks[0]({ kind: 'ask-entry', scopeToken: longEntry.scopeToken });
+    const pending = longStart.shell.askCallbacks[0]({ kind: 'ask-dispatch', question: longQuestion });
+    const checking = longStart.shell.renderedAsks.at(-1);
+    assert.strictEqual(checking.composer && checking.composer.state, 'checking',
+      'a 1500-character question renders as checking');
+    assert.strictEqual(checking.composer.question, longQuestion);
+    assert.strictEqual(await pending, true, 'a 1500-character question is asked');
+    assert.deepStrictEqual(longHarness.askMessages().map(message => message.question.text), [longQuestion]);
+    assert.strictEqual(longStart.shell.renderedAsks.at(-1).mode, 'answer',
+      'the answer to a 1500-character question renders');
+  }
+
   // If the "checking" render still fails, the editing view stays on screen
   // and has to keep working.
   const harness = startAsk();

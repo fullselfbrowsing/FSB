@@ -1401,6 +1401,57 @@ function testAskAndAnswerComposition(composer) {
   }
 }
 
+// The composer declares a 2000-unit question limit and the HUD schema allows a
+// 1200-unit conclusion. The blanket check every model string goes through must
+// not quietly lower either, or a long question never renders as "checking"
+// and a long answer is withdrawn instead of shown.
+function testLongAskText(composer) {
+  const schema = require(HUD_SCHEMA_PATH);
+  const longQuestion = 'a'.repeat(1500);
+  const longestQuestion = 'a'.repeat(2000);
+  const longestConclusion = 'b'.repeat(1200);
+  for (const state of ['checking', 'error']) {
+    const model = composer.composeContractAsk(
+      schema.parseProjection(askProjection(state, { question: longQuestion }))
+    );
+    assert.ok(model && composer.validateContractAskModel(model),
+      `a 1500-unit question composes while ${state}`);
+    assert.strictEqual(model.composer.question, longQuestion);
+  }
+  const editing = composer.composeContractAsk(
+    schema.parseProjection(askProjection('editing', { question: longestQuestion }))
+  );
+  assert.ok(editing && composer.validateContractAskModel(editing),
+    'a question at the 2000-unit limit composes');
+  assert.strictEqual(editing.composer.characterCount, 2000);
+  assert.strictEqual(editing.composer.showCharacterCount, true);
+
+  const baseAnswer = answerProjection().body.answer;
+  const answer = composer.composeContractAsk(schema.parseProjection(answerProjection({
+    question: longestQuestion,
+    answer: Object.assign({}, baseAnswer, { conclusion: longestConclusion })
+  })));
+  assert.ok(answer && composer.validateContractAskModel(answer),
+    'an answer with the longest question and conclusion composes');
+  assert.strictEqual(answer.answer.question, longestQuestion);
+  assert.strictEqual(answer.answer.conclusion.text, longestConclusion);
+
+  for (const [label, base, mutate] of [
+    ['a 2001-unit question', editing, value => {
+      value.composer.question = 'a'.repeat(2001);
+      value.composer.characterCount = 2001;
+    }],
+    ['a 2001-unit answered question', answer, value => { value.answer.question = 'a'.repeat(2001); }],
+    ['a 1201-unit conclusion', answer, value => { value.answer.conclusion.text = 'b'.repeat(1201); }],
+    ['a 1025-unit trust explanation', answer, value => { value.answer.trust.explanation = 'c'.repeat(1025); }]
+  ]) {
+    const changed = mutableClone(base);
+    mutate(changed);
+    deepFreeze(changed);
+    assert.strictEqual(composer.validateContractAskModel(changed), false, `${label} is refused`);
+  }
+}
+
 function assertNoForbiddenContractSurface(model) {
   const serialized = JSON.stringify(model);
   for (const forbidden of [
@@ -1718,6 +1769,7 @@ function runContractComposerContract(composer) {
   testContractStateCopyAndEmptySemantics(composer);
   testAskEntryComposition(composer);
   testAskAndAnswerComposition(composer);
+  testLongAskText(composer);
   console.log('skopeo-adaptive-composer contract-view: PASS');
 }
 
