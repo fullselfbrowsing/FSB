@@ -9,8 +9,6 @@ export interface CapabilityApp {
   readonly cls?: string;
 }
 
-const SIMPLE_ICON_COLOR = '94a3b8';
-
 /** Monogram fallback for apps Simple Icons does not carry (trademark opt-outs). */
 function capabilityIcon(name: string): string {
   const label = name.slice(0, 1).toUpperCase();
@@ -18,8 +16,10 @@ function capabilityIcon(name: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+/* The Simple Icons marks, saved in the marquee's slate (#94a3b8) under
+   showcase/assets/capabilities so the page asks no third-party host for them. */
 function simpleIcon(slug: string): string {
-  return `https://cdn.simpleicons.org/${slug}/${SIMPLE_ICON_COLOR}`;
+  return `/assets/capabilities/${slug}.svg`;
 }
 
 function capability(name: string, slug?: string): CapabilityApp {

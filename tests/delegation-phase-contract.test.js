@@ -162,6 +162,11 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/benchmark-assets-parity.test.js',
   'node tests/execute-js-trusted-types.test.js',
   'node tests/drag-drop-selector-resolution.test.js',
+  'node tests/showcase-static-cache-policy.test.js',
+  'node tests/showcase-capability-logos.test.js',
+  'node tests/about-knowledge-categories-parity.test.js',
+  'node tests/showcase-depth-ghost-parity.test.js',
+  'node tests/icon-fonts-parity.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([

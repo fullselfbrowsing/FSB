@@ -287,3 +287,86 @@
     text-align: center;
   }
 }
+
+/* Phones: a plane has one screen and no scrolling of its own, so the lists are set
+   more tightly. The answers themselves are untouched: an open one still takes the
+   height it needs, and its plane is fitted again around it. */
+@media (max-width: 600px) {
+  .support-header {
+    margin-bottom: 20px;
+  }
+
+  .support-header h1 {
+    margin-bottom: 8px;
+  }
+
+  .support-header p {
+    font-size: 0.92rem;
+  }
+
+  /* The space under each block separated it from the next one on a scrolling
+     page; a plane ends there. */
+  .faq-section,
+  .troubleshooting-section {
+    margin-bottom: 0;
+  }
+
+  .faq-section h2,
+  .troubleshooting-section h2 {
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+  }
+
+  .faq-list {
+    gap: 6px;
+  }
+
+  .faq-question {
+    padding: 11px 14px;
+    font-size: 0.86rem;
+  }
+
+  .troubleshooting-grid {
+    gap: 8px;
+  }
+
+  /* Each card: the icon beside its title, then the two paragraphs across. */
+  .trouble-card {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    column-gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .trouble-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 0;
+  }
+
+  .trouble-card h3 {
+    align-self: center;
+    margin-bottom: 0;
+  }
+
+  .trouble-card > p,
+  .trouble-fix {
+    grid-column: 1 / -1;
+  }
+
+  .trouble-card > p {
+    margin-top: 6px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+
+  .trouble-fix {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+
+  .trouble-fix p {
+    font-size: 0.76rem;
+    line-height: 1.5;
+  }
+}

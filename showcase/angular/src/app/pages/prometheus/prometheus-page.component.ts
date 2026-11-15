@@ -63,7 +63,7 @@ export class PrometheusPageComponent implements OnInit, OnDestroy {
     this.tokens = this.tokenValue();
 
     if (this.browser) {
-      this.countdownTimer = window.setInterval(() => this.updateCountdown(true), 1000);
+      this.countdownTimer = setZoneFreeInterval(() => this.updateCountdown(true), 1000);
     }
   }
 
@@ -164,3 +164,6 @@ export class PrometheusPageComponent implements OnInit, OnDestroy {
     this.tokenRaf = window.requestAnimationFrame(() => this.runTokenMeter());
   }
 }
+
+// Imported here, below every $localize call, so the line numbers messages.xlf pins do not move.
+import { setZoneFreeInterval } from '../../core/zone/zone-free-interval';
