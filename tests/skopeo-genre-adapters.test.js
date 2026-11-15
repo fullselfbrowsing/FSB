@@ -19,7 +19,7 @@ const projector = require('../extension/utils/skopeo-capability-projector.js');
 const appContextResolver = require('../extension/content/skopeo-app-context-resolver.js');
 const { GENRE_MATRIX } = require('./fixtures/skopeo-catalog/genre-matrix.js');
 
-const ROUTER_SHA256 = '05ef0cdb0da5a5968edfe52b5d864c093d34b053f15461d60434183e7a4494fe';
+const ROUTER_SHA256 = '308f95249bbdd5338deb2a8f06a3cbc25ee0b4861d74c50433c829ab4e91380d';
 const ANCHOR_SHA256 = 'e28fb1d493e42af502d16194e4e1a6a3a3ee750c1111e84afcf5eeeb949fcf37';
 const APPROVED_ATOMS = new Set([
   'section-heading',
@@ -309,19 +309,32 @@ function testDriveDelegation(adapters) {
     globalThis.FSBSkopeoContextRouter = previous;
   }
 
+  // A Drive or Docs page with no item in its URL (My Drive, Recent, the Docs
+  // home) has nothing to anchor to. That is not a failure: the adapter answers
+  // null and the resolver keeps the HUD up without an entity.
   const missingStable = closedInput(fixture, [
     { signal: 'exact-origin', value: 'https://docs.google.com' },
     { signal: 'trusted-context-kind', value: 'agreement-reading' },
   ]);
-  const expectedFailure = deepRouter.createRouter({ generation: missingStable.generation }).route({
-    url: missingStable.url,
+  assert.equal(adapters.resolve(fixture.adapterId, missingStable), null,
+    'Drive/Docs without a stable item stays unanchored instead of failing');
+
+  const conflicting = closedInput(fixture, [
+    { signal: 'exact-origin', value: 'https://docs.google.com' },
+    { signal: 'trusted-context-kind', value: 'agreement-reading' },
+    { signal: 'docs-document-id', value: 'doc-999' },
+  ]);
+  const expectedFailure = deepRouter.createRouter({ generation: conflicting.generation }).route({
+    url: conflicting.url,
     contextKind: 'agreement-reading',
-    semanticIdentity: null,
-    evidence: missingStable.adapterEvidence,
+    semanticIdentity: { kind: 'docs-document', id: 'doc-999' },
+    evidence: conflicting.adapterEvidence,
   });
-  const actualFailure = adapters.resolve(fixture.adapterId, missingStable);
+  assert.equal(expectedFailure.status, 'uncertain', 'the URL names a different document');
+  assert.equal(expectedFailure.reason, 'context-evidence-conflict');
+  const actualFailure = adapters.resolve(fixture.adapterId, conflicting);
   assert.deepEqual(actualFailure, expectedFailure,
-    'Drive/Docs uncertain result passes through without a guessed fallback');
+    'Drive/Docs conflicting identity passes the router failure through without a guessed fallback');
 }
 
 function testAdapterSourceSafety(adapters) {

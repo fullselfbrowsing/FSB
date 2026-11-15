@@ -2286,7 +2286,7 @@ function createContentRuntimeHarness(options = {}) {
   vm.runInNewContext(runtimeSource, sandbox, { filename: RUNTIME_PATH });
   const api = window.__FSB_SKOPEO_RUNTIME__;
   const origin = new URL(initialUrl).origin;
-  const projection = Object.freeze({
+  const projection = options.projection || Object.freeze({
     generation: 57,
     exactOrigin: origin,
     profileId: 'drive-docs-deep-pack',
@@ -2549,6 +2549,80 @@ async function testContentRuntimeProductionRouterAndClosedContract() {
     assert.strictEqual(started.shell.destroyed, false,
       `${mode}: a render the shell refuses leaves nothing behind, so the shell survives`);
     assert.strictEqual(harness.api.getSnapshot().phase, 'active', `${mode}: Skopeo stays active`);
+  }
+}
+
+// Drive and Docs pages with no item in the URL (My Drive, Recent, the Docs
+// home) are still the app, just with nothing to anchor to. These run the real
+// projector, router, resolver and adapter registry on the runtime's own URL
+// evidence, so the HUD must stay up on every one of them.
+async function testContentRuntimeDriveRootsAndAccountPaths() {
+  const profileIndex = require('../extension/catalog/skopeo-profile-index.generated.js');
+  const projector = require('../extension/utils/skopeo-capability-projector.js');
+  const productionRouter = require('../extension/content/skopeo-context-router.js');
+  const productionResolver = require('../extension/content/skopeo-app-context-resolver.js');
+  const productionAdapters = require('../extension/content/skopeo-adapter-registry.js');
+  // The runtime runs in its own vm realm and the resolver checks prototypes,
+  // so values cross as frozen copies, the way they would arrive in one world.
+  function frozenCopy(value) {
+    const copy = JSON.parse(JSON.stringify(value));
+    (function freeze(item) {
+      if (!item || typeof item !== 'object' || Object.isFrozen(item)) return;
+      Object.values(item).forEach(freeze);
+      Object.freeze(item);
+    })(copy);
+    return copy;
+  }
+  const resolverAcrossRealms = Object.freeze({
+    createResolver(settings) {
+      const resolver = productionResolver.createResolver({
+        generation: settings.generation,
+        projection: frozenCopy(settings.projection),
+        resolveAdapter: productionAdapters.resolve
+      });
+      return {
+        resolve(input) { return resolver.resolve(frozenCopy(input)); },
+        dispose() { return resolver.dispose(); }
+      };
+    },
+    validateResult: productionResolver.validateResult
+  });
+  for (const [url, expectedKind] of [
+    ['https://drive.google.com/drive/my-drive', null],
+    ['https://drive.google.com/drive/recent', null],
+    ['https://drive.google.com/drive/shared-with-me', null],
+    ['https://drive.google.com/drive/u/0/home', null],
+    ['https://docs.google.com/document/u/0/', null],
+    ['https://docs.google.com/document/u/1/d/agreement-A/edit', 'docs-document']
+  ]) {
+    const projection = projector.createProjection({ tabId: 7, generation: 57, url }, profileIndex);
+    assert.strictEqual(projection.status, 'recognized', `${url}: the profile recognizes the page`);
+    const harness = createContentRuntimeHarness({
+      url,
+      projection,
+      hudResponses: [message => contentProjection(message, 'reading')]
+    });
+    harness.window.FSBSkopeoContextRouter = productionRouter;
+    harness.window.FSBSkopeoAppContextResolver = resolverAcrossRealms;
+    harness.window.FSBSkopeoAdapterRegistry = productionAdapters;
+    const started = harness.start();
+    await flushContentRuntime();
+    assert.strictEqual(started.committed, true, `${url}: the HUD commits`);
+    assert.strictEqual(harness.api.getSnapshot().phase, 'active', `${url}: the HUD stays up`);
+    const ready = harness.messages.find(message => message.action === 'skopeo:ready');
+    assert.ok(ready, `${url}: the runtime reports ready`);
+    assert.strictEqual(ready.semanticEntity ? ready.semanticEntity.kind : null, expectedKind,
+      `${url}: the page resolves to the expected entity`);
+    if (expectedKind) {
+      assert.strictEqual(ready.semanticEntity.id, 'agreement-A',
+        `${url}: the document id is read past the account segment`);
+      assert.strictEqual(harness.hudMessages().length, 1, `${url}: the contract view is requested`);
+      assert.deepStrictEqual(started.shell.renderedContracts.map(model => model.mode), ['reading'],
+        `${url}: the contract view renders`);
+    } else {
+      assert.strictEqual(harness.hudMessages().length, 0,
+        `${url}: with no entity there is no contract view to request`);
+    }
   }
 }
 
@@ -3816,6 +3890,7 @@ async function runHudRuntimeContract() {
     await testContentRuntimeAdmissionMatrix(sources.runtime);
     await testContentRuntimeReplacementAndActions();
     await testContentRuntimeProductionRouterAndClosedContract();
+    await testContentRuntimeDriveRootsAndAccountPaths();
     await testContentAskRuntimeLifecycle();
     await testContentAskConfirmationRouting();
     await testContentAlertConfirmationRouting();

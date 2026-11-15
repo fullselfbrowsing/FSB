@@ -3,7 +3,8 @@
 
   var DRIVE_ORIGIN = 'https://drive.google.com';
   var DOCS_ORIGIN = 'https://docs.google.com';
-  var DOCS_DOCUMENT_PREFIX = '/document/d/';
+  // A second signed-in account puts /u/<n> before the document id.
+  var DOCS_DOCUMENT_PATH = /^\/document\/(?:u\/\d+\/)?d\/([^/]*)/;
   var MAX_URL_LENGTH = 4096;
   var MAX_VALUE_LENGTH = 512;
   var MAX_EVIDENCE = 8;
@@ -81,10 +82,9 @@
   }
 
   function decodeDocumentId(parsed) {
-    if (parsed.origin !== DOCS_ORIGIN || !parsed.pathname.startsWith(DOCS_DOCUMENT_PREFIX)) {
-      return null;
-    }
-    var encoded = parsed.pathname.slice(DOCS_DOCUMENT_PREFIX.length).split('/')[0];
+    if (parsed.origin !== DOCS_ORIGIN) return null;
+    var match = DOCS_DOCUMENT_PATH.exec(parsed.pathname);
+    var encoded = match ? match[1] : '';
     if (!encoded) return null;
     try {
       var decoded = decodeURIComponent(encoded);

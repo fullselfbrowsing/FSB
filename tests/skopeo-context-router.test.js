@@ -187,7 +187,7 @@ function createContractOracle() {
         stableSignal = SIGNAL.DRIVE_ITEM_ID;
         stableValue = identity.id;
       } else if (input.contextKind === CONTEXT_KIND.AGREEMENT_READING) {
-        const match = parsed.pathname.match(/^\/document\/d\/([^/]+)(?:\/|$)/);
+        const match = parsed.pathname.match(/^\/document\/(?:u\/\d+\/)?d\/([^/]+)(?:\/|$)/);
         if (parsed.origin !== DOCS_ORIGIN || identity.kind !== IDENTITY_KIND.DOCS_DOCUMENT ||
             !match || !match[1]) {
           return fail(REASON.CONTEXT_EVIDENCE_CONFLICT);
@@ -202,7 +202,7 @@ function createContractOracle() {
         stableSignal = SIGNAL.DOCS_DOCUMENT_ID;
         stableValue = identity.id;
       } else if (identity.kind === IDENTITY_KIND.DOCS_DOCUMENT) {
-        const match = parsed.pathname.match(/^\/document\/d\/([^/]+)(?:\/|$)/);
+        const match = parsed.pathname.match(/^\/document\/(?:u\/\d+\/)?d\/([^/]+)(?:\/|$)/);
         let documentId = '';
         try {
           documentId = match && match[1] ? decodeURIComponent(match[1]) : '';
@@ -374,6 +374,15 @@ function testRecognizedContexts(api) {
       })
     },
     {
+      label: 'agreement reading in a second signed-in account',
+      input: routeInput({
+        url: DOCS_ORIGIN + '/document/u/1/d/doc-123/edit',
+        contextKind: 'agreement-reading',
+        semanticIdentity: { kind: 'docs-document', id: 'doc-123' },
+        evidence: evidence(DOCS_ORIGIN, 'agreement-reading', 'docs-document-id', 'doc-123')
+      })
+    },
+    {
       label: 'focused ask',
       input: routeInput({
         url: DRIVE_ORIGIN + '/drive/u/0/my-drive',
@@ -430,6 +439,18 @@ function testEvidenceAndIdentityFailures(api) {
       contextKind: 'agreement-reading',
       semanticIdentity: { kind: 'docs-document', id: 'doc-999' },
       evidence: evidence(DOCS_ORIGIN, 'agreement-reading', 'docs-document-id', 'doc-999')
+    })],
+    ['docs account route and identity mismatch', routeInput({
+      url: DOCS_ORIGIN + '/document/u/1/d/doc-123/edit',
+      contextKind: 'agreement-reading',
+      semanticIdentity: { kind: 'docs-document', id: 'doc-999' },
+      evidence: evidence(DOCS_ORIGIN, 'agreement-reading', 'docs-document-id', 'doc-999')
+    })],
+    ['docs home names no document', routeInput({
+      url: DOCS_ORIGIN + '/document/u/0/',
+      contextKind: 'agreement-reading',
+      semanticIdentity: { kind: 'docs-document', id: 'doc-123' },
+      evidence: evidence(DOCS_ORIGIN, 'agreement-reading', 'docs-document-id', 'doc-123')
     })]
   ];
   for (const [label, input] of conflicts) {

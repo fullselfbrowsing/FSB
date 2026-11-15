@@ -301,6 +301,11 @@
   function resolveDrive(adapterId, normalized) {
     var contextKind = evidenceValue(normalized.evidence, 'trusted-context-kind');
     var identity = driveIdentity(normalized.evidence, contextKind);
+    // A page whose URL names no item (My Drive, Recent, the Docs home) is still
+    // Drive or Docs, just with nothing to anchor to. Answering null lets the
+    // resolver keep the HUD up without an entity. Once an item is named, the
+    // router decides, and its failure passes through.
+    if (!identity) return null;
     var routerEvidence = Object.freeze(normalized.evidence.filter(function (item) {
       return ROUTER_SIGNALS.has(item.signal);
     }));

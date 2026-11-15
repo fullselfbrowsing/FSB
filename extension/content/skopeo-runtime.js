@@ -1786,7 +1786,8 @@
       evidence.push({ signal: 'exact-origin', value: parsed.origin });
       let match;
       if (parsed.origin === 'https://docs.google.com') {
-        match = parsed.pathname.match(/\/document\/d\/([A-Za-z0-9._:-]+)/);
+        // A second signed-in account puts /u/<n> before the document id.
+        match = parsed.pathname.match(/\/document\/(?:u\/\d+\/)?d\/([A-Za-z0-9._:-]+)/);
         evidence.push({ signal: 'trusted-context-kind', value: 'agreement-reading' });
         if (match) evidence.push({ signal: 'docs-document-id', value: match[1] });
       } else {
