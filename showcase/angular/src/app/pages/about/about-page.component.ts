@@ -156,7 +156,7 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly zone = inject(NgZone);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  categories: KnowledgeCategory[] = [];
+  categories: KnowledgeCategory[] = localizedCategories(KNOWLEDGE_CATEGORIES);
   graphDetail: GraphDetail = 'simple';
 
   // Counts are formatted per locale, not hardcoded: a literal '1,440' rendered a
@@ -285,12 +285,12 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
       win.__FSB_CATEGORY_LABELS = KNOWLEDGE_CATEGORY_LABELS;
       win.__FSB_SITE_LABELS = KNOWLEDGE_SITE_LABELS;
       win.__FSB_GRAPH_COPY = KNOWLEDGE_GRAPH_COPY;
-      this.categories = Array.isArray(win.__FSB_CATEGORIES)
-        ? win.__FSB_CATEGORIES.map((category) => ({
-          ...category,
-          name: KNOWLEDGE_CATEGORY_LABELS[category.name] || category.name,
-        }))
-        : [];
+      // The legend is already drawn from KNOWLEDGE_CATEGORIES; what the script loaded wins.
+      const loaded = win.__FSB_CATEGORIES;
+      if (Array.isArray(loaded)) {
+        this.categories = localizedCategories(loaded);
+      }
+
       this.cdr.detectChanges();
       await new Promise((resolve) => window.requestAnimationFrame(resolve));
       const currentHost = this.graphHost?.nativeElement;
@@ -416,3 +416,36 @@ const ABOUT_RAIL_LABELS: readonly string[] = [
   $localize`:@@about.depth.rail.moreActions:More actions`,
   $localize`:@@depth.rail.index:Index`,
 ];
+
+/* The legend under the site graph, as showcase/js/fsb-knowledge-data.js lists it
+   (tests/about-knowledge-categories-parity.test.js keeps the two equal). Holding
+   it here puts the legend in the prerendered page: before, it was inserted when
+   that script arrived and pushed the card around after first paint. */
+const KNOWLEDGE_CATEGORIES: readonly KnowledgeCategory[] = [
+  { name: 'E-Commerce & Shopping', color: '#4285f4', colorDark: '#5b9bf5', count: 8 },
+  { name: 'Social Media', color: '#34a853', colorDark: '#4ec973', count: 7 },
+  { name: 'Finance & Trading', color: '#ea4335', colorDark: '#f07068', count: 6 },
+  { name: 'Travel & Booking', color: '#fbbc04', colorDark: '#f5d058', count: 7 },
+  { name: 'Email Platforms', color: '#8b5cf6', colorDark: '#a78bfa', count: 3 },
+  { name: 'Coding Platforms', color: '#06b6d4', colorDark: '#38d0e8', count: 7 },
+  { name: 'Career & Job Search', color: '#ec4899', colorDark: '#f472b6', count: 45 },
+  { name: 'Gaming Platforms', color: '#f97316', colorDark: '#fb923c', count: 4 },
+  { name: 'Productivity Tools', color: '#14b8a6', colorDark: '#3dd6c4', count: 9 },
+  { name: 'Design & Whiteboard', color: '#a855f7', colorDark: '#c084fc', count: 3 },
+  { name: 'Games', color: '#0891b2', colorDark: '#22b8cf', count: 2 },
+  { name: 'Media', color: '#d946ef', colorDark: '#e879f9', count: 3 },
+  { name: 'Music', color: '#4285f4', colorDark: '#5b9bf5', count: 1 },
+  { name: 'News', color: '#34a853', colorDark: '#4ec973', count: 2 },
+  { name: 'Productivity', color: '#ea4335', colorDark: '#f07068', count: 3 },
+  { name: 'Reference', color: '#fbbc04', colorDark: '#f5d058', count: 1 },
+  { name: 'Sports', color: '#8b5cf6', colorDark: '#a78bfa', count: 1 },
+  { name: 'Maps & Navigation', color: '#06b6d4', colorDark: '#38d0e8', count: 1 },
+  { name: 'Utilities', color: '#ec4899', colorDark: '#f472b6', count: 17 },
+];
+
+function localizedCategories(categories: readonly KnowledgeCategory[]): KnowledgeCategory[] {
+  return categories.map((category) => ({
+    ...category,
+    name: KNOWLEDGE_CATEGORY_LABELS[category.name] || category.name,
+  }));
+}
