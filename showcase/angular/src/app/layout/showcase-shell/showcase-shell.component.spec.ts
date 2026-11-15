@@ -4,7 +4,8 @@ import { Router, provideRouter } from '@angular/router';
 
 import { AppComponent } from '../../app.component';
 import { ThemeService } from '../../core/theme.service';
-import { depthPageForPath } from './showcase-shell.component';
+import { depthPageForPath, shelllessForPath } from './showcase-shell.component';
+import { routes } from '../../app.routes';
 
 @Component({
   standalone: true,
@@ -326,5 +327,22 @@ describe('depthPageForPath', () => {
     expect(depthPageForPath('/agents/')).toBe('agents');
     expect(depthPageForPath('/dashboard')).toBeNull();
     expect(depthPageForPath('/release-notes')).toBeNull();
+  });
+});
+
+describe('shelllessForPath', () => {
+  it('is true for every route that declares itself shellless, and for no other', () => {
+    for (const route of routes) {
+      if (!route.path || route.path === '**') continue;
+      expect(shelllessForPath('/' + route.path))
+        .withContext(route.path)
+        .toBe(route.data?.['shellless'] === true);
+    }
+    expect(shelllessForPath('')).toBeFalse();
+  });
+
+  it('ignores slashes, the query and the fragment', () => {
+    expect(shelllessForPath('/lattice/?from=home#verbs')).toBeTrue();
+    expect(shelllessForPath('about?x=1')).toBeFalse();
   });
 });

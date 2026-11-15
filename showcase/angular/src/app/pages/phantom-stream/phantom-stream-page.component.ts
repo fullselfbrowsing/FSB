@@ -201,7 +201,7 @@ export class PhantomStreamPageComponent implements OnInit, AfterViewInit, OnDest
     this.queueScrollSpySetup();
 
     if (this.browser) {
-      this.miniTimer = window.setInterval(() => {
+      this.miniTimer = setZoneFreeInterval(() => {
         this.miniSec = (this.miniSec + 59) % 60;
       }, 1000);
     }
@@ -422,3 +422,6 @@ export class PhantomStreamPageComponent implements OnInit, AfterViewInit, OnDest
     }
   }
 }
+
+// Imported here, below every $localize call, so the line numbers messages.xlf pins do not move.
+import { setZoneFreeInterval } from '../../core/zone/zone-free-interval';

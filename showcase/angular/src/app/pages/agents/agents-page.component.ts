@@ -141,7 +141,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     if (this.prefersReducedMotion || this.cycleTimer !== null || this.doc.visibilityState === 'hidden') {
       return;
     }
-    this.cycleTimer = window.setInterval(() => this.advanceToken(), 3000);
+    this.cycleTimer = setZoneFreeInterval(() => this.advanceToken(), 3000);
   }
 
   private handleVisibilityChange(): void {
@@ -447,3 +447,6 @@ const AGENTS_RAIL_LABELS: readonly string[] = [
   $localize`:@@agents.depth.rail.getStarted:Get started`,
   $localize`:@@depth.rail.index:Index`,
 ];
+
+// Imported here, below every $localize call, so the line numbers messages.xlf pins do not move.
+import { setZoneFreeInterval } from '../../core/zone/zone-free-interval';

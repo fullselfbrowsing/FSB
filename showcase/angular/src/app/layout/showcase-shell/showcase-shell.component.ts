@@ -19,6 +19,9 @@ const DEPTH_PATHS: Readonly<Record<string, DepthPageKey>> = {
   support: 'support',
 };
 
+/* Routes that draw their own chrome (`data: { shellless: true }`): no nav, no footer. */
+const SHELLLESS_PATHS: ReadonlySet<string> = new Set(['stats', 'lattice', 'concierge', 'phantom-stream', 'prometheus']);
+
 /* Nav cue entries, top to bottom. Its list opens upward from the bottom edge. */
 const CUE_ORDER: readonly string[] = ['home', 'about', 'agents', 'dashboard', 'privacy', 'support'];
 
@@ -43,10 +46,11 @@ export class ShowcaseShellComponent implements OnInit, OnDestroy {
   readonly appVersion = APP_VERSION;
   mobileMenuOpen = false;
   navScrolled = false;
-  shellless = false;
   initialNavigationComplete = this.router.navigated;
-  /* Read from the URL before the router has resolved anything, so the first
-     paint already has the right nav instead of flipping once navigation ends. */
+  /* Both read from the URL before the router has resolved anything, so the first
+     render already matches the prerendered page instead of flipping once navigation
+     ends: the right nav on a depth page, and no nav at all on a shellless one. */
+  shellless = shelllessForPath(this.location.path());
   depthPage: DepthPageKey | null = depthPageForPath(this.location.path());
   cueOpen = false;
 
@@ -113,15 +117,12 @@ export class ShowcaseShellComponent implements OnInit, OnDestroy {
     while (activeRoute.firstChild) {
       activeRoute = activeRoute.firstChild;
     }
-    this.shellless = activeRoute.snapshot.data['shellless'] === true;
-    if (this.shellless) {
-      this.closeMobileMenu();
-    }
     if (this.router.navigated) {
+      this.shellless = activeRoute.snapshot.data['shellless'] === true;
       const depth = activeRoute.snapshot.data['depth'];
       this.depthPage = isDepthPageKey(depth) ? depth : null;
     }
-    if (this.depthPage) this.closeMobileMenu();
+    if (this.shellless || this.depthPage) this.closeMobileMenu();
   }
 }
 
@@ -134,4 +135,8 @@ function isDepthPageKey(value: unknown): value is DepthPageKey {
 export function depthPageForPath(path: string): DepthPageKey | null {
   const clean = path.split(/[?#]/)[0].replace(/^\/+|\/+$/g, '');
   return DEPTH_PATHS[clean] ?? null;
+}
+
+export function shelllessForPath(path: string): boolean {
+  return SHELLLESS_PATHS.has(path.split(/[?#]/)[0].replace(/^\/+|\/+$/g, ''));
 }

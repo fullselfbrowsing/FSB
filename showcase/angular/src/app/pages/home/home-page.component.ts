@@ -63,12 +63,12 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly localeId = inject(LOCALE_ID);
   private readonly themeService = inject(ThemeService);
 
-  private rollTimer?: ReturnType<typeof setInterval>;
+  private rollTimer?: number;
   private hoverTimer?: ReturnType<typeof setTimeout>;
   private fanCloseTimer?: ReturnType<typeof setTimeout>;
   private copiedTimer?: ReturnType<typeof setTimeout>;
   private rafId?: number;
-  private engTimer?: ReturnType<typeof setInterval>;
+  private engTimer?: number;
   private engSwapTimer?: ReturnType<typeof setTimeout>;
   private engHover = false;
   private engReducedMotion = false;
@@ -155,7 +155,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     if (typeof window === 'undefined') return;
-    this.rollTimer = setInterval(() => this.advance(), ROTATE_MS);
+    this.rollTimer = setZoneFreeInterval(() => this.advance(), ROTATE_MS);
     // Read once, not subscribed: under reduced motion the engine panel never auto-rotates.
     this.engReducedMotion =
       typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -433,7 +433,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private startEngCycle(): void {
     if (this.engTimer) clearInterval(this.engTimer);
-    this.engTimer = setInterval(() => {
+    this.engTimer = setZoneFreeInterval(() => {
       if (this.activePlane !== ENGINE_PLANE || this.engHover || this.engKeyFocus || this.doc.hidden) return;
       this.engGo(nextEngMode(this.engMode));
     }, ENG_CYCLE_MS);
@@ -677,3 +677,6 @@ export function fanOffset(t: number): [number, number] {
   const [dx1, r1] = FAN_CURVE[i + 1];
   return [Math.round(dx0 + (dx1 - dx0) * f), Number((r0 + (r1 - r0) * f).toFixed(1))];
 }
+
+// Imported here, below every $localize call, so the line numbers messages.xlf pins do not move.
+import { setZoneFreeInterval } from '../../core/zone/zone-free-interval';
