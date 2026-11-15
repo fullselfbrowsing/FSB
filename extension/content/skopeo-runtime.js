@@ -206,7 +206,8 @@
       contractAskEpoch: 0,
       contractAskScope: null,
       contractAskQuestion: null,
-      contractAskConfirmation: null
+      contractAskConfirmation: null,
+      deferredContractAnswer: null
     };
     const api = {};
     const runtimeResources = zeroResources();
@@ -746,7 +747,7 @@
       state.contractActionIds = Object.freeze([]);
       state.pendingContractActions.clear();
       state.consumedContractActions.clear();
-      state.contractAskEpoch += 1;
+      advanceContractAskEpoch();
       state.contractAskState = 'idle';
       state.contractAskScope = null;
       state.contractAskQuestion = null;
@@ -848,15 +849,40 @@
       return scalars > 0;
     }
 
-    function currentContractAskAuthority(
+    // Visibility is kept out of the "still current" checks on purpose. Only a
+    // new dispatch or a render needs the tab on screen. The reply to something
+    // the user already started often lands while hidden, because opening a
+    // source activates its new tab.
+    function contractAskStillCurrent(
       tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
     ) {
       return isLive(tuple.generation) && state.phase === 'active' && state.mounted &&
         sameCurrentContractTuple(tuple) && state.contractActionEpoch === contractEpoch &&
         state.contractAskEpoch === askEpoch && state.contractSemanticEntityToken === entityToken &&
         state.contractRequestActionToken === requestActionToken &&
-        state.contractViewToken === projectionToken && state.pendingContractToken === null &&
-        documentIsVisible();
+        state.contractViewToken === projectionToken && state.pendingContractToken === null;
+    }
+
+    function currentContractAskAuthority(
+      tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
+    ) {
+      return contractAskStillCurrent(
+        tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
+      ) && documentIsVisible();
+    }
+
+    // Every new ask state supersedes an answer still waiting for the tab.
+    function advanceContractAskEpoch() {
+      state.deferredContractAnswer = null;
+      state.contractAskEpoch += 1;
+      return state.contractAskEpoch;
+    }
+
+    function showDeferredContractAnswer() {
+      const deferred = state.deferredContractAnswer;
+      state.deferredContractAnswer = null;
+      if (!deferred || deferred.requestEpoch !== state.contractAskEpoch) return false;
+      return deferred.show();
     }
 
     function localAskProjection(tuple, entityToken, requestActionToken, projectionToken, scope, askState,
@@ -1077,15 +1103,23 @@
       return true;
     }
 
-    function currentContractAction(
+    function contractActionStillCurrent(
       tuple, entityToken, requestActionToken, projectionToken, epoch, actionId
     ) {
       return isLive(tuple.generation) && state.phase === 'active' && state.mounted &&
         sameCurrentContractTuple(tuple) && state.contractActionEpoch === epoch &&
         state.contractSemanticEntityToken === entityToken &&
-        state.contractRequestActionToken === requestActionToken && documentIsVisible() &&
+        state.contractRequestActionToken === requestActionToken &&
         state.contractViewToken === projectionToken && state.pendingContractToken === null &&
         contractTokenInCurrentModel(actionId) && !state.consumedContractActions.has(actionId);
+    }
+
+    function currentContractAction(
+      tuple, entityToken, requestActionToken, projectionToken, epoch, actionId
+    ) {
+      return documentIsVisible() && contractActionStillCurrent(
+        tuple, entityToken, requestActionToken, projectionToken, epoch, actionId
+      );
     }
 
     function contractTokenInCurrentModel(actionId) {
@@ -1114,7 +1148,7 @@
       try { response = await chrome.runtime.sendMessage(request); } catch (_error) { response = null; }
       const stillPending = state.pendingContractActions.has(actionId);
       const current = stillPending && requestActionToken &&
-        currentContractAction(
+        contractActionStillCurrent(
           tuple, entityToken, requestActionToken, projectionToken, epoch, actionId
         );
       if (stillPending) state.pendingContractActions.delete(actionId);
@@ -1142,8 +1176,7 @@
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch
       )) return false;
       cancelContractAskBestEffort();
-      state.contractAskEpoch += 1;
-      const askEpoch = state.contractAskEpoch;
+      const askEpoch = advanceContractAskEpoch();
       state.contractAskScope = Object.freeze({
         kind: scope.kind,
         label: scope.label,
@@ -1245,8 +1278,7 @@
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
       ) || !state.contractAskScope || !['editing', 'error'].includes(state.contractAskState)) return false;
       const question = typeof rawQuestion === 'string' ? rawQuestion.trim() : '';
-      state.contractAskEpoch += 1;
-      const requestEpoch = state.contractAskEpoch;
+      const requestEpoch = advanceContractAskEpoch();
       state.contractActionIds = Object.freeze([]);
       state.pendingContractActions.clear();
       state.consumedContractActions.clear();
@@ -1273,23 +1305,36 @@
       if (response) {
         try { response = JSON.parse(JSON.stringify(response)); } catch (_error) { response = null; }
       }
-      if (!currentContractAskAuthority(
+      if (!contractAskStillCurrent(
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, requestEpoch
       ) || state.contractAskState !== 'checking') return false;
-      if (!exactContractAnswerAuthority(response, request, requestActionToken)) {
-        return renderContractAskError(
-          'provider-unavailable', tuple, entityToken, requestActionToken, projectionToken,
-          contractEpoch, requestEpoch, question
+      let model = null;
+      if (exactContractAnswerAuthority(response, request, requestActionToken)) {
+        model = contractAskModelForProjection(response);
+        if (!model || model.scope.scopeToken !== response.body.scope.scopeToken) {
+          withdrawContractProjection();
+          return false;
+        }
+      }
+      const show = function() {
+        if (!currentContractAskAuthority(
+          tuple, entityToken, requestActionToken, projectionToken, contractEpoch, requestEpoch
+        ) || state.contractAskState !== 'checking') return false;
+        if (!model) {
+          return renderContractAskError(
+            'provider-unavailable', tuple, entityToken, requestActionToken, projectionToken,
+            contractEpoch, requestEpoch, question
+          );
+        }
+        return installContractAnswer(
+          response, model, tuple, entityToken, requestActionToken, contractEpoch, requestEpoch
         );
-      }
-      const model = contractAskModelForProjection(response);
-      if (!model || model.scope.scopeToken !== response.body.scope.scopeToken) {
-        withdrawContractProjection();
-        return false;
-      }
-      return installContractAnswer(
-        response, model, tuple, entityToken, requestActionToken, contractEpoch, requestEpoch
-      );
+      };
+      if (documentIsVisible()) return show();
+      // The user switched tabs while the answer was being worked out. Keep it
+      // and show it when the tab comes back, instead of dropping it.
+      state.deferredContractAnswer = Object.freeze({ requestEpoch: requestEpoch, show: show });
+      return true;
     }
 
     function editContractAsk(
@@ -1300,8 +1345,7 @@
       ) || !['editing', 'error'].includes(state.contractAskState)) return false;
       const next = typeof question === 'string' ? question : null;
       if (next !== null && !safeContractQuestion(next)) return false;
-      state.contractAskEpoch += 1;
-      const nextEpoch = state.contractAskEpoch;
+      const nextEpoch = advanceContractAskEpoch();
       state.contractAskState = 'editing';
       return renderLocalContractAsk(
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, nextEpoch,
@@ -1316,8 +1360,7 @@
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
       ) || state.contractAskState !== 'checking') return false;
       cancelContractAskBestEffort();
-      state.contractAskEpoch += 1;
-      const nextEpoch = state.contractAskEpoch;
+      const nextEpoch = advanceContractAskEpoch();
       state.contractAskState = 'editing';
       return renderLocalContractAsk(
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, nextEpoch,
@@ -1336,8 +1379,7 @@
       if (!currentContractAskAuthority(
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
       ) || state.contractAskState !== 'result' || !state.contractAskScope) return false;
-      state.contractAskEpoch += 1;
-      const nextEpoch = state.contractAskEpoch;
+      const nextEpoch = advanceContractAskEpoch();
       state.contractAskState = 'editing';
       state.contractAskQuestion = null;
       state.contractAskConfirmation = null;
@@ -1524,16 +1566,18 @@
       if (response) {
         try { response = JSON.parse(JSON.stringify(response)); } catch (_error) { response = null; }
       }
-      const current = currentContractAskAuthority(
+      const current = contractAskStillCurrent(
         tuple, entityToken, requestActionToken, projectionToken, contractEpoch, askEpoch
       ) && state.pendingContractActions.has(actionId);
       state.pendingContractActions.delete(actionId);
       if (!current) return false;
+      const opened = hasExactOwnKeys(response, ['success', 'status']) &&
+        response.success === true && response.status === 'opened';
+      // An opened source needs nothing drawn here. Any other reply renders
+      // into this tab, so a hidden tab leaves the action unspent for a retry.
+      if (!opened && !documentIsVisible()) return false;
       state.consumedContractActions.add(actionId);
-      if (hasExactOwnKeys(response, ['success', 'status']) &&
-          response.success === true && response.status === 'opened') {
-        return true;
-      }
+      if (opened) return true;
       if (exactConfirmationResponse(response)) {
         const confirmation = confirmationCopy(response, actionId);
         const callback = function(payload) {
@@ -2344,8 +2388,9 @@
       if (!state.activeListenersInstalled) return;
       window.removeEventListener('keydown', onKeydown, false);
       window.removeEventListener('pagehide', onPagehide, false);
+      document.removeEventListener('visibilitychange', onVisibilitychange, false);
       state.activeListenersInstalled = false;
-      bumpRuntimeResource('listeners', -2);
+      bumpRuntimeResource('listeners', -3);
     }
 
     function removeRuntimeListener() {
@@ -2421,7 +2466,7 @@
       }
       state.mounted = false;
 
-      state.teardownOrder.push('unregister-key/pagehide-listeners');
+      state.teardownOrder.push('unregister-key/pagehide/visibility-listeners');
       removeActiveListeners();
 
       state.teardownOrder.push('unregister-runtime-listener');
@@ -2631,8 +2676,9 @@
       // This bubble fallback runs only when that boundary did not consume the key.
       window.addEventListener('keydown', onKeydown, false);
       window.addEventListener('pagehide', onPagehide, false);
+      document.addEventListener('visibilitychange', onVisibilitychange, false);
       state.activeListenersInstalled = true;
-      bumpRuntimeResource('listeners', 2);
+      bumpRuntimeResource('listeners', 3);
       if (!isLive(generation)) return false;
       const currentUrl = window.location && typeof window.location.href === 'string'
         ? window.location.href
@@ -2774,6 +2820,11 @@
 
     function onPagehide() {
       requestKill('navigation');
+    }
+
+    function onVisibilitychange() {
+      if (!isLive(state.generation) || !documentIsVisible()) return;
+      showDeferredContractAnswer();
     }
 
     // The shell projects a new route only from Ambient. An in-page navigation

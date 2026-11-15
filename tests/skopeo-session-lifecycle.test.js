@@ -1043,6 +1043,7 @@ function createRuntimeHarness(options = {}) {
   let now = 1000;
   let nextTimerId = 1;
   const windowListeners = new ListenerRegistry(type => operations.push(`remove-window:${type}`));
+  const documentListeners = new ListenerRegistry(type => operations.push(`remove-document:${type}`));
   const runtimeListeners = new ListenerRegistry(() => operations.push('remove-runtime-listener'));
 
   const observationRoot = {
@@ -1056,7 +1057,13 @@ function createRuntimeHarness(options = {}) {
     activeElement: { id: 'host-focus' },
     documentElement,
     body,
-    createElement() { return {}; }
+    createElement() { return {}; },
+    addEventListener(type, listener, eventOptions) {
+      documentListeners.add(type, listener, eventOptions);
+    },
+    removeEventListener(type, listener, eventOptions) {
+      documentListeners.remove(type, listener, eventOptions);
+    }
   };
 
   function resourceSnapshot(mounted) {
@@ -1559,6 +1566,7 @@ function createRuntimeHarness(options = {}) {
     observationRoot,
     timers,
     windowListeners,
+    documentListeners,
     runtimeListeners,
     evaluate,
     toContent,
@@ -1573,6 +1581,8 @@ function assertRuntimeOff(harness, label) {
   assert.equal(harness.runtimeListeners.count('message'), 0, `${label}: Chrome listener removed`);
   assert.equal(harness.windowListeners.count('keydown'), 0, `${label}: Escape listener removed`);
   assert.equal(harness.windowListeners.count('pagehide'), 0, `${label}: pagehide listener removed`);
+  assert.equal(harness.documentListeners.count('visibilitychange'), 0,
+    `${label}: visibility listener removed`);
   assert.equal(harness.sandbox.__FSB_SKOPEO_RUNTIME__, undefined, `${label}: sentinel removed`);
   assert.equal(harness.sandbox.__FSB_SKOPEO_TEST_FIXTURE__, undefined, `${label}: fixture flag removed`);
   for (const shell of harness.shells) {
@@ -1710,6 +1720,7 @@ function testRuntimePrepareCommitAndProbe() {
   assert.equal(harness.runtimeListeners.count('message'), 1, 'runtime evaluation installs one named message listener');
   assert.equal(harness.shells.length, 0, 'runtime evaluation creates no shell or host');
   assert.equal(harness.windowListeners.count(), 0, 'runtime evaluation creates no active page listeners');
+  assert.equal(harness.documentListeners.count(), 0, 'runtime evaluation creates no document listeners');
   assert.deepEqual(plain(api.getSnapshot().resources), {
     ...ZERO_RESOURCES,
     listeners: 1
@@ -1749,6 +1760,8 @@ function testRuntimePrepareCommitAndProbe() {
   assert.deepEqual(shell.getResourceSnapshot(), ZERO_RESOURCES, 'prepare owns zero shell resources');
   assert.equal(harness.windowListeners.count('keydown'), 0, 'prepare installs no Escape listener');
   assert.equal(harness.windowListeners.count('pagehide'), 0, 'prepare installs no pagehide listener');
+  assert.equal(harness.documentListeners.count('visibilitychange'), 0,
+    'prepare installs no visibility listener');
   assert.deepEqual(plain(api.getSnapshot().resources), {
     ...ZERO_RESOURCES,
     listeners: 1
@@ -1771,10 +1784,12 @@ function testRuntimePrepareCommitAndProbe() {
   assert.equal(shell.mounted, true, 'matching commit creates one Ambient shell');
   assert.equal(harness.windowListeners.count('keydown'), 1, 'commit installs one runtime Escape listener');
   assert.equal(harness.windowListeners.count('pagehide'), 1, 'commit installs one runtime pagehide listener');
+  assert.equal(harness.documentListeners.count('visibilitychange'), 1,
+    'commit installs one runtime visibility listener');
   assert.deepEqual(plain(api.getSnapshot().resources), {
     ...ZERO_RESOURCES,
     roots: 1,
-    listeners: 3,
+    listeners: 4,
     popoverTopLayer: 1
   }, 'committed snapshot combines shell and runtime-owned listeners');
   assert.deepEqual(harness.outbound.at(-1), {
@@ -2146,7 +2161,7 @@ async function testRuntimeAbortFirstAndLateWork() {
     'dispose-registry',
     'dispose-router',
     'destroy-shell',
-    'unregister-key/pagehide-listeners',
+    'unregister-key/pagehide/visibility-listeners',
     'unregister-runtime-listener',
     'delete-fixture-hook/flag',
     'delete-sentinel',
@@ -2173,6 +2188,7 @@ async function testRuntimeAbortFirstAndLateWork() {
   const routerDisposeIndex = harness.operations.indexOf('dispose-router:1');
   const keydownRemovalIndex = harness.operations.indexOf('remove-window:keydown');
   const pagehideRemovalIndex = harness.operations.indexOf('remove-window:pagehide');
+  const visibilityRemovalIndex = harness.operations.indexOf('remove-document:visibilitychange');
   const runtimeRemovalIndex = harness.operations.indexOf('remove-runtime-listener');
   const acknowledgementIndex = harness.operations.indexOf('send:skopeo:teardown-complete');
   assert.ok(
@@ -2180,7 +2196,8 @@ async function testRuntimeAbortFirstAndLateWork() {
       routerDisposeIndex < destroyIndex &&
       destroyIndex < keydownRemovalIndex &&
       keydownRemovalIndex < pagehideRemovalIndex &&
-      pagehideRemovalIndex < runtimeRemovalIndex &&
+      pagehideRemovalIndex < visibilityRemovalIndex &&
+      visibilityRemovalIndex < runtimeRemovalIndex &&
       runtimeRemovalIndex < acknowledgementIndex,
     'teardown acknowledgement is emitted only after shell and runtime-owned listeners are gone'
   );
@@ -2490,6 +2507,7 @@ function testRuntimeReplacementAndFreshReinjection() {
   assert.equal(secondShell.destroyed, true, 'script reinjection disposes all prior shell resources first');
   assert.equal(harness.runtimeListeners.count('message'), 1, 'script reinjection still owns exactly one runtime listener');
   assert.equal(harness.windowListeners.count(), 0, 'fresh reinjection has no active Escape/pagehide listeners before commit');
+  assert.equal(harness.documentListeners.count(), 0, 'fresh reinjection has no visibility listener before commit');
   assert.equal(harness.shells.length, 2, 'script evaluation alone restores no prior primitive shell');
   assert.equal(thirdApi.configure({
     action: 'skopeo:configure', generation: 3, projection: harness.toContent(catalogProjection(3))

@@ -2926,6 +2926,139 @@ async function testContentAskRuntimeLifecycle() {
   false, 'navigation prevents late answer residue');
 }
 
+// The reply to an action the user already started can land after the tab
+// hides: opening a source activates its new tab, and an answer can take long
+// enough for the user to switch away. Neither reply may be dropped. A hidden
+// tab still refuses to start anything new.
+async function testContentRuntimeHiddenTabReplies() {
+  function setVisibility(harness, value) {
+    Object.defineProperty(harness.document, 'visibilityState', { value, configurable: true });
+    harness.document.dispatchEvent({ type: 'visibilitychange' });
+  }
+  function askStates(shell) {
+    return shell.renderedAsks.map(model => model.mode + ':' + (model.composer ? model.composer.state : '-'));
+  }
+
+  let citationHarness = null;
+  citationHarness = createContentRuntimeHarness({
+    hudResponses: [
+      message => contentProjection(message, 'reading'),
+      message => contentProjection(message, 'reading')
+    ],
+    citationResponder() {
+      setVisibility(citationHarness, 'hidden');
+      return { success: true, status: 'opened' };
+    }
+  });
+  const citationStart = citationHarness.start();
+  await flushContentRuntime();
+  const withdrawalsBefore = citationStart.shell.withdrawals;
+  const onCitation = citationStart.shell.contractCallbacks[0];
+  assert.strictEqual(await onCitation('renewal-action-opaque'), true,
+    'a source that opened in its own tab still counts as opened');
+  await flushContentRuntime();
+  assert.strictEqual(citationHarness.revokeMessages().length, 0, 'the opened view is not revoked');
+  assert.strictEqual(citationStart.shell.withdrawals, withdrawalsBefore, 'the opened view is not withdrawn');
+  assert.strictEqual(citationHarness.hudMessages().length, 1, 'the opened view is not refreshed');
+  setVisibility(citationHarness, 'visible');
+  await flushContentRuntime();
+  assert.strictEqual(await onCitation('renewal-action-opaque'), false, 'the opened source is consumed');
+  assert.strictEqual(citationHarness.citationMessages().length, 1);
+  assert.strictEqual(citationHarness.api.getSnapshot().phase, 'active');
+  setVisibility(citationHarness, 'hidden');
+  assert.strictEqual(await onCitation('effective-action-opaque'), false, 'a hidden tab opens no new source');
+  assert.strictEqual(citationHarness.citationMessages().length, 1);
+
+  let askActionToken = null;
+  let askHarness = null;
+  askHarness = createContentRuntimeHarness({
+    hudResponses: [message => {
+      askActionToken = message.actionToken;
+      return contentScopedProjection(message, 'reading');
+    }],
+    askResponder(message) {
+      setVisibility(askHarness, 'hidden');
+      return contentAnswerProjection(message, askActionToken, 'hidden');
+    },
+    answerActionResponder() {
+      setVisibility(askHarness, 'hidden');
+      return { success: true, status: 'opened' };
+    }
+  });
+  const askStart = askHarness.start();
+  await flushContentRuntime();
+  assert.strictEqual(askHarness.document.listenerCount('visibilitychange'), 1,
+    'the runtime watches for the tab to come back');
+  const askEntry = askStart.shell.renderedContracts[0].askEntries[0];
+  assert.strictEqual(askStart.shell.contractCallbacks[0]({
+    kind: 'ask-entry', scopeToken: askEntry.scopeToken
+  }), true);
+  assert.strictEqual(await askStart.shell.askCallbacks[0]({
+    kind: 'ask-dispatch', question: 'When does this agreement renew?'
+  }), true, 'an answer that lands while hidden is kept');
+  await flushContentRuntime();
+  assert.deepStrictEqual(askStates(askStart.shell), ['ask:editing', 'ask:checking'],
+    'nothing renders into the hidden tab');
+  setVisibility(askHarness, 'visible');
+  await flushContentRuntime();
+  const shown = askStart.shell.renderedAsks.at(-1);
+  assert.strictEqual(shown.mode, 'answer', 'the kept answer shows once the tab is back');
+  assert.strictEqual(shown.authority.projectionToken, 'projection-answer-hidden-opaque');
+  setVisibility(askHarness, 'hidden');
+  setVisibility(askHarness, 'visible');
+  assert.strictEqual(askStart.shell.renderedAsks.filter(model => model.mode === 'answer').length, 1,
+    'a kept answer shows once');
+
+  const answerCallback = askStart.shell.askCallbacks.at(-1);
+  assert.strictEqual(await answerCallback({
+    kind: 'answer-action', actionId: 'answer-governing-hidden-opaque'
+  }), true, 'an answer source that opened in its own tab still counts as opened');
+  setVisibility(askHarness, 'visible');
+  assert.strictEqual(await answerCallback({
+    kind: 'answer-action', actionId: 'answer-governing-hidden-opaque'
+  }), false, 'the opened answer source is consumed');
+  assert.strictEqual(askHarness.answerActionMessages().length, 1);
+
+  for (const ending of ['navigation', 'teardown']) {
+    let endingActionToken = null;
+    let endingHarness = null;
+    endingHarness = createContentRuntimeHarness({
+      hudResponses: [
+        message => {
+          endingActionToken = message.actionToken;
+          return contentScopedProjection(message, 'reading');
+        },
+        message => contentScopedProjection(message, 'reading')
+      ],
+      askResponder(message) {
+        setVisibility(endingHarness, 'hidden');
+        return contentAnswerProjection(message, endingActionToken, 'left-behind');
+      }
+    });
+    const endingStart = endingHarness.start();
+    await flushContentRuntime();
+    const endingEntry = endingStart.shell.renderedContracts[0].askEntries[0];
+    endingStart.shell.contractCallbacks[0]({ kind: 'ask-entry', scopeToken: endingEntry.scopeToken });
+    assert.strictEqual(await endingStart.shell.askCallbacks[0]({
+      kind: 'ask-dispatch', question: 'When does this agreement renew?'
+    }), true);
+    if (ending === 'navigation') {
+      assert.ok(endingHarness.sendRuntime({
+        action: 'skopeo:route-change', generation: 57,
+        url: 'https://docs.google.com/document/d/agreement-B/edit'
+      }));
+    } else {
+      endingHarness.api.terminate({ action: 'skopeo:terminate', generation: 57, reason: 'off' });
+      assert.strictEqual(endingHarness.document.listenerCount('visibilitychange'), 0,
+        'teardown removes the visibility listener');
+    }
+    setVisibility(endingHarness, 'visible');
+    await flushContentRuntime();
+    assert.strictEqual(endingStart.shell.renderedAsks.some(model => model.mode === 'answer'), false,
+      `${ending} drops an answer kept for a hidden tab`);
+  }
+}
+
 async function testContentAskConfirmationRouting() {
   let requestActionToken = null;
   let askRequest = null;
@@ -3892,6 +4025,7 @@ async function runHudRuntimeContract() {
     await testContentRuntimeProductionRouterAndClosedContract();
     await testContentRuntimeDriveRootsAndAccountPaths();
     await testContentAskRuntimeLifecycle();
+    await testContentRuntimeHiddenTabReplies();
     await testContentAskConfirmationRouting();
     await testContentAlertConfirmationRouting();
     await testSharedSurfaceCompletionOrders();
