@@ -950,6 +950,24 @@ function testArgumentCollectorShell(composer, shellApi) {
   });
   form.dispatchEvent(shiftTab);
   assert.strictEqual(shiftTab.defaultPrevented, false, 'Shift+Tab follows the existing non-modal Focused contract');
+  assert.strictEqual(tab.propagationStopped, false, 'Tab still reaches the shell keyboard boundary');
+  assert.strictEqual(shiftTab.propagationStopped, false, 'Shift+Tab still reaches the shell keyboard boundary');
+
+  for (const type of ['keydown', 'keypress']) {
+    const typed = createEvent(type, { key: 'k', target: form.querySelector('[name="query"]') });
+    form.dispatchEvent(typed);
+    assert.strictEqual(typed.propagationStopped, true,
+      type + ': a key typed into the collector never reaches host-page shortcut handlers');
+    assert.strictEqual(typed.defaultPrevented, false, type + ': the collector field still receives the key');
+    const save = createEvent(type, { key: 's', ctrlKey: true, target: form.querySelector('[name="query"]') });
+    form.dispatchEvent(save);
+    assert.strictEqual(save.propagationStopped, true, type + ': Ctrl+S in the collector stays in the HUD');
+    const synthetic = createEvent(type, { key: 'k', isTrusted: false, target: form.querySelector('[name="query"]') });
+    form.dispatchEvent(synthetic);
+    assert.strictEqual(synthetic.propagationStopped, false, type + ': page-created key events are left alone');
+  }
+  assert.strictEqual(actions.filter(payload => payload.kind === 'cancel-arguments').length, 0,
+    'typed keys never cancel the collector');
 
   const validQuery = form.querySelector('[name="query"]');
   validQuery.value = 'quarterly';

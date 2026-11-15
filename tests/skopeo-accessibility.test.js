@@ -415,6 +415,101 @@ function testEscapeWindowExpiry(api) {
   harness.shell.destroy('escape-expiry');
 }
 
+function mountAskComposer(api) {
+  const HudSchema = require('../extension/utils/skopeo-hud-schema.js');
+  const Composer = require('../extension/content/skopeo-adaptive-composer.js');
+  const parsed = HudSchema.parseProjection({
+    version: 'skopeo-hud-projection/1',
+    generation: 57,
+    exactOrigin: 'https://drive.google.com',
+    profileVersion: 'profile-v57',
+    contextEpoch: 12,
+    semanticEntityToken: 'drive-folder:opaque-current',
+    requestActionToken: 'request-opaque-current',
+    projectionToken: 'projection-opaque-current',
+    mode: 'ask',
+    currentness: 'current',
+    result: 'complete',
+    body: {
+      scope: { kind: 'agreement', label: 'Current agreement · Acme', scopeToken: 'scope-ask-opaque' },
+      question: null,
+      state: 'editing',
+      error: null
+    }
+  });
+  assert.ok(parsed, 'ask fixture is a valid projection');
+  const model = Composer.composeContractAsk(parsed);
+  assert.ok(model, 'ask fixture composes an ask model');
+  const harness = createHarness(api, { generation: 57 });
+  const prepared = harness.shell.prepareAmbient();
+  assert.ok(prepared && harness.shell.mountAmbient(prepared) === true, 'ask fixture mounts Ambient');
+  const actions = [];
+  assert.strictEqual(harness.shell.renderContractAsk(model, payload => {
+    actions.push(payload.kind);
+    return true;
+  }), true, 'ask composer renders');
+  const region = harness.shadow().querySelector('.skopeo-contract-ask');
+  const question = harness.shadow().querySelector('.skopeo-ask-question');
+  assert.ok(region && question, 'ask composer has its region and question field');
+  return { harness, region, question, actions };
+}
+
+// The mock DOM does not bubble, so walk the path a real key event would take
+// from the field to the page and stop where a listener stops it.
+function typeInto(path, type, key, init = {}) {
+  const event = createEvent(type, Object.assign({ key, target: path[0] }, init));
+  for (const node of path) {
+    node.dispatchEvent(event);
+    if (event.propagationStopped) break;
+  }
+  return event;
+}
+
+function testFieldKeysStayInHud(api) {
+  const { harness, region, question, actions } = mountAskComposer(api);
+  const hostShortcuts = [];
+  for (const type of ['keydown', 'keypress']) {
+    harness.document.addEventListener(type, event => hostShortcuts.push(type + ':' + event.key));
+  }
+  const path = [question, region, harness.document];
+
+  for (const type of ['keydown', 'keypress']) {
+    const printable = typeInto(path, type, 'j');
+    assert.strictEqual(printable.propagationStopped, true, type + ': a printable key typed in the ask field stops at the field');
+    assert.strictEqual(printable.defaultPrevented, false, type + ': the ask field still receives the character');
+    const save = typeInto(path, type, 's', { ctrlKey: true });
+    assert.strictEqual(save.propagationStopped, true, type + ': Ctrl+S typed in the ask field stops at the field');
+    assert.strictEqual(save.defaultPrevented, false, type + ': the shell does not cancel the browser default for Ctrl+S');
+    const synthetic = typeInto(path, type, 'j', { isTrusted: false });
+    assert.strictEqual(synthetic.propagationStopped, false, type + ': page-created key events are left alone');
+  }
+  assert.deepStrictEqual(hostShortcuts, ['keydown:j', 'keypress:j'],
+    'only the untrusted events reach host-page shortcut listeners');
+
+  assert.deepStrictEqual(actions, [], 'typed keys trigger no ask action');
+
+  hostShortcuts.length = 0;
+  const tab = typeInto(path, 'keydown', 'Tab');
+  assert.strictEqual(tab.propagationStopped, false, 'Tab leaves the field for the shell focus trap');
+  assert.deepStrictEqual(hostShortcuts, ['keydown:Tab']);
+  const escapeInField = createEvent('keydown', { key: 'Escape', target: question });
+  question.dispatchEvent(escapeInField);
+  assert.strictEqual(escapeInField.propagationStopped, false, 'Escape leaves the field for the region and shell Escape handlers');
+  const escape = typeInto(path, 'keydown', 'Escape');
+  assert.deepStrictEqual(actions, ['ask-back'], 'Escape typed in the field still reaches the region Back handler');
+  assert.strictEqual(escape.defaultPrevented, true, 'the region consumes that Escape');
+
+  const composing = typeInto(path, 'keydown', 'Process', { isComposing: true });
+  assert.strictEqual(composing.defaultPrevented, false, 'IME composition keys are never prevented');
+  question.dispatchEvent(createEvent('compositionstart', { target: question }));
+  const composingEscape = typeInto(path, 'keydown', 'Escape', { isComposing: true });
+  assert.strictEqual(composingEscape.defaultPrevented, false, 'Escape that cancels an IME composition is not consumed');
+  question.dispatchEvent(createEvent('compositionend', { target: question }));
+
+  harness.shell.destroy('field-keys');
+  assert.strictEqual(question.listenerCount('keypress'), 0, 'destroy removes the field keypress listener');
+}
+
 function testFocusRestorationAndFallback(api) {
   const { harness, origin } = mountFixture(api);
   harness.shell.enableControlledFixture(harness.fixtureToken);
@@ -556,6 +651,7 @@ function runProductionContract(api) {
   testLiveRegionCadence(api);
   testEscapeBoundary(api);
   testEscapeWindowExpiry(api);
+  testFieldKeysStayInHud(api);
   testFocusRestorationAndFallback(api);
   testFailedFocusPostconditionUsesFallback(api);
   testExactCopyAndStyles();

@@ -1786,6 +1786,17 @@
     return true;
   }
 
+  // Keys typed into a HUD field belong to that field. Without this, a page's
+  // own shortcut handlers (bubble listeners on document or window) act on
+  // them, so typing "j" or Ctrl+S in the ask box also drives the page. Escape
+  // and Tab keep bubbling: the shell's window listener needs them for Back,
+  // the double-Escape close and the gate's focus trap. Nothing is prevented,
+  // so the field, IME composition and browser defaults behave as before.
+  function keepFieldKeyInHud(event) {
+    if (!event || event.isTrusted !== true || event.key === 'Escape' || event.key === 'Tab') return;
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+  }
+
   class SkopeoShell {
     constructor(options) {
       const settings = options || {};
@@ -3162,6 +3173,7 @@
         });
       });
       this._listen(form, 'keydown', function (event) {
+        keepFieldKeyInHud(event);
         if (!event || event.isTrusted !== true || event.key !== 'Escape' || submitted) return;
         if (typeof event.preventDefault === 'function') event.preventDefault();
         if (typeof event.stopPropagation === 'function') event.stopPropagation();
@@ -3172,6 +3184,7 @@
           collectionEpoch: collection.collectionEpoch
         });
       });
+      this._listen(form, 'keypress', keepFieldKeyInHud);
       this._pointerSurface(form);
       this._acquireSurface('pendingRenders', function () {
         submitted = true;
@@ -4497,12 +4510,14 @@
       this._listen(question, 'compositionend', function () { composing = false; updateCount(); });
       this._listen(question, 'input', updateCount);
       this._listen(question, 'keydown', function (event) {
+        keepFieldKeyInHud(event);
         if (!event || event.isTrusted !== true || composing || event.isComposing || event.key !== 'Enter' ||
             (!event.metaKey && !event.ctrlKey)) return;
         if (dispatch() === false) return;
         event.preventDefault();
         event.stopPropagation();
       });
+      this._listen(question, 'keypress', keepFieldKeyInHud);
       this._listen(region, 'keydown', function (event) {
         if (!event || event.isTrusted !== true || event.defaultPrevented || event.key !== 'Escape' ||
             composing || event.isComposing) return;
