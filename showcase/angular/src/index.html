@@ -25,6 +25,16 @@
     })();
   </script>
 
+  <!-- A depth page (layout/depth) centres each plane in the window. On a slow connection
+       the browser paints while the first plane's markup is still arriving, draws it
+       short, then moves everything as the rest lands. The first plane therefore stays
+       hidden until the next one has begun, which is when the first is complete. This
+       has to be inline: the stylesheet arrives too late, and the build's critical-CSS
+       step drops selectors that use :has(). A browser without :has() ignores the rule. -->
+  <style>
+    .fsb-depth-layer:not(.fsb-depth-layer ~ .fsb-depth-layer):not(:has(~ .fsb-depth-layer)) { visibility: hidden; }
+  </style>
+
   <!-- Without JavaScript the depth pages (layout/depth) cannot move between their
        planes, so they fall back to one ordinary scrolling column. -->
   <noscript>
