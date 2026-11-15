@@ -5,9 +5,11 @@
    read scrolls inside itself instead, before the camera moves on; on a phone
    every plane is fitted, so a swipe always moves the camera.
 
-   Everything here is style writes on nodes the template already rendered; no DOM is
-   created. The engine runs outside Angular's zone and reports the plane in focus
-   through `onActive`, which is the only thing a page needs to react to.
+   Everything here is style writes on nodes the template already rendered. The one
+   thing it adds is a label over each rail entry, on phones that tick only for a
+   tapped switch (labelEntries() below). The engine runs outside Angular's zone and
+   reports the plane in focus through `onActive`, which is the only thing a page
+   needs to react to.
 
    Markup contract (see the pages that use it):
      [data-depth-stage]          the stage; holds every .fsb-depth-layer
@@ -89,6 +91,8 @@ const WIDEN_BELOW = 0.97;
 const FIT_EASE = 'transform .35s cubic-bezier(.16,1,.3,1)';
 /* The length of the tick a phone gives when a swipe lands on another plane. */
 const TICK_MS = 15;
+/* Marks the label that makes a phone without vibration tick (labelEntries() below). */
+const TAP_LABEL = 'data-depth-tick';
 
 /* After a swipe snaps to a plane, wheel events that still arrive this soon belong
    to that swipe's momentum and are eaten. The snap itself comes 160ms after the
@@ -118,6 +122,14 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let railEl: HTMLElement | null = null;
   let rail: HTMLElement[] = [];
   let railKey = '';
+  // An iPhone cannot vibrate from script. The one haptic a page can cause there is
+  // the tick of the native switch control, and only when a finger taps the switch or
+  // a label for it. `placed` is set where the entry was positioned to hold its label.
+  const tapTicks =
+    typeof win.navigator.vibrate !== 'function' && 'switch' in win.HTMLInputElement.prototype && win.navigator.maxTouchPoints > 0;
+  const tapLabels = new Map<HTMLElement, { label: HTMLLabelElement; placed: boolean }>();
+  // How far the labels reach past their entries, as last written (placeLabels()).
+  let tapInset = '';
   let cueEl: HTMLElement | null = null;
   let cueLast = -1;
   const reduce = !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -272,8 +284,65 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       if (rail.length > 9) railEl.setAttribute('data-dense', rail.length > 16 ? 'xl' : '');
       else railEl.removeAttribute('data-dense');
     }
+    labelEntries();
     railKey = '';
     markRail();
+  }
+  // On such a phone a tap on a rail entry lands on a see-through label for a hidden
+  // switch, and the phone ticks as it does for a switch of its own. The label, not
+  // the switch, is under the finger: a touch that starts on a switch belongs to the
+  // switch, and a slide along the rail could not start there. A swipe is not a tap,
+  // so a swipe between planes, or a slide along the rail, stays silent there.
+  function labelEntries(): void {
+    for (const [b, had] of Array.from(tapLabels)) if (!rail.includes(b) || had.label.parentElement !== b) unlabel(b);
+    if (!tapTicks || !railEl) return;
+    for (const b of rail) {
+      if (tapLabels.has(b)) continue;
+      const label = doc.createElement('label');
+      label.setAttribute(TAP_LABEL, '');
+      label.setAttribute('aria-hidden', 'true');
+      label.style.position = 'absolute';
+      const sw = doc.createElement('input');
+      sw.type = 'checkbox';
+      sw.setAttribute('switch', '');
+      sw.setAttribute('aria-hidden', 'true');
+      sw.tabIndex = -1;
+      sw.style.position = 'absolute';
+      sw.style.width = sw.style.height = '1px';
+      sw.style.margin = '0';
+      sw.style.opacity = '0';
+      sw.style.visibility = 'hidden';
+      label.appendChild(sw);
+      // Positioned whatever the page's rules say now: the rule that positions an entry
+      // on a phone held upright stops applying when it is turned sideways, and the
+      // label would then be laid out against the whole rail.
+      const placed = !b.style.position;
+      if (placed) b.style.position = 'relative';
+      b.appendChild(label);
+      tapLabels.set(b, { label, placed });
+    }
+    tapInset = '';
+    placeLabels();
+  }
+  // Out over the strip beside the buttons and half the gap between them: a tap there
+  // opens the nearest entry, so it ticks as well. Both come from the rail's rules,
+  // which change when a phone turns, so they are measured again with the window.
+  function placeLabels(): void {
+    if (!tapLabels.size || !railEl) return;
+    const cs = win.getComputedStyle(railEl);
+    const edge = parseFloat(cs.paddingRight) || 0;
+    const gap = (parseFloat(cs.rowGap) || 0) / 2;
+    const inset = `${-gap}px ${-edge}px ${-gap}px 0`;
+    if (inset === tapInset) return;
+    tapInset = inset;
+    for (const had of tapLabels.values()) had.label.style.inset = inset;
+  }
+  function unlabel(b: HTMLElement): void {
+    const had = tapLabels.get(b);
+    if (!had) return;
+    had.label.remove();
+    if (had.placed) b.style.position = '';
+    tapLabels.delete(b);
   }
   function markRail(): void {
     // The finger's entry stays marked until the camera has arrived there, or until
@@ -292,6 +361,10 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       b.classList.toggle('is-active', on);
       if (on) b.setAttribute('aria-current', 'step');
       else b.removeAttribute('aria-current');
+      // A tap on the entry the camera is already on moves nothing, so it goes to
+      // the entry itself, which does not tick.
+      const had = tapLabels.get(b);
+      if (had) had.label.style.pointerEvents = on ? 'none' : '';
     }
   }
 
@@ -567,6 +640,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   }
 
   function layout(): void {
+    // The rail's rules change with the window too.
+    placeLabels();
     const H = stage!.clientHeight;
     const W = stage!.clientWidth;
     const narrow = W <= NARROW_MAX_WIDTH;
@@ -779,7 +854,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     raf = win.requestAnimationFrame(frame);
   }
   // A phone ticks when a swipe or tap lands on another plane. Browsers that cannot
-  // vibrate have no such function; Chrome ignores the call, and warns in the console,
+  // vibrate have no such function (an iPhone ticks for a tap on a rail entry
+  // instead: labelEntries()); Chrome ignores the call, and warns in the console,
   // until the page has been tapped once.
   function tick(): void {
     if (win.performance.now() - lastTouch > 1000) return;
@@ -1098,14 +1174,22 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   }
   function onClick(e: MouseEvent): void {
     const t = e.target as Element | null;
+    // A label over a rail entry hands its click on to the switch inside it, which is
+    // what makes the phone tick. The switch's click is that hand-over, not a second tap.
+    const viaLabel = t?.closest?.(`[${TAP_LABEL}]`) || null;
+    if (viaLabel && t !== viaLabel) return;
     // A click in a plane whose answers open on demand may open one: it is then
     // scrolled into view as it opens.
     const L = t?.closest?.<DepthLayer>('.fsb-depth-layer');
     if (L && layers.includes(L) && grows(L).length) L._armed = win.performance.now();
     const b = t?.closest?.<HTMLElement>('[data-depth-go]');
     if (!b || !root.contains(b)) return;
-    e.preventDefault();
-    if (win.performance.now() - slidEnd < SLID_CLICK_MS) return;
+    // Cancelling a label's click stops it reaching the switch, and the tick with it.
+    // That is right for the click a short slide leaves behind, which opens nothing,
+    // and for no other.
+    const stray = win.performance.now() - slidEnd < SLID_CLICK_MS;
+    if (!viaLabel || stray) e.preventDefault();
+    if (stray) return;
     openEntry(b);
     try {
       stage!.focus({ preventScroll: true });
@@ -1201,6 +1285,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       win.removeEventListener('load', rescan);
       cueEl?.style.removeProperty('--cue');
       railEl?.removeAttribute('data-sliding');
+      for (const b of Array.from(tapLabels.keys())) unlabel(b);
       stage.removeAttribute('data-depth-live');
     },
   };
