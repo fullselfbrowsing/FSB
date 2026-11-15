@@ -493,6 +493,19 @@ async function localCheckSection() {
     ['a URL fragment in the goal', (r) => { r.goal = 'Go to https://shop.example/cart#coupon-SPRING25 now'; }, 'coupon-SPRING25'],
     ['a scheme-less URL query in the goal', (r) => { r.goal = 'Go to shop.example/cart?order=88231 now'; }, 'order=88231'],
   ];
+  // Goals that hold a URL query or a password outside an http(s) URL with a
+  // dotted host: refused raw, and sent once buildRequest has reduced them.
+  const goalLeaks = [
+    ['a query right after a bare host', 'Search amazon.com?k=shoes then add the first one', 'k=shoes'],
+    ['a localhost URL query', 'Open localhost:3000/admin?session=abc123 and click save', 'session=abc123'],
+    ['an IPv4 URL query', 'Open 127.0.0.1:8080/x?ticket=4471 and click', 'ticket=4471'],
+    ['a URL glued to the word before it', 'Open linkhttps://a.example/x?order=88231 now', 'order=88231'],
+    ['an ftp URL query', 'Open ftp://files.example/x?ticket=9 now', 'ticket=9'],
+    ['a password typed without a scheme', 'Log in at admin:hunter2@router.example/setup?x=1', 'hunter2'],
+  ];
+  for (const [label, goal, secret] of goalLeaks) {
+    raw.push([`${label} in the goal`, (r) => { r.goal = goal; }, secret]);
+  }
   for (const [label, mutate, secret] of raw) {
     const request = validRequest();
     mutate(request);
@@ -526,6 +539,24 @@ async function localCheckSection() {
     check('no raw value reaches the wire body',
       ['4111 1111', 'sk-ant-abcdefghijklmnop1234', injection, 'AKIAABCDEFGHIJKLMNOP', 'token=abc123',
         'AbCdEfGh1234567890IjKlMnOpQrStUv12'].every((secret) => !wire.includes(secret)), wire.slice(0, 300));
+  }
+  for (const [label, goal, secret] of goalLeaks) {
+    const reduced = S.buildRequest({
+      kinds: ['operation'],
+      goal,
+      url: 'https://example.test/',
+      title: '',
+      visibleText: '',
+      elements: [{ id: 'a', role: 'button', label: 'Go', ops: ['click'] }],
+      offeredOps: ['click'],
+    });
+    check(`precondition: buildRequest succeeds with ${label} in the goal`, reduced.ok === true, show(reduced));
+    if (!reduced.ok) continue;
+    const sent = await runOnce(jsonResponse(503, fallbackBody('busy', 503)), { request: reduced.request });
+    const wire = sent.fetchImpl.calls.length === 1 ? String(sent.fetchImpl.calls[0].init.body) : '';
+    check(`a goal with ${label}, reduced by buildRequest, passes the sanitized-form check and reaches the network`,
+      sent.fetchImpl.calls.length === 1 && sent.result.fallback === 'busy' && !wire.includes(secret),
+      show({ goal: reduced.request.goal, result: sent.result }));
   }
 
   const controller = new AbortController();

@@ -521,11 +521,39 @@ function scrubSection() {
     ['Email bob@example.com?subject=hi', 'Email bob@example.com?subject=hi'],
     ['Read node.js#readme and README.md#install', 'Read node.js#readme and README.md#install'],
     ['Is it shop.example/cart?', 'Is it shop.example/cart?'],
-    ['Is it on example.com?', 'Is it on example.com?']
+    ['Is it on example.com?', 'Is it on example.com?'],
+    // A query right after a bare host, a localhost or IPv4 address, a URL
+    // glued to the word before it, any other scheme, and a user:password
+    // typed without a scheme are all reduced too.
+    ['search amazon.com?k=shoes then add the first one', 'search amazon.com then add the first one'],
+    ['go to example.com?q=secret and click', 'go to example.com and click'],
+    ['open localhost:3000/admin?session=abc123 and click save', 'open localhost:3000/admin and click save'],
+    ['Open Localhost:3000/admin?session=abc123', 'Open Localhost:3000/admin'],
+    ['open 127.0.0.1:8080/x?q=1 and click', 'open 127.0.0.1:8080/x and click'],
+    ['open linkhttps://a.com/x?order=88231 now', 'open linkhttps://a.com/x now'],
+    ['open ftp://files.example/x?ticket=9 now', 'open ftp://files.example/x now'],
+    ['open ftp://admin:hunter2@files.example/x now', 'open ftp://files.example/x now'],
+    ['login at admin:hunter2@router.example/setup?x=1', 'login at router.example/setup'],
+    ['login at admin:hunter2@router.example now', 'login at router.example now'],
+    ['curl //admin:hunter2@localhost:8080/x', 'curl //localhost:8080/x'],
+    ['ping admin:pa@ss@10.0.0.1 now', 'ping 10.0.0.1 now'],
+    // A bare host followed only by '#' looks exactly like README.md#install,
+    // so it stays as typed; a mailto: address is an email, not a password.
+    ['go to example.com#orders/88231', 'go to example.com#orders/88231'],
+    ['Email mailto:bob@example.com?subject=hi', 'Email mailto:bob@example.com?subject=hi']
   ]) {
     const reduced = S.reduceGoalUrls(goal);
     check(`reduceGoalUrls keeps the task and drops only URL queries: ${goal.slice(0, 32)}...`,
       reduced === expected && S.reduceGoalUrls(reduced) === reduced, show(reduced));
+  }
+  // The goal is reduced before it is cut to length, so one long word or run
+  // of punctuation must not make the URL patterns backtrack quadratically.
+  for (const [label, goal] of [['letters', 'a'.repeat(50000)], ['dotted labels', 'a.'.repeat(25000)],
+    ['userinfo characters', '~'.repeat(50000)], ['colons', 'a:'.repeat(25000)]]) {
+    const started = process.hrtime.bigint();
+    const reduced = S.reduceGoalUrls(goal);
+    const ms = Number(process.hrtime.bigint() - started) / 1e6;
+    check(`reduceGoalUrls stays linear on a 50,000-character run of ${label}`, reduced === goal && ms < 150, `${ms.toFixed(1)} ms`);
   }
   {
     const built = S.buildRequest(sampleInput({ goal: 'Go to shop.example/cart?order=88231 and click Continue' }));

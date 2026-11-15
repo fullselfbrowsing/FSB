@@ -679,9 +679,13 @@
     return { origin: parsed.origin, path: reducedPath };
   }
 
-  // An http(s) URL inside free text runs up to whitespace, quotes or brackets;
-  // sentence punctuation right after it belongs to the prose, not the URL.
-  var GOAL_URL_RE = /\bhttps?:\/\/[^\s<>"'`]+/gi;
+  // A URL with a scheme inside free text runs up to whitespace, quotes or
+  // brackets; sentence punctuation right after it belongs to the prose, not
+  // the URL. Any scheme counts, and the URL may be glued to the word before
+  // it with no space. The scheme is capped at 32 characters so a long
+  // word cannot make every start position rescan it; a longer scheme only
+  // moves the start of the match, and the URL is still reduced.
+  var GOAL_URL_RE = /[A-Za-z][A-Za-z0-9+.-]{0,31}:\/\/[^\s<>"'`]+/gi;
   var URL_TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}]+$/;
   // Chinese and Japanese text often follows a URL with no space. The host may
   // be an internationalized name, so it also admits letters, marks and digits;
@@ -689,20 +693,47 @@
   // the prose again.
   var URL_AUTHORITY_STOP_RE = /[^A-Za-z0-9\-._~:\/?#\[\]@!$&()*+,;=%\p{L}\p{M}\p{N}]/u;
   var URL_TAIL_STOP_RE = /[^A-Za-z0-9\-._~:\/?#\[\]@!$&()*+,;=%]/;
+  // A host typed without a scheme: a dotted name, localhost or an IPv4 address.
+  var BARE_HOST_SOURCE =
+    '(?:(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}' +
+    '|localhost|\\d{1,3}(?:\\.\\d{1,3}){3})';
   // A URL typed without a scheme that carries a query or fragment: an optional
-  // protocol-relative '//', a dotted host, an optional port and path, then '?'
-  // or '#'. The lookbehind skips emails and the inside of a longer URL.
+  // protocol-relative '//', a host, an optional port and path, then '?' or
+  // '#'. The lookbehind skips emails and the inside of a longer URL.
   var BARE_GOAL_URL_RE = new RegExp(
     '(?<![\\w@.\\/:-])(\\/\\/)?' +
-    '((?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}(?::\\d{1,5})?)' +
+    '(' + BARE_HOST_SOURCE + '(?::\\d{1,5})?)' +
     '(\\/[A-Za-z0-9\\-._~:\\/\\[\\]@!$&()*+,;=%]*)?' +
     '([?#][A-Za-z0-9\\-._~:\\/?#\\[\\]@!$&()*+,;=%]+)',
-    'g'
+    'gi'
+  );
+  // A user:password@ typed before such a host with no scheme. The colon is
+  // required, so an email such as bob@example.com is left alone, and so is a
+  // mailto: address. The password may hold '@' (the last one ends it, as in
+  // a browser). The lookbehind is the one above plus every character a user
+  // name can hold, so the pattern never fires inside a URL that has a scheme
+  // and never rescans a run of name characters from each position.
+  var BARE_GOAL_USERINFO_RE = new RegExp(
+    '(?<![\\w@.\\/:~%-])(?!mailto:)(\\/\\/)?' +
+    '[A-Za-z0-9\\-._~%]+:[A-Za-z0-9\\-._~!$&\'()*+,;=%:@]*@' +
+    '(?=' + BARE_HOST_SOURCE + ')',
+    'gi'
   );
 
   function splitTrailingPunctuation(text) {
     var trailing = (text.match(URL_TRAILING_PUNCTUATION_RE) || [''])[0];
     return { url: trailing ? text.slice(0, text.length - trailing.length) : text, trailing: trailing };
+  }
+
+  // A URL with another scheme, or one that does not parse, keeps its scheme,
+  // host and path as typed; the query, fragment and any user:password@ go.
+  function stripUrlExtras(url) {
+    var schemeEnd = url.indexOf('//') + 2;
+    var kept = url.split(/[?#]/)[0];
+    var pathStart = kept.indexOf('/', schemeEnd);
+    var authorityEnd = pathStart === -1 ? kept.length : pathStart;
+    var at = kept.lastIndexOf('@', authorityEnd - 1);
+    return at < schemeEnd ? kept : kept.slice(0, schemeEnd) + kept.slice(at + 1);
   }
 
   function reduceSchemeUrl(match) {
@@ -722,16 +753,18 @@
     var parts = splitTrailingPunctuation(match.slice(0, urlEnd));
     if (!/[?#@]/.test(parts.url)) return match;
     var reduced = toOriginPath(parts.url);
-    return (reduced ? reduced.origin + reduced.path : parts.url.split(/[?#]/)[0]) +
+    return (reduced ? reduced.origin + reduced.path : stripUrlExtras(parts.url)) +
       parts.trailing + rest;
   }
 
-  // Only a www. host, a host with a path, or a '//' form counts, so a file
-  // name such as README.md#install is not taken for a web address. The host
-  // and path stay as typed, with the path scrubbed one segment at a time as
-  // toOriginPath does.
-  function reduceBareUrl(match, slashes, host, path) {
-    if (!slashes && !path && !/^www\./i.test(host)) return match;
+  // A www. host, a host with a path, a '//' form, or a host followed
+  // directly by a query counts. A bare host followed only by '#' does not:
+  // a file name such as README.md#install or node.js#readme has exactly
+  // that shape, and a dotted name alone does not say which one it is. The
+  // host and path stay as typed, with the path scrubbed one segment at a
+  // time as toOriginPath does.
+  function reduceBareUrl(match, slashes, host, path, suffix) {
+    if (!slashes && !path && !/^www\./i.test(host) && suffix.charAt(0) !== '?') return match;
     var parts = splitTrailingPunctuation(match);
     if (!/[?#]/.test(parts.url)) return match;
     var scrubbedPath = path ? path.split('/').map(scrubPathSegment).join('/') : '';
@@ -743,7 +776,7 @@
    * userinfo to its origin and path, the same rule page.path follows (D-20).
    * The privacy disclosure promises query strings and fragments never reach
    * FSB's server, and a URL can sit anywhere in the goal, with or without a
-   * scheme. A URL that does not parse keeps only what precedes '?' or '#'.
+   * scheme. A URL that does not parse keeps only its scheme, host and path.
    * Other text, including text that follows a URL with no space, is unchanged.
    * A malformed URL can reduce to text that is reducible again, so the passes
    * repeat until nothing changes: the client refuses a goal that is not a
@@ -753,7 +786,10 @@
     if (typeof goal !== 'string') return goal;
     var current = goal;
     for (var pass = 0; pass < 4; pass += 1) {
-      var next = current.replace(GOAL_URL_RE, reduceSchemeUrl).replace(BARE_GOAL_URL_RE, reduceBareUrl);
+      var next = current
+        .replace(GOAL_URL_RE, reduceSchemeUrl)
+        .replace(BARE_GOAL_USERINFO_RE, '$1')
+        .replace(BARE_GOAL_URL_RE, reduceBareUrl);
       if (next === current) return next;
       current = next;
     }
