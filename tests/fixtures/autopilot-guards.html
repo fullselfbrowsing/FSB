@@ -1,0 +1,60 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Order: Blue Mug</title></head>
+<body>
+<!-- The reporter's BU-02c, BU-02h and BU-03 shapes (#146): fields wrapped in
+     their labels, and a natively disabled button with a click listener. -->
+<h1>Order: Blue Mug</h1>
+<label>Your name <input id="name"></label>
+<button id="place" disabled>Place order</button>
+<form id="contact"><label>Message <textarea id="m"></textarea></label><button>Send</button></form>
+<!-- Control: the page enables Apply itself once a coupon is typed. -->
+<label>Coupon <input id="coupon"></label>
+<button id="apply" disabled>Apply</button>
+<script>
+// Just enough of the extension APIs for the real content scripts to load in a
+// plain page. Messages go straight to messaging.js's own listeners.
+window.__fsbListeners = [];
+window.chrome = Object.assign(window.chrome || {}, {
+  runtime: {
+    id: "fixture", lastError: null,
+    onMessage: { addListener: fn => window.__fsbListeners.push(fn), removeListener() {} },
+    sendMessage: () => Promise.resolve(), getURL: p => p, getManifest: () => ({ version: "0" })
+  },
+  storage: { local: { get: async () => ({}), set: async () => {} }, onChanged: { addListener() {} } }
+});
+window.__FSB_COOKIE_DISMISSED__ = true;
+window.orderClicks = 0;
+window.applyClicks = 0;
+window.messagesSent = 0;
+document.getElementById("place").addEventListener("click", () => { window.orderClicks++; });
+document.getElementById("apply").addEventListener("click", () => { window.applyClicks++; });
+document.getElementById("coupon").addEventListener("input", event => {
+  document.getElementById("apply").disabled = !event.target.value;
+});
+document.getElementById("contact").addEventListener("submit", event => {
+  event.preventDefault();
+  window.messagesSent++;
+});
+window.fsbSend = request => new Promise(resolve => {
+  for (const listener of window.__fsbListeners) listener(request, { id: "fixture" }, resolve);
+});
+</script>
+<script src="../../extension/utils/diagnostics-ring-buffer.js"></script>
+<script src="../../extension/utils/redactForLog.js"></script>
+<script src="../../extension/utils/automation-logger.js"></script>
+<script src="../../extension/content/init.js"></script>
+<script src="../../extension/content/utils.js"></script>
+<script src="../../extension/content/dom-state.js"></script>
+<script src="../../extension/content/selectors.js"></script>
+<script src="../../extension/content/badge-combine.js"></script>
+<script src="../../extension/content/visual-feedback.js"></script>
+<script src="../../extension/content/phantom-stream-capture.js"></script>
+<script src="../../extension/content/dom-stream.js"></script>
+<script src="../../extension/content/trigger-observe.js"></script>
+<script src="../../extension/content/accessibility.js"></script>
+<script src="../../extension/utils/google-sheets-ui.js"></script>
+<script src="../../extension/content/actions.js"></script>
+<script src="../../extension/content/dom-analysis.js"></script>
+<script src="../../extension/content/messaging.js"></script>
+<script src="../../extension/content/lifecycle.js"></script>
+</body></html>

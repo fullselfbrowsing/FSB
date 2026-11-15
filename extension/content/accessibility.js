@@ -446,6 +446,20 @@
       details.nativeDisabled = false;
     }
 
+    // #156: inner node of a disabled <button> (e.g. a text-matched <span>).
+    // :disabled only matches the control itself, so check the ancestor.
+    try {
+      const disabledButton = element.closest('button:disabled');
+      if (disabledButton && disabledButton !== element) {
+        details.ancestorNativeDisabled = true;
+        return {
+          passed: false,
+          reason: 'Ancestor button is disabled (native :disabled)',
+          details
+        };
+      }
+    } catch (e) { /* closest unsupported */ }
+
     // Check aria-disabled on element
     if (element.getAttribute('aria-disabled') === 'true') {
       details.ariaDisabled = true;
@@ -998,7 +1012,11 @@
     checks.hasSize = rect.width > 0 && rect.height > 0;
 
     // Check 2: Not disabled
-    checks.notDisabled = !element.disabled && element.getAttribute('aria-disabled') !== 'true';
+    // #156: include disabled/aria-disabled ancestors so the fast path never
+    // approves a child of a disabled control.
+    let disabledAncestor = null;
+    try { disabledAncestor = element.closest('button:disabled, [aria-disabled="true"]'); } catch (e) { disabledAncestor = null; }
+    checks.notDisabled = !element.disabled && element.getAttribute('aria-disabled') !== 'true' && !disabledAncestor;
 
     // Check 3: Visible (computed style)
     const style = getComputedStyle(element);
