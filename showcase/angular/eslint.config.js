@@ -42,8 +42,9 @@ module.exports = tseslint.config(
           // Routing (Angular router takes literal strings, not translations)
           'routerLink', 'routerLinkActive',
           // ARIA structural attributes (not user-facing text)
-          // aria-live / aria-busy are politeness/busy tokens (e.g. "polite"), not copy
-          'aria-controls', 'aria-expanded', 'aria-hidden', 'aria-live', 'aria-busy',
+          // aria-live / aria-busy are politeness/busy tokens (e.g. "polite"), not copy;
+          // aria-controls / aria-labelledby hold the id of another element
+          'aria-controls', 'aria-labelledby', 'aria-expanded', 'aria-hidden', 'aria-live', 'aria-busy',
           // Image / element MIME-style flags
           'type', 'role'
         ]

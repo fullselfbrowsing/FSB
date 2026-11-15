@@ -345,6 +345,15 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
         unitText: 'percent',
       },
     };
+    // Tells search engines what to call the site; the home page is where it is declared.
+    const site = {
+      '@type': 'WebSite',
+      '@id': `${HOST}/#site`,
+      url: HOST,
+      name: 'FSB',
+      alternateName: ['Full Self-Browsing', 'Full Self Browsing'],
+      publisher: { '@id': `${HOST}/#org` },
+    };
     this.pageJsonLd.set('software-application', {
       '@context': 'https://schema.org',
       '@graph': [
@@ -355,9 +364,11 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
           inLanguage: this.localeId,
           name: this.title.getTitle(),
           description: this.meta.getTag('name="description"')?.content,
+          isPartOf: { '@id': site['@id'] },
           mainEntity: { '@id': software['@id'] },
           publisher: { '@id': `${HOST}/#org` },
         },
+        site,
         software,
         benchmark,
       ],

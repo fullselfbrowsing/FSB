@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ElementRef, OnInit, Renderer2, ViewChild, afterNextRender, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, Renderer2, ViewChild, afterNextRender, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
@@ -20,7 +20,7 @@ const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
   templateUrl: './privacy-page.component.html',
   styleUrl: './privacy-page.component.scss',
 })
-export class PrivacyPageComponent implements OnInit {
+export class PrivacyPageComponent implements OnInit, OnDestroy {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
   private readonly renderer = inject(Renderer2);
@@ -34,6 +34,11 @@ export class PrivacyPageComponent implements OnInit {
     const t = $localize`:@@privacy.meta.title:FSB - Privacy`;
     const d = $localize`:@@privacy.meta.description:How FSB handles your data: API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry, automation runs locally in your browser. BYO key, BYO browser.`;
     this.applyMeta(t, d, url);
+    this.injectPrivacyJsonLd(url);
+  }
+
+  ngOnDestroy(): void {
+    this.pageJsonLd.remove('privacy-page');
   }
 
   private applyMeta(t: string, d: string, url: string): void {
@@ -54,6 +59,24 @@ export class PrivacyPageComponent implements OnInit {
     this.meta.updateTag({ name: 'twitter:image', content: OG_IMAGE });
     this.meta.updateTag({ name: 'twitter:image:alt', content: OG_IMAGE_ALT });
     emitLocaleHead(this.renderer, this.doc, this.localeId, ROUTE_PATH);
+  }
+
+  /* The policy as a page: its name, its language, and the date shown under the
+     heading ("Last updated"), which is what tells a crawler the text is current. */
+  private readonly pageJsonLd = inject(PageJsonLdService);
+
+  private injectPrivacyJsonLd(url: string): void {
+    this.pageJsonLd.set('privacy-page', {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${url}#webpage`,
+      url,
+      inLanguage: this.localeId,
+      name: this.title.getTitle(),
+      description: this.meta.getTag('name="description"')?.content,
+      dateModified: PRIVACY_LAST_UPDATED,
+      publisher: { '@id': `${HOST}/#org` },
+    });
   }
 
   /* Depth page wiring. The policy is one plane that scrolls inside itself; once
@@ -88,3 +111,11 @@ const PRIVACY_RAIL_ARIA = $localize`:@@privacy.depth.rail.aria:FSB privacy polic
 const PRIVACY_RAIL_OVERVIEW = $localize`:@@privacy.depth.rail.overview:Overview`;
 const PRIVACY_RAIL_POLICY = $localize`:@@privacy.depth.rail.policy:Policy`;
 const PRIVACY_RAIL_INDEX = $localize`:@@depth.rail.index:Index`;
+
+/* The date in the page's "Last updated" line (privacy.header.updated in the template),
+   in the form structured data wants. tests/showcase-privacy-page.test.js fails when
+   the two disagree, so changing the policy means changing both. */
+const PRIVACY_LAST_UPDATED = '2026-09-29';
+
+// Imported at the end so the $localize calls at the top of the file keep the line numbers messages.xlf records.
+import { PageJsonLdService } from '../../core/seo/page-json-ld.service';

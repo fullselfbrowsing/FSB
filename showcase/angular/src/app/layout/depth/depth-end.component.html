@@ -16,9 +16,9 @@
   <nav class="fsb-end-groups" i18n-aria-label="@@depth.end.aria" aria-label="Site index">
     <div class="fsb-end-group" data-di="0.1">
       <div class="fsb-end-float" style="--d: 16">
-        <h2 class="fsb-end-label" i18n="@@shell.footer.col.pages.title">Pages</h2>
+        <p class="fsb-end-label" id="fsb-end-pages" i18n="@@shell.footer.col.pages.title">Pages</p>
         <span class="fsb-end-line" aria-hidden="true"></span>
-        <ul class="fsb-end-list">
+        <ul class="fsb-end-list" aria-labelledby="fsb-end-pages">
           <li><a routerLink="/" routerLinkActive="is-current" [routerLinkActiveOptions]="{exact: true}" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.footer.col.pages.home">Home</span></a></li>
           <li><a routerLink="/about" routerLinkActive="is-current" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.footer.col.pages.about">About</span></a></li>
           <li><a routerLink="/dashboard" routerLinkActive="is-current" [ariaCurrentWhenActive]="'page'"><span i18n="@@shell.footer.col.pages.dashboard">Dashboard</span></a></li>
@@ -31,9 +31,9 @@
 
     <div class="fsb-end-group" data-di="0.2">
       <div class="fsb-end-float" style="--d: 26">
-        <h2 class="fsb-end-label" i18n="@@shell.footer.col.project.title">Project</h2>
+        <p class="fsb-end-label" id="fsb-end-project" i18n="@@shell.footer.col.project.title">Project</p>
         <span class="fsb-end-line" aria-hidden="true"></span>
-        <ul class="fsb-end-list">
+        <ul class="fsb-end-list" aria-labelledby="fsb-end-project">
           <li><a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" [attr.translate]="'no'"><span i18n="@@shell.footer.project.github">GitHub</span><i class="fa-solid fa-arrow-up-right-from-square fsb-end-ext" aria-hidden="true"></i></a></li>
           <li><a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'"><span i18n="@@shell.footer.project.issues">Issues</span><i class="fa-solid fa-arrow-up-right-from-square fsb-end-ext" aria-hidden="true"></i></a></li>
           <li><a routerLink="/release-notes"><span i18n="@@shell.footer.project.releaseNotes">Release notes</span></a></li>
@@ -45,9 +45,9 @@
 
     <div class="fsb-end-group" data-di="0.3">
       <div class="fsb-end-float" style="--d: 20">
-        <h2 class="fsb-end-label" i18n="@@shell.footer.col.research.title">Research</h2>
+        <p class="fsb-end-label" id="fsb-end-research" i18n="@@shell.footer.col.research.title">Research</p>
         <span class="fsb-end-line" aria-hidden="true"></span>
-        <ul class="fsb-end-list">
+        <ul class="fsb-end-list" aria-labelledby="fsb-end-research">
           <li><a routerLink="/lattice" [attr.translate]="'no'"><span i18n="@@shell.footer.research.lattice">Lattice</span></a></li>
           <li><a routerLink="/concierge" [attr.translate]="'no'"><span i18n="@@shell.footer.research.concierge">Concierge</span></a></li>
           <li><a routerLink="/phantom-stream" [attr.translate]="'no'"><span i18n="@@shell.footer.research.phantomStream">PhantomStream</span></a></li>
@@ -58,9 +58,9 @@
 
     <div class="fsb-end-group" data-di="0.4">
       <div class="fsb-end-float" style="--d: 30">
-        <h2 class="fsb-end-label" i18n="@@shell.footer.col.community.title">Community</h2>
+        <p class="fsb-end-label" id="fsb-end-community" i18n="@@shell.footer.col.community.title">Community</p>
         <span class="fsb-end-line" aria-hidden="true"></span>
-        <ul class="fsb-end-list">
+        <ul class="fsb-end-list" aria-labelledby="fsb-end-community">
           <li><a href="https://x.com/fsb0804" target="_blank" rel="noopener" i18n-aria-label="@@shell.footer.community.x" aria-label="X" [attr.translate]="'no'"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i><i class="fa-solid fa-arrow-up-right-from-square fsb-end-ext" aria-hidden="true"></i></a></li>
           <li><a href="https://discord.gg/xRbj6JQpY" target="_blank" rel="noopener" [attr.translate]="'no'"><span i18n="@@shell.footer.community.discord">Discord</span><i class="fa-solid fa-arrow-up-right-from-square fsb-end-ext" aria-hidden="true"></i></a></li>
           <li><a routerLink="/sitemaps" [attr.translate]="'no'"><span i18n="@@shell.footer.community.sitemaps">Sitemaps</span></a></li>
