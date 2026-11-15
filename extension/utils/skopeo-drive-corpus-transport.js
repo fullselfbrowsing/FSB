@@ -184,9 +184,20 @@
       /^[A-Za-z0-9._~+/=-]+$/.test(value);
   }
 
-  function validBoundedString(value, maximum) {
-    return typeof value === 'string' && value.length > 0 && value.length <= maximum &&
-      !/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>]/.test(value);
+  // A file name is display text, not an identifier, so any bounded name is
+  // accepted here. The corpus schema decides whether it can be shown and
+  // withholds the one file as pending if not. Rejecting it here would fail
+  // the whole listing, and the reconciler reads a source missing from a
+  // listing as deleted.
+  function validName(value, maximum) {
+    return typeof value === 'string' && value.length > 0 && value.length <= maximum;
+  }
+
+  // MIME types are case-insensitive. Lowercase them before checking, the same
+  // way for getFile and both listings, so a file's fingerprint never depends
+  // on which call read it.
+  function normalizedMime(value) {
+    return typeof value === 'string' ? value.toLowerCase() : value;
   }
 
   function validMime(value) {
@@ -236,8 +247,9 @@
 
   function parseFile(raw, caps) {
     var fields = selectedDataValues(raw, FILE_FIELDS);
-    if (!fields || !validId(fields.id) || !validBoundedString(fields.name, caps.maxStringLength) ||
-        !validMime(fields.mimeType) || typeof fields.trashed !== 'boolean' ||
+    var mimeType = fields ? normalizedMime(fields.mimeType) : null;
+    if (!fields || !validId(fields.id) || !validName(fields.name, caps.maxStringLength) ||
+        !validMime(mimeType) || typeof fields.trashed !== 'boolean' ||
         !(fields.driveId === null || validId(fields.driveId)) ||
         !(fields.resourceKey === null || validToken(fields.resourceKey, caps.maxTokenLength)) ||
         !(fields.version === null || (typeof fields.version === 'string' && /^\d{1,32}$/.test(fields.version))) ||
@@ -258,19 +270,19 @@
     var shortcut = null;
     if (fields.shortcutDetails !== null) {
       var shortcutFields = selectedDataValues(fields.shortcutDetails, ['targetId', 'targetMimeType']);
-      if (!shortcutFields || !validId(shortcutFields.targetId) ||
-          !validMime(shortcutFields.targetMimeType)) {
+      var targetMimeType = shortcutFields ? normalizedMime(shortcutFields.targetMimeType) : null;
+      if (!shortcutFields || !validId(shortcutFields.targetId) || !validMime(targetMimeType)) {
         return null;
       }
       shortcut = {
         targetId: shortcutFields.targetId,
-        targetMimeType: shortcutFields.targetMimeType
+        targetMimeType: targetMimeType
       };
     }
     return {
       id: fields.id,
       name: fields.name,
-      mimeType: fields.mimeType,
+      mimeType: mimeType,
       parents: parents,
       trashed: fields.trashed,
       driveId: fields.driveId,
@@ -608,7 +620,19 @@
         };
       }
       var parsedFile = parseFile(fields.file, caps);
-      return parsedFile && parsedFile.id === fields.fileId
+      if (!parsedFile) {
+        // The change itself is well formed; only its file record is not.
+        // Report a bare hint rather than failing the page: the reconciler
+        // re-reads every hinted file through getFile and withholds it as
+        // pending if that read fails too.
+        return {
+          fileId: fields.fileId,
+          removed: false,
+          time: fields.time,
+          parsedFile: null
+        };
+      }
+      return parsedFile.id === fields.fileId
         ? {
             fileId: fields.fileId,
             removed: false,

@@ -4,10 +4,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { webcrypto, createHash } = require('node:crypto');
+
 const ROOT = path.resolve(__dirname, '..');
 const RECONCILER_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-drive-reconciler.js');
 const SCHEMA_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-corpus-schema.js');
 const CORPUS_STORE_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-corpus-store.js');
+const TRANSPORT_PATH = path.join(ROOT, 'extension', 'utils', 'skopeo-drive-corpus-transport.js');
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const DOC_MIME = 'application/vnd.google-apps.document';
@@ -1493,6 +1496,129 @@ async function testRealStoreSameRootRefreshAndRestartReuse(Reconciler) {
     'persisted Drive revision/checksum identities avoid unchanged content reads after restart');
 }
 
+// Serves raw Drive API records to the real transport, so its parsing runs
+// exactly as it does against the page.
+function realTransportOverDrive(rawGraph, changes) {
+  const Transport = require(TRANSPORT_PATH);
+  let tokenSequence = 0;
+  function ok(data) {
+    return { kind: 'ok', status: 200, data };
+  }
+  return Transport.createTransport({
+    async executeBoundPageRead(request) {
+      const args = request.args;
+      if (request.action === 'about') return ok({ permissionId: 'permission-1' });
+      if (request.action === 'getFile') {
+        const value = rawGraph.get(args.fileId);
+        return value ? ok(clone(value)) : { kind: 'not-found', status: 404 };
+      }
+      if (request.action === 'listChildren') {
+        return ok({
+          files: Array.from(rawGraph.values())
+            .filter((entry) => entry.parents.includes(args.parentFileId) && !entry.trashed)
+            .sort((left, right) => left.id.localeCompare(right.id))
+            .map(clone),
+          nextPageToken: null,
+          incompleteSearch: false
+        });
+      }
+      if (request.action === 'getStartPageToken') {
+        return ok({ startPageToken: `changes-${++tokenSequence}` });
+      }
+      if (request.action === 'listChanges') {
+        return ok({
+          changes: changes.splice(0).map(clone),
+          nextPageToken: null,
+          newStartPageToken: `changes-${++tokenSequence}`
+        });
+      }
+      if (request.action === 'readContent') {
+        const bytes = Buffer.from(`Agreement body ${args.fileId}`, 'utf8');
+        return ok({
+          bytesBase64: bytes.toString('base64'),
+          exactByteLength: bytes.byteLength,
+          byteHash: 'sha256:' + createHash('sha256').update(bytes).digest('hex')
+        });
+      }
+      return { kind: 'unsupported', status: null };
+    },
+    crypto: webcrypto,
+    context: { tabId: 77, origin: 'https://drive.google.com' },
+    caps: { maxItemsPerPage: 100, maxPagesPerChain: 8, maxTokenLength: 256, maxStringLength: 4096 }
+  });
+}
+
+// A name the corpus cannot display, or a mixed-case MIME type, used to fail
+// the whole Drive listing, so the folder could never be enrolled. Skipping
+// the file instead would be worse: a source missing from a listing is purged
+// as deleted. The file must stay listed and be withheld as pending.
+async function testUndisplayableDriveFileIsWithheldNotFatal(Reconciler) {
+  const schema = require(SCHEMA_PATH);
+  const oddName = 'Vendor -> Legal handoff';
+  const macroMime = 'application/vnd.ms-excel.sheet.macroEnabled.12';
+  function driveFile(id, mimeType, parents, overrides = {}) {
+    return file(id, mimeType, parents, Object.assign({
+      size: mimeType === FOLDER_MIME ? null : '24'
+    }, overrides));
+  }
+  const rawGraph = new Map([
+    ['outside-root', driveFile('outside-root', FOLDER_MIME, [], { driveId: null })],
+    ['root-1', driveFile('root-1', FOLDER_MIME, ['outside-root'])],
+    ['vendor-a', driveFile('vendor-a', FOLDER_MIME, ['root-1'])],
+    ['msa-doc', driveFile('msa-doc', DOC_MIME, ['vendor-a'], { name: 'MSA 2026' })],
+    ['handoff-doc', driveFile('handoff-doc', DOC_MIME, ['vendor-a'], { name: oddName })],
+    ['pricing-xlsm', driveFile('pricing-xlsm', macroMime, ['vendor-a'], {
+      name: 'Pricing.xlsm',
+      capabilities: { canDownload: true, canListChildren: false }
+    })],
+    ['root-policy', driveFile('root-policy', DOC_MIME, ['root-1'], { name: 'Policy' })]
+  ]);
+  const changes = [
+    { fileId: 'handoff-doc', removed: false, time: null, file: clone(rawGraph.get('handoff-doc')) },
+    { fileId: 'pricing-xlsm', removed: false, time: null, file: clone(rawGraph.get('pricing-xlsm')) },
+    { fileId: 'outside-unparseable', removed: false, time: null,
+      file: driveFile('outside-unparseable', DOC_MIME, ['outside-root'], { version: 'v2' }) }
+  ];
+  // The authority reads Drive through the same transport, so it sees what
+  // the transport publishes: sizes as numbers and MIME types lowercased.
+  const publishedGraph = new Map(Array.from(rawGraph, ([id, value]) => [id, Object.assign(clone(value), {
+    mimeType: value.mimeType.toLowerCase(),
+    size: value.size === null ? 0 : Number(value.size)
+  })]));
+  const trace = [];
+  const authority = new FakeAuthority(trace, {
+    graph: publishedGraph,
+    permissionId: 'permission-1',
+    contentHashes: new Map()
+  }, schema);
+  const harness = createHarness(Reconciler, {
+    trace,
+    transport: realTransportOverDrive(rawGraph, changes),
+    authority
+  });
+
+  const built = await harness.reconciler.buildInitialInventory(exactContext());
+  assert.equal(built.ok, true, 'a folder holding one undisplayable file still enrolls');
+  assert.equal(harness.store.visible, true);
+  assert.equal(sourceById(harness.store, 'msa-doc').state, 'ready', 'a sibling is certified');
+  assert.equal(sourceById(harness.store, 'root-policy').state, 'ready', 'a root file is certified');
+  const pricing = sourceById(harness.store, 'pricing-xlsm');
+  assert.equal(pricing.state, 'unreadable',
+    'a mixed-case MIME type is certified as an unsupported but listed source');
+  assert.equal(pricing.metadataFingerprint.mimeType, macroMime.toLowerCase());
+  const handoff = sourceById(harness.store, 'handoff-doc');
+  assert.ok(handoff, 'the undisplayable file stays in the corpus');
+  assert.equal(handoff.state, 'pending', 'the undisplayable file is withheld as pending');
+  assert.notEqual(handoff.visibility, 'active', 'the undisplayable file is never shown');
+  assert.equal(handoff.displayName, null, 'the undisplayable name is never stored');
+  assert.equal(sourceById(harness.store, 'outside-unparseable'), null,
+    'an unparseable change outside the root is dropped, not stored');
+  assert.equal(harness.trace.some((entry) => entry.at === 'store.purgeSource' &&
+    entry.reason === 'source-missing'), false, 'no listed file is purged as missing');
+  assert.deepEqual(harness.store.purged.filter((sourceFileId) => sourceFileId !== 'handoff-doc'), [],
+    'no certified sibling is purged');
+}
+
 async function main() {
   delete globalThis.FsbSkopeoDriveReconciler;
 
@@ -1519,6 +1645,7 @@ async function main() {
   await testMutationTimeoutHoldsReconcilerLane(Reconciler);
   await testCrashRestartConvergenceAndAbort(Reconciler);
   await testRealStoreSameRootRefreshAndRestartReuse(Reconciler);
+  await testUndisplayableDriveFileIsWithheldNotFatal(Reconciler);
 
   const source = fs.readFileSync(RECONCILER_PATH, 'utf8');
   assert.match(source, /FsbSkopeoDriveReconciler/);

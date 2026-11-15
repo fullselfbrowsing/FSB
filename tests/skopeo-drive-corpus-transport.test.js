@@ -772,6 +772,93 @@ async function testBackgroundTransport(transportModule) {
   assert.ok(changePage.value.newStartPageToken);
   assert.equal(JSON.stringify(changePage).includes('changes-start-2'), false);
 
+  // One file the corpus cannot show must not fail the page it is on. The
+  // reconciler would lose every sibling on that page, and a sibling missing
+  // from a listing reads as deleted.
+  const oddName = 'Vendor -> Legal handoff';
+  const macroMime = 'application/vnd.ms-excel.sheet.macroEnabled.12';
+  queue.push({ kind: 'ok', status: 200, data: {
+    files: [
+      makeFile({ id: 'sibling-1', resourceKey: null }),
+      makeFile({ id: 'odd-name-1', name: oddName, resourceKey: null }),
+      makeFile({ id: 'macro-1', name: 'Pricing.xlsm', mimeType: macroMime, resourceKey: null })
+    ],
+    nextPageToken: null,
+    incompleteSearch: false
+  } });
+  const tolerantList = await transport.listChildren({ parentFileId: 'folder-1' });
+  assert.equal(tolerantList.kind, 'ok',
+    'a name with <, > or a mixed-case MIME type does not fail the listing');
+  assert.deepEqual(tolerantList.value.files.map((entry) => entry.id),
+    ['sibling-1', 'odd-name-1', 'macro-1'], 'every sibling on the page is listed');
+  assert.equal(tolerantList.value.files[1].name, oddName,
+    'the name passes through; the corpus schema decides whether it can be shown');
+  assert.equal(tolerantList.value.files[2].mimeType, macroMime.toLowerCase(),
+    'MIME types are case-insensitive and published lowercased');
+
+  queue.push({ kind: 'ok', status: 200, data: makeFile({
+    id: 'macro-1', name: 'Pricing.xlsm', mimeType: macroMime, resourceKey: null
+  }) });
+  const macroFile = await transport.getFile({ fileId: 'macro-1' });
+  assert.equal(macroFile.kind, 'ok');
+  assert.equal(macroFile.value.mimeType, macroMime.toLowerCase(),
+    'getFile lowercases the MIME type exactly like listChildren, so fingerprints agree');
+
+  queue.push({ kind: 'ok', status: 200, data: { startPageToken: 'changes-odd-1' } });
+  const oddStart = await transport.getStartPageToken({});
+  queue.push({ kind: 'ok', status: 200, data: {
+    changes: [
+      { fileId: 'odd-name-1', removed: false, time: null,
+        file: makeFile({ id: 'odd-name-1', name: oddName, resourceKey: null }) },
+      { fileId: 'macro-1', removed: false, time: null,
+        file: makeFile({ id: 'macro-1', mimeType: macroMime, resourceKey: null }) },
+      { fileId: 'unparseable-1', removed: false, time: null,
+        file: makeFile({ id: 'unparseable-1', version: 'v2', resourceKey: null }) }
+    ],
+    nextPageToken: null,
+    newStartPageToken: 'changes-odd-2'
+  } });
+  const oddChanges = await transport.listChanges({ pageToken: oddStart.value.startPageToken });
+  assert.equal(oddChanges.kind, 'ok', 'one unparseable changed file does not fail the change page');
+  assert.equal(oddChanges.value.changes[0].file.name, oddName);
+  assert.equal(oddChanges.value.changes[1].file.mimeType, macroMime.toLowerCase());
+  assert.deepEqual(plain(oddChanges.value.changes[2]), {
+    fileId: 'unparseable-1', removed: false, time: null, file: null
+  }, 'an unparseable changed file becomes a bare hint that the reconciler re-reads');
+
+  for (const [label, files] of [
+    ['an invalid file id', [makeFile({ id: 'bad id', resourceKey: null })]],
+    ['a duplicate file id', [
+      makeFile({ id: 'dup-1', resourceKey: null }),
+      makeFile({ id: 'dup-1', resourceKey: null })
+    ]]
+  ]) {
+    queue.push({ kind: 'ok', status: 200, data: {
+      files, nextPageToken: null, incompleteSearch: false
+    } });
+    const rejected = await transport.listChildren({ parentFileId: 'folder-1' });
+    assert.equal(rejected.kind, 'malformed', `${label} still fails the listing`);
+  }
+  for (const [label, changes] of [
+    ['an invalid change file id', [{ fileId: 'bad id', removed: false, time: null, file: null }]],
+    ['a duplicate change file id', [
+      { fileId: 'dup-1', removed: true, time: null, file: null },
+      { fileId: 'dup-1', removed: true, time: null, file: null }
+    ]],
+    ['a changed file that names another id', [{
+      fileId: 'change-1', removed: false, time: null,
+      file: makeFile({ id: 'change-2', resourceKey: null })
+    }]]
+  ]) {
+    queue.push({ kind: 'ok', status: 200, data: { startPageToken: 'changes-bad-1' } });
+    const badStart = await transport.getStartPageToken({});
+    queue.push({ kind: 'ok', status: 200, data: {
+      changes, nextPageToken: null, newStartPageToken: 'changes-bad-2'
+    } });
+    const rejected = await transport.listChanges({ pageToken: badStart.value.startPageToken });
+    assert.equal(rejected.kind, 'malformed', `${label} still fails the change page`);
+  }
+
   const callsBeforeBadArgs = harness.calls.length;
   for (const [method, args] of [
     ['getFile', { fileId: 'file-1', url: 'https://example.test', method: 'DELETE' }],
