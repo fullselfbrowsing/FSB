@@ -39,3 +39,37 @@ export function shutdownWhenStdinEnds(stdin: StdinLike, onEnd: () => void): bool
   stdin.resume();
   return false;
 }
+
+export interface StdoutLike {
+  on(event: 'error', listener: (err: NodeJS.ErrnoException) => void): unknown;
+}
+
+const BROKEN_PIPE_CODES = new Set(['EPIPE', 'ERR_STREAM_DESTROYED', 'ECONNRESET']);
+
+/**
+ * When the host closes its end of the pipe while a response is still being
+ * written, Node emits an `error` (EPIPE) on stdout. With no listener that is an
+ * uncaught exception and the server crashes with a stack trace. Treat a broken
+ * pipe as the host going away: call `onBrokenPipe` exactly once. Any other
+ * stdout error is reported to `onOtherError` (rethrown by default).
+ *
+ * Returns the listener that was attached, for tests.
+ */
+export function shutdownOnBrokenStdout(
+  stdout: StdoutLike,
+  onBrokenPipe: () => void,
+  onOtherError: (err: NodeJS.ErrnoException) => void = (err) => { throw err; },
+): (err: NodeJS.ErrnoException) => void {
+  let fired = false;
+  const listener = (err: NodeJS.ErrnoException): void => {
+    if (err && typeof err.code === 'string' && BROKEN_PIPE_CODES.has(err.code)) {
+      if (fired) return;
+      fired = true;
+      onBrokenPipe();
+      return;
+    }
+    onOtherError(err);
+  };
+  stdout.on('error', listener);
+  return listener;
+}
