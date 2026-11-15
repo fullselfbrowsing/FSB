@@ -1,9 +1,10 @@
 import { Routes } from '@angular/router';
+import { loadDashboardRuntime } from './core/dashboard/dashboard-runtime-loader';
 
 export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/home/home-page.component').then(m => m.HomePageComponent), data: { depth: 'home' } },
   { path: 'about', loadComponent: () => import('./pages/about/about-page.component').then(m => m.AboutPageComponent), data: { depth: 'about' } },
-  { path: 'dashboard', loadComponent: () => import('./pages/dashboard/dashboard-page.component').then(m => m.DashboardPageComponent) },
+  { path: 'dashboard', loadComponent: () => Promise.all([import('./pages/dashboard/dashboard-page.component'), loadDashboardRuntime()]).then(([m]) => m.DashboardPageComponent) },
   { path: 'agents', loadComponent: () => import('./pages/agents/agents-page.component').then(m => m.AgentsPageComponent), data: { depth: 'agents' } },
   { path: 'release-notes', loadComponent: () => import('./pages/release-notes/release-notes-page.component').then(m => m.ReleaseNotesPageComponent) },
   { path: 'privacy', loadComponent: () => import('./pages/privacy/privacy-page.component').then(m => m.PrivacyPageComponent), data: { depth: 'privacy' } },

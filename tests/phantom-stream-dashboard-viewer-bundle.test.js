@@ -23,6 +23,9 @@ const bundlePath = path.join(repoRoot, 'showcase', 'js', 'phantom-stream-viewer.
 const staticHtml = fs.readFileSync(path.join(repoRoot, 'showcase', 'dashboard.html'), 'utf8');
 const angularJson = fs.readFileSync(path.join(repoRoot, 'showcase', 'angular', 'angular.json'), 'utf8');
 const angularIndex = fs.readFileSync(path.join(repoRoot, 'showcase', 'angular', 'src', 'index.html'), 'utf8');
+const angularRuntimeLoader = fs.readFileSync(
+  path.join(repoRoot, 'showcase', 'angular', 'src', 'app', 'core', 'dashboard', 'dashboard-runtime-loader.ts'), 'utf8');
+const angularRoutes = fs.readFileSync(path.join(repoRoot, 'showcase', 'angular', 'src', 'app', 'app.routes.ts'), 'utf8');
 const angularDashboardTs = fs.readFileSync(
   path.join(repoRoot, 'showcase', 'angular', 'src', 'app', 'pages', 'dashboard', 'dashboard-page.component.ts'),
   'utf8'
@@ -504,10 +507,17 @@ ok(angularJson.includes('"glob": "phantom-stream-viewer.js"'),
   'Angular build copies phantom-stream-viewer.js from static js assets');
 ok(angularJson.includes('"input": "../js"'),
   'Angular viewer asset copy uses shared showcase/js source');
-ok(angularIndex.includes('assets/phantom-stream-viewer.js'),
-  'Angular index loads PhantomStream viewer asset');
-ok(angularIndex.indexOf('assets/dashboard-runtime-state.js') < angularIndex.indexOf('assets/phantom-stream-viewer.js'),
-  'Angular index loads viewer after runtime-state');
+ok(!angularIndex.includes('assets/phantom-stream-viewer.js') && !angularIndex.includes('assets/dashboard-runtime-state.js'),
+  'Angular index does not load the dashboard scripts on every page');
+ok(angularRuntimeLoader.includes("'assets/phantom-stream-viewer.js'"),
+  'Angular dashboard runtime loader loads PhantomStream viewer asset');
+ok(angularRuntimeLoader.indexOf('assets/dashboard-runtime-state.js') !== -1
+  && angularRuntimeLoader.indexOf('assets/dashboard-runtime-state.js') < angularRuntimeLoader.indexOf('assets/phantom-stream-viewer.js'),
+  'Angular dashboard runtime loader loads viewer after runtime-state');
+ok(/script\.async = false/.test(angularRuntimeLoader),
+  'Angular dashboard runtime loader runs the scripts in order');
+ok(/path: 'dashboard'[^\n]*loadDashboardRuntime\(\)/.test(angularRoutes),
+  'Angular dashboard route waits for the runtime scripts before the component exists');
 ok(!angularDashboardTs.includes('@full-self-browsing/phantom-stream'),
   'Angular dashboard component does not import PhantomStream package directly');
 ok(angularDashboardTs.includes('copy: this.dashboardCopy'),

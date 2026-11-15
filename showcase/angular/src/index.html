@@ -43,11 +43,9 @@
 </head>
 <body>
   <app-root></app-root>
-  <!-- Dashboard CDN libraries (html5-qrcode + lz-string) load lazily on /dashboard
-       via DashboardPageComponent.loadDashboardCdnScripts() — they were previously
-       global, costing ~105 KB unused JS on every non-dashboard route. -->
-  <!-- Dashboard runtime state helpers (preview surface, remote control, task recovery derivation) -->
-  <script src="assets/dashboard-runtime-state.js"></script>
-  <script src="assets/phantom-stream-viewer.js"></script>
+  <!-- Nothing dashboard-specific loads here. Its CDN libraries (html5-qrcode, lz-string)
+       come from DashboardPageComponent.loadDashboardCdnScripts(), and its runtime state
+       helpers and PhantomStream viewer from core/dashboard/dashboard-runtime-loader.ts,
+       both when /dashboard is opened. -->
 </body>
 </html>
