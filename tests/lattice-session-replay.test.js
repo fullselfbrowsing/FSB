@@ -798,6 +798,115 @@ async function main() {
     assert.match(forgedMaterialized.error.message, /hash mismatch/i);
   });
 
+  // A capability step is classified by the slug capture wrote. Once the
+  // session has passed through the trusted store (an outcome update, a load,
+  // a logger save), replay must still see the same capability, or
+  // prepareReplay refuses the whole recording.
+  const capabilityHistory = createTrustedSessionStore();
+  const capabilitySessionId = 'session_capability_round_trip';
+  const capabilityTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'capabilities'
+  };
+  const capabilityCapture = replayHelpers.createReplayRecord({
+    sessionId: capabilitySessionId,
+    task: 'Capability round trip',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'mcp:capabilities-invoke',
+    requestPayload: { slug: 'github.get_repository', params: { owner: 'fullselfbrowsing', repo: 'FSB' } },
+    response: { success: true, repository: 'FSB' },
+    success: true,
+    dispatcher_route: 'message',
+    timestamp: Date.now() - 2000,
+    replayContext: Object.assign({}, capabilityTarget, {
+      slug: 'github.get_repository', sideEffectClass: 'read', service: 'GitHub', tier: 'T1a'
+    })
+  }, {
+    tool: 'mcp:capabilities-invoke',
+    requestPayload: { slug: 'github.create_issue', params: { owner: 'fullselfbrowsing', repo: 'FSB' } },
+    response: { success: true },
+    success: true,
+    dispatcher_route: 'message',
+    timestamp: Date.now() - 1000,
+    replayContext: Object.assign({}, capabilityTarget, { slug: 'github.create_issue', service: 'GitHub' })
+  }], 'capture');
+  const capturedCapabilities = capabilityCapture.manifest.steps.map((step) => step.capability);
+  const capabilitySessionRecord = (replay) => ({
+    id: capabilitySessionId,
+    task: 'Capability round trip',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay
+  });
+  await capabilityHistory.store.saveAutomationSession(capabilitySessionId, capabilitySessionRecord(capabilityCapture), []);
+  await capabilityHistory.store.updateAutomationSessionOutcome(capabilitySessionId, {
+    status: 'completed', outcome: 'success', reason: 'completed'
+  });
+  const storedCapabilityReplay = (await capabilityHistory.store.loadAutomationSession(capabilitySessionId)).session.replay;
+  check('the trusted store keeps a capability step as capture wrote it', () => {
+    assert.deepEqual(capturedCapabilities.map((capability) => capability.slug),
+      ['github.get_repository', 'github.create_issue']);
+    assert.deepEqual(storedCapabilityReplay.manifest.steps.map((step) => step.capability), capturedCapabilities);
+    assert.doesNotThrow(() => replayHelpers.validateReplayClassifications(storedCapabilityReplay.manifest.steps));
+  });
+
+  const capabilityLogger = loadLoggerWithStore(capabilityHistory.store);
+  capabilityLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'capability capture attached',
+    data: { sessionId: capabilitySessionId }
+  }];
+  const capabilityLoggerSaved = await capabilityLogger.saveSession(capabilitySessionId, {
+    status: 'completed',
+    mode: 'mcp-agent',
+    replay: capabilityCapture
+  });
+  const loggerCapabilitySteps = capabilityHistory.values.fsbSessionLogs[capabilitySessionId].replay.manifest.steps;
+  check('a logger save that carries a capture keeps its capability steps', () => {
+    assert.equal(capabilityLoggerSaved, true);
+    assert.deepEqual(loggerCapabilitySteps.map((step) => step.capability), capturedCapabilities);
+  });
+
+  const capabilityPrepared = await withReplayRuntime(capabilityHistory.local, second,
+    () => replayHelpers.prepareReplay(capabilitySessionId));
+  await capabilityHistory.store.updateAutomationSessionOutcome(capabilitySessionId, {
+    status: 'completed', outcome: 'success', reason: 'completed'
+  });
+  const capabilityPreparedAgain = await withReplayRuntime(capabilityHistory.local, second,
+    () => replayHelpers.prepareReplay(capabilitySessionId));
+  check('prepareReplay accepts capability steps before and after a sealed outcome update', () => {
+    assert.equal(capabilityPrepared.verified, true);
+    assert.deepEqual(capabilityPrepared.steps.map((step) => step.replay.availability), ['ready', 'approval-once']);
+    assert.equal(capabilityPreparedAgain.verified, true);
+    assert.equal(capabilityPreparedAgain.replay.manifestHash, capabilityPrepared.replay.manifestHash);
+    assert.deepEqual(capabilityPreparedAgain.steps.map((step) => step.capability), capturedCapabilities);
+  });
+
+  // Sessions saved before the slug was kept carry an always-null
+  // capabilityId instead, and some of them are already sealed. Their stored
+  // shape must not change, or their committed hash would stop matching.
+  const legacyCapabilityRecord = JSON.parse(JSON.stringify(capabilityHistory.values.fsbSessionLogs[capabilitySessionId]));
+  legacyCapabilityRecord.replay.manifest.steps.forEach((step) => {
+    step.capability = { capabilityId: null, sideEffectClass: step.capability.sideEffectClass, service: 'GitHub', tier: null };
+  });
+  capabilityHistory.values.fsbSessionLogs[capabilitySessionId] = JSON.parse(JSON.stringify(legacyCapabilityRecord));
+  await capabilityHistory.store.updateAutomationSessionOutcome(capabilitySessionId, { status: 'completed', outcome: 'success' });
+  check('a step stored with the older capability shape keeps that shape', () => {
+    assert.deepEqual(
+      capabilityHistory.values.fsbSessionLogs[capabilitySessionId].replay.manifest.steps.map((step) => step.capability),
+      legacyCapabilityRecord.replay.manifest.steps.map((step) => step.capability)
+    );
+  });
+
   console.log('Summary:', passed, 'passed');
 }
 

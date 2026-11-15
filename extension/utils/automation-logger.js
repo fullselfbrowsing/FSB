@@ -665,17 +665,30 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     return fields;
   }
 
+  // Capture writes a capability as slug, sideEffectClass, service and tier,
+  // and replay classifies the step by its slug. Sessions saved earlier hold
+  // an always-null capabilityId instead of the slug; it is kept as stored so
+  // the hash of an already sealed manifest still matches.
+  function getSafeReplayCapability(value) {
+    return {
+      ...(Object.prototype.hasOwnProperty.call(value, 'slug')
+        ? { slug: getSafePersistedText(value.slug || '', 128) || null }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(value, 'capabilityId')
+        ? { capabilityId: getSafePersistedText(value.capabilityId || '', 128) || null }
+        : {}),
+      sideEffectClass: getSafePersistedText(value.sideEffectClass || '', 32) || null,
+      service: getSafePersistedText(value.service || '', 96) || null,
+      tier: getSafePersistedText(value.tier || '', 32) || null
+    };
+  }
+
   function getSafeReplayStep(step, index) {
     if (!step || typeof step !== 'object') return null;
     const target = step.target && typeof step.target === 'object' ? step.target : {};
     const replay = step.replay && typeof step.replay === 'object' ? step.replay : {};
     const capability = step.capability && typeof step.capability === 'object'
-      ? {
-          capabilityId: getSafePersistedText(step.capability.capabilityId || '', 128) || null,
-          sideEffectClass: getSafePersistedText(step.capability.sideEffectClass || '', 32) || null,
-          service: getSafePersistedText(step.capability.service || '', 96) || null,
-          tier: getSafePersistedText(step.capability.tier || '', 32) || null
-        }
+      ? getSafeReplayCapability(step.capability)
       : null;
     const sealed = Object.prototype.hasOwnProperty.call(step, 'resultHash');
     return {

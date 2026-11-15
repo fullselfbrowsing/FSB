@@ -403,16 +403,31 @@
   var REPLAY_STEP_HASH_PATTERN = /^[a-f0-9]{64}$/;
   var REPLAY_RESULT_HASH_VERSION_PATTERN = /^[A-Za-z0-9._\/-]{1,64}$/;
 
+  // Capture writes a capability as slug, sideEffectClass, service and tier,
+  // and replay classifies the step by its slug. Sessions saved earlier hold
+  // an always-null capabilityId instead of the slug; it is kept as stored so
+  // the hash of an already sealed manifest still matches.
+  function safeReplayCapability(value) {
+    var capability = {};
+    if (Object.prototype.hasOwnProperty.call(value, 'slug')) {
+      capability.slug = redactText(value.slug || '', 128) || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'capabilityId')) {
+      capability.capabilityId = redactText(value.capabilityId || '', 128) || null;
+    }
+    capability.sideEffectClass = redactText(value.sideEffectClass || '', 32) || null;
+    capability.service = redactText(value.service || '', 96) || null;
+    capability.tier = redactText(value.tier || '', 32) || null;
+    return capability;
+  }
+
   function safeReplayStep(step, index) {
     if (!step || typeof step !== 'object' || Array.isArray(step)) return null;
     var target = step.target && typeof step.target === 'object' ? step.target : {};
     var replay = step.replay && typeof step.replay === 'object' ? step.replay : {};
-    var capability = step.capability && typeof step.capability === 'object' ? {
-      capabilityId: redactText(step.capability.capabilityId || '', 128) || null,
-      sideEffectClass: redactText(step.capability.sideEffectClass || '', 32) || null,
-      service: redactText(step.capability.service || '', 96) || null,
-      tier: redactText(step.capability.tier || '', 32) || null
-    } : null;
+    var capability = step.capability && typeof step.capability === 'object'
+      ? safeReplayCapability(step.capability)
+      : null;
     // Sealing replaces a step's result with hashes of its arguments and
     // result, and the manifest hash commits to exactly those fields. A sealed
     // step keeps them as written and never gains a result body; a malformed
