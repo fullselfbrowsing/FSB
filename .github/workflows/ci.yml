@@ -165,6 +165,8 @@ jobs:
         run: npm --prefix showcase/angular run test:marketing-i18n-seo
       - name: Exercise video sitemap schema regression fixtures
         run: npm --prefix showcase/angular run test:video-sitemap
+      - name: Exercise sitemap lastmod hashing fixtures
+        run: npm --prefix showcase/angular run test:sitemap-lastmod
       - name: Reject English-copy and cross-locale-identical targets
         run: npm --prefix showcase/angular run verify:translation-quality
       - name: Run Angular component tests
