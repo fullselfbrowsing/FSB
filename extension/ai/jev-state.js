@@ -683,23 +683,81 @@
   // sentence punctuation right after it belongs to the prose, not the URL.
   var GOAL_URL_RE = /\bhttps?:\/\/[^\s<>"'`]+/gi;
   var URL_TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}]+$/;
+  // Chinese and Japanese text often follows a URL with no space. The host may
+  // be an internationalized name, so it also admits letters, marks and digits;
+  // after the host a URL is plain ASCII, and the first other character starts
+  // the prose again.
+  var URL_AUTHORITY_STOP_RE = /[^A-Za-z0-9\-._~:\/?#\[\]@!$&()*+,;=%\p{L}\p{M}\p{N}]/u;
+  var URL_TAIL_STOP_RE = /[^A-Za-z0-9\-._~:\/?#\[\]@!$&()*+,;=%]/;
+  // A URL typed without a scheme that carries a query or fragment: an optional
+  // protocol-relative '//', a dotted host, an optional port and path, then '?'
+  // or '#'. The lookbehind skips emails and the inside of a longer URL.
+  var BARE_GOAL_URL_RE = new RegExp(
+    '(?<![\\w@.\\/:-])(\\/\\/)?' +
+    '((?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}(?::\\d{1,5})?)' +
+    '(\\/[A-Za-z0-9\\-._~:\\/\\[\\]@!$&()*+,;=%]*)?' +
+    '([?#][A-Za-z0-9\\-._~:\\/?#\\[\\]@!$&()*+,;=%]+)',
+    'g'
+  );
+
+  function splitTrailingPunctuation(text) {
+    var trailing = (text.match(URL_TRAILING_PUNCTUATION_RE) || [''])[0];
+    return { url: trailing ? text.slice(0, text.length - trailing.length) : text, trailing: trailing };
+  }
+
+  function reduceSchemeUrl(match) {
+    var schemeEnd = match.indexOf('//') + 2;
+    var authorityStop = match.slice(schemeEnd).search(URL_AUTHORITY_STOP_RE);
+    var authorityEnd = match.slice(schemeEnd).search(/[\/?#]/);
+    var urlEnd;
+    if (authorityStop !== -1 && (authorityEnd === -1 || authorityStop < authorityEnd)) {
+      urlEnd = schemeEnd + authorityStop;
+    } else if (authorityEnd === -1) {
+      urlEnd = match.length;
+    } else {
+      var tailStop = match.slice(schemeEnd + authorityEnd).search(URL_TAIL_STOP_RE);
+      urlEnd = tailStop === -1 ? match.length : schemeEnd + authorityEnd + tailStop;
+    }
+    var rest = match.slice(urlEnd);
+    var parts = splitTrailingPunctuation(match.slice(0, urlEnd));
+    if (!/[?#@]/.test(parts.url)) return match;
+    var reduced = toOriginPath(parts.url);
+    return (reduced ? reduced.origin + reduced.path : parts.url.split(/[?#]/)[0]) +
+      parts.trailing + rest;
+  }
+
+  // Only a www. host, a host with a path, or a '//' form counts, so a file
+  // name such as README.md#install is not taken for a web address. The host
+  // and path stay as typed, with the path scrubbed one segment at a time as
+  // toOriginPath does.
+  function reduceBareUrl(match, slashes, host, path) {
+    if (!slashes && !path && !/^www\./i.test(host)) return match;
+    var parts = splitTrailingPunctuation(match);
+    if (!/[?#]/.test(parts.url)) return match;
+    var scrubbedPath = path ? path.split('/').map(scrubPathSegment).join('/') : '';
+    return (slashes || '') + host + scrubbedPath + parts.trailing;
+  }
 
   /**
-   * Reduce each http(s) URL in the task text that carries a query, fragment or
+   * Reduce each URL in the task text that carries a query, fragment or
    * userinfo to its origin and path, the same rule page.path follows (D-20).
    * The privacy disclosure promises query strings and fragments never reach
-   * FSB's server, and a URL can sit anywhere in the goal. A URL that does not
-   * parse keeps only what precedes '?' or '#'. Other text is unchanged.
+   * FSB's server, and a URL can sit anywhere in the goal, with or without a
+   * scheme. A URL that does not parse keeps only what precedes '?' or '#'.
+   * Other text, including text that follows a URL with no space, is unchanged.
+   * A malformed URL can reduce to text that is reducible again, so the passes
+   * repeat until nothing changes: the client refuses a goal that is not a
+   * fixed point.
    */
   function reduceGoalUrls(goal) {
     if (typeof goal !== 'string') return goal;
-    return goal.replace(GOAL_URL_RE, function reduceOne(match) {
-      var trailing = (match.match(URL_TRAILING_PUNCTUATION_RE) || [''])[0];
-      var url = trailing ? match.slice(0, match.length - trailing.length) : match;
-      if (!/[?#@]/.test(url)) return match;
-      var reduced = toOriginPath(url);
-      return (reduced ? reduced.origin + reduced.path : url.split(/[?#]/)[0]) + trailing;
-    });
+    var current = goal;
+    for (var pass = 0; pass < 4; pass += 1) {
+      var next = current.replace(GOAL_URL_RE, reduceSchemeUrl).replace(BARE_GOAL_URL_RE, reduceBareUrl);
+      if (next === current) return next;
+      current = next;
+    }
+    return current;
   }
 
   var DROPPED_INPUT_TYPES = ['password', 'hidden', 'file'];

@@ -499,6 +499,41 @@ function scrubSection() {
     S.reduceGoalUrls('Tick Alpha at https://example.com/list, then save.') ===
       'Tick Alpha at https://example.com/list, then save.');
 
+  // Text that follows a URL with no space (normal in Chinese and Japanese)
+  // stays part of the task, and a URL typed without a scheme is reduced too.
+  // Emails and file names are not web addresses. Every result is a fixed
+  // point, since the client refuses a goal reduceGoalUrls would still change.
+  for (const [goal, expected] of [
+    ['打开https://shop.example/cart?order=88231，然后点击“继续”按钮',
+      '打开https://shop.example/cart，然后点击“继续”按钮'],
+    ['https://shop.example/cart?order=88231を開いて、「続ける」をクリック',
+      'https://shop.example/cartを開いて、「続ける」をクリック'],
+    ['打开https://shop.example/cart，然后发邮件给bob@example.com',
+      '打开https://shop.example/cart，然后发邮件给bob@example.com'],
+    ['打开https://shop.example，然后发邮件给bob@example.com',
+      '打开https://shop.example，然后发邮件给bob@example.com'],
+    ['Go to shop.example/cart?order=88231 and click Continue',
+      'Go to shop.example/cart and click Continue'],
+    ['Open www.shop.example#orders/88231.', 'Open www.shop.example.'],
+    ['Load //cdn.example/app.js?v=3 first', 'Load //cdn.example/app.js first'],
+    ['See shop.example/a?ref=x, then pay', 'See shop.example/a, then pay'],
+    ['Then go to https://a.example/r?to=www.b.example/x?y=1 now', 'Then go to https://a.example/r now'],
+    ['Email bob@example.com?subject=hi', 'Email bob@example.com?subject=hi'],
+    ['Read node.js#readme and README.md#install', 'Read node.js#readme and README.md#install'],
+    ['Is it shop.example/cart?', 'Is it shop.example/cart?'],
+    ['Is it on example.com?', 'Is it on example.com?']
+  ]) {
+    const reduced = S.reduceGoalUrls(goal);
+    check(`reduceGoalUrls keeps the task and drops only URL queries: ${goal.slice(0, 32)}...`,
+      reduced === expected && S.reduceGoalUrls(reduced) === reduced, show(reduced));
+  }
+  {
+    const built = S.buildRequest(sampleInput({ goal: 'Go to shop.example/cart?order=88231 and click Continue' }));
+    check('a scheme-less URL query never reaches the request goal',
+      built.ok === true && built.request.goal === 'Go to shop.example/cart and click Continue',
+      show(built.ok ? built.request.goal : built));
+  }
+
   const phrase = ['ignore', 'all', 'previous', 'instructions'].join(' ');
   const tag = ['[', 'SYSTEM', ']'].join('');
   const result = S.buildRequest(sampleInput({

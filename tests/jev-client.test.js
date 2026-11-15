@@ -491,6 +491,7 @@ async function localCheckSection() {
     ['a dot segment in page.path', (r) => { r.page.path = '/a/../checklist'; }, '/a/../'],
     ['a URL query in the goal', (r) => { r.goal = 'Open https://shop.example/cart?order=88231. Save'; }, 'order=88231'],
     ['a URL fragment in the goal', (r) => { r.goal = 'Go to https://shop.example/cart#coupon-SPRING25 now'; }, 'coupon-SPRING25'],
+    ['a scheme-less URL query in the goal', (r) => { r.goal = 'Go to shop.example/cart?order=88231 now'; }, 'order=88231'],
   ];
   for (const [label, mutate, secret] of raw) {
     const request = validRequest();
