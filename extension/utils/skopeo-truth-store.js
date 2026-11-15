@@ -2255,11 +2255,18 @@
       }
       var keys = Object.keys(affected).sort();
       var nextGeneration = null;
+      var clearedGeneration = false;
       if (priorGeneration) {
         var remaining = priorGeneration.families.filter(function(family) {
           return !own(affected, family.familyId + '\u0000' + family.snapshotId);
         });
-        if (remaining.length !== priorGeneration.families.length) {
+        if (remaining.length === 0 && priorGeneration.families.length > 0) {
+          // Every published family is being withdrawn. An empty generation
+          // would read as current truth with no facts, so drop the pointer and
+          // let the next read report the facts as missing.
+          await removeKeys([generationControlKey(input.partitionKey)], context);
+          clearedGeneration = true;
+        } else if (remaining.length !== priorGeneration.families.length) {
           for (var remainingIndex = 0;
             remainingIndex < remaining.length;
             remainingIndex += 1) {
@@ -2322,13 +2329,13 @@
           throw statusError('dependency-mismatch');
         }
       }
-      if (nextGeneration) {
+      if (nextGeneration || clearedGeneration) {
         var values = await readAll(context);
         var obsoleteGenerationKeys = Object.keys(values).filter(function(key) {
           return keyBelongsToPartition(key, input.partitionKey) &&
             key.indexOf(PREFIX + 'generation:') === 0 &&
-            key !== generationKey(
-              input.partitionKey, nextGeneration.outputGenerationId);
+            (!nextGeneration || key !== generationKey(
+              input.partitionKey, nextGeneration.outputGenerationId));
         });
         await removeKeys(obsoleteGenerationKeys, context);
       }

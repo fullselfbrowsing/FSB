@@ -546,11 +546,10 @@ async function testCompleteDisplaySnapshotContract() {
   assert.strictEqual(projection.families.length, 1);
   exactKeys(projection.families[0], [
     'familyId', 'sourceBindings', 'documentStableIds', 'lineageRelationIds',
-    'recordVersionIds', 'relationVersionIds', 'candidateGenerationIds',
     'candidateSchemaVersion', 'promptVersion', 'adjudicationVersion',
     'deadlineRuleVersion', 'calendarVersion', 'lineageProof', 'assertions',
     'conflicts', 'citations', 'deadlineRules', 'deadlineResults'
-  ], 'display family omits duplicated partition/context/generation authority fields');
+  ], 'display family omits authority fields and the full graph id sets it does not show');
   assert.strictEqual(projection.families[0].familyId, harness.familyId);
   assert.ok(deepFrozen(projection), 'complete display snapshot is recursively frozen');
   assert.ok(Buffer.byteLength(JSON.stringify(projection), 'utf8') <= 64 * 1024,

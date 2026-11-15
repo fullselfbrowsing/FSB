@@ -638,6 +638,11 @@ async function testSymmetricDependenciesAndGraphInvalidator() {
     partitionKey: PARTITION,
     familyId: sibling.familyId
   }), null, 'graph source change withdraws remaining source-dependent truth');
+  const clearedMetadata = await harness.store.inspectMetadata({ partitionKey: PARTITION });
+  assert.equal(clearedMetadata.outputGenerationId, null,
+    'withdrawing the last published family leaves no current generation, so display reports the facts missing');
+  assert.deepEqual(Array.from(clearedMetadata.families), [],
+    'no empty generation stands in for withdrawn truth');
 
   const republished = await makeProof({ familyOrdinal: 6, sourceIds: [SOURCE_A, SOURCE_B] });
   await stageAndPublish(harness.store, republished);
