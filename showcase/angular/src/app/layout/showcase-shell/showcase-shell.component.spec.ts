@@ -282,6 +282,30 @@ describe('Showcase shell on depth pages', () => {
     expect(found.filter((r) => r.media !== '(hover: hover)')).toEqual([]);
   });
 
+  it('leaves the logo off a phone, where the cue already has Home', async () => {
+    // The test window is wider than a phone, so the rule itself is looked for.
+    const el = await open('/');
+    expect(el.querySelector('.nav--depth .nav-brand')).not.toBeNull();
+    const hidesBrand = /\.nav--depth(\[[^\]]*\])*\s+\.nav-brand(\[[^\]]*\])*$/;
+    const media: (string | null)[] = [];
+    const walk = (rules: CSSRuleList, within: string | null): void => {
+      for (const rule of Array.from(rules)) {
+        if (rule instanceof CSSMediaRule) walk(rule.cssRules, rule.conditionText);
+        else if (rule instanceof CSSStyleRule && rule.style.display === 'none' && rule.selectorText.split(',').some((s) => hidesBrand.test(s.trim()))) {
+          media.push(within);
+        }
+      }
+    };
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        walk(sheet.cssRules, null);
+      } catch {
+        // A sheet from another origin cannot be read.
+      }
+    }
+    expect(media).toEqual(['(max-width: 768px)']);
+  });
+
   it('brings back the classic nav and footer on a page without depth', async () => {
     const el = await open('/');
     await router.navigateByUrl('/plain');

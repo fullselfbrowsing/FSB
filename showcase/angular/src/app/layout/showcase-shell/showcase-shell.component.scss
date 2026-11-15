@@ -421,6 +421,14 @@
   box-shadow: none;
 }
 
+/* On a phone the planes have the screen to themselves; Home and the other
+   pages are in the nav cue at the bottom. */
+@media (max-width: 768px) {
+  .nav--depth .nav-brand {
+    display: none;
+  }
+}
+
 .fsb-navcue {
   --cue: 0;
   align-items: center;
