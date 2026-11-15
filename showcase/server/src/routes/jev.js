@@ -473,8 +473,13 @@ function createJevRouter({
         type = undefined;
         status = undefined;
       }
+      // Any other 4xx from the parser is the client's fault even when it has
+      // no known type: a body that claims gzip but does not inflate comes
+      // through as a plain 400.
       if (type === 'entity.too.large' || status === 413) reason = 'payload_too_large';
-      else if (PARSER_ERROR_TYPES.includes(type)) reason = 'invalid_request';
+      else if (PARSER_ERROR_TYPES.includes(type) || (Number.isInteger(status) && status >= 400 && status <= 499)) {
+        reason = 'invalid_request';
+      }
       refuse(res, reason, startedAt);
     } catch (_swallowed) {
       // Nothing more can be done for this response.

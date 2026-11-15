@@ -493,6 +493,14 @@ async function validationSection() {
   check('the generic error handler was not hit by the case-variant parser errors', genericHandlerHit === false);
   checkTyped('a non-JSON content type', await send(gw.port, { raw: JSON.stringify(baseRequest()), contentType: 'text/plain' }),
     400, 'invalid_request');
+  // A body that claims gzip but does not inflate: the parser reports a plain
+  // 400 with no error type. The client sent it wrong; the server did not fail.
+  const serverErrorsBefore = dailyRequests(db, DAY, 'server_error');
+  checkTyped('a corrupt gzip body', await send(gw.port, { raw: 'not gzip at all', headers: { 'Content-Encoding': 'gzip' } }),
+    400, 'invalid_request');
+  check('the corrupt gzip body is not counted as a server error',
+    dailyRequests(db, DAY, 'server_error') === serverErrorsBefore, String(dailyRequests(db, DAY, 'server_error')));
+  check('the generic error handler was not hit by the corrupt gzip body', genericHandlerHit === false);
   checkTyped('GET /api/jev/decide', await send(gw.port, { method: 'GET' }), 404, 'invalid_request');
   checkTyped('POST /api/jev/other', await send(gw.port, { path: '/api/jev/other', body: baseRequest() }), 404, 'invalid_request');
 
