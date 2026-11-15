@@ -885,7 +885,21 @@
       var sessions = entries.slice(0, LIMITS.SESSION_COUNT).map(function(entry) {
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
         var safeRecord = safeSession(entry.id, entry, now);
-        return safeRecord ? safeIndexEntry(safeRecord) : null;
+        if (!safeRecord) return null;
+        var listed = safeIndexEntry(safeRecord);
+        // An index entry holds its replay status as flat fields, not as a
+        // replay record, so rebuilding it from a session would always report
+        // "not replayable". Read those fields from the entry, bounded the way
+        // a replay record's integrity, provenance and counts are.
+        if (!safeRecord.replay) {
+          listed.replayIntegrity = typeof entry.replayIntegrity === 'string'
+            ? redactText(entry.replayIntegrity, 16) || null : null;
+          listed.replayProvenance = typeof entry.replayProvenance === 'string'
+            ? redactText(entry.replayProvenance, 32) || null : null;
+          listed.replayableCount = safeNumber(entry.replayableCount, 0, 0, 100);
+          listed.replayBlockedCount = safeNumber(entry.replayBlockedCount, 0, 0, 100);
+        }
+        return listed;
       }).filter(Boolean);
       while (sessions.length && byteLength({ sessions: sessions }) > LIMITS.SESSION_RESPONSE_BYTES) {
         sessions.pop();

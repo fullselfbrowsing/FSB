@@ -2154,6 +2154,52 @@ async function run() {
     check(Buffer.byteLength(listedJson) <= api.LIMITS.SESSION_RESPONSE_BYTES,
       'session list response is capped after sanitization');
 
+    // Index entries keep replay status as flat fields, never as a replay
+    // record, so the list has to read those fields from the entry itself.
+    const replayIndex = createFakeStorage({});
+    const replayIndexStore = api.create({ chrome: replayIndex.chrome, now: () => 1700000000000 });
+    await replayIndexStore.ready();
+    const verifiedSave = await replayIndexStore.saveAutomationSession('replayable-session', {
+      id: 'replayable-session',
+      task: 'Verified replay',
+      mode: 'autopilot',
+      startTime: 1699999990000,
+      endTime: 1700000000000,
+      status: 'completed',
+      logs: [],
+      replay: {
+        version: 'fsb-lattice-replay/v1',
+        integrity: 'verified',
+        provenance: 'capture',
+        manifest: { kind: 'fsb-browser-replay-manifest', steps: [], tabs: [] },
+        counts: { total: 4, executable: 3, approvalRequired: 1, blocked: 1 }
+      }
+    }, []);
+    replayIndex.values.fsbSessionIndex.push({
+      id: 'hostile-replay-fields',
+      task: 'Hostile replay fields',
+      status: 'completed',
+      startTime: 1,
+      endTime: 2,
+      replayIntegrity: 'v'.repeat(400),
+      replayProvenance: { nested: 'object' },
+      replayableCount: 1e9,
+      replayBlockedCount: 'many'
+    });
+    const replayListed = await replayIndexStore.listAutomationSessions();
+    const verifiedEntry = replayListed.sessions.find((entry) => entry.id === 'replayable-session');
+    const hostileEntry = replayListed.sessions.find((entry) => entry.id === 'hostile-replay-fields');
+    check(verifiedSave.ok === true && !!verifiedEntry &&
+          verifiedEntry.replayIntegrity === 'verified' && verifiedEntry.replayProvenance === 'capture' &&
+          verifiedEntry.replayableCount === 3 && verifiedEntry.replayBlockedCount === 1,
+    'session list reports the stored replay integrity, provenance and counts');
+    check(!!hostileEntry && hostileEntry.replayIntegrity === 'v'.repeat(16) && hostileEntry.replayProvenance === null &&
+          hostileEntry.replayableCount === 100 && hostileEntry.replayBlockedCount === 0,
+    'session list bounds replay fields read from a stored index entry');
+    check(!!verifiedEntry && JSON.stringify(Object.keys(verifiedEntry).sort()) ===
+          JSON.stringify(Object.keys(replayIndex.values.fsbSessionIndex[0]).sort()),
+    'session list entries keep the stored index key set');
+
     check((await store.getElementCacheConfig()).elementCacheSize === 321,
       'element-cache configuration is parsed and clamped by the trusted store');
     const unsetCacheStore = api.create({ chrome: createFakeStorage({}).chrome, now: () => 1700000000000 });
