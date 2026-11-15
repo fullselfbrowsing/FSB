@@ -639,6 +639,32 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     };
   }
 
+  const REPLAY_STEP_HASH_PATTERN = /^[a-f0-9]{64}$/;
+  const REPLAY_RESULT_HASH_VERSION_PATTERN = /^[A-Za-z0-9._\/-]{1,64}$/;
+
+  // Sealing replaces a step's result with hashes of its arguments and result,
+  // and the manifest hash commits to exactly those fields. A sealed step keeps
+  // them as written and never gains a result body; a malformed value is
+  // dropped, so the hash check fails instead of being repaired.
+  function getSafeSealedReplayFields(step) {
+    const fields = {};
+    if (typeof step.argumentHash === 'string' && REPLAY_STEP_HASH_PATTERN.test(step.argumentHash)) {
+      fields.argumentHash = step.argumentHash;
+    }
+    if (typeof step.resultHash === 'string' && REPLAY_STEP_HASH_PATTERN.test(step.resultHash)) {
+      fields.resultHash = step.resultHash;
+    }
+    if (typeof step.resultHashVersion === 'string' &&
+        REPLAY_RESULT_HASH_VERSION_PATTERN.test(step.resultHashVersion)) {
+      fields.resultHashVersion = step.resultHashVersion;
+    }
+    const summary = step.resultSummary;
+    if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
+      fields.resultSummary = getSafeReplayValue(summary, 0);
+    }
+    return fields;
+  }
+
   function getSafeReplayStep(step, index) {
     if (!step || typeof step !== 'object') return null;
     const target = step.target && typeof step.target === 'object' ? step.target : {};
@@ -651,6 +677,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           tier: getSafePersistedText(step.capability.tier || '', 32) || null
         }
       : null;
+    const sealed = Object.prototype.hasOwnProperty.call(step, 'resultHash');
     return {
       id: getSafePersistedText(step.id || `step-${index + 1}`, 128),
       index: Number.isFinite(Number(step.index)) ? Number(step.index) : index,
@@ -658,7 +685,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       tool: getSafePersistedText(step.tool || '', 128),
       route: getSafePersistedText(step.route || 'legacy', 64),
       arguments: getSafeReplayValue(step.arguments || {}, 0),
-      result: getSafeReplayValue(step.result || {}, 0),
+      ...(sealed ? {} : { result: getSafeReplayValue(step.result || {}, 0) }),
       success: step.success !== false,
       target: {
         logicalTab: getSafePersistedText(target.logicalTab || 'primary', 128),
@@ -672,7 +699,8 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         risk: getSafePersistedText(replay.risk || 'inspect-only', 32),
         availability: getSafePersistedText(replay.availability || 'unsupported', 32),
         reason: replay.reason == null ? null : getSafePersistedText(replay.reason, 256)
-      }
+      },
+      ...(sealed ? getSafeSealedReplayFields(step) : {})
     };
   }
 

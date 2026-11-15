@@ -3,8 +3,10 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const { pathToFileURL } = require('node:url');
 const replayHelpers = require('../extension/utils/lattice-replay.js');
+const trustedStoreApi = require('../extension/utils/trusted-local-feature-store.js');
 
 let passed = 0;
 function check(label, fn) {
@@ -143,6 +145,47 @@ function manifest() {
       replay: { risk: 'write', availability: 'approval-once', reason: 'Browser interaction may repeat a side effect' }
     }]
   };
+}
+
+function createTrustedSessionStore() {
+  const values = {};
+  const copy = (value) => JSON.parse(JSON.stringify(value));
+  const store = trustedStoreApi.create({
+    chrome: {
+      runtime: { id: 'fsb-replay-test-extension' },
+      storage: {
+        local: {
+          async get(keys) {
+            const selected = {};
+            for (const key of (Array.isArray(keys) ? keys : [keys])) {
+              if (Object.prototype.hasOwnProperty.call(values, key)) selected[key] = copy(values[key]);
+            }
+            return selected;
+          },
+          async set(update) { Object.assign(values, copy(update)); },
+          async remove(keys) { for (const key of (Array.isArray(keys) ? keys : [keys])) delete values[key]; }
+        }
+      }
+    }
+  });
+  return { store, values };
+}
+
+function loadLoggerWithStore(store) {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'utils', 'automation-logger.js'), 'utf8');
+  const context = vm.createContext({
+    chrome: { runtime: { id: 'fsb-replay-test-extension' } },
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout,
+    clearTimeout,
+    URL,
+    Blob,
+    TextEncoder,
+    fsbTrustedLocalFeatureStore: store
+  });
+  context.globalThis = context;
+  vm.runInContext(source, context, { filename: 'automation-logger.js' });
+  return context.automationLogger;
 }
 
 async function loadHost(harness, nonce) {
@@ -538,6 +581,142 @@ async function main() {
     assert.notEqual(driftedCheckpoint.resultHash, sealed.manifest.steps[0].resultHash);
     assert.equal(verifiedDriftedCheckpoint.ok, true);
     assert.equal(verifiedDriftedCheckpoint.body.parentReceiptCid, checkpoint.receiptCid);
+  });
+
+  // A sealed record is written back to storage as sealed, but every later
+  // outcome update, load and append-save passes it through the trusted
+  // store, and a save that carries a replay record also passes it through
+  // the logger. Both must keep a sealed step exactly as sealed, or the
+  // committed manifest hash stops matching and the session can no longer be
+  // replayed. Sealing reads the stored record, so the sealed manifest already
+  // has the store's shape.
+  const history = createTrustedSessionStore();
+  const roundTripId = 'session_sealed_round_trip';
+  const roundTripTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'content'
+  };
+  const roundTripCapture = replayHelpers.createReplayRecord({
+    sessionId: roundTripId,
+    task: 'Sealed history round trip',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'click',
+    requestPayload: { params: { selector: '#continue' } },
+    response: { success: true, clicked: true, tabId: 7 },
+    success: true,
+    timestamp: Date.now() - 2000,
+    replayContext: roundTripTarget
+  }, {
+    tool: 'click',
+    requestPayload: { params: { selector: '#missing' } },
+    response: { success: false, errorCode: 'element_not_found', error: 'No element matched #missing' },
+    success: false,
+    timestamp: Date.now() - 1000,
+    replayContext: roundTripTarget
+  }], 'capture');
+  const firstSave = await history.store.saveAutomationSession(roundTripId, {
+    id: roundTripId,
+    task: 'Sealed history round trip',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay: roundTripCapture
+  }, []);
+  const pendingReplay = (await history.store.loadAutomationSession(roundTripId)).session.replay;
+  const roundTripSeal = await second.dispatch('lattice-replay-seal', {
+    manifest: pendingReplay.manifest,
+    provenance: pendingReplay.provenance
+  });
+  const sealedRecord = Object.assign({}, pendingReplay, {
+    integrity: 'verified',
+    manifest: roundTripSeal.manifest,
+    manifestHash: roundTripSeal.manifestHash,
+    receipt: roundTripSeal.receipt,
+    receiptCid: roundTripSeal.receiptCid,
+    signerKid: roundTripSeal.signerKid,
+    counts: replayHelpers.replayCounts(roundTripSeal.manifest.steps),
+    error: null
+  });
+  check('a pending record keeps its step results until it is sealed', () => {
+    assert.equal(firstSave.ok, true);
+    assert.equal(pendingReplay.manifest.steps.every((step) => Object.prototype.hasOwnProperty.call(step, 'result')), true);
+    assert.equal(roundTripSeal.ok, true);
+    assert.equal(roundTripSeal.manifest.steps[1].resultSummary.errorCode, 'element_not_found');
+  });
+
+  history.values.fsbSessionLogs[roundTripId].replay = JSON.parse(JSON.stringify(sealedRecord));
+  const outcomeUpdate = await history.store.updateAutomationSessionOutcome(roundTripId, {
+    status: 'completed', outcome: 'success', reason: 'completed', summary: 'done', result: 'done',
+    completionMessage: 'done', error: '', blocker: '', nextStep: ''
+  });
+  const afterOutcome = JSON.parse(JSON.stringify(history.values.fsbSessionLogs[roundTripId].replay));
+  const loadedSession = (await history.store.loadAutomationSession(roundTripId)).session;
+  await history.store.saveAutomationSession(roundTripId, loadedSession, []);
+  const afterStoreSave = JSON.parse(JSON.stringify(history.values.fsbSessionLogs[roundTripId].replay));
+  check('the trusted store keeps a sealed manifest exactly as sealed', () => {
+    assert.equal(outcomeUpdate.ok, true);
+    assert.deepEqual(afterOutcome.manifest, sealedRecord.manifest);
+    assert.deepEqual(loadedSession.replay.manifest, sealedRecord.manifest);
+    assert.deepEqual(afterStoreSave.manifest, sealedRecord.manifest);
+    assert.equal(afterStoreSave.manifestHash, sealedRecord.manifestHash);
+    assert.equal(afterStoreSave.manifest.steps.some((step) => Object.prototype.hasOwnProperty.call(step, 'result')), false);
+  });
+
+  const roundTripLogger = loadLoggerWithStore(history.store);
+  roundTripLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'replay record attached',
+    data: { sessionId: roundTripId }
+  }];
+  const loggerSaved = await roundTripLogger.saveSession(roundTripId, {
+    status: 'completed',
+    mode: 'mcp-agent',
+    replay: sealedRecord
+  });
+  const afterLoggerSave = JSON.parse(JSON.stringify(history.values.fsbSessionLogs[roundTripId].replay));
+  check('a logger save that carries the sealed record keeps it exactly as sealed', () => {
+    assert.equal(loggerSaved, true);
+    assert.deepEqual(afterLoggerSave.manifest, sealedRecord.manifest);
+  });
+
+  const roundTripMaterialized = await second.dispatch('lattice-replay-materialize', {
+    manifest: afterLoggerSave.manifest,
+    manifestHash: afterLoggerSave.manifestHash,
+    receipt: afterLoggerSave.receipt,
+    signerKid: afterLoggerSave.signerKid
+  });
+  check('a sealed record still verifies after the store and logger round trips', () => {
+    assert.equal(roundTripMaterialized.ok, true, roundTripMaterialized.error && roundTripMaterialized.error.message);
+    assert.equal(roundTripMaterialized.verified, true);
+    assert.equal(roundTripMaterialized.manifestHash, sealedRecord.manifestHash);
+  });
+
+  const forgedRecord = JSON.parse(JSON.stringify(sealedRecord));
+  forgedRecord.manifest.steps[0].argumentHash = '<img src=x>';
+  forgedRecord.manifest.steps[1].resultSummary = 'element_not_found';
+  history.values.fsbSessionLogs[roundTripId].replay = forgedRecord;
+  await history.store.updateAutomationSessionOutcome(roundTripId, { status: 'completed', outcome: 'success' });
+  const afterForgery = history.values.fsbSessionLogs[roundTripId].replay;
+  const forgedMaterialized = await second.dispatch('lattice-replay-materialize', {
+    manifest: afterForgery.manifest,
+    manifestHash: afterForgery.manifestHash,
+    receipt: afterForgery.receipt,
+    signerKid: afterForgery.signerKid
+  });
+  check('malformed sealed fields are dropped and the record then fails closed', () => {
+    assert.equal(Object.prototype.hasOwnProperty.call(afterForgery.manifest.steps[0], 'argumentHash'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(afterForgery.manifest.steps[1], 'resultSummary'), false);
+    assert.equal(afterForgery.manifest.steps[1].resultHash, sealedRecord.manifest.steps[1].resultHash);
+    assert.equal(forgedMaterialized.ok, false);
+    assert.match(forgedMaterialized.error.message, /hash mismatch/i);
   });
 
   console.log('Summary:', passed, 'passed');

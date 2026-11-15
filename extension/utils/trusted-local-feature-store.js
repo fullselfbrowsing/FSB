@@ -400,6 +400,9 @@
     };
   }
 
+  var REPLAY_STEP_HASH_PATTERN = /^[a-f0-9]{64}$/;
+  var REPLAY_RESULT_HASH_VERSION_PATTERN = /^[A-Za-z0-9._\/-]{1,64}$/;
+
   function safeReplayStep(step, index) {
     if (!step || typeof step !== 'object' || Array.isArray(step)) return null;
     var target = step.target && typeof step.target === 'object' ? step.target : {};
@@ -410,6 +413,11 @@
       service: redactText(step.capability.service || '', 96) || null,
       tier: redactText(step.capability.tier || '', 32) || null
     } : null;
+    // Sealing replaces a step's result with hashes of its arguments and
+    // result, and the manifest hash commits to exactly those fields. A sealed
+    // step keeps them as written and never gains a result body; a malformed
+    // value is dropped, so the hash check fails instead of being repaired.
+    var sealed = Object.prototype.hasOwnProperty.call(step, 'resultHash');
     var safe = {
       id: redactText(step.id || ('step-' + (index + 1)), 128),
       index: safeNumber(step.index, index, 0, 99),
@@ -433,6 +441,20 @@
     };
     if (step.inputState === 'redacted') safe.inputState = 'redacted';
     if (capability) safe.capability = capability;
+    if (sealed) {
+      delete safe.result;
+      if (typeof step.argumentHash === 'string' && REPLAY_STEP_HASH_PATTERN.test(step.argumentHash)) {
+        safe.argumentHash = step.argumentHash;
+      }
+      if (typeof step.resultHash === 'string' && REPLAY_STEP_HASH_PATTERN.test(step.resultHash)) {
+        safe.resultHash = step.resultHash;
+      }
+      if (typeof step.resultHashVersion === 'string' &&
+          REPLAY_RESULT_HASH_VERSION_PATTERN.test(step.resultHashVersion)) {
+        safe.resultHashVersion = step.resultHashVersion;
+      }
+      if (isPlainRecord(step.resultSummary)) safe.resultSummary = safeReplayValue(step.resultSummary, 0);
+    }
     return safe;
   }
 
