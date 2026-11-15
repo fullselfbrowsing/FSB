@@ -11,7 +11,10 @@ import { SupportPageComponent } from '../../pages/support/support-page.component
 /* Before the engine starts (prerendered HTML, slow connection), depth.scss hides every
    plane but the first with `visibility: hidden` on the plane. A descendant that sets
    `visibility: visible` itself is not hidden by that and paints over the first plane.
-   Rules inside a plane must use `inherit` to show something. */
+   Rules inside a plane must use `inherit` to show something.
+
+   The one plane allowed to show is a second plane marked `data-depth-ghost`, which
+   depth.scss draws as the faint preview the engine would leave there. */
 describe('depth pages before the engine starts', () => {
   const pages: [string, Type<unknown>][] = [
     ['home', HomePageComponent],
@@ -33,7 +36,11 @@ describe('depth pages before the engine starts', () => {
       const host: HTMLElement = fixture.nativeElement;
       const stage = host.querySelector<HTMLElement>('.fsb-depth')!;
       stage.removeAttribute('data-depth-live');
-      const laterPlanes = Array.from(host.querySelectorAll<HTMLElement>('.fsb-depth-layer')).slice(1);
+      const planes = Array.from(host.querySelectorAll<HTMLElement>('.fsb-depth-layer'));
+      const ghosts = planes.filter(plane => plane.hasAttribute('data-depth-ghost'));
+      // The preview is the look of the plane directly behind the first; it fits no other.
+      expect(ghosts.every(plane => plane === planes[1])).withContext('data-depth-ghost only on the second plane').toBeTrue();
+      const laterPlanes = planes.slice(1).filter(plane => !plane.hasAttribute('data-depth-ghost'));
       expect(laterPlanes.length).toBeGreaterThan(0);
 
       const showing = laterPlanes.flatMap(plane =>
