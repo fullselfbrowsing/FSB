@@ -92,6 +92,27 @@ html:has(.fsb-depth) body {
   display: none;
 }
 
+/* A plane whose answers open on demand keeps its size when one opens (hold() in
+   depth-engine.ts). While the open answer does not fit, the plane scrolls inside
+   itself. Its padding is the room's own edge, where a plane that fills the room
+   already sits, so nothing moves when this switches on or off; content scrolled
+   under the nav or into the nav cue fades out. */
+.fsb-depth-layer[data-depth-over] {
+  align-items: flex-start;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 calc(var(--nav-height) + 12px), #000 calc(100% - 96px), transparent calc(100% - 48px));
+  mask-image: linear-gradient(to bottom, transparent 0, #000 calc(var(--nav-height) + 12px), #000 calc(100% - 96px), transparent calc(100% - 48px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 96px;
+  padding-top: calc(var(--nav-height) + 12px);
+  scrollbar-width: none;
+}
+
+.fsb-depth-layer[data-depth-over]::-webkit-scrollbar {
+  display: none;
+}
+
 .fsb-depth-fit {
   transform-origin: 50% 50%;
   width: 100%;
@@ -237,13 +258,15 @@ body:has(.fsb-navcue :focus-visible) .fsb-depth {
     visibility: visible !important;
   }
 
-  .fsb-depth-layer[data-scroll] {
+  .fsb-depth-layer[data-scroll],
+  .fsb-depth-layer[data-depth-over] {
     -webkit-mask-image: none;
     mask-image: none;
     overflow: visible;
   }
 
   .fsb-depth-fit {
+    margin-bottom: 0 !important;
     transform: none !important;
     width: 100% !important;
   }

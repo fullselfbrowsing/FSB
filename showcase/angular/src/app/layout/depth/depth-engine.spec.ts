@@ -146,6 +146,22 @@ describe('createDepthEngine', () => {
       expect(fitOf(1).style.width).toBe('');
       expect(scaleOf(1)).toBeLessThan(0.75);
     });
+
+    it('keeps its width and scale when an answer opens on demand', async () => {
+      const opens =
+        '<div class="answer" data-depth-grows style="display:grid;grid-template-rows:0fr">' +
+        `<div style="min-height:0;overflow:hidden">${prose(1)}</div></div>`;
+      build([120, { html: prose(2.4) + opens }, 120], PHONE);
+      const fit = fitOf(1);
+      const width = fit.style.width;
+      const scale = scaleOf(1);
+      expect(parseFloat(width)).toBeGreaterThan(110);
+      root.querySelector<HTMLElement>('.answer')!.style.gridTemplateRows = '1fr';
+      // Past the moment a plane whose content changed would be laid out again.
+      await new Promise((r) => setTimeout(r, 400));
+      expect(fit.style.width).toBe(width);
+      expect(scaleOf(1)).toBe(scale);
+    });
   });
 
   describe('a row that scrolls sideways', () => {
@@ -537,6 +553,121 @@ describe('createDepthEngine', () => {
       expect(activeIndex()).toBe(2);
       expect(seen).not.toContain(3);
     }, 10000);
+  });
+
+  describe('content that opens on demand', () => {
+    // A question with its answer under it, opening the way the support page's do: a
+    // grid row eased open from nothing.
+    const answer = (px: number, ease = ''): string =>
+      '<div class="item" style="background:#222"><div class="q" style="height:40px">question</div>' +
+      `<div class="answer" data-depth-grows style="display:grid;grid-template-rows:0fr${ease}">` +
+      `<div style="min-height:0;overflow:hidden"><div style="height:${px}px">answer</div></div></div></div>`;
+    // Above it, a box standing in for the other questions. Together they make a plane
+    // 1 / 0.8 of the room tall, so it fills the room scaled to 0.8. (One wrapper: the
+    // page styles space out a plane's own sibling sections.)
+    const filling = (rows: string): PlaneSpec => ({ html: `<div><div style="height:${Math.round(room() / 0.8) - 40}px"></div>${rows}</div>` });
+    const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    const frames = (n: number): Promise<void> =>
+      new Promise((resolve) => {
+        const step = (k: number): void => {
+          if (k <= 0) resolve();
+          else requestAnimationFrame(() => setTimeout(() => step(k - 1)));
+        };
+        step(n);
+      });
+    async function setOpen(row: HTMLElement, open: boolean): Promise<void> {
+      row.style.gridTemplateRows = open ? '1fr' : '0fr';
+      await frames(3);
+    }
+    const activeIndex = (): number => layers().findIndex((l) => !l.hasAttribute('inert'));
+    function wheel(deltaY: number): void {
+      root.querySelector('[data-depth-stage]')!.dispatchEvent(new WheelEvent('wheel', { deltaY, cancelable: true, bubbles: true }));
+    }
+
+    it('draws a plane with its answers closed just where it would be without them', () => {
+      build([120, filling(answer(300)), 120]);
+      const closed = fitOf(1).getBoundingClientRect();
+      engine!.destroy();
+      root.remove();
+      build([120, filling('<div style="background:#222;height:40px">question</div>'), 120]);
+      const plain = fitOf(1).getBoundingClientRect();
+      expect(closed.top).toBeCloseTo(plain.top, 0);
+      expect(closed.height).toBeCloseTo(plain.height, 0);
+      expect(closed.width).toBeCloseTo(plain.width, 0);
+    });
+
+    it('keeps the plane at its size when an answer opens', async () => {
+      build([120, filling(answer(300)), 120]);
+      const scale = scaleOf(1);
+      expect(scale).toBeCloseTo(0.8, 2);
+      await setOpen(root.querySelector<HTMLElement>('.answer')!, true);
+      expect(scaleOf(1)).toBe(scale);
+    });
+
+    it('scrolls inside itself once an open answer does not fit, without moving anything', async () => {
+      build([120, filling(answer(300)), 120]);
+      engine!.go(1);
+      await settle(1);
+      const L = layers()[1];
+      const top = fitOf(1).getBoundingClientRect().top;
+      await setOpen(L.querySelector<HTMLElement>('.answer')!, true);
+      expect(L.hasAttribute('data-depth-over')).toBeTrue();
+      expect(Math.abs(fitOf(1).getBoundingClientRect().top - top)).toBeLessThan(1);
+      // It scrolls by just the answer's height at the plane's scale.
+      expect(L.scrollHeight - L.clientHeight).toBeCloseTo(300 * 0.8, -1);
+    });
+
+    it('scrolls with the wheel before moving on to the next plane', async () => {
+      build([120, filling(answer(300)), 120]);
+      engine!.go(1);
+      await settle(1);
+      const L = layers()[1];
+      await setOpen(L.querySelector<HTMLElement>('.answer')!, true);
+      wheel(120);
+      await pause(450);
+      expect(activeIndex()).toBe(1);
+      expect(L.scrollTop).toBeGreaterThan(0);
+      for (let i = 0; i < 8 && activeIndex() < 2; i++) {
+        wheel(120);
+        await pause(450);
+      }
+      await settle(2);
+      expect(activeIndex()).toBe(2);
+    }, 10000);
+
+    it('brings an answer opened near the bottom into view, question and all', async () => {
+      build([120, filling(answer(Math.round(room() * 0.5), ';transition:grid-template-rows .3s linear')), 120]);
+      engine!.go(1);
+      await settle(1);
+      const L = layers()[1];
+      const row = L.querySelector<HTMLElement>('.answer')!;
+      const question = L.querySelector<HTMLElement>('.q')!;
+      // The click that opens it, as the page's own button would.
+      question.addEventListener('click', () => (row.style.gridTemplateRows = '1fr'));
+      question.click();
+      await pause(900);
+      const box = L.getBoundingClientRect();
+      const cs = getComputedStyle(L);
+      expect(L.scrollTop).toBeGreaterThan(0);
+      expect(row.getBoundingClientRect().bottom).toBeLessThanOrEqual(box.top + L.clientHeight - parseFloat(cs.paddingBottom) + 1);
+      expect(question.getBoundingClientRect().top).toBeGreaterThanOrEqual(box.top + parseFloat(cs.paddingTop) - 1);
+    }, 10000);
+
+    it('comes back to where it was when the answer closes', async () => {
+      build([120, filling(answer(300)), 120]);
+      engine!.go(1);
+      await settle(1);
+      const L = layers()[1];
+      const top = fitOf(1).getBoundingClientRect().top;
+      const row = L.querySelector<HTMLElement>('.answer')!;
+      await setOpen(row, true);
+      L.scrollTop = 120;
+      await setOpen(row, false);
+      expect(L.hasAttribute('data-depth-over')).toBeFalse();
+      expect(L.scrollTop).toBe(0);
+      expect(Math.abs(fitOf(1).getBoundingClientRect().top - top)).toBeLessThan(1);
+      expect(scaleOf(1)).toBeCloseTo(0.8, 2);
+    });
   });
 
   it('starts even when the fragment is not valid percent-encoding', () => {

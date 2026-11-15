@@ -25,7 +25,7 @@
                       <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
                     </button>
                   </h3>
-                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="openFaq === faq.id ? null : ''">
+                  <div class="faq-answer" data-depth-grows [id]="'faq-' + faq.id" [attr.inert]="openFaq === faq.id ? null : ''">
                     <div class="faq-answer-inner">
                       <p>{{ faq.a }}</p>
                       <div class="faq-resources">
@@ -76,7 +76,7 @@
                       <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
                     </button>
                   </h3>
-                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="openFaq === faq.id ? null : ''">
+                  <div class="faq-answer" data-depth-grows [id]="'faq-' + faq.id" [attr.inert]="openFaq === faq.id ? null : ''">
                     <div class="faq-answer-inner">
                       <p>{{ faq.a }}</p>
                       <div class="faq-resources">

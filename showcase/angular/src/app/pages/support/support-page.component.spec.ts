@@ -74,6 +74,14 @@ describe('Support FAQ layout', () => {
     return bounds.height;
   }
 
+  it('marks every answer as content that opens on demand', () => {
+    // The depth engine fits a plane without it, so opening an answer never shrinks
+    // the plane; it scrolls inside itself instead while the answer does not fit.
+    const answers = Array.from(host.querySelectorAll('.faq-answer'));
+    expect(answers.length).toBe(15);
+    expect(answers.every(a => a.hasAttribute('data-depth-grows'))).toBeTrue();
+  });
+
   it('collapses every answer completely and makes its contents inert', () => {
     host.querySelectorAll<HTMLElement>('.faq-answer').forEach(element => {
       expect(element.getBoundingClientRect().height).toBe(0);

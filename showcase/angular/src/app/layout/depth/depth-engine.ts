@@ -21,6 +21,9 @@
      [data-depth-anchor]         section starts inside a scrolling plane
      [data-depth-own]            gestures that start here belong to the element
      [data-depth-rigid]          a plane that keeps its own width when it is fitted
+     [data-depth-grows]          content that opens on demand (an answer): its plane
+                                 is fitted without it, keeps its size when it opens,
+                                 and scrolls inside itself while it does not fit
      .fsb-depth-rail [data-depth-go="i"][data-depth-sec="j"]  the plane index; a
                                  finger sliding along it runs through the entries,
                                  and the rail carries [data-sliding] while it does */
@@ -47,6 +50,10 @@ interface DepthLayer extends HTMLElement {
   _w?: number;
   /** The window and height the width was last worked out for. */
   _key?: string;
+  /** Content that opens on demand ([data-depth-grows]). */
+  _grows?: HTMLElement[];
+  /** When a click inside the plane last may have opened some of that content. */
+  _armed?: number;
 }
 
 interface DepthItem {
@@ -94,6 +101,10 @@ const SWALLOW_MS = 240;
    was. */
 const SLID_CLICK_MS = 350;
 
+/* After a click inside a plane whose answers open on demand, an answer that opens
+   within this long is scrolled into view. */
+const ARMED_MS = 900;
+
 export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions = {}): DepthEngine {
   const doc = root.ownerDocument;
   const win = (doc.defaultView || window) as Window & typeof globalThis;
@@ -139,6 +150,9 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let pinned: HTMLElement | null = null;
   let middles: number[] = [];
   let slidEnd = -1e9;
+  // How tall each piece of on-demand content was at the last pass, to tell which
+  // one is opening.
+  const grownTo = new WeakMap<HTMLElement, number>();
   let edgeT = 0;
   let lastAbs = 0;
   let steady = 0;
@@ -161,7 +175,10 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
 
   const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
   const isScroll = (L: DepthLayer | undefined): boolean => !!L && L.hasAttribute('data-scroll');
-  const css = (el: Element, pseudo?: string): CSSStyleDeclaration => win.getComputedStyle(el, pseudo);
+  // Scrolls inside itself: laid out as a scrolling document, or holding an open
+  // answer that does not fit its room.
+  const flows = (L: DepthLayer | undefined): boolean => isScroll(L) || (!!L && L.hasAttribute('data-depth-over'));
+  const css =(el: Element, pseudo?: string): CSSStyleDeclaration => win.getComputedStyle(el, pseudo);
 
   function splitList(s: string): string[] {
     const out: string[] = [];
@@ -180,10 +197,11 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   }
 
   // Measured from layout, not scrollHeight: while a plane is mid-flight its 3D
-  // transform inflates scrollHeight.
+  // transform inflates scrollHeight. A plane holding an open answer is drawn scaled
+  // from its top, its box trimmed to that height by a negative margin.
   function maxScroll(L: DepthLayer): number {
     const f = L.firstElementChild as HTMLElement | null;
-    const h = f ? f.offsetTop + f.offsetHeight + (parseFloat(css(L).paddingBottom) || 0) : L.scrollHeight;
+    const h = f ? f.offsetTop + f.offsetHeight + (parseFloat(f.style.marginBottom) || 0) + (parseFloat(css(L).paddingBottom) || 0) : L.scrollHeight;
     return Math.max(0, Math.min(L.scrollHeight, h) - L.clientHeight);
   }
   const curScroll = (L: DepthLayer): number => (L._st != null ? L._st : L.scrollTop);
@@ -212,6 +230,22 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   function anchors(L: DepthLayer): HTMLElement[] {
     if (!L._anch) L._anch = Array.from(L.querySelectorAll<HTMLElement>('[data-depth-anchor]'));
     return L._anch;
+  }
+  function grows(L: DepthLayer): HTMLElement[] {
+    if (!L._grows || L._grows.some((g) => !g.isConnected)) L._grows = Array.from(L.querySelectorAll<HTMLElement>('[data-depth-grows]'));
+    return L._grows;
+  }
+  // An element's laid-out height, unrounded and untouched by transforms.
+  const exact = (el: HTMLElement): number => parseFloat(css(el).height) || el.offsetHeight;
+  // The plane's height without what is open on demand: the height it is fitted at,
+  // so opening an answer never changes its scale or width. Worked out from unrounded
+  // heights: whole-pixel ones would make it wobble by a pixel while an answer opens.
+  function restHeight(L: DepthLayer, fit: HTMLElement): number {
+    const g = grows(L);
+    if (!g.length) return fit.offsetHeight;
+    let h = exact(fit);
+    for (const el of g) h -= exact(el);
+    return Math.round(h);
   }
   const topOf = (el: HTMLElement, L: DepthLayer): number => clamp(offIn(el, L) - padTop(L) - 8, 0, maxScroll(L));
   function secTop(L: DepthLayer, j: number): number {
@@ -429,7 +463,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   function solve(L: DepthLayer, fit: HTMLElement, room: number, W: number): void {
     const at = (factor: number): number => {
       setWide(L, fit, factor);
-      return fit.offsetHeight;
+      return restHeight(L, fit);
     };
     const h1 = at(1);
     const plain = h1 > 0 ? Math.min(1, room / h1) : 1;
@@ -481,6 +515,56 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       if (alive) widen();
     }, delay);
   }
+  // A plane whose answers open on demand keeps the scale it has with all of them
+  // closed. It is drawn scaled from its top, with its box trimmed to the height it
+  // shows, so once an open answer no longer fits the room the plane can scroll inside
+  // itself ([data-depth-over]) without anything on screen moving as it switches.
+  function hold(L: DepthLayer, fit: HTMLElement, s: number, room: number): void {
+    const fitted = !L.hasAttribute('data-full') && !isScroll(L);
+    const h = exact(fit);
+    const origin = fitted ? '50% 0' : '';
+    const trim = fitted && s < 1 ? (-h * (1 - s)).toFixed(2) + 'px' : '';
+    if (fit.style.transformOrigin !== origin) fit.style.transformOrigin = origin;
+    if (fit.style.marginBottom !== trim) fit.style.marginBottom = trim;
+    const over = fitted && h * s > room + 0.5;
+    if (over !== L.hasAttribute('data-depth-over')) {
+      if (over) L.setAttribute('data-depth-over', '');
+      else {
+        L.removeAttribute('data-depth-over');
+        L._st = null;
+      }
+    }
+    // The answer that has opened since the last pass, if a click just opened it.
+    let opening: HTMLElement | null = null;
+    for (const g of grows(L)) {
+      const gh = g.offsetHeight;
+      if (gh > (grownTo.get(g) || 0) + 0.5) opening = g;
+      grownTo.set(g, gh);
+    }
+    if (over && opening && L._armed && win.performance.now() - L._armed < ARMED_MS) keepInView(L, opening, s);
+  }
+  // Glides a plane that scrolls inside itself until an answer that is opening shows
+  // in full, without scrolling its question out at the top. Worked out from layout,
+  // scaled from the top of the plane, not from where things are drawn: elements still
+  // arriving with the plane are not where they will rest.
+  function keepInView(L: DepthLayer, el: HTMLElement, s: number): void {
+    const f0 = offIn(L.firstElementChild as HTMLElement, L);
+    const drawn = (y: number): number => f0 + (y - f0) * s;
+    const top = drawn(offIn(el.parentElement || el, L));
+    const bottom = drawn(offIn(el, L) + exact(el));
+    const cs = css(L);
+    const viewTop = parseFloat(cs.paddingTop) || 0;
+    // A little inside the room, clear of the fade below it (and of the rounding in
+    // whole-pixel offsets).
+    const viewBottom = L.clientHeight - (parseFloat(cs.paddingBottom) || 0) - 8;
+    let st = curScroll(L);
+    if (bottom - st > viewBottom) st = bottom - viewBottom;
+    st = clamp(Math.min(st, top - viewTop), 0, maxScroll(L));
+    if (Math.abs(st - curScroll(L)) > 0.5) {
+      L._st = st;
+      kick();
+    }
+  }
 
   function layout(): void {
     const H = stage!.clientHeight;
@@ -499,7 +583,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       const fit = L.firstElementChild as HTMLElement;
       let s = 1;
       if (!L.hasAttribute('data-full') && (!isScroll(L) || L._auto)) {
-        const h = fit.offsetHeight;
+        const h = restHeight(L, fit);
         const widens = narrow && !L._auto && !L.hasAttribute('data-depth-rigid');
         const settled = widens ? L._key === W + '|' + room + '|' + h : !L._w;
         if (!settled) stale = true;
@@ -523,6 +607,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       const tf = s < 0.999 ? 'scale(' + s.toFixed(4) + ')' : '';
       if (fit.style.transform !== tf) fit.style.transform = tf;
       L._s = s;
+      if (grows(L).length) hold(L, fit, s < 0.999 ? s : 1, room);
     }
     // A turned or resized window is refitted at once; a plane whose content is
     // still changing height (an answer opening) waits until it has stopped.
@@ -682,7 +767,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   }
   function park(): void {
     layers.forEach((L, j) => {
-      if (j === anchor || !isScroll(L) || L._st != null) return;
+      if (j === anchor || !flows(L) || L._st != null) return;
       const want = j < anchor ? maxScroll(L) : 0;
       if (Math.abs(L.scrollTop - want) > 1) L.scrollTop = want;
     });
@@ -714,7 +799,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     if (anchor !== from) tick();
     // Arriving at a scrolling plane from above starts at its top, from below at its end.
     const L = layers[anchor];
-    if (isScroll(L) && anchor !== from) {
+    if (flows(L) && anchor !== from) {
       L._st = null;
       L.scrollTop = anchor > from ? 0 : maxScroll(L);
     }
@@ -741,7 +826,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     if (!L || i < 0) return;
     anchor = target = p = i;
     for (const it of items) it.p = i;
-    if (isScroll(L)) {
+    if (flows(L)) {
       L._st = null;
       L.scrollTop = topOf(el, L);
     }
@@ -828,7 +913,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       edgeT = 0;
       steady = 0;
     }
-    if (!gesturing && isScroll(L)) {
+    if (!gesturing && flows(L)) {
       if (canScroll(L, dy)) {
         scrolled = true;
         edgeT = 0;
@@ -872,7 +957,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const L = layers[now];
     const down = k === 'ArrowDown' || k === 'PageDown' || (k === ' ' && !interactive && !e.shiftKey);
     const up = k === 'ArrowUp' || k === 'PageUp' || (k === ' ' && !interactive && e.shiftKey);
-    if ((down || up) && isScroll(L) && canScroll(L, down ? 1 : -1)) {
+    if ((down || up) && flows(L) && canScroll(L, down ? 1 : -1)) {
       const step = k === 'ArrowDown' || k === 'ArrowUp' ? 90 : L.clientHeight * 0.8;
       scrollBy(L, down ? step : -step);
     } else if (down) go(now + 1);
@@ -979,7 +1064,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       } else {
         const L = layers[Math.round(target)];
         // A sideways swipe belongs to whatever scrolls sideways under it, as with the wheel.
-        touch.mode = Math.abs(dx) > Math.abs(dy) || (isScroll(L) && canScroll(L, dy)) ? 'native' : 'depth';
+        touch.mode = Math.abs(dx) > Math.abs(dy) || (flows(L) && canScroll(L, dy)) ? 'native' : 'depth';
         if (touch.mode === 'depth') {
           anchor = Math.round(target);
           gesturing = true;
@@ -1012,7 +1097,12 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     }
   }
   function onClick(e: MouseEvent): void {
-    const b = (e.target as Element | null)?.closest?.<HTMLElement>('[data-depth-go]');
+    const t = e.target as Element | null;
+    // A click in a plane whose answers open on demand may open one: it is then
+    // scrolled into view as it opens.
+    const L = t?.closest?.<DepthLayer>('.fsb-depth-layer');
+    if (L && layers.includes(L) && grows(L).length) L._armed = win.performance.now();
+    const b = t?.closest?.<HTMLElement>('[data-depth-go]');
     if (!b || !root.contains(b)) return;
     e.preventDefault();
     if (win.performance.now() - slidEnd < SLID_CLICK_MS) return;
