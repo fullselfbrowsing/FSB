@@ -94,7 +94,7 @@ export class SupportPageComponent implements OnInit, OnDestroy {
 
   readonly faqs = Object.entries(SUPPORT_FAQ).map(([id, answer]) => ({ id, ...answer }));
   readonly resourceNames = { store: 'Chrome Web Store', github: 'GitHub', issues: 'GitHub Issues', clawhub: 'ClawHub' };
-  readonly expandedFaqs = new Set<string>();
+  openFaq: string | null = null;
 
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
@@ -151,8 +151,8 @@ export class SupportPageComponent implements OnInit, OnDestroy {
   }
 
   toggleFaq(id: string): void {
-    if (this.expandedFaqs.has(id)) this.expandedFaqs.delete(id);
-    else this.expandedFaqs.add(id);
+    // One answer open at a time: opening one closes the one that was open.
+    this.openFaq = this.openFaq === id ? null : id;
   }
 
   /* Depth page wiring: the questions are split across two planes, so each one

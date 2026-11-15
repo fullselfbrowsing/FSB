@@ -17,15 +17,15 @@
             <h2 class="reveal" data-di="0.25" i18n="@@support.faq.title">Frequently Asked Questions</h2>
             <div class="faq-list">
               @for (faq of faqsLead; track faq.id) {
-                <div class="faq-item reveal" [class.active]="expandedFaqs.has(faq.id)" [attr.data-di]="(40 + $index * 5) / 100">
+                <div class="faq-item reveal" [class.active]="openFaq === faq.id" [attr.data-di]="(40 + $index * 5) / 100">
                   <h3>
                     <button class="faq-question" type="button" (click)="toggleFaq(faq.id)"
-                      [attr.aria-expanded]="expandedFaqs.has(faq.id)" [attr.aria-controls]="'faq-' + faq.id">
+                      [attr.aria-expanded]="openFaq === faq.id" [attr.aria-controls]="'faq-' + faq.id">
                       <span>{{ faq.q }}</span>
                       <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
                     </button>
                   </h3>
-                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="expandedFaqs.has(faq.id) ? null : ''">
+                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="openFaq === faq.id ? null : ''">
                     <div class="faq-answer-inner">
                       <p>{{ faq.a }}</p>
                       <div class="faq-resources">
@@ -68,15 +68,15 @@
           <div class="faq-section">
             <div class="faq-list">
               @for (faq of faqsMore; track faq.id) {
-                <div class="faq-item reveal" [class.active]="expandedFaqs.has(faq.id)" [attr.data-di]="($index * 5) / 100">
+                <div class="faq-item reveal" [class.active]="openFaq === faq.id" [attr.data-di]="($index * 5) / 100">
                   <h3>
                     <button class="faq-question" type="button" (click)="toggleFaq(faq.id)"
-                      [attr.aria-expanded]="expandedFaqs.has(faq.id)" [attr.aria-controls]="'faq-' + faq.id">
+                      [attr.aria-expanded]="openFaq === faq.id" [attr.aria-controls]="'faq-' + faq.id">
                       <span>{{ faq.q }}</span>
                       <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
                     </button>
                   </h3>
-                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="expandedFaqs.has(faq.id) ? null : ''">
+                  <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="openFaq === faq.id ? null : ''">
                     <div class="faq-answer-inner">
                       <p>{{ faq.a }}</p>
                       <div class="faq-resources">

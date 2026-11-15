@@ -106,9 +106,12 @@ describe('marketing route metadata', () => {
           expect(Array.from(questions, question => question.textContent!.trim()))
             .toEqual(schema.mainEntity.map((question: { name: string }) => question.name));
           questions[0].click();
-          questions[1].click();
           harness.fixture.detectChanges();
           expect(questions[0].getAttribute('aria-expanded')).toBe('true');
+          // One answer open at a time: opening the second closes the first.
+          questions[1].click();
+          harness.fixture.detectChanges();
+          expect(questions[0].getAttribute('aria-expanded')).toBe('false');
           expect(questions[1].getAttribute('aria-expanded')).toBe('true');
         }
       }
