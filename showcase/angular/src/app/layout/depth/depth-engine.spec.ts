@@ -533,11 +533,33 @@ describe('createDepthEngine', () => {
         expect(reach()).toBeCloseTo(6, 0);
       });
 
+      it('reaches the rail\'s far edge beside an entry narrower than the rest', () => {
+        phone();
+        build([120, 120, 120]);
+        // As on the page: entries held against the screen edge, each as wide as what it
+        // holds, and the current one's tick the longest.
+        const nav = bar();
+        nav.style.alignItems = 'flex-end';
+        rail().forEach((b, i) => {
+          b.style.width = '';
+          b.style.paddingLeft = i ? '22px' : '30px';
+        });
+        const outer = nav.getBoundingClientRect();
+        const left = outer.left + nav.clientLeft;
+        rail().forEach((b, i) => {
+          const r = labels()[i].getBoundingClientRect();
+          // From the rail's far side, where a tap opens this entry too, out to the screen edge.
+          expect(r.left).toBeCloseTo(left, 0);
+          expect(r.right).toBeCloseTo(outer.right, 0);
+        });
+      });
+
       it('adds nothing where the phone can vibrate', () => {
         phone({ vibrates: true });
         build([120, 120, 120]);
         expect(labels().length).toBe(0);
         expect(rail().map((b) => b.style.position)).toEqual(['', '', '']);
+        expect(rail().map((b) => b.style.alignSelf)).toEqual(['', '', '']);
       });
 
       it('adds nothing where there is no switch control', () => {
@@ -566,13 +588,19 @@ describe('createDepthEngine', () => {
         expect(seen).toEqual([0, 1]);
       });
 
-      it('leaves a tap on the entry the camera is on to the entry itself', async () => {
+      it('keeps a tap on the entry the camera is on from the switch', async () => {
         phone();
         build([120, 120, 120]);
-        expect(labels().map((l) => l.style.pointerEvents)).toEqual(['none', '', '']);
+        // The camera is already there: nothing moves, so nothing ticks.
+        labels()[0].click();
+        expect(switchOf(0).checked).toBeFalse();
         engine!.go(2);
         await settle(2);
-        expect(labels().map((l) => l.style.pointerEvents)).toEqual(['', '', 'none']);
+        labels()[2].click();
+        expect(switchOf(2).checked).toBeFalse();
+        labels()[0].click();
+        expect(switchOf(0).checked).toBeTrue();
+        await settle(0);
       });
 
       it('still slides along the rail when the finger comes down on a label', async () => {
@@ -610,6 +638,39 @@ describe('createDepthEngine', () => {
         await settle(1);
       });
 
+      it('lets a tap that drifts a few pixels on an entry tick, and opens it once', async () => {
+        phone();
+        build([120, 120, 120]);
+        const focus = spyOn(root.querySelector<HTMLElement>('[data-depth-stage]')!, 'focus').and.callThrough();
+        // Past the few pixels at which a finger on the rail starts to slide, and still on
+        // the entry: the slide opens it, and a browser still counts the touch as a tap.
+        const start = labels()[1];
+        const [x, y] = mid(1);
+        touch('touchstart', [[x, y]], start);
+        touch('touchmove', [[x, y + 5]], start);
+        touch('touchend', [], start);
+        start.click();
+        expect(switchOf(1).checked).toBeTrue();
+        // The slide opened the entry; its click does not open it again.
+        expect(focus).not.toHaveBeenCalled();
+        await settle(1);
+        expect(seen).toEqual([0, 1]);
+      });
+
+      it('keeps a tap that drifts on the entry the camera is on silent', async () => {
+        phone();
+        build([120, 120, 120]);
+        const start = labels()[0];
+        const [x, y] = mid(0);
+        touch('touchstart', [[x, y]], start);
+        touch('touchmove', [[x, y + 5]], start);
+        touch('touchend', [], start);
+        start.click();
+        expect(switchOf(0).checked).toBeFalse();
+        await new Promise((r) => setTimeout(r, 200));
+        expect(seen).toEqual([0]);
+      });
+
       it('keeps one label per entry as the rail changes, and takes them away with the engine', () => {
         phone();
         build([120, 120, 120]);
@@ -624,6 +685,7 @@ describe('createDepthEngine', () => {
         engine = undefined;
         expect(labels().length).toBe(0);
         expect(rail().map((b) => b.style.position)).toEqual(['', '', '', '']);
+        expect(rail().map((b) => b.style.alignSelf)).toEqual(['', '', '', '']);
       });
     });
   });

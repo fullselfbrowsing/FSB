@@ -124,10 +124,11 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let railKey = '';
   // An iPhone cannot vibrate from script. The one haptic a page can cause there is
   // the tick of the native switch control, and only when a finger taps the switch or
-  // a label for it. `placed` is set where the entry was positioned to hold its label.
+  // a label for it. `placed` and `stretched` are set where the entry was positioned, or
+  // widened, to hold its label.
   const tapTicks =
     typeof win.navigator.vibrate !== 'function' && 'switch' in win.HTMLInputElement.prototype && win.navigator.maxTouchPoints > 0;
-  const tapLabels = new Map<HTMLElement, { label: HTMLLabelElement; placed: boolean }>();
+  const tapLabels = new Map<HTMLElement, { label: HTMLLabelElement; placed: boolean; stretched: boolean }>();
   // How far the labels reach past their entries, as last written (placeLabels()).
   let tapInset = '';
   let cueEl: HTMLElement | null = null;
@@ -162,6 +163,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let pinned: HTMLElement | null = null;
   let middles: number[] = [];
   let slidEnd = -1e9;
+  // The entry the last slide along the rail went to, if it opened one (onClick()).
+  let slidEntry: HTMLElement | null = null;
   // How tall each piece of on-demand content was at the last pass, to tell which
   // one is opening.
   const grownTo = new WeakMap<HTMLElement, number>();
@@ -318,8 +321,13 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       // label would then be laid out against the whole rail.
       const placed = !b.style.position;
       if (placed) b.style.position = 'relative';
+      // As wide as the rail: an entry narrower than the widest leaves bare rail beside it,
+      // and a tap there opens it too (onTouchEnd()). The page holds an entry's content
+      // against the screen edge, so nothing on screen moves, and the rail is no wider.
+      const stretched = !b.style.alignSelf;
+      if (stretched) b.style.alignSelf = 'stretch';
       b.appendChild(label);
-      tapLabels.set(b, { label, placed });
+      tapLabels.set(b, { label, placed, stretched });
     }
     tapInset = '';
     placeLabels();
@@ -342,6 +350,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     if (!had) return;
     had.label.remove();
     if (had.placed) b.style.position = '';
+    if (had.stretched) b.style.alignSelf = '';
     tapLabels.delete(b);
   }
   function markRail(): void {
@@ -361,10 +370,6 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       b.classList.toggle('is-active', on);
       if (on) b.setAttribute('aria-current', 'step');
       else b.removeAttribute('aria-current');
-      // A tap on the entry the camera is already on moves nothing, so it goes to
-      // the entry itself, which does not tick.
-      const had = tapLabels.get(b);
-      if (had) had.label.style.pointerEvents = on ? 'none' : '';
     }
   }
 
@@ -1089,6 +1094,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   // with a tick for each. The rail stays put while it slides, so it is measured once.
   function startSlide(): void {
     sliding = true;
+    slidEntry = null;
     middles = railMiddles();
     pinned = rail.find((b) => b.classList.contains('is-active')) || null;
     railEl?.setAttribute('data-sliding', '');
@@ -1100,6 +1106,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     pinned = b;
     const from = anchor;
     openEntry(b);
+    slidEntry = b;
     // go() ticks when the plane changes; another section of the same plane ticks here.
     if (anchor === from) tick();
     markRail();
@@ -1185,10 +1192,13 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const b = t?.closest?.<HTMLElement>('[data-depth-go]');
     if (!b || !root.contains(b)) return;
     // Cancelling a label's click stops it reaching the switch, and the tick with it.
-    // That is right for the click a short slide leaves behind, which opens nothing,
-    // and for no other.
+    // That is right for a click that moves nothing: one on the entry the camera is
+    // already on, or the click a short slide leaves behind on the entry the finger came
+    // down on. That click is a tap after all when the slide went to that same entry:
+    // the finger drifted a little, and the slide opened the entry under it.
     const stray = win.performance.now() - slidEnd < SLID_CLICK_MS;
-    if (!viaLabel || stray) e.preventDefault();
+    const quiet = !viaLabel || (stray ? b !== slidEntry : b.classList.contains('is-active'));
+    if (quiet) e.preventDefault();
     if (stray) return;
     openEntry(b);
     try {
