@@ -1891,6 +1891,7 @@
       'lineageRole',
       'governance',
       'acceptedPath',
+      'applicableAssertionVersionIds',
       'overlays',
       'inheritances'
     ]);
@@ -1916,10 +1917,17 @@
       0,
       false
     );
+    var applicableAssertionVersionIds = parseIdArray(
+      fields.applicableAssertionVersionIds,
+      'stav1:',
+      MAX_ASSERTIONS_PER_FAMILY,
+      0,
+      false
+    );
     var overlayInputs = dataArrayValues(fields.overlays, MAX_RELATION_VERSIONS, 0);
     var inheritanceInputs = dataArrayValues(fields.inheritances, MAX_GRAPH_RECORD_VERSIONS, 0);
     if (!execution || !temporal || !lineageRole || !governance || !acceptedPath ||
-        !overlayInputs || !inheritanceInputs) {
+        !applicableAssertionVersionIds || !overlayInputs || !inheritanceInputs) {
       return null;
     }
     var overlays = [];
@@ -2007,6 +2015,7 @@
       ['lineageRole', lineageRole],
       ['governance', governance],
       ['acceptedPath', acceptedPath],
+      ['applicableAssertionVersionIds', applicableAssertionVersionIds],
       ['overlays', frozenArray(overlays)],
       ['inheritances', frozenArray(inheritances)]
     ]);
@@ -2767,6 +2776,14 @@
     var lineageProof = await parseLineageProof(fields.lineageProof, citations.items);
     if (!lineageProof || lineageProof.partitionKey !== fields.partitionKey ||
         lineageProof.familyId !== fields.familyId) {
+      return null;
+    }
+    var assertionSet = makeSet(assertions.items.map(function(assertion) {
+      return assertion.assertionVersionId;
+    }));
+    if (lineageProof.applicableAssertionVersionIds.some(function(assertionVersionId) {
+      return !assertionSet[assertionVersionId];
+    })) {
       return null;
     }
     var recordSet = makeSet(recordVersionIds);

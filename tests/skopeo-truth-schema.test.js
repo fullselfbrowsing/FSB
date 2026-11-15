@@ -489,7 +489,7 @@ if (!fs.existsSync(SCHEMA_PATH)) {
     };
   }
 
-  function lineageProof({ familyId, citationIds }) {
+  function lineageProof({ familyId, citationIds, applicableAssertionVersionIds = [] }) {
     return {
       schemaVersion: VERSION,
       partitionKey: PARTITION,
@@ -523,6 +523,7 @@ if (!fs.existsSync(SCHEMA_PATH)) {
         [RELATION_A]
       ),
       acceptedPath: [RECORD_A, RECORD_B],
+      applicableAssertionVersionIds: sorted(applicableAssertionVersionIds),
       overlays: [{
         baseClauseRecordVersionId: CLAUSE_RECORD_A,
         amendmentDocumentRecordVersionId: RECORD_B,
@@ -740,7 +741,8 @@ if (!fs.existsSync(SCHEMA_PATH)) {
     sourceBindings,
     recordVersionIds,
     relationVersionIds,
-    candidateGenerationIds
+    candidateGenerationIds,
+    applicableAssertionVersionIds
   }) {
     const family = await makeFamily();
     return {
@@ -768,7 +770,8 @@ if (!fs.existsSync(SCHEMA_PATH)) {
       evaluationContext,
       lineageProof: lineageProof({
         familyId: family.familyId,
-        citationIds: [citations[0].citationId]
+        citationIds: [citations[0].citationId],
+        applicableAssertionVersionIds
       }),
       assertions: assertions.slice().sort(
         (left, right) => left.assertionVersionId.localeCompare(right.assertionVersionId)
@@ -1367,6 +1370,30 @@ if (!fs.existsSync(SCHEMA_PATH)) {
       await TruthSchema.parseLineageProof(lineage, [citation]),
       'four independent lineage axes parse'
     );
+    const applicableIds = [hexId('stav1:', 2), hexId('stav1:', 1)];
+    const applicable = await TruthSchema.parseLineageProof({
+      ...lineage,
+      applicableAssertionVersionIds: sorted(applicableIds)
+    }, [citation]);
+    assert.deepEqual(plain(applicable.applicableAssertionVersionIds), sorted(applicableIds),
+      'applicable assertion version ids parse');
+    const withoutApplicable = clone(lineage);
+    delete withoutApplicable.applicableAssertionVersionIds;
+    await rejectsNull(
+      TruthSchema.parseLineageProof(withoutApplicable, [citation]),
+      'a lineage proof without applicable assertion ids is rejected'
+    );
+    for (const [label, ids] of [
+      ['unsorted', applicableIds],
+      ['duplicated', [applicableIds[1], applicableIds[1]]],
+      ['wrong-prefix', [hexId('sta1:', 1)]],
+      ['non-string', [7]]
+    ]) {
+      await rejectsNull(
+        TruthSchema.parseLineageProof({ ...lineage, applicableAssertionVersionIds: ids }, [citation]),
+        `applicable assertion ids reject ${label} input`
+      );
+    }
     for (const [axisName, wrongReason] of [
       ['execution', 'effective-as-of-date'],
       ['temporal', 'lineage-base-evidence'],
@@ -1516,10 +1543,23 @@ if (!fs.existsSync(SCHEMA_PATH)) {
       assertions: [assertion, secondAssertion],
       conflicts: [conflict],
       deadlineRules: [rule],
-      deadlineResults: [result]
+      deadlineResults: [result],
+      applicableAssertionVersionIds: [assertion.assertionVersionId]
     });
     const proof = await TruthSchema.parseSemanticFamilyProof(proofInput);
     assert.ok(proof, 'storage-independent semantic family proof parses');
+    assert.deepEqual(plain(proof.lineageProof.applicableAssertionVersionIds),
+      [assertion.assertionVersionId]);
+    await rejectsNull(
+      TruthSchema.parseSemanticFamilyProof({
+        ...proofInput,
+        lineageProof: {
+          ...proofInput.lineageProof,
+          applicableAssertionVersionIds: [hexId('stav1:', 4096)]
+        }
+      }),
+      'an applicable assertion id must name one of the proof\'s assertions'
+    );
     assert.equal(frozenTree(proof), true);
     assert.equal(nullPrototypeTree(proof), true);
     const exactSetProofInput = {

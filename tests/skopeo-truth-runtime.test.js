@@ -212,6 +212,7 @@ function runtimeHarness(overrides = {}) {
       lineageRole: Object.freeze({ conclusion: 'base', reasonCode: 'lineage-base-evidence', citationIds: Object.freeze([]) }),
       governance: Object.freeze({ conclusion: 'governing', reasonCode: 'governing-path-accepted', citationIds: Object.freeze([]) }),
       acceptedPath: Object.freeze([]),
+      applicableAssertionVersionIds: Object.freeze([]),
       overlays: Object.freeze([]),
       inheritances: Object.freeze([])
     }),

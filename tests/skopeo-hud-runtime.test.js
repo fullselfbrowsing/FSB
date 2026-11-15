@@ -4255,6 +4255,113 @@ async function testHudFamiliesKeepTheirOwnSources(backgroundSource) {
   );
 }
 
+async function testHudFactsFollowLineageApplicability(backgroundSource) {
+  const { amendmentSource, baseSource } = require('./skopeo-lineage-adjudicator.test.js');
+  const date = (value) => ({ kind: 'civil-date', value });
+  const join = loadHudTruthJoin(backgroundSource, { global: { crypto: require('crypto').webcrypto } });
+  const sourceIds = ['source_base', 'source_replacement'];
+  const sourceTokens = new Map(sourceIds.map((id) => [id, `source:${id}`]));
+  const projectFolder = (adjudicated, truth) => hudJoinProjection(adjudicated, truth, {
+    mode: 'folder',
+    sources: sourceIds.map((id) => ({
+      sourceBinding: sourceTokens.get(id), vendorScopeFileId: 'scope:0', state: 'ready', indexState: 'complete'
+    })),
+    vendorLabels: [{ vendorScopeFileId: 'scope:0', vendorToken: 'vendor:0', label: 'Acme' }]
+  });
+  const materialDates = (projected) => projected.truth.families[0].materialDates
+    .map((entry) => [entry.type, entry.civilDate, entry.sourceBinding]);
+  const factRoles = (projected) => projected.truth.families[0].facts
+    .map((fact) => [fact.type, fact.value, fact.evidenceRole, fact.sourceBinding]);
+
+  // A full replacement moves every date to the replacement document.
+  const replaced = await adjudicatedHudFixture({
+    sources: [
+      baseSource({ facts: [{ type: 'expiration-date', value: date('2027-01-01'), clause: 'notice' }] }),
+      amendmentSource('replacement', {
+        effectiveDates: ['2022-01-01'],
+        facts: [{ type: 'expiration-date', value: date('2029-01-01'), clause: 'amended' }],
+        lineages: [{ from: 'replacement', to: 'base', scope: 'document', targetClause: null, role: 'full-replacement' }]
+      })
+    ]
+  });
+  assert.strictEqual(replaced.result.families.length, 1);
+  const family = replaced.result.families[0];
+  assert.strictEqual(family.lineageProof.governance.value, 'governing');
+  const replacedFolder = join.hudTruthProjection(hudTruthJoinInput(replaced, { sourceTokens }));
+  assert.deepStrictEqual(materialDates(replacedFolder),
+    [['expiration', '2029-01-01', 'source:source_replacement']],
+    'a date the replacement superseded is not a material date');
+  const replacedView = projectFolder(replaced, replacedFolder.truth);
+  assert.strictEqual(replacedView && replacedView.mode, 'folder');
+  assert.strictEqual(replacedView.body.vendors[0].nextMaterialDate.civilDate, '2029-01-01',
+    'the vendor row shows the governing expiration, not the replaced one');
+  const replacedReading = join.hudTruthProjection(hudTruthJoinInput(replaced, {
+    sourceTokens, mode: 'reading', focusSourceId: 'source_replacement'
+  }));
+  assert.deepStrictEqual(factRoles(replacedReading).sort(), [
+    ['expiration', '2027-01-01', 'history', 'source:source_base'],
+    ['expiration', '2029-01-01', 'governing', 'source:source_replacement']
+  ], 'the governing clause fact is governing and the replaced one is history');
+
+  const replacementAssertion = family.assertions.find((assertion) =>
+    assertion.typedValue.value === '2029-01-01');
+  assert.deepStrictEqual(family.lineageProof.applicableAssertionVersionIds,
+    [replacementAssertion.assertionVersionId],
+    'the lineage proof names the assertions that apply on the governing path');
+
+  // Ask evidence takes its role from the same set. A citation no assertion
+  // uses is document evidence and keeps the accepted-path rule.
+  const assertionCitationIds = new Set(family.assertions.flatMap((assertion) => assertion.citationIds));
+  const askTruth = (keep) => ({
+    families: [{ ...family, citations: family.citations.filter(keep) }]
+  });
+  const factCitations = askTruth((citation) => assertionCitationIds.has(citation.citationId));
+  assert.strictEqual(join.hudAskCitationProof(factCitations, 'source_replacement').evidenceRole, 'governing',
+    'Ask cites the governing clause fact as governing');
+  assert.strictEqual(join.hudAskCitationProof(factCitations, 'source_base').evidenceRole, 'history',
+    'Ask cites the replaced fact as history');
+  const documentCitations = askTruth((citation) => !assertionCitationIds.has(citation.citationId) &&
+    family.lineageProof.acceptedPath.includes(citation.recordVersionId));
+  const documentProof = join.hudAskCitationProof(documentCitations, 'source_replacement');
+  assert.ok(documentProof && documentProof.assertion === null);
+  assert.strictEqual(documentProof.evidenceRole, 'governing',
+    'document evidence on the accepted path stays governing');
+
+  // A clause amendment replaces only the clause it targets; the base
+  // document's other clauses still govern.
+  const amended = await adjudicatedHudFixture({
+    sources: [
+      baseSource({
+        facts: [
+          { type: 'expiration-date', value: date('2027-01-01'), clause: 'notice' },
+          { type: 'termination-date', value: date('2030-01-01'), clause: 'sales' }
+        ]
+      }),
+      amendmentSource('replacement', {
+        effectiveDates: ['2022-01-01'],
+        facts: [{ type: 'expiration-date', value: date('2029-01-01'), clause: 'amended' }],
+        lineages: [{
+          from: 'replacement', to: 'base', scope: 'clause', targetClause: 'notice', role: 'partial-amendment'
+        }]
+      })
+    ]
+  });
+  assert.strictEqual(amended.result.families[0].lineageProof.governance.value, 'partially-governing');
+  const amendedFolder = join.hudTruthProjection(hudTruthJoinInput(amended, { sourceTokens }));
+  assert.deepStrictEqual(materialDates(amendedFolder).sort(), [
+    ['expiration', '2029-01-01', 'source:source_replacement'],
+    ['termination', '2030-01-01', 'source:source_base']
+  ], 'the amended clause date replaces the base one; untouched base clauses still count');
+  const amendedReading = join.hudTruthProjection(hudTruthJoinInput(amended, {
+    sourceTokens, mode: 'reading', focusSourceId: 'source_base'
+  }));
+  assert.deepStrictEqual(factRoles(amendedReading).sort(), [
+    ['expiration', '2027-01-01', 'history', 'source:source_base'],
+    ['expiration', '2029-01-01', 'governing', 'source:source_replacement'],
+    ['termination', '2030-01-01', 'governing', 'source:source_base']
+  ]);
+}
+
 async function runHudRuntimeContract() {
   try {
     const sources = loadSources();
@@ -4390,6 +4497,7 @@ async function runHudRuntimeContract() {
     testProductionJoin(sources.background);
     await testHudFolderEmptyAndAskText(sources.background);
     await testHudFamiliesKeepTheirOwnSources(sources.background);
+    await testHudFactsFollowLineageApplicability(sources.background);
     testContentRuntimeStaticContract(sources);
     await testContentRuntimeAdmissionMatrix(sources.runtime);
     await testContentRuntimeReplacementAndActions();

@@ -301,6 +301,7 @@ async function makeProof({ familyOrdinal = 1, sourceIds = [SOURCE_A, SOURCE_B] }
         [RELATION_A]
       ),
       acceptedPath: recordIds.slice().sort(),
+      applicableAssertionVersionIds: [],
       overlays: [],
       inheritances: []
     },

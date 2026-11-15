@@ -4847,6 +4847,15 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
           return typeof id === 'string' && id.indexOf('srv1:') === 0;
         })
       );
+      // The accepted path names whole documents, replaced ones included, and
+      // fact citations point at clauses. Whether a fact still applies comes
+      // from the proof's applicable assertion set instead.
+      const applicableAssertionIds = new Set(
+        rawFamily.lineageProof &&
+          Array.isArray(rawFamily.lineageProof.applicableAssertionVersionIds)
+          ? rawFamily.lineageProof.applicableAssertionVersionIds
+          : []
+      );
       const citationsOnAcceptedPath = (rawFamily.citations || []).filter(function(citation) {
         return citation && acceptedPathIds.has(citation.recordVersionId);
       });
@@ -4924,11 +4933,11 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
           const revision = hudMetadataRevision(
             metadataBySource.get(citation.sourceFileId), citation.contentFingerprint);
           if (!actionId || !revision) return;
-          const onAcceptedPath = acceptedPathIds.has(citation.recordVersionId);
+          const applicable = applicableAssertionIds.has(assertion.assertionVersionId);
           facts.push({
             type: type,
             value: value,
-            evidenceRole: onAcceptedPath ? 'governing' : 'history',
+            evidenceRole: applicable ? 'governing' : 'history',
             trustState: assertion.trustState,
             citationLabel: label,
             sourceBinding: sourceTokens.get(citation.sourceFileId),
@@ -4977,6 +4986,7 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
       assertions.forEach(function(assertion) {
         const type = hudMaterialDateType(assertion.assertionType);
         if (!type || assertion.typedValue && assertion.typedValue.kind !== 'civil-date') return;
+        if (!applicableAssertionIds.has(assertion.assertionVersionId)) return;
         if (assertion.trustState !== 'accepted' &&
             (assertion.trustState !== 'extracted' || governanceValue === 'review-required')) {
           return;
@@ -5474,16 +5484,20 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
         return candidate && Array.isArray(candidate.citationIds) &&
           candidate.citationIds.indexOf(citation.citationId) !== -1;
       }) || null;
-      const acceptedPath = family.lineageProof && Array.isArray(family.lineageProof.acceptedPath)
-        ? family.lineageProof.acceptedPath
-        : [];
+      const lineageProof = family.lineageProof || {};
+      // A fact is governing only while its assertion still applies. A
+      // citation no assertion uses is document evidence, which keeps the
+      // accepted-path rule.
+      const governing = assertion
+        ? Array.isArray(lineageProof.applicableAssertionVersionIds) &&
+          lineageProof.applicableAssertionVersionIds.indexOf(assertion.assertionVersionId) !== -1
+        : Array.isArray(lineageProof.acceptedPath) &&
+          lineageProof.acceptedPath.indexOf(citation.recordVersionId) !== -1;
       return {
         family: family,
         citation: citation,
         assertion: assertion,
-        evidenceRole: acceptedPath.indexOf(citation.recordVersionId) !== -1
-          ? 'governing'
-          : 'history'
+        evidenceRole: governing ? 'governing' : 'history'
       };
     }
     return null;

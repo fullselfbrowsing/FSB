@@ -2427,6 +2427,10 @@
       lineageRole: lineageAxis,
       governance: governanceAxis,
       acceptedPath: acceptedPathRecordVersionIds.sort(compareText),
+      // The accepted path lists documents, including ones a later document
+      // replaced. Consumers need the assertions that still apply.
+      applicableAssertionVersionIds: Array.from(applicableAssertionVersionIds)
+        .sort(compareText),
       overlays: overlays,
       inheritances: inheritances
     };
