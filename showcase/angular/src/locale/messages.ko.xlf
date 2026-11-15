@@ -1843,8 +1843,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="about.meta.title" datatype="html">
-        <source>About FSB | AI Browser Automation Demo</source>
-        <target state="translated">FSB 소개 | AI 브라우저 자동화 데모</target>
+        <source>About FSB | Demo, Built-in Memory &amp; Action Library</source>
+        <target state="translated">FSB 소개 | 데모, 내장 메모리, 동작 라이브러리</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/about/about-page.component.ts</context>
           <context context-type="linenumber">194</context>
@@ -2491,8 +2491,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.meta.description" datatype="html">
-        <source>Connect Codex, Claude Code, Cursor, OpenClaw, and Hermes to your real Chrome session with FSB. Install the MCP bridge and verify it with doctor.</source>
-        <target state="translated">FSB로 Codex, Claude Code, Cursor, OpenClaw, Hermes를 실제 Chrome 세션에 연결하세요. MCP 브리지를 설치하고 doctor로 확인하세요.</target>
+        <source>Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.</source>
+        <target state="translated">Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, Cursor에 진짜 브라우저를 제공하세요. 이미 로그인한 Chrome, MCP 도구 69개, 한 줄 설치, doctor로 확인.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">72</context>
@@ -6615,8 +6615,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.meta.description" datatype="html">
-        <source>FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.</source>
-        <target state="translated">Online-Mind2Web의 FSB: AI 검토 결과(277/300), 92.3%. 자연어 지시로 Chrome을 자동화하거나 MCP로 AI 에이전트를 연결하세요. FSB는 오픈 소스이며 실제 브라우저 세션에서 작동합니다.</target>
+        <source>FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Open-source Chrome automation that reads the actual DOM instead of relying on vision, calls APIs when it can, and connects AI agents through MCP.</source>
+        <target state="translated">Online-Mind2Web의 FSB: AI 검토 결과(277/300), 92.3%. 비전에 의존하지 않고 실제 DOM을 읽고, 가능하면 API를 호출하며, MCP로 AI 에이전트를 연결하는 오픈 소스 Chrome 자동화.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">148</context>
@@ -6647,8 +6647,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.mcp" datatype="html">
-        <source>MCP server for Claude Code, Codex, Cursor, Antigravity, and OpenClaw</source>
-        <target state="translated">Claude Code, Codex, Cursor, Antigravity, OpenClaw를 위한 MCP 서버</target>
+        <source>MCP server with 69 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes</source>
+        <target state="translated">Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, Hermes를 위한 도구 69개의 MCP 서버</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">313</context>
@@ -11235,16 +11235,16 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.meta.title" datatype="html">
-        <source>FSB - Privacy</source>
-        <target state="translated">FSB - 개인정보</target>
+        <source>Privacy Policy | FSB</source>
+        <target state="translated">개인정보처리방침 | FSB</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
           <context context-type="linenumber">34</context>
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.meta.description" datatype="html">
-        <source>How FSB handles your data: API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry, automation runs locally in your browser. BYO key, BYO browser.</source>
-        <target state="translated">FSB가 데이터를 다루는 방식: API 키는 Chrome 로컬 저장소에 암호화되고, 익명 사용 통계는 수신 거부할 수 있으며, 자동화는 브라우저 안에서 로컬로 실행됩니다. 키도 브라우저도 사용자의 것입니다.</target>
+        <source>FSB privacy policy: runs inside your browser, API keys encrypted locally with AES-GCM, no third-party tracking, opt-out anonymous usage telemetry, open source and auditable.</source>
+        <target state="translated">FSB 개인정보처리방침: 브라우저 안에서 실행되고, API 키는 AES-GCM으로 로컬에서 암호화되며, 제3자 추적이 없고, 익명 사용 통계는 수신 거부할 수 있으며, 오픈 소스로 누구나 검증할 수 있습니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
           <context context-type="linenumber">35</context>

@@ -31,8 +31,8 @@ export class PrivacyPageComponent implements OnInit, OnDestroy {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
     // Marked via $localize so per-locale builds emit translated strings; embedded brand
     // tokens (FSB, Chrome) are preserved verbatim by translators per DO-NOT-TRANSLATE.md.
-    const t = $localize`:@@privacy.meta.title:FSB - Privacy`;
-    const d = $localize`:@@privacy.meta.description:How FSB handles your data: API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry, automation runs locally in your browser. BYO key, BYO browser.`;
+    const t = $localize`:@@privacy.meta.title:Privacy Policy | FSB`;
+    const d = $localize`:@@privacy.meta.description:FSB privacy policy: runs inside your browser, API keys encrypted locally with AES-GCM, no third-party tracking, opt-out anonymous usage telemetry, open source and auditable.`;
     this.applyMeta(t, d, url);
     this.injectPrivacyJsonLd(url);
   }

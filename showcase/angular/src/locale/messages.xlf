@@ -1636,7 +1636,7 @@
         </context-group>
       </trans-unit>
       <trans-unit id="about.meta.title" datatype="html">
-        <source>About FSB | AI Browser Automation Demo</source>
+        <source>About FSB | Demo, Built-in Memory &amp; Action Library</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/about/about-page.component.ts</context>
           <context context-type="linenumber">194</context>
@@ -2206,7 +2206,7 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.meta.description" datatype="html">
-        <source>Connect Codex, Claude Code, Cursor, OpenClaw, and Hermes to your real Chrome session with FSB. Install the MCP bridge and verify it with doctor.</source>
+        <source>Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">72</context>
@@ -5822,7 +5822,7 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.meta.description" datatype="html">
-        <source>FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.</source>
+        <source>FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Open-source Chrome automation that reads the actual DOM instead of relying on vision, calls APIs when it can, and connects AI agents through MCP.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">148</context>
@@ -5850,7 +5850,7 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.mcp" datatype="html">
-        <source>MCP server for Claude Code, Codex, Cursor, Antigravity, and OpenClaw</source>
+        <source>MCP server with 69 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">313</context>
@@ -9857,14 +9857,14 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.meta.title" datatype="html">
-        <source>FSB - Privacy</source>
+        <source>Privacy Policy | FSB</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
           <context context-type="linenumber">34</context>
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.meta.description" datatype="html">
-        <source>How FSB handles your data: API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry, automation runs locally in your browser. BYO key, BYO browser.</source>
+        <source>FSB privacy policy: runs inside your browser, API keys encrypted locally with AES-GCM, no third-party tracking, opt-out anonymous usage telemetry, open source and auditable.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
           <context context-type="linenumber">35</context>

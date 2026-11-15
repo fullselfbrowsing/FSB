@@ -191,7 +191,7 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
     // Title and description carry user-facing copy (browser tab + meta description / social cards).
     // Marked via $localize so per-locale builds emit translated strings; embedded brand tokens
     // (FSB, MCP) are listed in DO-NOT-TRANSLATE.md for translators.
-    const t = $localize`:@@about.meta.title:About FSB | AI Browser Automation Demo`;
+    const t = $localize`:@@about.meta.title:About FSB | Demo, Built-in Memory & Action Library`;
     const d = $localize`:@@about.meta.description:Watch the 33-second FSB demo, explore built-in memory for 130 sites, and discover 60 browser actions available to AI agents through MCP.`;
     this.applyMeta(t, d, url);
     this.injectTrailerVideoJsonLd();

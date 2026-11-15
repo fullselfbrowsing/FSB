@@ -145,7 +145,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
     const t = $localize`:@@home.meta.title:Full Self-Browsing | 92.3% on Online-Mind2Web | AI Browser Automation & MCP`;
-    const d = $localize`:@@home.meta.description:FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.`;
+    const d = $localize`:@@home.meta.description:FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Open-source Chrome automation that reads the actual DOM instead of relying on vision, calls APIs when it can, and connects AI agents through MCP.`;
     this.applyMeta(t, d, url);
     this.injectSoftwareApplicationJsonLd();
     if (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string') {
@@ -310,7 +310,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       subjectOf: { '@id': `${HOST}/#online-mind2web` },
       featureList: [
         $localize`:@@home.schema.feature.benchmark:Online-Mind2Web: AI-reviewed result (277/300), 92.3%`,
-        $localize`:@@home.schema.feature.mcp:MCP server for Claude Code, Codex, Cursor, Antigravity, and OpenClaw`,
+        $localize`:@@home.schema.feature.mcp:MCP server with 69 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes`,
         $localize`:@@home.schema.feature.browser:Real browser automation through a local Chrome extension`,
         $localize`:@@home.schema.feature.triggers:Trigger watchers for reactive DOM monitoring`,
         $localize`:@@home.schema.feature.capabilities:Native first-party API capability catalog with guarded invoke_capability calls`,

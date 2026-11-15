@@ -1843,8 +1843,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="about.meta.title" datatype="html">
-        <source>About FSB | AI Browser Automation Demo</source>
-        <target state="translated">关于 FSB | AI 浏览器自动化演示</target>
+        <source>About FSB | Demo, Built-in Memory &amp; Action Library</source>
+        <target state="translated">关于 FSB | 演示、内置内存和动作库</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/about/about-page.component.ts</context>
           <context context-type="linenumber">194</context>
@@ -2491,8 +2491,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.meta.description" datatype="html">
-        <source>Connect Codex, Claude Code, Cursor, OpenClaw, and Hermes to your real Chrome session with FSB. Install the MCP bridge and verify it with doctor.</source>
-        <target state="translated">通过 FSB 将 Codex、Claude Code、Cursor、OpenClaw 和 Hermes 连接到你的真实 Chrome 会话。安装 MCP 桥接程序，并使用 doctor 验证。</target>
+        <source>Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.</source>
+        <target state="translated">为 Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex 或 Cursor 提供真实的浏览器：已登录的 Chrome、69 个 MCP 工具、一行命令安装，并使用 doctor 验证。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">72</context>
@@ -6615,8 +6615,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.meta.description" datatype="html">
-        <source>FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.</source>
-        <target state="translated">FSB 在 Online-Mind2Web 上：AI 审核结果（277/300），92.3%。通过自然语言指令自动操作 Chrome，或通过 MCP 连接 AI 智能体。FSB 是开源软件，可在你的真实浏览器会话中运行。</target>
+        <source>FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Open-source Chrome automation that reads the actual DOM instead of relying on vision, calls APIs when it can, and connects AI agents through MCP.</source>
+        <target state="translated">FSB 在 Online-Mind2Web 上：AI 审核结果（277/300），92.3%。开源的 Chrome 自动化：读取真实的 DOM 而不依靠视觉，能调用 API 时就调用 API，并通过 MCP 连接 AI 智能体。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">148</context>
@@ -6647,8 +6647,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.mcp" datatype="html">
-        <source>MCP server for Claude Code, Codex, Cursor, Antigravity, and OpenClaw</source>
-        <target state="translated">适用于 Claude Code、Codex、Cursor、Antigravity 和 OpenClaw 的 MCP 服务器</target>
+        <source>MCP server with 69 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes</source>
+        <target state="translated">提供 69 个工具的 MCP 服务器，适用于 Claude Code、Claude Desktop、Codex、Cursor、VS Code、Antigravity、OpenCode、Cline、OpenClaw 和 Hermes</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">313</context>
@@ -11235,16 +11235,16 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.meta.title" datatype="html">
-        <source>FSB - Privacy</source>
-        <target state="translated">FSB - 隐私</target>
+        <source>Privacy Policy | FSB</source>
+        <target state="translated">隐私政策 | FSB</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
           <context context-type="linenumber">34</context>
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.meta.description" datatype="html">
-        <source>How FSB handles your data: API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry, automation runs locally in your browser. BYO key, BYO browser.</source>
-        <target state="translated">FSB 如何处理您的数据：API 密钥会在 Chrome 本地存储空间中加密；匿名使用情况遥测可选择退出；自动化完全在浏览器内运行。自备密钥、自备浏览器。</target>
+        <source>FSB privacy policy: runs inside your browser, API keys encrypted locally with AES-GCM, no third-party tracking, opt-out anonymous usage telemetry, open source and auditable.</source>
+        <target state="translated">FSB 隐私政策：在您的浏览器内运行，API 密钥使用 AES-GCM 在本地加密，无第三方跟踪，匿名使用情况遥测可选择退出，开源且可审计。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
           <context context-type="linenumber">35</context>
