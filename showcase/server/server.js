@@ -43,15 +43,16 @@ app.disable('x-powered-by');
 // CSP keeps 'unsafe-inline' for scripts/styles because the showcase ships
 // inline JSON-LD scripts (per page), an inline theme-bootstrap script in
 // index.html, and Angular's component-scoped <style> emissions. Nonces are
-// not viable without per-request server rendering. CDN allowlist covers
-// Font Awesome (cdnjs) + Phosphor (unpkg) icon CSS and the dashboard's
-// lazy-loaded html5-qrcode/lz-string from unpkg.
+// not viable without per-request server rendering. The only outside host left
+// is unpkg, for the dashboard's lazy-loaded html5-qrcode/lz-string scripts:
+// the icon fonts (Font Awesome, Phosphor) and the capability logos are served
+// from this origin, so styles, fonts and images need no CDN allowance.
 // NOTE: script-src-attr is intentionally NOT set to 'none' here. Angular 20
 // emits the lazy-CSS pattern `<link rel="stylesheet" media="print"
 // onload="this.media='all'">` for the global styles bundle; setting
 // script-src-attr to 'none' blocks that onload handler, leaving the bundle
-// stuck at media="print" so its @import for Font Awesome / Phosphor never
-// applies to screen rendering -- icons disappear. Without an explicit
+// stuck at media="print" so everything outside the inlined critical CSS never
+// applies to screen rendering. Without an explicit
 // script-src-attr, it falls back to script-src which permits 'unsafe-inline'.
 // connect-src is restricted to 'self'; same-origin endpoint
 // /api/public-stats/github/:endpoint_id serves cached GitHub stats so the
@@ -60,12 +61,10 @@ app.disable('x-powered-by');
 const SHOWCASE_CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://unpkg.com",
-  "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com",
-  "font-src 'self' data: https://cdnjs.cloudflare.com https://unpkg.com",
-  // cdn.simpleicons.org serves the brand/tech logos in the home capability
-  // marquee (home-page.component simpleIcon()); i.ytimg.com is the /about
-  // YouTube thumbnails. Without simpleicons here every catalog logo is blocked.
-  "img-src 'self' data: blob: https://i.ytimg.com https://cdn.simpleicons.org",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  // i.ytimg.com is the /about YouTube thumbnails.
+  "img-src 'self' data: blob: https://i.ytimg.com",
   "media-src 'self' blob:",
   // raw.githubusercontent.com serves the Natural Earth land GeoJSON the stats
   // globe fetches once per session (globe-visualization.service); without it the
