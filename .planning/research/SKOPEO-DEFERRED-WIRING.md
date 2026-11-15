@@ -5,6 +5,11 @@ Recorded 2026-11-14 after the PR #153 review fixes landed on `Jev` (commits
 out of that patch pass, because each needs a design decision rather than a
 local fix.
 
+Updated 2026-11-15 after the second PR #153 review: the same-root restage
+purge, the stale staging handle and the logger and diagnostics boot fallback
+are fixed on `Jev`; the null content fingerprint and three corpus
+gaps found while fixing them are recorded below.
+
 ## 1. Graph builds have no production caller (review #2)
 
 `FsbSkopeoGraphEngine.create()` is wired into the truth engine in
@@ -41,6 +46,17 @@ Open questions before wiring:
   - Pages split by item count can exceed the 256 KiB value limit (~1268).
   - Publishing candidate relations never purges the query cache (~1690).
   - `lexicalTerm` can split a surrogate pair (`skopeo-graph-extractor.js` ~560).
+- **Every build re-spends provider calls on an unchanged source.** Ingestion
+  certificates always carry `contentFingerprint: null`
+  (`skopeo-drive-authority.js` ~939), so the extractor's `reuseKey`
+  (`skopeo-graph-extractor.js` ~1163) answers `content-fingerprint-unavailable`
+  and `checkReuse` always replaces. The fix belongs with the cost decision
+  above: compare the graph store's published fragment `contentFingerprint`
+  with the byte hash prepare reads (`content.byteHash`), and reuse when they
+  match. That means `checkReuse` runs after the first content read, or the
+  authority pays one extra `readContent` per certificate. When it lands, the
+  fake ingestion certificate in `tests/skopeo-graph-runtime.test.js` (~65-98)
+  must start issuing a null fingerprint, as production does.
 
 ## 2. Lineage cannot be accepted across sources (review #19)
 
@@ -90,19 +106,35 @@ The HUD-side caps (32 in the truth engine, the lineage adjudicator and
 - **Vendor folder labels** with leading or trailing spaces close the folder
   HUD. The folder `askScopes` label (`background.js` ~5139) is not trimmed,
   but the schema requires trimmed text.
-- **`recover()` in the corpus store** purges any unpublished operation as
-  `orphaned-staging`, including a re-sync another Drive tab is staging at that
-  moment (`skopeo-corpus-store.js` ~1793). Stores are shared, while kernels
-  are per tab.
+- **`recover()` in the corpus store** keeps a failed same-root restage:
+  `beginReplacement` marks a restage of the published corpus
+  `refreshesPublished`, and `recover()` leaves that partition untouched and
+  returns `restage-required`. Any other unpublished operation is still purged
+  as `orphaned-staging`, including another Drive tab's first enrollment or
+  different-root staging in progress at that moment. Stores are shared, while
+  kernels are per tab.
+- **A navigation during `proveFolder` can purge an enrolled corpus**
+  (unverified, found by reading). `proveFolder` returns `kind: 'closed'` when
+  the live context changes, and several controller paths treat any failed
+  proof as lost access and call `withdrawAndPurge(…, 'lost-access')`
+  (`skopeo-corpus-controller.js` ~488, ~502, ~530, ~593, ~715). The restage
+  path in `recoverUnlocked` (~695) purges only on `inaccessible`, which is the
+  rule the others probably want.
+- **Worker loss inside `beginReplacement`** (unverified). If the worker dies
+  between the closed-manifest write (`skopeo-corpus-store.js` ~1010) and the
+  operation write (~1063), the old committed operation sits beside a closed
+  manifest and is still purged as an orphan. Writing the marked operation
+  first would close the window.
+- **Page-side listing failures.** The Drive transport now accepts any bounded
+  file name and lowercases MIME types, but `corpusFile` in
+  `capability-fetch.js` still fails a whole page for a name with control
+  characters, an empty name or one over 4096 characters, and fails
+  `listChanges` for a change with `removed: false` and no file.
 - **A cancelled `purgeSource`** rolls the source back to ready and active
   after some participants already deleted their data (~659).
 - **A failed reconcile run** can leave a stale in-memory content identity, and
   later runs in that tab then return `closed` (`skopeo-drive-reconciler.js`
   ~918).
-- **`diagnostics-ring-buffer.js`** uses the same "store, else sendMessage"
-  fallback as the automation logger did. Entries appended inside the worker
-  before the trusted boot stay only in the in-memory ring. No specific
-  pre-boot append was found, so this was not changed.
 - **`reconcileSource`** still stages a withheld record for an uncertified id
   with no prior record. It is only scheduled by the authority for sources it
   already holds, so the outside-change filter was applied to the two
