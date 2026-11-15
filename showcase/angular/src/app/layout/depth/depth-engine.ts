@@ -80,8 +80,6 @@ interface Ambient {
 const MIN_SCALE_WIDE = 0.6;
 const MIN_SCALE_NARROW = 0.45;
 const NARROW_MAX_WIDTH = 600;
-/* A plane this close to full size is left at its own width. */
-const WIDEN_BELOW = 0.97;
 const FIT_EASE = 'transform .35s cubic-bezier(.16,1,.3,1)';
 /* The length of the tick a phone gives when a swipe lands on another plane. */
 const TICK_MS = 15;
@@ -428,7 +426,10 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   }
   // Finds the width at which a narrow plane needs to shrink least: the largest
   // scale s for which the plane, laid out 1 / s times as wide as the window, is no
-  // taller than the room once scaled.
+  // taller than the room once scaled. Laid out that wide it fills the window's width
+  // once scaled, even when widening gains it nothing (a list of one-line rows). Left
+  // at its own width, such a plane would switch to filling the width partway through
+  // an answer opening inside it, and jump.
   function solve(L: DepthLayer, fit: HTMLElement, room: number, W: number): void {
     const at = (factor: number): number => {
       setWide(L, fit, factor);
@@ -437,7 +438,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const h1 = at(1);
     const plain = h1 > 0 ? Math.min(1, room / h1) : 1;
     let factor = 1;
-    if (plain < WIDEN_BELOW) {
+    if (plain < 1) {
       let lo = plain;
       let hi = 1;
       for (let k = 0; k < 6; k++) {
@@ -446,9 +447,9 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
         else hi = mid;
       }
       // A picture or video that keeps its proportions grows taller as its plane
-      // widens, and gains nothing: such a plane stays at its own width.
+      // widens, and the plane would have to shrink further: it stays at its own width.
       const h = at(1 / lo);
-      if (h > 0 && Math.min(lo, room / h) > plain + 0.005) factor = 1 / lo;
+      if (h > 0 && Math.min(lo, room / h) >= plain - 0.001) factor = 1 / lo;
     }
     L._key = W + '|' + room + '|' + at(factor);
   }

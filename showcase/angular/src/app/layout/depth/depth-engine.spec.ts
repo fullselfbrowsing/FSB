@@ -135,8 +135,20 @@ describe('createDepthEngine', () => {
       expect(fit.offsetHeight * scale).toBeLessThanOrEqual(room() + 1);
     });
 
-    it('leaves a box of a fixed height at its own width', () => {
+    it('lays a box of a fixed height out just wide enough to fill the window', () => {
+      // Widening gains it nothing: it keeps its scale, and spans the window.
       build([120, Math.round(room() / 0.7), 120], PHONE);
+      const fit = fitOf(1);
+      const scale = scaleOf(1);
+      expect(scale).toBeCloseTo(0.7, 1);
+      expect(parseFloat(fit.style.width)).toBeGreaterThan(130);
+      expect(fit.offsetWidth * scale).toBeCloseTo(PHONE, -1);
+    });
+
+    it('keeps a picture that grows with its width at its own width', () => {
+      // A box that keeps its proportions, 1 / 0.7 times the room tall at the phone's width.
+      const side = Math.round(room() / 0.7);
+      build([120, { html: `<div data-di="0" style="aspect-ratio:${PHONE} / ${side};background:#333;width:100%"></div>` }, 120], PHONE);
       expect(fitOf(1).style.width).toBe('');
       expect(scaleOf(1)).toBeCloseTo(0.7, 1);
     });
@@ -171,11 +183,12 @@ describe('createDepthEngine', () => {
     });
 
     it('keeps a plane fitted on every frame while its content opens, and leaves it there', async () => {
-      // The way a support answer opens: a grid row eased from nothing to its content.
+      // The way a support answer opens: a grid row eased from nothing to its content,
+      // under rows that a wider layout would not make any shorter (the questions).
       const opens =
         '<div class="opens" style="display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s linear">' +
         `<div style="min-height:0;overflow:hidden">${prose(1.5)}</div></div>`;
-      build([120, { html: prose(0.6) + opens }, 120], PHONE);
+      build([120, { html: `<div style="height:${Math.round(room() / 0.9)}px"></div>${opens}` }, 120], PHONE);
       // By now the plane's own scale would be eased.
       await new Promise((r) => setTimeout(r, 700));
       const fit = fitOf(1);
@@ -196,8 +209,9 @@ describe('createDepthEngine', () => {
         narrowest = Math.min(narrowest, fit.offsetWidth * s);
       }
       expect(tallest).toBeLessThanOrEqual(room() + 2);
-      // A plane this close to fitting keeps its own width (WIDEN_BELOW in the engine).
-      expect(narrowest).toBeGreaterThan(PHONE * 0.97 - 1);
+      // Fitted or shrunk, it spans the window: no frame switches it from its own
+      // width to a wider layout.
+      expect(narrowest).toBeGreaterThan(PHONE - 2);
       expect(parseFloat(fit.style.width)).toBeGreaterThan(110);
       const width = fit.style.width;
       const transform = fit.style.transform;
