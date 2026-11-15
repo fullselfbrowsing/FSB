@@ -5551,6 +5551,9 @@
         this._discardSuspendedScopes();
         result = this._commitSurfaceScope(scope);
         if (result && level === ATTENTION.AMBIENT) this._applyPlacement(this._currentPlacement);
+        // No gate is up after an Ambient or Anchored render, so a cancel that
+        // was still waiting on the gate it left can no longer block the next one.
+        if (result) this._consequenceExitPending = false;
       }
 
       if (result && level === ATTENTION.FOCUSED) {

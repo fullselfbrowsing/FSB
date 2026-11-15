@@ -198,6 +198,7 @@
       contractSemanticEntityToken: null,
       contractRequestActionToken: null,
       contractViewToken: null,
+      contractViewRendered: false,
       contractActionIds: Object.freeze([]),
       pendingContractActions: new Set(),
       consumedContractActions: new Set(),
@@ -727,8 +728,9 @@
     function withdrawContractProjection() {
       // Only a rendered view can be left behind. While a request is still
       // pending nothing is on screen, so the shell's false means there was
-      // nothing to withdraw, not a failed withdrawal.
-      const owned = state.contractViewToken !== null || state.contractAskState !== 'idle';
+      // nothing to withdraw, not a failed withdrawal. The view token is set
+      // before the render runs, so it cannot tell the two apart.
+      const owned = state.contractViewRendered || state.contractAskState !== 'idle';
       cancelContractAskBestEffort();
       const revokeClaim = contractRevokeClaim(
         state.contractViewToken,
@@ -740,6 +742,7 @@
       state.contractSemanticEntityToken = null;
       state.contractRequestActionToken = null;
       state.contractViewToken = null;
+      state.contractViewRendered = false;
       state.contractActionIds = Object.freeze([]);
       state.pendingContractActions.clear();
       state.consumedContractActions.clear();
@@ -1045,6 +1048,7 @@
       state.pendingContractToken = null;
       state.contractRequestActionToken = actionToken;
       state.contractViewToken = response.projectionToken;
+      state.contractViewRendered = true;
       state.contractActionIds = actionIds;
       state.contractAskState = 'idle';
       state.contractAskScope = null;
@@ -2457,6 +2461,7 @@
       state.contractSemanticEntityToken = null;
       state.contractRequestActionToken = null;
       state.contractViewToken = null;
+      state.contractViewRendered = false;
       state.contractActionIds = Object.freeze([]);
       state.pendingContractActions.clear();
       state.consumedContractActions.clear();

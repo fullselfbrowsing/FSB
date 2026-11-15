@@ -2466,10 +2466,16 @@ async function testContentRuntimeProductionRouterAndClosedContract() {
       }
     };
   }
-  function withdrawLikeRealShell(shell) {
+  function withdrawLikeRealShell(shell, options = {}) {
     let mounted = false;
     const render = shell.renderContractView;
     shell.renderContractView = function (model, onAction) {
+      if (options.refuseRender) {
+        // The real shell withdraws and returns false when the geometry
+        // certificate is missing.
+        this.withdrawCorpus();
+        return false;
+      }
       const rendered = render.call(this, model, onAction);
       if (rendered) mounted = true;
       return rendered;
@@ -2512,6 +2518,37 @@ async function testContentRuntimeProductionRouterAndClosedContract() {
     assert.strictEqual(started.shell.destroyed, false,
       `${label}: nothing was rendered yet, so withdrawing it does not destroy the shell`);
     assert.strictEqual(snapshot.phase, 'active', `${label}: Skopeo stays active`);
+  }
+
+  // A view token is issued before the render runs, so a response that never
+  // renders must not count as a rendered view either.
+  {
+    const pending = deferred();
+    const harness = createContentRuntimeHarness({
+      url: 'https://drive.google.com/drive/folders/vendor-root-A',
+      hudResponses: [pending]
+    });
+    const started = harness.start();
+    withdrawLikeRealShell(started.shell);
+    await flushContentRuntime();
+    Object.defineProperty(harness.document, 'visibilityState', { value: 'hidden', configurable: true });
+    pending.resolve(contentProjection(harness.hudMessages()[0], 'folder'));
+    await flushContentRuntime();
+    assert.strictEqual(started.shell.destroyed, false,
+      'hidden tab: a projection that lands while hidden never rendered, so the shell survives');
+    assert.strictEqual(harness.api.getSnapshot().phase, 'active', 'hidden tab: Skopeo stays active');
+  }
+  for (const mode of ['folder', 'contract-closed']) {
+    const harness = createContentRuntimeHarness({
+      url: 'https://drive.google.com/drive/folders/vendor-root-A',
+      hudResponses: [message => contentProjection(message, mode)]
+    });
+    const started = harness.start();
+    withdrawLikeRealShell(started.shell, { refuseRender: true });
+    await flushContentRuntime();
+    assert.strictEqual(started.shell.destroyed, false,
+      `${mode}: a render the shell refuses leaves nothing behind, so the shell survives`);
+    assert.strictEqual(harness.api.getSnapshot().phase, 'active', `${mode}: Skopeo stays active`);
   }
 }
 

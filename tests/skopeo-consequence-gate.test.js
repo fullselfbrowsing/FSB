@@ -564,6 +564,40 @@ function assertConfirmationRendersInShell(projection, slug, confirmation, label)
     label + ' actual shell returns to exact zero');
 }
 
+// A route change collapses the shell to Ambient while a cancel is still in
+// flight, so back() never runs for that gate. The next gate must still be
+// cancellable.
+function assertAmbientRenderReleasesPendingExit(projection, slug, confirmation, label) {
+  const context = composerContext(projection);
+  const group = projection.capabilityGroups.find(function(candidate) {
+    return candidate.capabilities.some(function(row) { return row.slug === slug; });
+  });
+  const initial = Composer.compose(composeInput(context, 'initial'));
+  const focused = Composer.compose(composeInput(context, 'open-actions'));
+  const interstitial = Composer.compose(composeInput(
+    context, 'select-action', group.id, slug, confirmation
+  ));
+  const shellHarness = createShellHarness(Shell, { generation: projection.generation });
+  const prepared = shellHarness.shell.prepareAmbient();
+  assert.ok(prepared && shellHarness.shell.mountAmbient(prepared), label + ' mounts the actual shell');
+  assert.equal(shellHarness.shell.renderAdaptive(initial, []), true, label + ' renders initial state');
+  assert.equal(shellHarness.shell.renderAdaptive(focused, []), true, label + ' renders Focused state');
+  assert.equal(shellHarness.shell.renderAdaptive(interstitial, []), true, label + ' renders the first gate');
+  shellHarness.dispatchKey('Escape', { isTrusted: true });
+  assert.equal(shellHarness.calls.adaptive.length, 1, label + ' first gate requests one cancel');
+  assert.equal(shellHarness.shell.render('ambient', {}), true,
+    label + ' a route change collapses the open gate to Ambient');
+  assert.equal(shellHarness.shell.renderAdaptive(initial, []), true, label + ' re-renders initial state');
+  assert.equal(shellHarness.shell.renderAdaptive(focused, []), true, label + ' re-renders Focused state');
+  assert.equal(shellHarness.shell.renderAdaptive(interstitial, []), true, label + ' renders the next gate');
+  shellHarness.shadow().querySelector('.skopeo-gate-return').click();
+  assert.equal(shellHarness.calls.adaptive.length, 2,
+    label + ' the next gate still emits its own cancel after the collapse');
+  assert.equal(shellHarness.calls.adaptive[1].kind, 'cancel-consequence',
+    label + ' the next gate cancel routes through consequence cancellation');
+  shellHarness.shell.destroy('consequence-boundary');
+}
+
 async function assertFiveWriteRenderBoundaries() {
   assert.deepEqual(ActionAuthority.CONSEQUENCE_BOUNDS, {
     label: 80,
@@ -595,6 +629,14 @@ async function assertFiveWriteRenderBoundaries() {
         opened.confirmation,
         testCase.slug + ' ' + boundary
       );
+      if (testCase === FIVE_READY_WRITE_CASES[0] && boundary === 'minimum') {
+        assertAmbientRenderReleasesPendingExit(
+          harness.state.projection,
+          testCase.slug,
+          opened.confirmation,
+          testCase.slug + ' collapsed gate'
+        );
+      }
       const cancelled = harness.gate.cancel(confirmRequest(harness, opened), { tabId: harness.tabId });
       assert.equal(cancelled.status, 'cancelled', testCase.slug + ' ' + boundary + ' token is consumed');
     }
