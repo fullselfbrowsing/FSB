@@ -1974,6 +1974,301 @@ async function testFailureInjectedRestartRecovery(contracts) {
     `failure matrix recovered before/after ${purgeBoundaries} purge and ${replacementBoundaries} replacement awaits`);
 }
 
+const CORPUS_OPERATION_STORAGE_KEY = 'skopeoCorpusStore:v1:operation';
+const RESTAGE_SOURCE_IDS = Object.freeze(['source-1', 'source-2']);
+
+async function stageWithoutCommit(harness, store, claim, sourceIds = RESTAGE_SOURCE_IDS) {
+  const handle = await mutate(store, (guard) => store.beginReplacement(claim, guard));
+  assert.equal(Number.isSafeInteger(handle && handle.operationEpoch), true, 'the staging run begins');
+  for (const sourceFileId of sourceIds) {
+    const staged = await mutate(store, (guard) => store.stageSource(
+      handle,
+      harness.fixtures.sourceRecord(claim, sourceFileId),
+      guard
+    ));
+    assert.equal(staged && staged.ok, true, `the staging run stages ${sourceFileId}`);
+  }
+  return handle;
+}
+
+function participantPurgeCalls(harness) {
+  return harness.controller.trace.filter((entry) => entry.timing === 'before' &&
+    /\.purge(?:Source|Partition)$/.test(entry.type));
+}
+
+function storedOperationMarked(harness) {
+  const operation = harness.values[CORPUS_OPERATION_STORAGE_KEY];
+  return !!operation && Object.prototype.hasOwnProperty.call(operation, 'refreshesPublished');
+}
+
+function recoverAs(store, accountPermissionId) {
+  return mutate(store, (guard) => store.recover({ provenAccountPermissionId: accountPermissionId }, guard));
+}
+
+// A same-root re-sync overwrites source records in place and replaces the
+// committed operation, so when it fails before commit there is no clean
+// earlier corpus to roll back to. Recovery used to purge the live corpus as
+// orphaned staging. It must keep it and ask for a restage instead.
+async function testSameRootRestageFailureRetainsPublishedPartition(contracts) {
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-restage-base');
+    const owned = harness.future.countPartition(AX);
+    await stageWithoutCommit(harness, harness.store, AX);
+    assert.equal(harness.values[CORPUS_OPERATION_STORAGE_KEY].refreshesPublished, true,
+      'a restage of the published corpus is marked');
+    harness.controller.reset();
+    const restarted = recreateStore(harness);
+    const recovered = await recoverAs(restarted, AX.accountPermissionId);
+    assert.equal(recovered && recovered.ok, true);
+    assert.equal(recovered.status, 'restage-required', 'recovery asks for a restage instead of purging');
+    assert.deepEqual(clonePlain(recovered.claim), clonePlain(AX), 'the retained claim is the exact root');
+    assert.deepEqual(participantPurgeCalls(harness), [], 'recovery calls no purge participant');
+    assert.equal(harness.future.countPartition(AX), owned, 'every participant-owned derivative is kept');
+    assert.equal(await restarted.getVisibleManifest(AX), null,
+      'the retained corpus stays hidden until it is restaged');
+    const inspected = await restarted.inspectMetadata(AX);
+    assert.equal(inspected && inspected.lifecycle, 'staging', 'the retained partition is still staging');
+    assert.deepEqual(inspected.sources.map((source) => source.sourceFileId).sort(), RESTAGE_SOURCE_IDS,
+      'the retained source records are kept for the restage');
+
+    const restaged = await stageWithoutCommit(harness, restarted, AX);
+    const committed = await mutate(restarted, (guard) => restarted.commitInventory(
+      restaged,
+      harness.fixtures.checkpoint('checkpoint-restaged', RESTAGE_SOURCE_IDS.length),
+      guard
+    ));
+    assert.equal(committed && committed.ok, true, 'a restage commits the retained partition');
+    assert.deepEqual(visibleSourceIds(await restarted.getVisibleManifest(AX)), RESTAGE_SOURCE_IDS,
+      'the restaged corpus is visible again');
+    assert.equal(harness.future.countPartition(AX), owned, 'republication keeps every participant');
+    assert.equal(storedOperationMarked(harness), false, 'a committed operation keeps the unmarked shape');
+  }
+
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-cross-tab-base');
+    const liveHandle = await stageWithoutCommit(harness, harness.store, AX);
+    const recovered = await recoverAs(harness.store, AX.accountPermissionId);
+    assert.equal(recovered && recovered.status, 'restage-required');
+    const committed = await mutate(harness.store, (guard) => harness.store.commitInventory(
+      liveHandle,
+      harness.fixtures.checkpoint('checkpoint-cross-tab', RESTAGE_SOURCE_IDS.length),
+      guard
+    ));
+    assert.equal(committed && committed.ok, true,
+      'recovery writes nothing, so another tab\'s live same-root restage still commits');
+    assert.deepEqual(visibleSourceIds(await harness.store.getVisibleManifest(AX)), RESTAGE_SOURCE_IDS);
+  }
+
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-carry-base');
+    const owned = harness.future.countPartition(AX);
+    await stageWithoutCommit(harness, harness.store, AX);
+    assert.equal((await recoverAs(harness.store, AX.accountPermissionId)).status, 'restage-required');
+    await stageWithoutCommit(harness, harness.store, AX, [RESTAGE_SOURCE_IDS[0]]);
+    assert.equal(harness.values[CORPUS_OPERATION_STORAGE_KEY].refreshesPublished, true,
+      'a retry of a retained restage carries the mark forward');
+    harness.controller.reset();
+    const second = await recoverAs(recreateStore(harness), AX.accountPermissionId);
+    assert.equal(second && second.status, 'restage-required', 'a second failed restage is retained too');
+    assert.deepEqual(participantPurgeCalls(harness), []);
+    assert.equal(harness.future.countPartition(AX), owned);
+  }
+
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX, AY } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-other-root-base');
+    await stageWithoutCommit(harness, harness.store, AY, [RESTAGE_SOURCE_IDS[0]]);
+    assert.equal(storedOperationMarked(harness), false, 'staging a different root is not marked');
+    const recovered = await recoverAs(recreateStore(harness), AX.accountPermissionId);
+    assert.equal(recovered && recovered.status, 'closed', 'failed different-root staging is not retained');
+    assert.equal(harness.future.countPartition(AX), 0, 'the replaced root is purged');
+    assert.equal(harness.future.countPartition(AY), 0, 'the abandoned candidate is purged');
+  }
+
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await stageWithoutCommit(harness, harness.store, AX);
+    assert.equal(storedOperationMarked(harness), false, 'a first enrollment is not marked');
+    const recovered = await recoverAs(recreateStore(harness), AX.accountPermissionId);
+    assert.equal(recovered && recovered.status, 'closed', 'a failed first enrollment is not retained');
+    assert.equal(harness.future.countPartition(AX), 0, 'a failed first enrollment is purged');
+  }
+
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-account-base');
+    await stageWithoutCommit(harness, harness.store, AX);
+    const recovered = await recoverAs(recreateStore(harness), 'account-B');
+    assert.equal(recovered && recovered.status, 'closed', 'another account never inherits a retained restage');
+    assert.equal(harness.future.countPartition(AX), 0, 'another account\'s proof purges it');
+  }
+
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-withdraw-base');
+    await stageWithoutCommit(harness, harness.store, AX);
+    const withdrawn = await mutate(harness.store,
+      (guard) => harness.store.withdrawPartition(AX, 'user-withdrawn', guard));
+    assert.equal(withdrawn && withdrawn.ok, true);
+    const recovered = await recoverAs(recreateStore(harness), AX.accountPermissionId);
+    assert.equal(recovered && recovered.status, 'closed', 'a withdrawn restage is not retained');
+    assert.equal(harness.future.countPartition(AX), 0, 'a withdrawn restage is purged');
+  }
+
+  {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-legacy-base');
+    await stageWithoutCommit(harness, harness.store, AX);
+    const legacy = { ...harness.values[CORPUS_OPERATION_STORAGE_KEY] };
+    delete legacy.refreshesPublished;
+    harness.values[CORPUS_OPERATION_STORAGE_KEY] = legacy;
+    const recovered = await recoverAs(recreateStore(harness), AX.accountPermissionId);
+    assert.equal(recovered && recovered.status, 'closed',
+      'an unmarked staging record written before the marker still parses and is purged');
+    assert.equal(harness.future.countPartition(AX), 0);
+  }
+
+  for (const [label, corrupt] of [
+    ['a marker that is not true', (record) => ({ ...record, refreshesPublished: false })],
+    ['a marker on a committed record', (record) => ({ ...record, state: 'committed', refreshesPublished: true })]
+  ]) {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, 'checkpoint-malformed-base');
+    await stageWithoutCommit(harness, harness.store, AX);
+    harness.values[CORPUS_OPERATION_STORAGE_KEY] = corrupt(harness.values[CORPUS_OPERATION_STORAGE_KEY]);
+    const restarted = recreateStore(harness);
+    const recovered = await recoverAs(restarted, AX.accountPermissionId);
+    assert.equal(recovered && recovered.ok, false, `${label} fails closed`);
+    assert.equal(recovered.status, 'recovery-pending', `${label} is a corrupt operation record`);
+    assert.equal(await restarted.getVisibleManifest(AX), null);
+  }
+  check(true, 'a failed same-root restage is retained for a restage, and every other failure still purges');
+}
+
+// The controller side of a retained restage: the HUD offers enrollment, a
+// same-root enrollment keeps the participants, and a woken worker resumes the
+// restage. A different root still replaces it.
+async function testControllerResumesRetainedRestage(contracts) {
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
+  function liveFolder(folderFileId) {
+    return {
+      tabId: 54,
+      origin: 'https://drive.google.com',
+      generation: 1,
+      profileId: 'drive-docs',
+      profileVersion: 1,
+      contextEpoch: 1,
+      contextKind: 'drive-folder',
+      entityKind: 'drive-folder',
+      entityId: folderFileId
+    };
+  }
+  function createController(store, accountPermissionId, live) {
+    const transport = {
+      async about() {
+        return { kind: 'ok', status: 200, value: { permissionId: accountPermissionId } };
+      },
+      async getFile(input) {
+        return {
+          kind: 'ok',
+          status: 200,
+          value: {
+            id: input.fileId,
+            name: 'Vendor agreements',
+            mimeType: FOLDER_MIME,
+            parents: [],
+            trashed: false,
+            capabilities: { canListChildren: true, canDownload: false },
+            shortcutDetails: null
+          }
+        };
+      }
+    };
+    const controller = contracts.corpusController.create({
+      store,
+      transport,
+      readLiveContext: async () => ({ ...live }),
+      now: () => Date.now(),
+      signal: new AbortController().signal,
+      limits: { maxOperationMs: 5000 }
+    });
+    assert.ok(controller, 'the real controller accepts the real store');
+    return controller;
+  }
+  async function retainedRestage(cursor) {
+    const harness = createCorpusHarness(contracts);
+    const { AX } = harness.fixtures.partitions;
+    await activateCorpus(harness, AX, RESTAGE_SOURCE_IDS, cursor);
+    await stageWithoutCommit(harness, harness.store, AX);
+    harness.controller.reset();
+    return harness;
+  }
+
+  {
+    const harness = await retainedRestage('checkpoint-controller-retained');
+    const { AX } = harness.fixtures.partitions;
+    const owned = harness.future.countPartition(AX);
+    const live = liveFolder(AX.corpusRootFileId);
+    const controller = createController(recreateStore(harness), AX.accountPermissionId, live);
+    assert.deepEqual(await controller.getRootStatus({ folderFileId: AX.corpusRootFileId }),
+      { ok: true, status: 'unconfigured' }, 'a retained restage offers enrollment');
+    assert.deepEqual(participantPurgeCalls(harness), [], 'root status purges nothing');
+    const enrolled = await controller.enroll({ folderFileId: AX.corpusRootFileId });
+    assert.equal(enrolled && enrolled.ok, true);
+    assert.equal(enrolled.status, 'validating');
+    assert.deepEqual(participantPurgeCalls(harness), [], 're-enrolling the retained root purges nothing');
+    assert.equal(harness.future.countPartition(AX), owned,
+      're-enrolling the retained root keeps every participant');
+
+    const wokenStore = recreateStore(harness);
+    const woken = createController(wokenStore, AX.accountPermissionId, live);
+    assert.deepEqual(await woken.recover(), { ok: true, status: 'validating' },
+      'wake recovery hands the retained restage to the reconciler');
+    assert.deepEqual(clonePlain(woken.getCurrentClaim()), clonePlain(AX),
+      'wake recovery holds the retained claim');
+    const restaged = await stageWithoutCommit(harness, wokenStore, AX);
+    const committed = await mutate(wokenStore, (guard) => wokenStore.commitInventory(
+      restaged,
+      harness.fixtures.checkpoint('checkpoint-controller-restaged', RESTAGE_SOURCE_IDS.length),
+      guard
+    ));
+    assert.equal(committed && committed.ok, true);
+    assert.deepEqual(await woken.revalidate(), { ok: true, status: 'active' },
+      'the restaged corpus revalidates as active');
+    assert.deepEqual(participantPurgeCalls(harness), []);
+    assert.equal(harness.future.countPartition(AX), owned);
+  }
+
+  {
+    const harness = await retainedRestage('checkpoint-controller-other-root');
+    const { AX, AY } = harness.fixtures.partitions;
+    const controller = createController(
+      recreateStore(harness),
+      AY.accountPermissionId,
+      liveFolder(AY.corpusRootFileId)
+    );
+    const enrolled = await controller.enroll({ folderFileId: AY.corpusRootFileId });
+    assert.equal(enrolled && enrolled.status, 'validating');
+    assert.ok(participantPurgeCalls(harness).some((entry) => entry.type.endsWith('.purgePartition') &&
+      entry.detail.partitionKey === contracts.schema.makePartitionKey(AX) &&
+      entry.detail.reason === 'root-replaced'), 'enrolling another root replaces the retained one');
+    assert.equal(harness.future.countPartition(AX), 0, 'the replaced root is purged');
+  }
+  check(true, 'the controller resumes a retained restage and still replaces it for another root');
+}
+
 async function runCorpusStoreContract() {
   console.log('\n--- Phase 54 Plan 03: exact corpus store and MV3 recovery ---');
   const contracts = loadCorpusContracts();
@@ -1991,6 +2286,8 @@ async function runCorpusStoreContract() {
   await testControllerTimeoutHoldsMutationLane(contracts);
   await testStrictParticipantFailureAndDurableRecovery(contracts);
   await testFailureInjectedRestartRecovery(contracts);
+  await testSameRootRestageFailureRetainsPublishedPartition(contracts);
+  await testControllerResumesRetainedRestage(contracts);
 }
 
 async function run() {

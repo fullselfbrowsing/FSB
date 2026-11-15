@@ -71,6 +71,9 @@
     'operationEpoch',
     'priorPartitionKey'
   ];
+  // A staging record that restages the published corpus under its own key
+  // carries refreshesPublished: true. Every other record keeps the base keys.
+  var REFRESH_OPERATION_KEYS = OPERATION_KEYS.concat(['refreshesPublished']);
   var SOURCE_JOURNAL_KEYS = [
     'version',
     'kind',
@@ -287,6 +290,10 @@
 
   function parseOperation(schema, value) {
     var fields = exactFields(value, OPERATION_KEYS);
+    if (!fields) {
+      fields = exactFields(value, REFRESH_OPERATION_KEYS);
+      if (fields && (fields.refreshesPublished !== true || fields.state !== 'staging')) return null;
+    }
     if (!fields || fields.version !== OPERATION_VERSION || fields.kind !== 'replacement' ||
         (fields.state !== 'staging' && fields.state !== 'committed') ||
         !validEpoch(fields.operationEpoch)) {
@@ -298,7 +305,7 @@
         !(fields.priorPartitionKey === null || schema.parsePartitionKey(fields.priorPartitionKey))) {
       return null;
     }
-    return frozenRecord([
+    var entries = [
       ['version', OPERATION_VERSION],
       ['kind', 'replacement'],
       ['state', fields.state],
@@ -307,11 +314,14 @@
       ['corpusRootFileId', fields.corpusRootFileId],
       ['operationEpoch', fields.operationEpoch],
       ['priorPartitionKey', fields.priorPartitionKey]
-    ]);
+    ];
+    if (fields.refreshesPublished === true) entries.push(['refreshesPublished', true]);
+    return frozenRecord(entries);
   }
 
-  function operationRecord(tuple, partitionKey, operationEpoch, priorPartitionKey, state) {
-    return {
+  function operationRecord(tuple, partitionKey, operationEpoch, priorPartitionKey, state,
+    refreshesPublished) {
+    var record = {
       version: OPERATION_VERSION,
       kind: 'replacement',
       state: state,
@@ -321,6 +331,8 @@
       operationEpoch: operationEpoch,
       priorPartitionKey: priorPartitionKey
     };
+    if (state === 'staging' && refreshesPublished === true) record.refreshesPublished = true;
+    return record;
   }
 
   function sameOperation(handle, operation, state) {
@@ -978,6 +990,22 @@
             manifestEpoch,
             oldOperation ? oldOperation.operationEpoch : 0
           ) + 1;
+          // Restaging the published corpus under its own key overwrites its
+          // source records in place and replaces its committed operation, so
+          // a failed attempt leaves no earlier corpus to fall back to. Mark
+          // it, so recovery keeps the partition for a restage instead of
+          // purging it as an orphan. A retry of a marked restage that has not
+          // committed yet carries the mark forward.
+          var refreshesPublished = false;
+          if (activePartitionKey === parsed.partitionKey) {
+            refreshesPublished = await validatePublishedManifest(manifestResult.manifest, mutation);
+          } else if (oldOperation && oldOperation.state === 'staging' &&
+              oldOperation.refreshesPublished === true &&
+              oldOperation.partitionKey === parsed.partitionKey) {
+            var retainedResult = await readPartition(parsed.partitionKey, mutation);
+            refreshesPublished = !!retainedResult.record &&
+              retainedResult.record.lifecycle === 'staging';
+          }
 
           await writeOne(CONTROL_KEY, closedManifest(schema, 'closed', operationEpoch), mutation);
 
@@ -994,8 +1022,12 @@
             }
           }
 
+          // A staging run under the same key is not abandoned: the candidate
+          // write below restages that partition anyway, and withdrawing it
+          // first would drop a carried-forward restage mark.
           if (oldOperation && oldOperation.state === 'staging' &&
-              oldOperation.partitionKey !== priorPartitionKey) {
+              oldOperation.partitionKey !== priorPartitionKey &&
+              oldOperation.partitionKey !== parsed.partitionKey) {
             var abandonedTuple = schema.parsePartitionKey(oldOperation.partitionKey);
             var abandonedResult = await readPartition(oldOperation.partitionKey, mutation);
             var abandonedEpoch = abandonedResult.record
@@ -1025,7 +1057,8 @@
             parsed.partitionKey,
             operationEpoch,
             priorPartitionKey,
-            'staging'
+            'staging',
+            refreshesPublished
           );
           await writeOne(OPERATION_KEY, operation, mutation);
           visibleAccountPermissionId = parsed.tuple.accountPermissionId;
@@ -1653,6 +1686,35 @@
         operationResult.operation.operationEpoch === manifest.authorityEpoch;
     }
 
+    // A marked restage of the published corpus that never committed is kept
+    // for a restage rather than purged as orphaned staging. Its records were
+    // overwritten in place, so there is nothing cleaner to roll back to, and
+    // the participants still agree with them: the reconciler purges a
+    // changed source's derivatives before restaging it. Only the proven
+    // account may keep it, and only while its partition is intact staging.
+    function retainedRefresh(operation, values, provenAccountPermissionId) {
+      if (!operation || operation.state !== 'staging' || operation.refreshesPublished !== true ||
+          operation.accountPermissionId !== provenAccountPermissionId) {
+        return null;
+      }
+      var partitionKey = partitionStorageKey(operation.partitionKey);
+      var partition = own(values, partitionKey)
+        ? schema.parsePartitionRecord(values[partitionKey])
+        : null;
+      if (!partition || partition.partitionKey !== operation.partitionKey ||
+          partition.lifecycle !== 'staging' ||
+          sourceEntriesForPartition(values, operation.partitionKey).corrupt) {
+        return null;
+      }
+      return {
+        partitionKey: operation.partitionKey,
+        claim: frozenRecord([
+          ['accountPermissionId', operation.accountPermissionId],
+          ['corpusRootFileId', operation.corpusRootFileId]
+        ])
+      };
+    }
+
     async function recover(input, mutationGuard) {
       var proof = exactFields(input, []);
       var proofAccountPermissionId = null;
@@ -1798,7 +1860,14 @@
           var operationIsPublished = currentOperationEntry && currentOperationEntry.state === 'committed' &&
             currentManifestEntry && currentManifestEntry.lifecycle === 'active' &&
             currentManifestEntry.activePartitionKey === currentOperationEntry.partitionKey;
-          if (currentOperationEntry && !operationIsPublished && steps < LIMITS.MAX_RECOVERY_STEPS) {
+          // A retained restage is left exactly as it is, with no write at
+          // all, so another tab's live restage of the same root can still
+          // commit under its handle.
+          var retained = currentOperationEntry && !operationIsPublished
+            ? retainedRefresh(currentOperationEntry, values, proofAccountPermissionId)
+            : null;
+          if (currentOperationEntry && !operationIsPublished && !retained &&
+              steps < LIMITS.MAX_RECOVERY_STEPS) {
             var candidateClaim = claimFromPartitionKey(currentOperationEntry.partitionKey);
             var cleanedCandidate = await withPartition(candidateClaim.partitionKey, function() {
               return purgePartitionUnlocked(candidateClaim, 'orphaned-staging', mutation);
@@ -1827,7 +1896,8 @@
               currentManifestEntry.activePartitionKey === encodedPartitionKey &&
               partitionValue.lifecycle === 'active' &&
               partitionValue.accountPermissionId === proofAccountPermissionId;
-            if (!stillActive && partitionValue.lifecycle !== 'purged') {
+            var stillRetained = !!retained && retained.partitionKey === encodedPartitionKey;
+            if (!stillActive && !stillRetained && partitionValue.lifecycle !== 'purged') {
               var orphanClaim = claimFromPartitionKey(encodedPartitionKey);
               var cleanedOrphan = await withPartition(encodedPartitionKey, function() {
                 return purgePartitionUnlocked(orphanClaim, 'orphaned-staging', mutation);
@@ -1854,6 +1924,13 @@
             }
           }
           visibleAccountPermissionId = proofAccountPermissionId;
+          if (retained && steps < LIMITS.MAX_RECOVERY_STEPS) {
+            return frozenRecord([
+              ['ok', true],
+              ['status', 'restage-required'],
+              ['claim', retained.claim]
+            ]);
+          }
           return frozenRecord([
             ['ok', true],
             ['status', steps >= LIMITS.MAX_RECOVERY_STEPS ? 'recovery-pending' : 'closed']

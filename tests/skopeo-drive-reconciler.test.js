@@ -1496,6 +1496,54 @@ async function testRealStoreSameRootRefreshAndRestartReuse(Reconciler) {
     'persisted Drive revision/checksum identities avoid unchanged content reads after restart');
 }
 
+// A same-root refresh restages the live partition in place. When it fails
+// before commit, the next recovery used to purge the whole partition as
+// orphaned staging, taking every participant-owned derivative with it.
+async function testRealStoreSameRootRefreshFailureRetainsParticipants(Reconciler) {
+  const schema = require(SCHEMA_PATH);
+  const CorpusStore = require(CORPUS_STORE_PATH);
+  const memory = createMemoryStorage();
+  const trace = [];
+  const transport = new FakeTransport(trace, { hiddenUntilChanges: [], changePages: [[]] });
+  const authority = new FakeAuthority(trace, transport, schema);
+  const store = CorpusStore.create({ storageArea: memory.area, schema, now: () => 1700000000000 });
+  const participants = registerOwnedParticipants(store);
+  const reconciler = Reconciler.create({
+    schema,
+    store,
+    transport,
+    authority,
+    limits: limits()
+  });
+  const claim = { accountPermissionId: 'permission-1', corpusRootFileId: 'root-1' };
+
+  const initial = await reconciler.buildInitialInventory(exactContext());
+  assert.equal(initial.ok, true, 'real corpus store publishes the initial corpus');
+  const sourceIds = (await store.getVisibleManifest(claim)).sources.map((source) => source.sourceFileId);
+  participants.seed(sourceIds);
+  const ownedCount = participants.count();
+  assert.ok(ownedCount > 0, 'participants own derivatives of the published corpus');
+
+  transport.setFailure('listChanges', 'transient');
+  const failedRefresh = await reconciler.buildInitialInventory(exactContext());
+  assert.equal(failedRefresh.ok, false, 'a same-root refresh fails before commit');
+  assert.equal(await store.getVisibleManifest(claim), null,
+    'the corpus is hidden while its restage is unfinished');
+  transport.clearFailure('listChanges');
+
+  const resumed = await reconciler.resume(exactContext());
+  assert.equal(participants.partitionPurges(), 0,
+    'recovery after a failed same-root refresh invokes zero partition purges');
+  assert.equal(participants.count(), ownedCount,
+    'recovery after a failed same-root refresh keeps every participant-owned derivative');
+  assert.equal(resumed.ok, true, 'resume restages and republishes the retained corpus');
+  assert.deepEqual(
+    (await store.getVisibleManifest(claim)).sources.map((source) => source.sourceFileId),
+    sourceIds,
+    'the republished corpus holds the same sources'
+  );
+}
+
 // Serves raw Drive API records to the real transport, so its parsing runs
 // exactly as it does against the page.
 function realTransportOverDrive(rawGraph, changes) {
@@ -1645,6 +1693,7 @@ async function main() {
   await testMutationTimeoutHoldsReconcilerLane(Reconciler);
   await testCrashRestartConvergenceAndAbort(Reconciler);
   await testRealStoreSameRootRefreshAndRestartReuse(Reconciler);
+  await testRealStoreSameRootRefreshFailureRetainsParticipants(Reconciler);
   await testUndisplayableDriveFileIsWithheldNotFatal(Reconciler);
 
   const source = fs.readFileSync(RECONCILER_PATH, 'utf8');

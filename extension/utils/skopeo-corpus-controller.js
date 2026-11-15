@@ -290,6 +290,17 @@
       });
     }
 
+    // The store keeps a same-root restage that failed before commit and
+    // reports it as 'restage-required' with its claim. It is the enrolled
+    // root, waiting to be restaged, so it is neither purged nor shown.
+    function restageClaim(value, permissionId) {
+      return isPlainRecord(value) && value.ok === true && value.status === 'restage-required' &&
+        isPlainRecord(value.claim) && value.claim.accountPermissionId === permissionId &&
+        validId(value.claim.corpusRootFileId)
+        ? claim(value.claim.accountPermissionId, value.claim.corpusRootFileId)
+        : null;
+    }
+
     async function closeUnproven(deadline) {
       // `recover({})` is the store's durable unproven closure; it advances the
       // authority epoch and removes the active projection without guessing identity.
@@ -391,6 +402,11 @@
       var recoveredClaim = identityRecovery.value.status === 'active'
         ? identityRecovery.value.claim
         : null;
+      var retainedClaim = restageClaim(identityRecovery.value, candidate.accountPermissionId);
+      // Enrolling the retained root again is how its restage resumes, so its
+      // corpus and participants stay. Enrolling another root replaces it.
+      var restagesRetained = !!retainedClaim &&
+        retainedClaim.corpusRootFileId === candidate.corpusRootFileId;
       if (recoveredClaim && isPlainRecord(recoveredClaim) &&
           recoveredClaim.accountPermissionId === candidate.accountPermissionId &&
           validId(recoveredClaim.corpusRootFileId)) {
@@ -398,6 +414,8 @@
           recoveredClaim.accountPermissionId,
           recoveredClaim.corpusRootFileId
         );
+      } else if (retainedClaim) {
+        currentClaim = retainedClaim;
       } else if (currentClaim && currentClaim.accountPermissionId !== candidate.accountPermissionId) {
         currentClaim = null;
         currentHandle = null;
@@ -419,7 +437,7 @@
         }
       }
 
-      if (currentClaim) {
+      if (currentClaim && !restagesRetained) {
         var reason = currentClaim.accountPermissionId === candidate.accountPermissionId
           ? 'root-replaced'
           : 'account-changed';
@@ -620,7 +638,10 @@
           ? 'active'
           : 'unconfigured');
       }
-      if (recovery.value.status !== 'closed' && recovery.value.status !== 'purged') {
+      // A retained restage has no visible corpus yet. Offer enrollment: for
+      // its own root that resumes the restage without a purge.
+      if (recovery.value.status !== 'closed' && recovery.value.status !== 'purged' &&
+          !restageClaim(recovery.value, proof.permissionId)) {
         currentStatus = 'fail-quiet';
         return result(false, 'fail-quiet');
       }
@@ -652,6 +673,29 @@
         return store.recover({ provenAccountPermissionId: permissionId }, operationGuard);
       });
       if (!recovery.ok || !recovery.value || recovery.value.ok !== true) {
+        currentStatus = 'fail-quiet';
+        return result(false, 'fail-quiet');
+      }
+      var retainedClaim = restageClaim(recovery.value, permissionId);
+      if (retainedClaim) {
+        // Prove the retained root before handing it back. 'validating' with
+        // the claim set sends wake recovery to reconciler.resume, which
+        // restages and commits it; revalidate then reports it active.
+        var restageProof = await proveFolder(deadline, context, retainedClaim.corpusRootFileId);
+        if (restageProof.ok && restageProof.permissionId === permissionId) {
+          currentClaim = retainedClaim;
+          currentHandle = null;
+          currentStatus = 'validating';
+          return result(true, 'validating');
+        }
+        // Only a root that is gone or no longer shared loses its corpus. A
+        // changed page or account leaves the retained restage for later.
+        if (restageProof.kind === 'unproven') await closeUnproven(deadline);
+        else if (restageProof.kind === 'inaccessible') {
+          await withdrawAndPurge(deadline, retainedClaim, 'lost-access');
+        }
+        currentClaim = null;
+        currentHandle = null;
         currentStatus = 'fail-quiet';
         return result(false, 'fail-quiet');
       }
