@@ -182,6 +182,8 @@ jobs:
         run: npm --prefix showcase/angular run verify:video-seo
       - name: Verify localized marketing copy, branding and SEO on prerendered HTML
         run: npm --prefix showcase/angular run verify:marketing-i18n-seo
+      - name: Verify prerendered pages carry hydration data
+        run: npm --prefix showcase/angular run verify:hydration
       - name: Verify per-locale gzipped bundle budget (CI-05)
         run: node showcase/angular/scripts/verify-bundle-budgets.mjs
       # Crawler smoke (smoke:crawler) hits production by default; it lives in
