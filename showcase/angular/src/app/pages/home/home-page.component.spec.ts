@@ -4,6 +4,7 @@ import {
   buildLeaderboardRows,
   buildLeaderboardTicks,
   detectBrowserIconClass,
+  fanOffset,
   nextEngMode,
 } from './home-page.component';
 
@@ -301,5 +302,30 @@ describe('buildLeaderboardTicks', () => {
       { at: 60, label: '60%' },
       { at: 80, label: '80%' },
     ]);
+  });
+});
+
+describe('fanOffset', () => {
+  it('starts flat next to the copy button and ends on the far arc', () => {
+    expect(fanOffset(0)).toEqual([0, 0]);
+    expect(fanOffset(1)).toEqual([-214, -13.5]);
+  });
+
+  it('passes through the designed points', () => {
+    expect(fanOffset(0.5)).toEqual([-45, -6]);
+    expect(fanOffset(0.25)).toEqual([-13, -3]);
+  });
+
+  it('interpolates between points and keeps bending outward', () => {
+    const offsets = Array.from({ length: 10 }, (_, i) => fanOffset(i / 9));
+    for (let i = 1; i < offsets.length; i++) {
+      expect(offsets[i][0]).toBeLessThan(offsets[i - 1][0]);
+      expect(offsets[i][1]).toBeLessThan(offsets[i - 1][1]);
+    }
+  });
+
+  it('clamps values outside the fan', () => {
+    expect(fanOffset(-1)).toEqual([0, 0]);
+    expect(fanOffset(2)).toEqual([-214, -13.5]);
   });
 });

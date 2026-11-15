@@ -215,6 +215,25 @@ for (const id of REQUIRED_IDS) {
     'marker missing; build with i18nMissingTranslation: error will fail');
 }
 
+// The date under the heading and the dateModified the page's structured data reports
+// are written in two places; a policy change that updates one must update the other.
+{
+  const componentTs = fs.readFileSync(
+    path.join(ROOT, 'showcase/angular/src/app/pages/privacy/privacy-page.component.ts'), 'utf8');
+  const visible = (html.match(/i18n="@@privacy\.header\.updated">Last updated: ([A-Z][a-z]+ \d{1,2}, \d{4})</) || [])[1];
+  const declared = (componentTs.match(/const PRIVACY_LAST_UPDATED = '(\d{4}-\d{2}-\d{2})';/) || [])[1];
+  check('visible "Last updated" date found', Boolean(visible), 'privacy.header.updated line not found');
+  check('PRIVACY_LAST_UPDATED constant found', Boolean(declared), 'constant missing from privacy-page.component.ts');
+  const parsed = visible ? new Date(`${visible} UTC`) : null;
+  const iso = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : null;
+  check('structured-data dateModified matches the visible "Last updated" date',
+    Boolean(iso) && iso === declared,
+    `page shows ${visible} (${iso}), PRIVACY_LAST_UPDATED is ${declared}`);
+  check('privacy page emits page-level structured data',
+    componentTs.includes("this.pageJsonLd.set('privacy-page'") && componentTs.includes('dateModified: PRIVACY_LAST_UPDATED'),
+    'WebPage JSON-LD with dateModified missing');
+}
+
 console.log(`\n=== showcase-privacy-page.test results: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);
 process.exit(0);

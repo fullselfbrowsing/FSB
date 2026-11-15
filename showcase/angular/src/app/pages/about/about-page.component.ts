@@ -15,6 +15,9 @@ import {
 import { Title, Meta } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
+import { DepthEndComponent } from '../../layout/depth/depth-end.component';
+import { DepthRailComponent, type DepthRailItem } from '../../layout/depth/depth-rail.component';
+import { DepthStageDirective } from '../../layout/depth/depth-stage.directive';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { PageJsonLdService } from '../../core/seo/page-json-ld.service';
 import TRAILER_VIDEO from '../../core/seo/trailer-video.json';
@@ -116,6 +119,8 @@ interface KnowledgeGraphApi {
   destroy(container: HTMLElement): void;
   setDetailLevel(level: GraphDetail): void;
   highlight(query: string): void;
+  pause?(): void;
+  resume?(): void;
 }
 
 interface FsbKnowledgeWindow extends Window {
@@ -133,7 +138,7 @@ let knowledgeGraphLoadPromise: Promise<void> | null = null;
 @Component({
   selector: 'app-about-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, DepthStageDirective, DepthRailComponent, DepthEndComponent],
   templateUrl: './about-page.component.html',
   styleUrl: './about-page.component.scss',
 })
@@ -149,8 +154,9 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly themeService = inject(ThemeService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly zone = inject(NgZone);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  categories: KnowledgeCategory[] = [];
+  categories: KnowledgeCategory[] = localizedCategories(KNOWLEDGE_CATEGORIES);
   graphDetail: GraphDetail = 'simple';
 
   // Counts are formatted per locale, not hardcoded: a literal '1,440' rendered a
@@ -185,7 +191,7 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
     // Title and description carry user-facing copy (browser tab + meta description / social cards).
     // Marked via $localize so per-locale builds emit translated strings; embedded brand tokens
     // (FSB, MCP) are listed in DO-NOT-TRANSLATE.md for translators.
-    const t = $localize`:@@about.meta.title:About FSB | AI Browser Automation Demo`;
+    const t = $localize`:@@about.meta.title:About FSB | Demo, Built-in Memory & Action Library`;
     const d = $localize`:@@about.meta.description:Watch the 33-second FSB demo, explore built-in memory for 130 sites, and discover 60 browser actions available to AI agents through MCP.`;
     this.applyMeta(t, d, url);
     this.injectTrailerVideoJsonLd();
@@ -193,11 +199,13 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     void this.initMemoryGraph();
+    this.armVideoShield();
   }
 
   ngOnDestroy(): void {
     this.pageJsonLd.remove('about-trailer-video');
     this.destroyMemoryGraph();
+    this.disarmVideoShield?.();
   }
 
   setGraphDetail(detail: GraphDetail): void {
@@ -277,18 +285,20 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
       win.__FSB_CATEGORY_LABELS = KNOWLEDGE_CATEGORY_LABELS;
       win.__FSB_SITE_LABELS = KNOWLEDGE_SITE_LABELS;
       win.__FSB_GRAPH_COPY = KNOWLEDGE_GRAPH_COPY;
-      this.categories = Array.isArray(win.__FSB_CATEGORIES)
-        ? win.__FSB_CATEGORIES.map((category) => ({
-          ...category,
-          name: KNOWLEDGE_CATEGORY_LABELS[category.name] || category.name,
-        }))
-        : [];
+      // The legend is already drawn from KNOWLEDGE_CATEGORIES; what the script loaded wins.
+      const loaded = win.__FSB_CATEGORIES;
+      if (Array.isArray(loaded)) {
+        this.categories = localizedCategories(loaded);
+      }
+
       this.cdr.detectChanges();
       await new Promise((resolve) => window.requestAnimationFrame(resolve));
       const currentHost = this.graphHost?.nativeElement;
       if (!currentHost) return;
       this.zone.runOutsideAngular(() => {
         win.KnowledgeGraph?.render(currentHost, { detailLevel: this.graphDetail });
+        this.graphRunning = true;
+        this.syncGraphMotion();
       });
     } catch (error) {
       console.warn('Knowledge graph render failed:', error);
@@ -329,4 +339,113 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (typeof window === 'undefined') return undefined;
     return (window as FsbKnowledgeWindow).KnowledgeGraph;
   }
+
+  /* Depth page wiring. The memory graph is drawn once the page mounts but only
+     animates while its plane is the one in view. */
+  readonly rail: readonly DepthRailItem[] = ABOUT_RAIL_LABELS.map((label, layer) => ({ label, layer }));
+  readonly railLabel = ABOUT_RAIL_ARIA;
+  private activePlane = 0;
+  private graphRunning = false;
+  private disarmVideoShield?: () => void;
+
+  onDepthActive(index: number): void {
+    this.activePlane = index;
+    this.syncGraphMotion();
+  }
+
+  private syncGraphMotion(): void {
+    const graph = this.getKnowledgeGraph();
+    if (!graph || !this.graphHost) return;
+    const want = this.activePlane === GRAPH_PLANE;
+    if (want === this.graphRunning) return;
+    this.graphRunning = want;
+    this.zone.runOutsideAngular(() => (want ? graph.resume?.() : graph.pause?.()));
+  }
+
+  /* A cross-origin player swallows wheel and touch gestures, so scrolling over the
+     trailer would never reach the depth engine. A transparent shield sits on the
+     player and lets clicks through only once the pointer has settled on it (or
+     after a first tap), and comes back when the pointer leaves. */
+  private armVideoShield(): void {
+    const frame = this.host.nativeElement.querySelector<HTMLElement>('.video-frame');
+    const shield = frame?.querySelector<HTMLElement>('.video-shield');
+    const win = this.doc.defaultView;
+    if (!frame || !shield || !win) return;
+    let dwell = 0;
+    const lower = (): void => {
+      win.clearTimeout(dwell);
+      shield.classList.add('is-lowered');
+    };
+    const raise = (): void => {
+      win.clearTimeout(dwell);
+      shield.classList.remove('is-lowered');
+    };
+    const settle = (e: PointerEvent): void => {
+      if (e.pointerType === 'touch') return;
+      win.clearTimeout(dwell);
+      dwell = win.setTimeout(lower, SHIELD_DWELL_MS);
+    };
+    const hold = (): void => win.clearTimeout(dwell);
+    this.zone.runOutsideAngular(() => {
+      shield.addEventListener('pointermove', settle, { passive: true });
+      shield.addEventListener('wheel', hold, { passive: true });
+      shield.addEventListener('click', lower);
+      frame.addEventListener('mouseleave', raise);
+    });
+    this.disarmVideoShield = () => {
+      win.clearTimeout(dwell);
+      shield.removeEventListener('pointermove', settle);
+      shield.removeEventListener('wheel', hold);
+      shield.removeEventListener('click', lower);
+      frame.removeEventListener('mouseleave', raise);
+    };
+  }
+}
+
+/* Depth page: the planes of this page in order. The memory graph sits on the
+   fourth; the trailer shield waits this long for the pointer to settle. */
+const GRAPH_PLANE = 3;
+const SHIELD_DWELL_MS = 450;
+const ABOUT_RAIL_ARIA = $localize`:@@about.depth.rail.aria:About FSB sections`;
+const ABOUT_RAIL_LABELS: readonly string[] = [
+  $localize`:@@depth.rail.intro:Intro`,
+  $localize`:@@about.depth.rail.demo:Demo`,
+  $localize`:@@about.depth.rail.memory:Memory`,
+  $localize`:@@about.depth.rail.siteGraph:Site graph`,
+  $localize`:@@about.depth.rail.actionLibrary:Action library`,
+  $localize`:@@about.depth.rail.moreActions:More actions`,
+  $localize`:@@depth.rail.index:Index`,
+];
+
+/* The legend under the site graph, as showcase/js/fsb-knowledge-data.js lists it
+   (tests/about-knowledge-categories-parity.test.js keeps the two equal). Holding
+   it here puts the legend in the prerendered page: before, it was inserted when
+   that script arrived and pushed the card around after first paint. */
+const KNOWLEDGE_CATEGORIES: readonly KnowledgeCategory[] = [
+  { name: 'E-Commerce & Shopping', color: '#4285f4', colorDark: '#5b9bf5', count: 8 },
+  { name: 'Social Media', color: '#34a853', colorDark: '#4ec973', count: 7 },
+  { name: 'Finance & Trading', color: '#ea4335', colorDark: '#f07068', count: 6 },
+  { name: 'Travel & Booking', color: '#fbbc04', colorDark: '#f5d058', count: 7 },
+  { name: 'Email Platforms', color: '#8b5cf6', colorDark: '#a78bfa', count: 3 },
+  { name: 'Coding Platforms', color: '#06b6d4', colorDark: '#38d0e8', count: 7 },
+  { name: 'Career & Job Search', color: '#ec4899', colorDark: '#f472b6', count: 45 },
+  { name: 'Gaming Platforms', color: '#f97316', colorDark: '#fb923c', count: 4 },
+  { name: 'Productivity Tools', color: '#14b8a6', colorDark: '#3dd6c4', count: 9 },
+  { name: 'Design & Whiteboard', color: '#a855f7', colorDark: '#c084fc', count: 3 },
+  { name: 'Games', color: '#0891b2', colorDark: '#22b8cf', count: 2 },
+  { name: 'Media', color: '#d946ef', colorDark: '#e879f9', count: 3 },
+  { name: 'Music', color: '#4285f4', colorDark: '#5b9bf5', count: 1 },
+  { name: 'News', color: '#34a853', colorDark: '#4ec973', count: 2 },
+  { name: 'Productivity', color: '#ea4335', colorDark: '#f07068', count: 3 },
+  { name: 'Reference', color: '#fbbc04', colorDark: '#f5d058', count: 1 },
+  { name: 'Sports', color: '#8b5cf6', colorDark: '#a78bfa', count: 1 },
+  { name: 'Maps & Navigation', color: '#06b6d4', colorDark: '#38d0e8', count: 1 },
+  { name: 'Utilities', color: '#ec4899', colorDark: '#f472b6', count: 17 },
+];
+
+function localizedCategories(categories: readonly KnowledgeCategory[]): KnowledgeCategory[] {
+  return categories.map((category) => ({
+    ...category,
+    name: KNOWLEDGE_CATEGORY_LABELS[category.name] || category.name,
+  }));
 }

@@ -25,17 +25,39 @@
     })();
   </script>
 
+  <!-- A depth page (layout/depth) centres each plane in the window. On a slow connection
+       the browser paints while the first plane's markup is still arriving, draws it
+       short, then moves everything as the rest lands. The first plane therefore stays
+       hidden until the next one has begun, which is when the first is complete. This
+       has to be inline: the stylesheet arrives too late, and the build's critical-CSS
+       step drops selectors that use :has(). A browser without :has() ignores the rule. -->
+  <style>
+    .fsb-depth-layer:not(.fsb-depth-layer ~ .fsb-depth-layer):not(:has(~ .fsb-depth-layer)) { visibility: hidden; }
+  </style>
+
+  <!-- Without JavaScript the depth pages (layout/depth) cannot move between their
+       planes, so they fall back to one ordinary scrolling column. -->
+  <noscript>
+    <style>
+      html:has(.fsb-depth), html:has(.fsb-depth) body { height: auto !important; overflow: auto !important; }
+      .fsb-depth { position: static !important; overflow: visible !important; }
+      .fsb-depth-layer { position: relative !important; inset: auto !important; min-height: 100vh; visibility: visible !important; pointer-events: auto !important; }
+      .fsb-depth-layer[data-scroll] { overflow: visible !important; -webkit-mask-image: none; mask-image: none; }
+      .fsb-depth-layer[data-depth-ghost] { filter: none !important; opacity: 1 !important; transform: none !important; }
+      .fsb-depth-layer[data-depth-ghost] > .fsb-depth-fit { opacity: 1 !important; }
+      .fsb-depth-rail, .fsb-depth-ambient { display: none !important; }
+    </style>
+  </noscript>
+
   <link rel="icon" type="image/png" href="/assets/icon48.png">
   <!-- Organization JSON-LD (LD-01, D-10..D-12). Inherited by every prerendered route via index.html template. Payload is hand-authored single-line strict JSON; no field contains '<' so no \u003c escape pass is needed. Pattern: PITFALLS.md P4. Threat: T-LD-01 (XSS via JSON-LD injection). -->
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","@id":"https://full-selfbrowsing.com/#org","name":"FSB","alternateName":["Full Self-Browsing","Full Self Browsing"],"url":"https://full-selfbrowsing.com","logo":"https://full-selfbrowsing.com/assets/fsb_logo_dark.png","sameAs":["https://github.com/fullselfbrowsing/FSB","https://www.youtube.com/@parzival5707"]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","@id":"https://full-selfbrowsing.com/#org","name":"FSB","alternateName":["Full Self-Browsing","Full Self Browsing"],"url":"https://full-selfbrowsing.com","logo":"https://full-selfbrowsing.com/assets/fsb_logo_dark.png","sameAs":["https://github.com/fullselfbrowsing/FSB","https://www.youtube.com/@parzival5707","https://x.com/fsb0804"]}</script>
 </head>
 <body>
   <app-root></app-root>
-  <!-- Dashboard CDN libraries (html5-qrcode + lz-string) load lazily on /dashboard
-       via DashboardPageComponent.loadDashboardCdnScripts() — they were previously
-       global, costing ~105 KB unused JS on every non-dashboard route. -->
-  <!-- Dashboard runtime state helpers (preview surface, remote control, task recovery derivation) -->
-  <script src="assets/dashboard-runtime-state.js"></script>
-  <script src="assets/phantom-stream-viewer.js"></script>
+  <!-- Nothing dashboard-specific loads here. Its CDN libraries (html5-qrcode, lz-string)
+       come from DashboardPageComponent.loadDashboardCdnScripts(), and its runtime state
+       helpers and PhantomStream viewer from core/dashboard/dashboard-runtime-loader.ts,
+       both when /dashboard is opened. -->
 </body>
 </html>
