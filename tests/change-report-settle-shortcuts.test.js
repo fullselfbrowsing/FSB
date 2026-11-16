@@ -300,7 +300,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   {
     const actionsSrc = fs.readFileSync(ACTIONS_PATH, 'utf8');
     const clickBody = slice(actionsSrc, '  click: async (params) => {', '  // Click on search result links');
-    async function runClick(stability) {
+    async function runClick(stability, classifyJevRisk = () => null) {
       const element = {
         tagName: 'BUTTON', type: undefined, isConnected: true, textContent: 'Save', innerText: 'Save',
         classList: { contains: () => false },
@@ -318,7 +318,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
           isCanvasBasedEditor: () => false,
           smartEnsureReady: async () => ({ ready: true, scrolled: false }),
           elementCache: new Map(),
-          sessionId: null
+          sessionId: null,
+          classifyJevRisk
         },
         actionRecorder: { record() {} },
         logger: { logActionExecution() {} },
@@ -340,6 +341,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     check(timedOut.success === true && timedOut.pageStable === false, 'timed-out content wait: pageStable false');
     const errored = await runClick({ stable: false, timedOut: false, reason: 'error' });
     check(errored.pageStable === false, 'a stability wait that failed: pageStable false');
+    const risky = await runClick({ stable: true, timedOut: false }, () => 'form_submit');
+    check(risky.success === true && risky.pageStable === false, 'a commit-class target keeps the service-worker wait even when the page settled');
+    const unclassifiable = await runClick({ stable: true, timedOut: false }, undefined);
+    check(unclassifiable.pageStable === true, 'default stub: a safe target settles early');
+    const noClassifier = await runClick({ stable: true, timedOut: false }, null);
+    check(noClassifier.pageStable === false, 'without the risk classifier the click keeps the service-worker wait');
+    const throwing = await runClick({ stable: true, timedOut: false }, () => { throw new Error('boom'); });
+    check(throwing.pageStable === false, 'a classifier error keeps the service-worker wait');
 
     const typeBody = slice(actionsSrc, '  type: async (params) => {', '  pressEnter: async (params) => {');
     const typeWait = typeBody.indexOf('const typeStability = await waitForPageStability(');

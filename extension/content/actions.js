@@ -2473,6 +2473,12 @@ const tools = {
                 FSB.querySelectorWithShadow(selectorUsed) !== element) {
               return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
             }
+            // The service worker may skip its own settle wait only for a control the
+            // code-only risk classifier finds nothing against. Anything that can
+            // submit, send, pay, delete or confirm keeps the full wait, so an effect
+            // that arrives late still reaches its change report.
+            let settlesEarly = false;
+            try { settlesEarly = typeof FSB.classifyJevRisk === 'function' && FSB.classifyJevRisk(element, {}) === null; } catch (_e) { settlesEarly = false; }
             clickDispatched = true;
             element.click();
             const fallbackStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
@@ -2483,7 +2489,7 @@ const tools = {
               scrolled: false,
               // True only when the stability wait after the click saw the page
               // settle; the service worker then skips its own settle wait.
-              pageStable: !!(fallbackStability && fallbackStability.stable === true),
+              pageStable: settlesEarly && !!(fallbackStability && fallbackStability.stable === true),
               method: 'programmatic_click_obscured_fallback',
               verification: { verified: false, reason: 'obscured_fallback_no_verification' },
               elementInfo: { tag: element.tagName, text: (element.innerText || '').substring(0, 50), wasScrolledIntoView: false },
@@ -2588,6 +2594,12 @@ const tools = {
       // Dispatch full mouse event sequence for proper JS handler triggering.
       // The synthetic click is the only activation: a second one would flip
       // toggles back and submit forms twice.
+      // The service worker may skip its own settle wait only for a control the
+      // code-only risk classifier finds nothing against. Anything that can
+      // submit, send, pay, delete or confirm keeps the full wait, so an effect
+      // that arrives late still reaches its change report.
+      let settlesEarly = false;
+      try { settlesEarly = typeof FSB.classifyJevRisk === 'function' && FSB.classifyJevRisk(element, {}) === null; } catch (_e) { settlesEarly = false; }
       clickDispatched = true;
       element.dispatchEvent(new MouseEvent('mousedown', mouseEventInit));
       element.dispatchEvent(new MouseEvent('mouseup', mouseEventInit));
@@ -2597,7 +2609,7 @@ const tools = {
       const clickStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
       // True only when that wait saw the page settle; the service worker then
       // skips its own settle wait before taking the change report.
-      const pageStable = !!(clickStability && clickStability.stable === true);
+      const pageStable = settlesEarly && !!(clickStability && clickStability.stable === true);
 
       // VERIFY-04: Capture post-state and verify using SHARED utilities
       const postState = captureActionState(element, 'click');
