@@ -12972,6 +12972,64 @@ let contentScriptHealth = new Map();
 // Track active content script ports per tab for persistent connections
 const contentScriptPorts = new Map();
 
+// FSB's automation content scripts are injected on demand (the manifest only
+// registers a MAIN-world canvas helper), so a main-frame document whose commit
+// cleared a tab's content-script state starts without one. Until a port
+// connects, a ready signal or health answer arrives, or FSB starts an
+// injection, health checks on that tab skip the waits that exist for a script
+// whose port is reconnecting. Each entry records the committed documentId.
+const contentScriptKnownEmptyTabs = new Map();
+
+function markContentScriptKnownEmpty(details) {
+  const tabId = details.tabId;
+  if (typeof tabId !== 'number' || tabId < 0) return;
+  const qualifiers = Array.isArray(details.transitionQualifiers) ? details.transitionQualifiers : [];
+  // A back/forward commit can restore a cached document whose content script
+  // is alive and about to reconnect its port.
+  if (qualifiers.includes('forward_back')) {
+    contentScriptKnownEmptyTabs.delete(tabId);
+    return;
+  }
+  contentScriptKnownEmptyTabs.set(tabId, {
+    documentId: typeof details.documentId === 'string' && details.documentId ? details.documentId : null,
+    committedAt: Date.now()
+  });
+  enforceMapLimit(contentScriptKnownEmptyTabs, MAX_CONTENT_SCRIPT_ENTRIES);
+}
+
+function hasContentScriptKnownEmptyMark(tabId) {
+  if (!contentScriptKnownEmptyTabs.has(tabId)) return false;
+  if (contentScriptPorts.has(tabId) || contentScriptReadyStatus.get(tabId)?.ready) {
+    contentScriptKnownEmptyTabs.delete(tabId);
+    return false;
+  }
+  return true;
+}
+
+// Before injecting, confirms that the marked document is still the tab's main
+// document and that no FSB content script from any injector has started in it.
+// Any other answer drops the mark, so the caller keeps the existing waits.
+async function confirmContentScriptKnownEmpty(tabId) {
+  if (!hasContentScriptKnownEmptyMark(tabId)) return false;
+  const mark = contentScriptKnownEmptyTabs.get(tabId);
+  try {
+    const [probe] = await chrome.scripting.executeScript({
+      target: mark.documentId ? { tabId, documentIds: [mark.documentId] } : { tabId, frameIds: [0] },
+      world: 'ISOLATED',
+      injectImmediately: true,
+      func: () => window.__FSB_CONTENT_SCRIPT_LOADED__ === true
+    });
+    if (probe && probe.frameId === 0 && probe.result === false
+        && contentScriptKnownEmptyTabs.get(tabId) === mark && !contentScriptPorts.has(tabId)) {
+      return true;
+    }
+  } catch (_error) {
+    // The document is gone or cannot be scripted; treat its state as unknown.
+  }
+  if (contentScriptKnownEmptyTabs.get(tabId) === mark) contentScriptKnownEmptyTabs.delete(tabId);
+  return false;
+}
+
 // Listen for persistent port connections from content scripts
 chrome.runtime.onConnect.addListener((port) => {
   armMcpBridge('runtime.onConnect');
@@ -13009,6 +13067,7 @@ chrome.runtime.onConnect.addListener((port) => {
       lastHeartbeat: Date.now()
     });
     enforceMapLimit(contentScriptPorts, MAX_CONTENT_SCRIPT_ENTRIES);
+    contentScriptKnownEmptyTabs.delete(tabId);
     debugLog('[FSB Background] Port stored for tab:', tabId);
 
     automationLogger.logComm(null, 'receive', 'port_connected', true, { tabId });
@@ -13074,6 +13133,7 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     try { portInfo.port.disconnect(); } catch (e) {}
     contentScriptPorts.delete(tabId);
   }
+  markContentScriptKnownEmpty(details);
 
   // Phase 243 plan 02 (BG-04 / D-03): emit a LOG-04
   // 'agent-tab-user-navigation' diagnostic when the user (typed,
@@ -13119,6 +13179,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   contentScriptPorts.delete(tabId);
   contentScriptReadyStatus.delete(tabId);
   contentScriptHealth.delete(tabId);
+  contentScriptKnownEmptyTabs.delete(tabId);
   // A closed tab cannot still be acting or watching; drop its icon claims so
   // they cannot outrank a live one.
   try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.dropTab(tabId); } catch (_e) { /* icon is presentation-only */ }
@@ -13237,6 +13298,7 @@ chrome.runtime.onSuspend.addListener(() => {
   contentScriptPorts.clear();
   contentScriptReadyStatus.clear();
   contentScriptHealth.clear();
+  contentScriptKnownEmptyTabs.clear();
 });
 
 // Performance monitoring
@@ -13413,9 +13475,13 @@ async function checkContentScriptHealth(tabId, timeout = 4000) {
       return true;
     }
 
+    // A document committed since FSB cleared this tab has no port to wait for
+    // and no script to retry against; one health message is enough.
+    const knownEmpty = !portInfo && hasContentScriptKnownEmptyMark(tabId);
+
     // If port not found but we know content script should be there,
     // wait briefly for port reconnection (service worker may have just woken)
-    if (!portInfo) {
+    if (!portInfo && !knownEmpty) {
       automationLogger.debug('Port not found, waiting for potential reconnection', { tabId });
       await new Promise(r => setTimeout(r, 1000)); // Wait 1 second
       portInfo = contentScriptPorts.get(tabId);
@@ -13444,7 +13510,8 @@ async function checkContentScriptHealth(tabId, timeout = 4000) {
     }
 
     // Message-based check with internal retry
-    for (let msgAttempt = 1; msgAttempt <= 2; msgAttempt++) {
+    const msgAttempts = knownEmpty ? 1 : 2;
+    for (let msgAttempt = 1; msgAttempt <= msgAttempts; msgAttempt++) {
       try {
         debugLog('[FSB Background] Sending healthCheck to tab:', { tabId, attempt: msgAttempt });
         // CRITICAL: Use frameId: 0 to target ONLY the main frame
@@ -13461,6 +13528,7 @@ async function checkContentScriptHealth(tabId, timeout = 4000) {
 
         if (response && response.success) {
           debugLog('[FSB Background] healthCheck successful for tab:', tabId);
+          contentScriptKnownEmptyTabs.delete(tabId);
           contentScriptHealth.set(tabId, {
             lastCheck: Date.now(),
             healthy: true,
@@ -13471,7 +13539,7 @@ async function checkContentScriptHealth(tabId, timeout = 4000) {
         }
       } catch (e) {
         debugLog('[FSB Background] healthCheck failed', { tabId, error: e.message });
-        if (msgAttempt < 2) {
+        if (msgAttempt < msgAttempts) {
           automationLogger.debug('Message health check failed, retrying', { tabId, attempt: msgAttempt, error: e.message });
           await new Promise(r => setTimeout(r, 500));
         }
@@ -13720,8 +13788,12 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
         }
       }
 
+      // A document confirmed empty since its commit has nothing to answer a
+      // health check and nothing reconnecting, so it goes straight to injection.
+      const knownEmpty = await confirmContentScriptKnownEmpty(tabId);
+
       // Check if content script is already healthy (might be from previous injection)
-      const isHealthy = await checkContentScriptHealth(tabId);
+      const isHealthy = !knownEmpty && await checkContentScriptHealth(tabId);
       if (isHealthy) {
         automationLogger.logComm(null, 'health', 'healthCheck', true, { tabId, source: 'existing' });
         contentScriptReadyStatus.set(tabId, { ready: true, timestamp: Date.now() });
@@ -13746,7 +13818,7 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
 
       // Check if content script was recently healthy - likely just needs time to reconnect
       const recentHealth = contentScriptHealth.get(tabId);
-      if (recentHealth && Date.now() - recentHealth.lastCheck < 30000 && recentHealth.healthy) {
+      if (!knownEmpty && recentHealth && Date.now() - recentHealth.lastCheck < 30000 && recentHealth.healthy) {
         automationLogger.debug('Content script was recently healthy, skipping re-injection', { tabId });
         // Just wait a bit more for reconnection instead of re-injecting
         await new Promise(r => setTimeout(r, 1500));
@@ -13762,6 +13834,9 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
       // automation-logger first, then init.js (namespace), then domain modules,
       // then messaging/lifecycle last (they depend on all above).
       automationLogger.logComm(null, 'send', 'inject', true, { tabId, attempt });
+      // Once injection starts the document may hold a script that is still
+      // connecting, so later health checks keep their reconnection waits.
+      contentScriptKnownEmptyTabs.delete(tabId);
 
       // Clear re-injection guards so content scripts re-initialize with fresh extension context.
       // After extension reload, old content scripts have invalidated chrome.runtime contexts.
@@ -20228,6 +20303,7 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
             url: request.url || sender.url,
             frameId: frameId
           });
+          contentScriptKnownEmptyTabs.delete(tabId);
           debugLog('[FSB Background] Tab marked as ready:', tabId);
           automationLogger.logInit('content_script', 'ready', { tabId, frameId, readyState: request.readyState, retry: request.retry || false });
           replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' }).catch((error) => {
