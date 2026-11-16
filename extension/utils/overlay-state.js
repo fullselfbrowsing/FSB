@@ -274,7 +274,7 @@
 
   var CAPABILITY_GUARDED_NOTE_TEXT = {
     RECIPE_CONSENT_MUTATING_REQUIRED: 'Blocked — nothing was created. Needs your approval to run write actions.',
-    RECIPE_CONSENT_REQUIRED: 'Blocked — this site needs your approval before FSB can act here.',
+    RECIPE_CONSENT_REQUIRED: 'Blocked. This site needs your approval before FSB can act here.',
     RECIPE_CONSENT_BLOCKED: 'Blocked — this site is on the do-not-automate list.',
     RECIPE_LEARN_PENDING: 'Not learned yet on this site — FSB will fall back to on-page actions.',
     RECIPE_DOM_FALLBACK_PENDING: 'The direct API path looks unavailable — falling back to on-page actions.'

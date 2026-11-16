@@ -28,6 +28,11 @@
     }
   }
 
+  // True while a visual session (MCP or autopilot) owns the status pill.
+  function fsbVisualSessionRunning() {
+    return Boolean(FSB.overlayState && FSB.overlayState.lifecycle === 'running');
+  }
+
   function fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState) {
     if (previousOverlayState?.lifecycle !== 'final' ||
         !overlayState || overlayState.lifecycle === 'cleared') return false;
@@ -1140,7 +1145,14 @@
 
             try {
               const execStart = Date.now();
-              result = await executeContentAction(tool, params);
+              // The status pill stays open while the action runs and folds a
+              // little after it ends.
+              try { FSB.progressOverlay.noteAction(true); } catch (e) { /* non-blocking */ }
+              try {
+                result = await executeContentAction(tool, params);
+              } finally {
+                try { FSB.progressOverlay.noteAction(false); } catch (e) { /* non-blocking */ }
+              }
               logger.logTiming(FSB.sessionId, 'ACTION', tool, Date.now() - execStart, { success: result?.success });
 
               // Invalidate cached element indexes
@@ -1149,10 +1161,11 @@
               // Clean up highlights
               try { FSB.actionGlowOverlay.hide(); } catch (e) { /* non-blocking */ }
               FSB.highlightManager.hide();
-              if (isManualMCP) {
-                // Manual MCP: no session to return to, destroy the glow entirely
-                try { FSB.viewportGlow.destroy(); } catch (e) { /* non-blocking */ }
+              if (isManualMCP && !fsbVisualSessionRunning()) {
+                // Manual MCP with no session to return to: fade the glow out
+                try { FSB.viewportGlow.dismiss(); } catch (e) { /* non-blocking */ }
               } else {
+                // The glow stays with the status pill for as long as the session runs
                 try { FSB.viewportGlow.setState('thinking'); } catch (e) { /* non-blocking */ }
               }
 
@@ -1181,7 +1194,7 @@
               try {
                 FSB.actionGlowOverlay.destroy();
                 FSB.highlightManager.hide();
-                if (isManualMCP) { FSB.viewportGlow.destroy(); }
+                if (isManualMCP && !fsbVisualSessionRunning()) { FSB.viewportGlow.dismiss(); }
               } catch (cleanupError) {
                 // Ignore cleanup errors
               }
@@ -1285,6 +1298,16 @@
         sendResponse({ success: true, ...pageReadiness });
         break;
 
+      case 'actionIconMotion':
+        try {
+          FSB.iconMotion = request.motion || null;
+          FSB.progressOverlay.setMotion(FSB.iconMotion);
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
       case 'sessionStatus':
         try {
           // [FSB Field Audit] Consumer: content script overlay renderer
@@ -1304,8 +1327,13 @@
           const previousOverlayState = FSB.overlayState;
           const replacesFinalSession = fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState);
           if (replacesFinalSession) {
-            FSB.progressOverlay.destroy();
+            // The finished pill morphs back for the new session instead of respawning.
+            FSB.progressOverlay.reset();
             FSB.replayPlayerOverlay.destroy();
+          }
+          if (overlayState.iconMotion !== undefined) {
+            FSB.iconMotion = overlayState.iconMotion || null;
+            FSB.progressOverlay.setMotion(FSB.iconMotion);
           }
 
           FSB.overlayState = overlayState;
@@ -1320,8 +1348,8 @@
               clearTimeout(FSB._overlayWatchdogTimer);
               FSB._overlayWatchdogTimer = null;
             }
-            FSB.viewportGlow.destroy();
-            FSB.progressOverlay.destroy();
+            FSB.viewportGlow.dismiss();
+            FSB.progressOverlay.dismiss();
             FSB.replayPlayerOverlay.destroy();
             FSB.actionGlowOverlay.destroy();
             FSB.lastActionStatusText = null;
@@ -1354,7 +1382,7 @@
                 FSB._overlayWatchdogTimer = null;
               }
               FSB.actionGlowOverlay.destroy();
-              FSB.viewportGlow.destroy();
+              FSB.viewportGlow.dismiss();
             } else {
               if (FSB._overlayWatchdogTimer) {
                 clearTimeout(FSB._overlayWatchdogTimer);
@@ -1364,8 +1392,8 @@
                 try {
                   var currentOverlayState = FSB.overlayState;
                   if (!currentOverlayState || currentOverlayState.lifecycle !== 'running') {
-                    FSB.viewportGlow.destroy();
-                    FSB.progressOverlay.destroy();
+                    FSB.viewportGlow.dismiss();
+                    FSB.progressOverlay.dismiss();
                     FSB.replayPlayerOverlay.destroy();
                     FSB.actionGlowOverlay.destroy();
                     FSB.overlayState = null;
@@ -1407,8 +1435,8 @@
                     FSB._overlayOrphanTimer = null;
                     console.warn('[FSB] Overlay watchdog: extended silence, cleaning up orphaned overlays');
                     try {
-                      FSB.viewportGlow.destroy();
-                      FSB.progressOverlay.destroy();
+                      FSB.viewportGlow.dismiss();
+                      FSB.progressOverlay.dismiss();
                       FSB.replayPlayerOverlay.destroy();
                       FSB.actionGlowOverlay.destroy();
                       FSB.overlayState = null;
@@ -1639,8 +1667,8 @@
               // any ongoing action overlay alone.
               try {
                 if (FSB.viewportGlow && FSB.viewportGlow.state === 'watching'
-                    && typeof FSB.viewportGlow.destroy === 'function') {
-                  FSB.viewportGlow.destroy();
+                    && typeof FSB.viewportGlow.dismiss === 'function') {
+                  FSB.viewportGlow.dismiss();
                 }
               } catch (_e) { /* best-effort */ }
 

@@ -448,32 +448,36 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   assertEq(iconStates.orbit.from, actingCss ? actingCss[1].toLowerCase() : null, 'acting: --glow-color-1 matches');
   assertEq(iconStates.orbit.to, actingCss ? actingCss[2].toLowerCase() : null, 'acting: --glow-color-2 matches');
 
-  // -- thinking: the indeterminate progress sweep ---------------------------
-  const sweepAnim = GLOW_SRC.match(/animation:\s*fsbProgressSweep\s*([\d.]+)s\s*([a-z-]+)\s*infinite/);
-  assert(!!sweepAnim, 'located the fsbProgressSweep animation shorthand');
-  assertEq(iconStates.sweep.duration, sweepAnim ? Math.round(Number(sweepAnim[1]) * 1000) : null,
-    'thinking: period matches fsbProgressSweep');
-  assertEq(sweepAnim && sweepAnim[2], 'ease-in-out', 'fsbProgressSweep is ease-in-out, as the icon assumes');
-
-  const sweepFill = GLOW_SRC.match(/\.fsb-progress-fill\s*\{[^}]*?background:\s*linear-gradient\(90deg,\s*(#[0-9a-fA-F]{6}),\s*(#[0-9a-fA-F]{6})\)/);
-  assert(!!sweepFill, 'located the .fsb-progress-fill gradient');
-  assertEq(iconStates.sweep.from, sweepFill ? sweepFill[1].toLowerCase() : null, 'thinking: gradient head matches');
-  assertEq(iconStates.sweep.to, sweepFill ? sweepFill[2].toLowerCase() : null, 'thinking: gradient tail matches');
-
-  // The canonical translate range, which the design export got wrong (-160/330).
-  const sweepKf = GLOW_SRC.match(/@keyframes fsbProgressSweep\s*\{[^}]*?0%\s*\{\s*transform:\s*translateX\((-?[\d.]+)%\)[^}]*?\}[^}]*?100%\s*\{\s*transform:\s*translateX\((-?[\d.]+)%\)/);
-  assert(!!sweepKf, 'located the fsbProgressSweep keyframe stops');
-  if (sweepKf) {
-    assert(ICON_SRC.includes('SWEEP_FROM_PCT = ' + (Number(sweepKf[1]) / 100).toFixed(2)),
-      'icon SWEEP_FROM_PCT tracks the canonical translateX start');
-    assert(ICON_SRC.includes('SWEEP_TO_PCT = ' + (Number(sweepKf[2]) / 100).toFixed(2)),
-      'icon SWEEP_TO_PCT tracks the canonical translateX end');
+  // -- the status pill plays the icon's own motions ------------------------
+  // The pill on the page is drawn from the same numbers, so the icon and the
+  // pill stay one system: same periods, same sweep, same ring and breathe.
+  const pillForms = GLOW_SRC.match(/const PILL_FORMS = Object\.freeze\(\{\s*sweep:\s*(\d+),\s*orbit:\s*(\d+),\s*ring:\s*(\d+),\s*breathe:\s*(\d+)\s*\}\)/);
+  assert(!!pillForms, 'located the pill motion periods');
+  if (pillForms) {
+    assertEq(Number(pillForms[1]), iconStates.sweep.duration, 'pill sweep period matches the icon');
+    assertEq(Number(pillForms[2]), iconStates.orbit.duration, 'pill orbit period matches the icon');
+    assertEq(Number(pillForms[3]), iconStates.ring.duration, 'pill ring period matches the icon');
+    assertEq(Number(pillForms[4]), iconStates.breathe.duration, 'pill breathe period matches the icon');
   }
-  const sweepWidth = GLOW_SRC.match(/\.fsb-progress-bar\.indeterminate\s+\.fsb-progress-fill\s*\{[^}]*?width:\s*(\d+)%/);
-  assert(!!sweepWidth, 'located the indeterminate fill width');
-  if (sweepWidth) {
-    assert(ICON_SRC.includes('SWEEP_FILL_FRACTION = ' + (Number(sweepWidth[1]) / 100)),
-      'icon SWEEP_FILL_FRACTION tracks the canonical 38% fill');
+
+  // Sweep: ease-in-out from -120% to 320% of a 38% fill on the orange gradient.
+  const pillSweep = GLOW_SRC.match(/m\.sweepX = (-?\d+) \+ (\d+) \* pillBezier\(0\.42, 0, 0\.58, 1, p\)/);
+  assert(!!pillSweep, 'located the pill sweep, ease-in-out as the icon assumes');
+  if (pillSweep) {
+    const from = Number(pillSweep[1]);
+    const to = from + Number(pillSweep[2]);
+    assert(ICON_SRC.includes('SWEEP_FROM_PCT = ' + (from / 100).toFixed(2)),
+      'icon SWEEP_FROM_PCT tracks the pill sweep start');
+    assert(ICON_SRC.includes('SWEEP_TO_PCT = ' + (to / 100).toFixed(2)),
+      'icon SWEEP_TO_PCT tracks the pill sweep end');
+  }
+  const pillFill = GLOW_SRC.match(/\.pl-fill\s*\{[^}]*?width:\s*(\d+)%;[^}]*?background:\s*linear-gradient\(90deg,\s*(#[0-9a-fA-F]{6}),\s*(#[0-9a-fA-F]{6})\)/);
+  assert(!!pillFill, 'located the pill track fill');
+  if (pillFill) {
+    assert(ICON_SRC.includes('SWEEP_FILL_FRACTION = ' + (Number(pillFill[1]) / 100)),
+      'icon SWEEP_FILL_FRACTION tracks the pill 38% fill');
+    assertEq(iconStates.sweep.from, pillFill[2].toLowerCase(), 'sweep: gradient head matches the pill');
+    assertEq(iconStates.sweep.to, pillFill[3].toLowerCase(), 'sweep: gradient tail matches the pill');
   }
 
   // -- watching: the trigger badge dot cadence ------------------------------
@@ -489,13 +493,20 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   assert(/var BREATHE_HOLD_MS = null;/.test(ICON_SRC),
     'the breathe is unbounded -- it loops while a watch is armed');
 
-  // -- calling: design-only, no upstream source -----------------------------
-  // Asserted as an absence, so this fails loudly the day someone DOES add a ring
-  // pulse upstream and the icon should start tracking it instead.
+  // -- calling: the ring, now also on the pill -------------------------------
+  // The pill plays it from the icon's clock in script, so there is no CSS ring
+  // keyframe or 1.6s literal to drift out of step with the icon.
   assert(!/@keyframes\s+\w*[Cc]apRing/.test(GLOW_SRC) && !/1\.6s/.test(GLOW_SRC),
-    'no capability ring pulse or 1.6s cadence exists upstream (calling is design-only)');
+    'the pill ring is clock-driven: no CSS ring keyframe or 1.6s cadence');
   assertEq(iconStates.ring.duration, 1600, 'calling: 1.6s, from the design export');
   assertEq(iconStates.ring.from, '#8b5cf6', 'calling: the capability violet');
+  assert(/m\.ring = 0\.9 - 0\.55 \* o;/.test(GLOW_SRC) && /if \(p < 0\.7\)/.test(GLOW_SRC)
+    && ICON_SRC.includes('CAP_ALPHA_HIGH = 0.9') && ICON_SRC.includes('CAP_ALPHA_LOW = 0.35')
+    && ICON_SRC.includes('CAP_PING_STOP = 0.7'),
+    'pill ring alpha 0.9 to 0.35 over 70% matches the icon');
+  assert(/stroke: #8b5cf6/.test(GLOW_SRC), 'pill ring uses the capability violet');
+  assert(/\(0\.45 \+ 0\.55 \* m\.peak\)/.test(GLOW_SRC) && ICON_SRC.includes('BREATHE_MIN_ALPHA = ' + BREATHE_MIN_ALPHA),
+    'pill breathe floor matches the icon');
 
   // -------------------------------------------------------------------------
   console.log('\nICON-02: the icon no longer reads phase at all');
@@ -1879,6 +1890,57 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(w.timerCount(), 0, 'disabling live motion stops its scheduler immediately');
     assertEq((w.sessionStore[INTENT_KEY] || {}).claims['watch:3'], 'breathe',
       'disabling live motion does not mutate watch functionality');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-22: each tab reports its motion and start time to the status pill');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    assertEq(w.api.getMotion(7), null, 'a tab with no claim has no motion');
+    w.api.noteActivity(7, 'sweep');
+    await flush();
+    const sweep = w.api.getMotion(7);
+    assertEq(sweep && sweep.form, 'sweep', 'a driving tool gives the tab a sweep');
+    assert(sweep && Number.isFinite(sweep.startedAt), 'the motion carries its start time');
+    const told = heard.filter((h) => h.tabId === 7);
+    assert(told.length >= 1 && told[told.length - 1].motion && told[told.length - 1].motion.form === 'sweep',
+      'the listener hears the tab change to sweep');
+    assertEq(told[told.length - 1].motion.startedAt, sweep.startedAt, 'the listener and getMotion agree on the start time');
+
+    w.api.noteActivity(7, 'orbit');
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'orbit', 'a read on the same tab switches it to orbit');
+    w.api.beginCapability(7);
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'ring', 'a capability call outranks the session claim');
+    w.api.setWatching(true, 7);
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'breathe', 'a watch outranks everything');
+    assertEq(w.api.getMotion(8), null, 'another tab keeps its own (empty) claims');
+    w.api.setWatching(false, 7);
+    w.api.endCapability(7);
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'orbit', 'releasing the watch and the call falls back to the session claim');
+
+    const before = heard.length;
+    w.api.dropTab(7);
+    await flush();
+    assertEq(w.api.getMotion(7), null, 'a closed tab has no motion');
+    assert(heard.slice(before).some((h) => h.tabId === 7 && h.motion === null), 'the listener hears a closed tab go idle');
+    assertEq(w.api.getMotion(undefined), null, 'tab-less claims never reach a page');
+  }
+
+  {
+    const w = makeWorker({ local: { [ANIMATIONS_KEY]: false } });
+    await w.api.init({ hasLiveSession: () => true });
+    w.api.noteActivity(3, 'sweep');
+    await flush();
+    assertEq(w.api.getMotion(3), null, 'with animations off the pill gets no motion either');
   }
 
   // -------------------------------------------------------------------------

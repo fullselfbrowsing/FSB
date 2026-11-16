@@ -58,6 +58,7 @@
     {
       "resources": [
         "assets/icon48.png",
+        "assets/onboarding/fonts/space-mono-400.ttf",
         "_locales/*/messages.json",
         "site-maps/*.json",
         "test-data/**/*",
