@@ -501,8 +501,9 @@ function appendRawError(text: string, errorMsg: string, errorKey: string): strin
 
 /**
  * Map an FSB result object to an MCP tool content response.
- * Successful results are JSON-stringified; failures are mapped to
- * human-readable error messages with contextual placeholders filled in.
+ * Successful results are JSON-stringified without indentation, since the
+ * host reads every character; failures are mapped to human-readable error
+ * messages with contextual placeholders filled in.
  *
  * IMPORTANT: The raw error from the extension is always appended to help
  * with debugging. The generic messages alone are not sufficient to
@@ -513,7 +514,7 @@ export function mapFSBError(
   context?: Record<string, string>,
 ): { content: Array<{ type: 'text'; text: string }>; isError?: boolean } {
   if (fsbResult && fsbResult.success) {
-    return { content: [{ type: 'text', text: JSON.stringify(fsbResult, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(fsbResult) }] };
   }
 
   if (fsbResult?.mayHaveExecuted === true) {

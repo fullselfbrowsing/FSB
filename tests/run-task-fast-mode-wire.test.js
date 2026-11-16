@@ -483,7 +483,7 @@ async function captureHeartbeat(opts = {}) {
 }
 
 function wireTextOf(value) {
-  return JSON.stringify({ success: true, ...value }, null, 2);
+  return JSON.stringify({ success: true, ...value });
 }
 
 // ---- Switch-on helpers (plan 70-06) -----------------------------------------
@@ -717,8 +717,8 @@ async function main() {
       check(additive, 'additive ' + pathName);
 
       const wire = { success: true, ...on };
-      const parsed = JSON.parse(JSON.stringify(wire, null, 2));
-      check(JSON.stringify(omitKey(parsed, 'fast_mode'), null, 2) === expected.wireText
+      const parsed = JSON.parse(JSON.stringify(wire));
+      check(JSON.stringify(omitKey(parsed, 'fast_mode')) === expected.wireText
         && Object.keys(parsed).at(-1) === 'fast_mode'
         && plainEqual(parsed.fast_mode, block), 'wire bytes ' + pathName);
 

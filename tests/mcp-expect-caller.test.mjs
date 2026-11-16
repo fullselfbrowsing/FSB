@@ -287,7 +287,7 @@ test('6. click without expect: no expect key on the wire and the baseline respon
   const payload = turn.dispatches[0].message.payload;
   assert.equal(Object.prototype.hasOwnProperty.call(payload, 'expect'), false, 'no expect key in the bridge payload');
   assert.equal(Object.prototype.hasOwnProperty.call(payload.params, 'expect'), false, 'no expect key in params');
-  assert.equal(turn.text, JSON.stringify(canned, null, 2), 'the response is the canned result, byte for byte');
+  assert.equal(turn.text, JSON.stringify(canned), 'the response is the canned result, byte for byte');
   assert.equal(turn.result.isError, undefined);
   assert.equal(turn.probes.length, 0, 'nothing is probed');
   assert.equal(turn.dispatches[0].options.timeout, 30000);
