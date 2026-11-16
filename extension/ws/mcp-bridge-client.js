@@ -1721,9 +1721,10 @@ class MCPBridgeClient {
     if (resolved.success === false) {
       return resolved;
     }
+    // The content script builds the snapshot from request.options.
     const response = await this._sendToContentScript(resolved.tabId, {
       action: 'getDOM',
-      maxElements: payload.maxElements || 50,
+      options: { maxElements: payload.maxElements || 50 },
     });
     return response;
   }
@@ -1738,9 +1739,10 @@ class MCPBridgeClient {
     if (resolved.success === false) {
       return resolved;
     }
+    // The content script reads its flags from request.params.
     const response = await this._sendToContentScript(resolved.tabId, {
       action: 'readPage',
-      full: payload.full || false,
+      params: { full: payload.full || false },
     });
     return response;
   }
