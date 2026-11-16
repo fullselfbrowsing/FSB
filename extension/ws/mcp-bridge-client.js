@@ -1783,8 +1783,10 @@ class MCPBridgeClient {
    * AFTER resolved.success === true).
    */
   /**
-   * Best-effort tab id for an icon claim. Falls back to null, which the icon
-   * keys as 'global' -- still ranks correctly, just not tab-scoped.
+   * Tab id for an icon claim: the tab the call names, else the agent's own tab
+   * the resolver would route it to. Hosts usually omit tab_id when they own a
+   * single tab, and a claim keyed 'global' still drives the toolbar icon but
+   * never reaches the status pill on the page. Null when neither is known.
    */
   _iconTabIdFrom(payload) {
     const bag = payload || {};
@@ -1793,6 +1795,13 @@ class MCPBridgeClient {
     for (let i = 0; i < candidates.length; i++) {
       const n = Number(candidates[i]);
       if (Number.isFinite(n) && n > 0) return n;
+    }
+    const peek = typeof globalThis !== 'undefined' ? globalThis.peekAgentTabId : null;
+    if (typeof peek === 'function') {
+      try {
+        const n = Number(peek(bag.agentId));
+        if (Number.isFinite(n) && n > 0) return n;
+      } catch (_e) { /* the icon is presentation-only */ }
     }
     return null;
   }
@@ -1830,6 +1839,10 @@ class MCPBridgeClient {
     if (!sidecar || typeof sidecar !== 'object') return;
     if (!Number.isFinite(tabId) || tabId <= 0) return;
     if (typeof agentId !== 'string' || !agentId) return;
+    // The pill this tick raises plays the icon's motion for its own tab, so the
+    // call's activity is claimed on the tab it landed on. That differs from the
+    // routed tab when open_tab or switch_tab moves the agent to another tab.
+    this._noteIconActivity('mcp:execute-action', { ...payload, tabId });
     try {
       await Promise.race([MCPVisualSessionLifecycleUtils.recordVisualSessionTick(tabId, agentId, {
         visualReason: typeof sidecar.visualReason === 'string' ? sidecar.visualReason : '',
