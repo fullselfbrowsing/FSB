@@ -43,6 +43,9 @@ const { BIND_INSTRUMENT_HASH, BIND_INSTRUMENT_VERSION } = require(path.join(JEV_
 const PIN_DIRECT = 'jev-1.13.0';
 const PIN_OPENROUTER = 'typesafe/jev-1.13';
 const SNAPSHOT = 'typesafe/jev-1.13-20260917';
+const BIND_PROFILE_FILE = 'bind-jev-1.14-20261014-synth377.json';
+const BIND_PIN = 'typesafe/jev-1.14';
+const BIND_SNAPSHOT = 'typesafe/jev-1.14-20261014';
 const UNCALIBRATED_NOTE = 'Explicit UNCALIBRATED default (D-28). No Jev decision acts and no Jev flag contributes '
   + 'until a V3-calibrated profile for the deployed pin and INSTRUMENT_HASH is committed beside this file.';
 
@@ -128,8 +131,8 @@ function loadModule() {
 function shippedProfileSection(cal) {
   console.log('\n[the shipped UNCALIBRATED profile (D-28)]');
   const files = fs.readdirSync(PROFILES).sort();
-  check('profiles/ holds only uncalibrated.json (no calibrated profile ships in Phase 67)',
-    deepEqual(files, ['uncalibrated.json']), show(files));
+  check('profiles/ holds uncalibrated.json and the one bind profile, nothing else',
+    deepEqual(files, [BIND_PROFILE_FILE, 'uncalibrated.json']), show(files));
   const raw = JSON.parse(fs.readFileSync(path.join(PROFILES, 'uncalibrated.json'), 'utf8'));
   check('the file has exactly the profile keys',
     deepEqual(Object.keys(raw), ['schemaVersion', 'profileId', 'status', 'note', 'model', 'snapshot',
@@ -454,12 +457,13 @@ function loadSection(cal) {
   const nonString = attempt(() => cal.loadProfiles(42));
   check('a non-string directory gives [UNCALIBRATED]', !nonString.threw && nonString.value.length === 1);
   const shipped = attempt(() => cal.loadProfiles());
-  check('the shipped directory gives exactly [UNCALIBRATED]',
-    !shipped.threw && shipped.value.length === 1 && shipped.value[0] === U);
-  check('selection over the shipped profiles is UNCALIBRATED for both pins',
+  check('the shipped directory gives UNCALIBRATED first, then the bind profile',
+    !shipped.threw && shipped.value.length === 2 && shipped.value[0] === U
+      && shipped.value[1].instrumentHash === BIND_INSTRUMENT_HASH, shipped.threw ? 'threw' : show(shipped.value.map((p) => p.profileId)));
+  check('selection over the shipped profiles is UNCALIBRATED for the decision instrument under every pin',
     !shipped.threw
-      && cal.selectProfile(shipped.value, { model: PIN_DIRECT, instrumentHash: INSTRUMENT_HASH }) === U
-      && cal.selectProfile(shipped.value, { model: PIN_OPENROUTER, instrumentHash: INSTRUMENT_HASH }) === U);
+      && [PIN_DIRECT, PIN_OPENROUTER, BIND_PIN, BIND_SNAPSHOT].every((model) =>
+        cal.selectProfile(shipped.value, { model, instrumentHash: INSTRUMENT_HASH }) === U));
 }
 
 function faultSection(cal) {
@@ -569,7 +573,7 @@ function bindSection(cal) {
     deepEqual(Object.keys(shipped.decisions.bind), CONTRACT.KEYS.bindDecision));
   check('decisions hold exactly the bind kind', deepEqual(Object.keys(shipped.decisions), ['bind']));
   const loaded = cal.loadProfiles();
-  check('selection over the shipped profiles is UNCALIBRATED for the bind hash',
+  check('selection over the shipped profiles is UNCALIBRATED for the bind hash under a pin with no profile',
     cal.selectProfile(loaded, { model: PIN_OPENROUTER, instrumentHash: BIND_INSTRUMENT_HASH }) === U);
 
   check('a bind profile is valid', deepEqual(cal.validateProfile(bp), { ok: true, errors: [] }), show(cal.validateProfile(bp)));
@@ -675,6 +679,74 @@ function bindSection(cal) {
       && cal.calibrationStatus({ profile: v1, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT, instrumentHash: BIND_INSTRUMENT_HASH }) === 'uncalibrated');
 }
 
+// ---------------------------------------------------------------------------
+// The shipped bind profile
+// ---------------------------------------------------------------------------
+
+function shippedBindProfileSection(cal) {
+  console.log('\n[the shipped bind profile: typesafe/jev-1.14, threshold 0.9]');
+  const U = cal.UNCALIBRATED_PROFILE;
+  const raw = JSON.parse(fs.readFileSync(path.join(PROFILES, BIND_PROFILE_FILE), 'utf8'));
+  check('the file has exactly the profile keys',
+    deepEqual(Object.keys(raw), ['schemaVersion', 'profileId', 'status', 'note', 'model', 'snapshot',
+      'instrumentVersion', 'instrumentHash', 'thresholds']), show(Object.keys(raw)));
+  check('validateProfile accepts it', deepEqual(cal.validateProfile(raw), { ok: true, errors: [] }), show(cal.validateProfile(raw)));
+  check('it is calibrated and its profileId is the file name without .json',
+    raw.status === 'calibrated' && `${raw.profileId}.json` === BIND_PROFILE_FILE, raw.profileId);
+  check('it names the typesafe/jev-1.14 pin and the dated snapshot it was measured on',
+    raw.model === BIND_PIN && raw.snapshot === BIND_SNAPSHOT);
+  // Keyed to the live constants: editing the bind questions changes the hash,
+  // and this profile then stops applying until the threshold is measured again.
+  check('it is keyed to the current bind instrument version and hash',
+    raw.instrumentVersion === BIND_INSTRUMENT_VERSION && raw.instrumentHash === BIND_INSTRUMENT_HASH,
+    `${raw.instrumentVersion} ${raw.instrumentHash}`);
+  check('it holds only the bind threshold, 0.9',
+    deepEqual(raw.thresholds, { operation: null, target: null, completion: null, stuck: null, risk: null, bind: 0.9 }),
+    show(raw.thresholds));
+  check('the note says the cases were synthetic', /synthetic/.test(raw.note) && raw.note.length <= 2000);
+
+  const loaded = cal.loadProfiles();
+  const selected = cal.selectProfile(loaded, { model: BIND_PIN, instrumentHash: BIND_INSTRUMENT_HASH });
+  check('it is selected for the typesafe/jev-1.14 pin and the bind hash', deepEqual(selected, raw), selected.profileId);
+  check('the selected profile is deep-frozen', isDeepFrozen(selected));
+  check('it is not selected when the configured pin is the dated snapshot or another version',
+    cal.selectProfile(loaded, { model: BIND_SNAPSHOT, instrumentHash: BIND_INSTRUMENT_HASH }) === U
+      && cal.selectProfile(loaded, { model: 'typesafe/jev-1.15', instrumentHash: BIND_INSTRUMENT_HASH }) === U);
+  check('it is never selected for the decision instrument',
+    cal.selectProfile(loaded, { model: BIND_PIN, instrumentHash: INSTRUMENT_HASH }) === U);
+
+  const run = (answersValue, extra) => cal.applyCalibration(Object.assign({
+    profile: selected, configuredModel: BIND_PIN, servedModel: BIND_SNAPSHOT, answers: answersValue, kinds: ['bind'],
+    instrumentHash: BIND_INSTRUMENT_HASH,
+  }, extra || {}));
+  const ok = run(bindAnswers('c2', 0.97, 'c2', 0.9));
+  check('served by the measured snapshot, agreeing orders at or above 0.9 meet the threshold',
+    deepEqual(ok.calibration, { status: 'calibrated', profileId: raw.profileId })
+      && ok.decisions.bind.threshold === 0.9 && ok.decisions.bind.meetsThreshold === true, show(ok));
+  check('one order below 0.9 does not meet', run(bindAnswers('c2', 0.99, 'c2', 0.89)).decisions.bind.meetsThreshold === false);
+  check('disagreeing orders do not meet', run(bindAnswers('c2', 0.99, 'c3', 0.99)).decisions.bind.meetsThreshold === false);
+  check('agreeing on none_of_the_above does not meet',
+    run(bindAnswers('none_of_the_above', 1, 'none_of_the_above', 1)).decisions.bind.meetsThreshold === false);
+  const pinServed = run(bindAnswers('c2', 1, 'c2', 1), { servedModel: BIND_PIN });
+  check('the undated pin as served model is snapshot_changed: the measurement names a dated snapshot',
+    pinServed.calibration.status === 'snapshot_changed' && pinServed.decisions.bind.threshold === null
+      && pinServed.decisions.bind.meetsThreshold === false, show(pinServed.calibration));
+  const newer = run(bindAnswers('c2', 1, 'c2', 1), { servedModel: 'typesafe/jev-1.14-20261201' });
+  check('a newer snapshot of the same pin is snapshot_changed and cannot act',
+    newer.calibration.status === 'snapshot_changed' && newer.decisions.bind.threshold === null
+      && newer.decisions.bind.meetsThreshold === false, show(newer.calibration));
+  const other = run(bindAnswers('c2', 1, 'c2', 1), { servedModel: 'typesafe/jev-1.15-20261201' });
+  check('a model outside the pinned family is uncalibrated and cannot act',
+    other.calibration.status === 'uncalibrated' && other.decisions.bind.meetsThreshold === false, show(other.calibration));
+  const v1Kinds = cal.applyCalibration({
+    profile: selected, configuredModel: BIND_PIN, servedModel: BIND_SNAPSHOT,
+    answers: answers({ operation: 1, target: 1, completion: 0, stuck: 1, risk: 1 }), kinds: CONTRACT.KINDS.slice(),
+  });
+  check('it calibrates none of the decision kinds',
+    v1Kinds.calibration.status === 'uncalibrated'
+      && Object.values(v1Kinds.decisions).every((d) => d.threshold === null && d.meetsThreshold === false), show(v1Kinds.calibration));
+}
+
 function main() {
   console.log('--- jev-calibration-profile (JEV-05, JEV-07) ---');
   const cal = loadModule();
@@ -693,6 +765,7 @@ function main() {
   loadSection(cal);
   faultSection(cal);
   bindSection(cal);
+  shippedBindProfileSection(cal);
   console.log(`\n=== jev-calibration-profile results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
 }

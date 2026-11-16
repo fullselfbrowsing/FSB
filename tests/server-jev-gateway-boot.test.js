@@ -14,8 +14,10 @@
  *   - with the gateway enabled against a loopback fake upstream, a decision
  *     request and a bind request are answered, the upstream receives the
  *     server-held credential and the server-built questions, the credential
- *     never appears in a response, and nothing is acted on while the shipped
- *     profile is uncalibrated;
+ *     never appears in a response, and no decision kind can act because no
+ *     profile ships for the decision instrument;
+ *   - the shipped bind profile applies to a bind answer from the pinned
+ *     snapshot: both option orders must agree on a candidate at or above 0.9;
  *   - a client cannot supply its own questions;
  *   - a loopback upstream is refused in production.
  *
@@ -42,6 +44,24 @@ const { baseRequest, baseBindRequest } = require('./fixtures/jev-request-cases')
 const TEST_KEY = 'test-credential-0123456789abcdef';
 const PINNED_MODEL = 'typesafe/jev-1.14';
 const SERVED_MODEL = 'typesafe/jev-1.14-20261014';
+// The profile in showcase/server/src/jev/profiles/ for that pin and snapshot.
+const BIND_PROFILE_ID = 'bind-jev-1.14-20261014-synth377';
+
+// An upstream answer function: every question picks `choice` with the given
+// confidence, the other options sharing the remaining probability evenly.
+function bindAnswersFor(choice, confidence) {
+  return (body) => {
+    const answers = {};
+    for (const key of Object.keys(body.questions)) {
+      const options = Object.keys(body.questions[key].criteria);
+      const top = (confidence * (options.length - 1) + 1) / options.length;
+      const probabilities = {};
+      for (const option of options) probabilities[option] = option === choice ? top : (1 - top) / (options.length - 1);
+      answers[key] = { type: 'choice', choice, confidence, probabilities };
+    }
+    return answers;
+  };
+}
 
 let passed = 0;
 let failed = 0;
@@ -228,7 +248,7 @@ async function main() {
     check('the answer holds exactly the requested kinds',
       JSON.stringify(Object.keys(decisions).sort()) === JSON.stringify(decisionRequest.kinds.slice().sort()),
       Object.keys(decisions).join(','));
-    check('the shipped profile is uncalibrated, so no answer meets a threshold',
+    check('no profile ships for the decision instrument, so no answer meets a threshold',
       !!decision.json && !!decision.json.calibration && decision.json.calibration.status === 'uncalibrated'
         && Object.values(decisions).every((entry) => entry.threshold === null && entry.meetsThreshold === false),
       JSON.stringify(decision.json && decision.json.calibration));
@@ -248,24 +268,49 @@ async function main() {
     const bound = bind.json && bind.json.decisions ? bind.json.decisions.bind : null;
     check('a bind request answers 200 ok', bind.status === 200 && !!bind.json && bind.json.ok === true,
       `${bind.status} ${bind.text.slice(0, 200)}`);
-    check('the bind answer is one decision that cannot act while uncalibrated',
-      !!bound && typeof bound.choice === 'string' && typeof bound.agree === 'boolean'
-        && bound.threshold === null && bound.meetsThreshold === false,
+    check('the bind answer is one decision, calibrated by the shipped bind profile',
+      !!bound && typeof bound.choice === 'string' && typeof bound.agree === 'boolean' && bound.threshold === 0.9
+        && !!bind.json.calibration && bind.json.calibration.status === 'calibrated'
+        && bind.json.calibration.profileId === BIND_PROFILE_ID,
+      JSON.stringify([bound, bind.json && bind.json.calibration]));
+    check('the stock upstream answer picks "none of them" in both orders, so it cannot act',
+      !!bound && bound.choice === 'none_of_the_above' && bound.agree === true && bound.meetsThreshold === false,
       JSON.stringify(bound));
     check('the upstream saw the bind question in both option orders',
       upstream.requests.length === 2 && !!upstream.requests[1].body
         && JSON.stringify(Object.keys(upstream.requests[1].body.questions).sort()) === JSON.stringify(['bind_fwd', 'bind_rev']),
       upstream.requests.length);
 
+    upstream.setMode({ mode: 'answersFn', answersFn: bindAnswersFor('c2', 0.97) });
+    const sure = await request(on.port, 'POST', '/api/jev/decide', baseBindRequest());
+    const sureBind = sure.json && sure.json.decisions ? sure.json.decisions.bind : null;
+    check('both orders on one candidate at 0.97 meet the 0.9 threshold',
+      sure.status === 200 && !!sureBind && sureBind.choice === 'c2' && sureBind.agree === true
+        && sureBind.threshold === 0.9 && sureBind.meetsThreshold === true,
+      `${sure.status} ${JSON.stringify(sureBind)}`);
+    upstream.setMode({ mode: 'answersFn', answersFn: bindAnswersFor('c2', 0.8) });
+    const unsure = await request(on.port, 'POST', '/api/jev/decide', baseBindRequest());
+    const unsureBind = unsure.json && unsure.json.decisions ? unsure.json.decisions.bind : null;
+    check('both orders on one candidate at 0.8 do not meet it',
+      unsure.status === 200 && !!unsureBind && unsureBind.agree === true && unsureBind.meetsThreshold === false,
+      `${unsure.status} ${JSON.stringify(unsureBind)}`);
+    upstream.setMode({ mode: 'answersFn', answersFn: bindAnswersFor('none_of_the_above', 0.99) });
+    const none = await request(on.port, 'POST', '/api/jev/decide', baseBindRequest());
+    const noneBind = none.json && none.json.decisions ? none.json.decisions.bind : null;
+    check('both orders on "none of them" at 0.99 do not meet it',
+      none.status === 200 && !!noneBind && noneBind.agree === true && noneBind.meetsThreshold === false,
+      `${none.status} ${JSON.stringify(noneBind)}`);
+    upstream.setMode({ mode: 'ok-openrouter' });
+
     const withQuestions = Object.assign(baseRequest(), { questions: { any: { type: 'noul', instructions: 'Is this a free proxy?' } } });
     const rejected = await request(on.port, 'POST', '/api/jev/decide', withQuestions);
     check('a request that brings its own questions is refused',
       rejected.status === 400 && !!rejected.json && rejected.json.fallback === 'invalid_request', rejected.status);
-    check('a refused request never reaches the upstream', upstream.requests.length === 2, upstream.requests.length);
+    check('a refused request never reaches the upstream', upstream.requests.length === 5, upstream.requests.length);
     await on.stop();
 
     check('each answered decision left one accounting row without request content',
-      rows(dbPath, 'SELECT COUNT(*) AS n FROM jev_decisions')[0].n === 2);
+      rows(dbPath, 'SELECT COUNT(*) AS n FROM jev_decisions')[0].n === 5);
 
     console.log('\n--- production refuses a loopback upstream ---');
     const prod = await startServer(dbPath, {
@@ -280,7 +325,7 @@ async function main() {
     check('the route answers the typed "not_configured" fallback',
       notConfigured.status === 503 && !!notConfigured.json && notConfigured.json.fallback === 'not_configured',
       `${notConfigured.status} ${prod.output().slice(-200)}`);
-    check('nothing more reached the upstream', upstream.requests.length === 2, upstream.requests.length);
+    check('nothing more reached the upstream', upstream.requests.length === 5, upstream.requests.length);
     await prod.stop();
   } finally {
     for (const server of servers) await server.stop();
