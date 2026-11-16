@@ -173,8 +173,21 @@ test('#157 filling five different fields is not mistaken for a stuck loop', asyn
   }
 });
 
-// Runs `iterations` rounds of makeResults(i) through the real session hooks and
-// returns the iteration that stopped the run, or null.
+// The meta-cognitive attempt counter, loaded the way meta-cognitive-tracker.test.js
+// loads it: agent-loop.js needs chrome globals to require in full, but this
+// section stands alone.
+function loadMetaAttemptTracker() {
+  const agentLoop = fs.readFileSync(path.join(__dirname, '../extension/ai/agent-loop.js'), 'utf8');
+  const start = agentLoop.indexOf('var _META_INTERACT_TOOLS = {');
+  const end = agentLoop.indexOf('\n}\n', agentLoop.indexOf('\nfunction _trackMetaAttempt(session, call, iterNum) {')) + 2;
+  assert(start >= 0 && end > 2, 'missing the meta-cognitive section of agent-loop.js');
+  return vm.runInNewContext(agentLoop.slice(start, end) + '\n({ _trackMetaAttempt, _META_INTERACT_TOOLS })', {});
+}
+
+// Runs `iterations` rounds of makeResults(i) through the detectors a real
+// iteration runs, in its order: the meta-cognitive attempt counter on the last
+// interaction, then the session hooks (stuck detection). Returns the iteration
+// that stopped the run, or null.
 async function iterationThatStops(makeResults, iterations) {
   const { HookPipeline, LIFECYCLE_EVENTS } = require('../extension/ai/hook-pipeline.js');
   const { createSafetyBreakerHook, createStuckDetectionHook } = require('../extension/ai/hooks/safety-hooks.js');
@@ -183,11 +196,18 @@ async function iterationThatStops(makeResults, iterations) {
     sliceFunction(background, 'function createSessionHooks(') + '\ncreateSessionHooks',
     { HookPipeline, LIFECYCLE_EVENTS, createSafetyBreakerHook, createStuckDetectionHook, detectStuck, checkSafetyBreakers, automationLogger: { debug() {} } }
   );
+  const { _trackMetaAttempt, _META_INTERACT_TOOLS } = loadMetaAttemptTracker();
   const pipeline = createSessionHooks('s3');
   const session = { agentState: { consecutiveNoChangeCount: 0, actionFingerprints: [], stuckWarningCount: 0 }, actionHistory: [] };
   for (let i = 1; i <= iterations; i++) {
     session.agentState.iterationCount = i;
-    const r = await pipeline.emit(LIFECYCLE_EVENTS.AFTER_ITERATION, { session, toolResults: makeResults(i), iteration: i });
+    const toolResults = makeResults(i);
+    const interaction = toolResults.filter(tr => _META_INTERACT_TOOLS[tr.name]).pop();
+    if (interaction) {
+      const signal = _trackMetaAttempt(session, { name: interaction.name, args: interaction.args }, i);
+      if (signal && signal.forceStop) return i;
+    }
+    const r = await pipeline.emit(LIFECYCLE_EVENTS.AFTER_ITERATION, { session, toolResults, iteration: i });
     if (r.stopped) return i;
   }
   return null;
@@ -206,17 +226,37 @@ test('#157 visiting several pages or scrolling a long page is not mistaken for a
     { callId: 's' + i, name: 'scroll', args: { direction: 'down' }, result: { success: true, hadEffect: true, result: { scrollY: 700 * i, atBottom: false } } }
   ], 14);
   assert.equal(scrolls, null, 'stopped while scrolling a long page, at iteration ' + scrolls);
+});
 
-  // Same 40-character prefix, different row each time.
-  const scripts = await iterationThatStops(i => [
-    { callId: 'j' + i, name: 'execute_js', args: { code: "const rows = document.querySelectorAll('.result-row'); rows[" + i + '].click()' }, result: { success: true, hadEffect: true } }
-  ], 14);
-  assert.equal(scripts, null, 'stopped while running different scripts, at iteration ' + scripts);
-
+// The meta-cognitive counter allows five attempts on one target in 12
+// iterations. Stuck detection must not cut these runs shorter: a new query or
+// a script on a new row is not a repeat.
+test('#157 retrying one target with new text or a new script runs five attempts and stops at the sixth', async () => {
   const queries = await iterationThatStops(i => [
     { callId: 'q' + i, name: 'type_text', args: { selector: '#search', text: 'query ' + i }, result: { success: true, hadEffect: true } }
   ], 14);
-  assert.equal(queries, null, 'stopped while typing different queries into one field, at iteration ' + queries);
+  assert.equal(queries, 6, 'typing different queries into one field stops at iteration 6, got ' + queries);
+
+  // Same 40-character prefix, different row each time; a repeat would stop at 5.
+  const scripts = await iterationThatStops(i => [
+    { callId: 'j' + i, name: 'execute_js', args: { code: "const rows = document.querySelectorAll('.result-row'); rows[" + i + '].click()' }, result: { success: true, hadEffect: true } }
+  ], 14);
+  assert.equal(scripts, 6, 'scripts on different rows of one list stop at iteration 6, got ' + scripts);
+});
+
+// hadEffect only says the tool is not read-only, so new coordinates or a new
+// script text must not count as goal progress. The meta-cognitive counter has
+// no key for either of these, so goal progress is what stops them.
+test('#157 nudging a click to new coordinates or rewriting a script is not progress', async () => {
+  const nudges = await iterationThatStops(i => [
+    { callId: 'c' + i, name: 'click_at', args: { x: 300 + (i % 7), y: 200 + (i % 5) }, result: { success: true, hadEffect: true, result: { success: true, method: 'cdp_direct' } } }
+  ], 20);
+  assert.equal(nudges, 10, 'a click nudged around one spot stops at iteration 10, got ' + nudges);
+
+  const rewrites = await iterationThatStops(i => [
+    { callId: 'j' + i, name: 'execute_js', args: { code: '/* attempt ' + i + " */ document.getElementsByClassName('go')[0].click()" }, result: { success: true, hadEffect: true } }
+  ], 20);
+  assert.equal(rewrites, 10, 'a script rewritten to try the same thing again stops at iteration 10, got ' + rewrites);
 });
 
 test('#157 every argument a tool declares tells its calls apart', async () => {

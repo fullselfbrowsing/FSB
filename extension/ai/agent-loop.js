@@ -221,6 +221,8 @@ var _STUCK_IGNORED_ARGS = { visual_reason: true, client: true, is_final: true, t
 var _STUCK_TARGET_ARGS = { selector: true, elementId: true, element_id: true, code: true };
 // Tool name -> sorted names of the arguments that tell two of its calls apart.
 var _stuckArgNamesByTool = null;
+// Tool name -> argument name -> the type its input schema declares.
+var _stuckArgTypesByTool = null;
 
 function _stuckIsIdentifyingArg(name) {
   return !_STUCK_IGNORED_ARGS[name] && !_STUCK_TARGET_ARGS[name];
@@ -239,11 +241,17 @@ function _stuckIsIdentifyingArg(name) {
 function _stuckIdentifyingArgs(toolName, args) {
   if (!_stuckArgNamesByTool) {
     _stuckArgNamesByTool = {};
+    _stuckArgTypesByTool = {};
     for (var i = 0; i < _al_TOOL_REGISTRY.length; i++) {
       var def = _al_TOOL_REGISTRY[i];
       var props = def && def.inputSchema && def.inputSchema.properties;
       if (!def || !def.name || !props) continue;
       _stuckArgNamesByTool[def.name] = Object.keys(props).filter(_stuckIsIdentifyingArg).sort();
+      var types = {};
+      for (var name in props) {
+        if (Object.prototype.hasOwnProperty.call(props, name)) types[name] = props[name] && props[name].type;
+      }
+      _stuckArgTypesByTool[def.name] = types;
     }
   }
   if (Object.prototype.hasOwnProperty.call(_stuckArgNamesByTool, toolName)) {
@@ -253,6 +261,26 @@ function _stuckIdentifyingArgs(toolName, args) {
   // loop here still leaves goal progress and the iteration cap to stop it;
   // stopping a session that is making progress cannot be undone.
   return Object.keys(args).filter(_stuckIsIdentifyingArg).sort();
+}
+
+/**
+ * Whether an argument says what an action puts on the page (a URL, typed text,
+ * a value, a file, a sheet chunk) rather than how the action is aimed
+ * (coordinates, wheel deltas, step counts, delays, modifier keys). The tool's
+ * schema draws the line: aiming arguments are numbers and switches. Only the
+ * first kind is evidence of progress, because a click nudged a few pixels is
+ * the same attempt again. Call after _stuckIdentifyingArgs, which fills the
+ * type table.
+ *
+ * @param {string} toolName
+ * @param {string} name - Argument name
+ * @param {*} value - Its value, used when the schema declares no type
+ * @returns {boolean}
+ */
+function _stuckIsContentArg(toolName, name, value) {
+  var types = _stuckArgTypesByTool && _stuckArgTypesByTool[toolName];
+  var type = (types && types[name]) || typeof value;
+  return type !== 'number' && type !== 'integer' && type !== 'boolean';
 }
 
 // Short values verbatim; long ones keep a readable prefix plus a hash of the
@@ -280,18 +308,22 @@ function _stuckFingerprintValue(value) {
  * pointer, and the URL, where map apps keep their zoom).
  *
  * @param {{name: string, args?: Object, result?: Object}} tr - One tool result
+ * @param {boolean} [contentOnly] - For the goal-progress check: keep only what
+ *   the action put on the page and where it left the view, leaving out how it
+ *   was aimed and a script's own text
  * @returns {string} Element, then `key=value` details; the element alone
  *   when the call has no identifying values
  */
-function _stuckActionTarget(tr) {
+function _stuckActionTarget(tr, contentOnly) {
   var args = (tr.args && typeof tr.args === 'object') ? tr.args : {};
   var target = args.selector || args.elementId || args.element_id || '';
-  if (!target && args.code) target = _stuckFingerprintValue(args.code);
+  if (!target && args.code && !contentOnly) target = _stuckFingerprintValue(args.code);
   var details = [];
   var names = _stuckIdentifyingArgs(tr.name, args);
   for (var i = 0; i < names.length; i++) {
     var value = args[names[i]];
     if (value === undefined || value === null || value === '') continue;
+    if (contentOnly && !_stuckIsContentArg(tr.name, names[i], value)) continue;
     details.push(names[i] + '=' + _stuckFingerprintValue(value));
   }
   var page = tr.result && tr.result.result;
@@ -508,11 +540,15 @@ function detectStuck(session, toolResults) {
       var success = !!(trV.result && trV.result.success);
       var hadEffect = !!(trV.result && trV.result.hadEffect);
       gpOutcomeKey = trV.name + ':' + (success ? 'ok' : 'err') + ':' + (hadEffect ? 'fx' : 'nf');
-      // A successful action that changed something counts as progress when it
-      // is a new action: the next stretch of a long page, a new query, the
-      // next chunk of a sheet. Repeats and back-and-forth cycles add nothing
-      // new, so they are still caught. Failures keep the coarse key.
-      if (success && hadEffect) gpOutcomeKey += ':' + _stuckActionTarget(trV);
+      // A successful action counts as progress when it puts something new on
+      // the page (a URL, a query, the next chunk of a sheet) or leaves the
+      // view somewhere new (the next stretch of a long page). hadEffect only
+      // says the tool is not read-only, so how the action was aimed
+      // (coordinates, deltas, timings) and a script's own text stay out: a
+      // click nudged a few pixels, or a script rewritten to try again, is the
+      // same attempt. Repeats and back-and-forth cycles add nothing new, so
+      // they are still caught. Failures keep the coarse key.
+      if (success && hadEffect) gpOutcomeKey += ':' + _stuckActionTarget(trV, true);
       break;
     }
     var iterForTracker = state.iterationCount || session.iterationCount || (state.actionFingerprints ? state.actionFingerprints.length : 0);
