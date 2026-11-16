@@ -240,10 +240,16 @@ const MAP_FIXTURES = Object.freeze([
     text: 'Detected: Action outcome unknown\nWhy: No response within 30000ms\nNext action: The operation may still be running. Wait for it to settle, then inspect the current page before deciding whether to retry.\n\n{"outcome":"unknown","mayHaveExecuted":true}',
   },
   {
-    label: 'generic error',
+    label: 'element not found',
     input: { success: false, error: 'element not found' },
     isError: true,
-    text: 'Detected: Page navigation\nWhy: element not found\nNext action: Refresh page state with read_page or get_dom_snapshot, then retry.',
+    text: 'Detected: Element lookup\nWhy: element not found\nNext action: Take a fresh get_dom_snapshot and retry with a selector or ref from it, or use a different selector.',
+  },
+  {
+    label: 'generic error',
+    input: { success: false, error: 'something went wrong' },
+    isError: true,
+    text: 'Detected: Page navigation\nWhy: something went wrong\nNext action: Refresh page state with read_page or get_dom_snapshot, then retry.',
   },
   {
     label: 'success with expect_result',

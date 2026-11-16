@@ -53,6 +53,7 @@ const LAYER_LABELS = {
   tabOwnership: 'Tab ownership',
   restrictedPage: 'Restricted page',
   pageNavigation: 'Page navigation',
+  elementLookup: 'Element lookup',
   visualSession: 'Visual session contract',
   sessionLookup: 'Session lookup',
   settings: 'Settings',
@@ -200,6 +201,56 @@ function isBridgeOwnershipError(
     || /bridge disconnected|port 7225|relay|disconnected mode/i.test(errorMsg);
 }
 
+const ELEMENT_WORDS = /\b(elements?|selectors?|refs?)\b/i;
+
+/**
+ * A selector or element ref that matched nothing, a ref from an older
+ * snapshot, or a selector the page could not parse. Left to the default arm
+ * these would get the generic page-navigation advice, which reads as if the
+ * page had moved. Only the two keys those messages resolve to are considered, and
+ * a "not found" message must name an element, selector or ref, so a missing
+ * tab, session or credential keeps its previous text.
+ */
+function describeElementLookupFailure(
+  errorKey: string,
+  fsbResult: Record<string, unknown> | null | undefined,
+  errorMsg: string,
+): ErrorDetail | null {
+  if (errorKey !== 'element_not_found' && errorKey !== 'action_rejected') return null;
+  const explicitCode = typeof fsbResult?.errorCode === 'string'
+    ? fsbResult.errorCode
+    : (typeof fsbResult?.code === 'string' ? fsbResult.code : '');
+
+  const stale = fsbResult?.refStale === true
+    || /^unknown ref\b/i.test(errorMsg)
+    || (/\bstale\b/i.test(errorMsg) && ELEMENT_WORDS.test(errorMsg));
+  if (stale) {
+    return {
+      detected: LAYER_LABELS.elementLookup,
+      why: errorMsg || 'The element ref comes from an earlier snapshot and no longer points at the page.',
+      nextAction: 'The page changed after that snapshot. Take a fresh get_dom_snapshot and retry with a ref from it.',
+    };
+  }
+
+  if (errorKey === 'element_not_found'
+      && (/^element_not_found$/i.test(explicitCode) || ELEMENT_WORDS.test(errorMsg))) {
+    return {
+      detected: LAYER_LABELS.elementLookup,
+      why: errorMsg || 'The selector or element ref matched no element on the current page.',
+      nextAction: 'Take a fresh get_dom_snapshot and retry with a selector or ref from it, or use a different selector.',
+    };
+  }
+
+  if (errorKey === 'action_rejected' && /not a valid selector|invalid selector/i.test(errorMsg)) {
+    return {
+      detected: LAYER_LABELS.elementLookup,
+      why: errorMsg,
+      nextAction: 'Fix the selector syntax, or take a get_dom_snapshot and use a selector or ref from it.',
+    };
+  }
+  return null;
+}
+
 function buildLayeredDetail(
   errorKey: string,
   fsbResult: Record<string, unknown> | null | undefined,
@@ -241,6 +292,9 @@ function buildLayeredDetail(
         : SETTING_NEXT_ACTION_FALLBACK,
     };
   }
+
+  const elementLookup = describeElementLookupFailure(errorKey, fsbResult, errorMsg);
+  if (elementLookup) return elementLookup;
 
   switch (errorKey) {
     case 'package_version_mismatch':
