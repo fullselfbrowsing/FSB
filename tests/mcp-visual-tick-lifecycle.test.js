@@ -41,6 +41,10 @@
  *   N. replayVisualSessionLifecycleForTab re-sends a live entry without
  *      extending its window, clears an elapsed one, leaves is_final alone,
  *      and background.js calls it on content-script ready and tab load.
+ *   O. sendSessionStatus counts only an answer from the overlay handler as
+ *      delivered: an empty answer, a send that never settles and a rejected
+ *      send all inject the content script and send again, and a document
+ *      that has only just committed is injected into without a probe.
  *
  * Run: node tests/mcp-visual-tick-lifecycle.test.js
  */
@@ -599,6 +603,104 @@ async function caseN() {
     'N.15 an explicit start_visual_session session on the tab takes precedence');
 }
 
+// ------------------------------------------------------------------
+// Case O -- delivery to a page with no content script. sendSessionStatus is
+// the only path that injects for the overlay, and it used to inject only when
+// its first send threw. Chrome rejects a send to a tab with no receiver; Safari
+// answers empty or does not settle, so the overlay never appeared on a page an
+// agent had just opened. Only an answer from the overlay handler may count as
+// delivered, and a document that has only just committed is injected into
+// without probing it first.
+// ------------------------------------------------------------------
+
+function loadSendSessionStatus(sendMessage, absentTabs) {
+  const fs = require('fs');
+  const vm = require('vm');
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const start = bg.indexOf('async function sendSessionStatus(tabId, statusData) {');
+  const end = bg.indexOf('\nfunction getMcpVisualSessionManager()', start);
+  // Shorten the caps so a send that never settles costs milliseconds here.
+  const source = bg.slice(start, end).replace(/, 750\)/g, ', 30)').replace(', 1000)', ', 60)');
+  const events = [];
+  const debug = [];
+  let sends = 0;
+  const context = {
+    setTimeout,
+    clearTimeout,
+    contentScriptAbsentTabs: new Set(absentTabs || []),
+    automationLogger: { debug: (message, data) => debug.push({ message, data }) },
+    ensureContentScriptInjected: async (tabId, retries) => { events.push('inject:' + tabId + ':' + retries); return true; },
+    chrome: { tabs: { sendMessage: (tabId, payload, options) => {
+      sends++;
+      events.push('send:' + tabId + ':' + payload.action + ':' + options.frameId);
+      return sendMessage(sends);
+    } } }
+  };
+  return { send: vm.runInNewContext(source + '\nsendSessionStatus', context), events, debug };
+}
+
+async function caseO() {
+  console.log('\n--- Case O: sendSessionStatus injects when the page holds no content script ---');
+  const status = { phase: 'running', reason: 'Opening the page' };
+  const sent = 'send:7:sessionStatus:0';
+  const injected = 'inject:7:1';
+
+  const answered = loadSendSessionStatus(async () => ({ success: true }));
+  await answered.send(7, status);
+  check(answered.events.join() === sent, 'O.1 an answered send is delivered once, with no injection');
+
+  const declined = loadSendSessionStatus(async () => ({ success: false, error: 'overlay failed' }));
+  await declined.send(7, status);
+  check(declined.events.join() === sent, 'O.2 an error answer still comes from a content script: no injection');
+
+  const empty = loadSendSessionStatus(async (n) => (n === 1 ? undefined : { success: true }));
+  await empty.send(7, status);
+  check(empty.events.join() === [sent, injected, sent].join(),
+    'O.3 an empty answer (Safari, no receiver) injects and sends again');
+
+  const hung = loadSendSessionStatus((n) => (n === 1 ? new Promise(() => {}) : Promise.resolve({ success: true })));
+  await hung.send(7, status);
+  check(hung.events.join() === [sent, injected, sent].join(),
+    'O.4 a send that never settles injects after the probe cap and sends again');
+
+  const rejected = loadSendSessionStatus((n) => (n === 1
+    ? Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'))
+    : Promise.resolve({ success: true })));
+  await rejected.send(7, status);
+  check(rejected.events.join() === [sent, injected, sent].join(),
+    'O.5 a rejected send (Chrome, no receiver) injects and sends again');
+
+  const fresh = loadSendSessionStatus(async () => ({ success: true }), [7]);
+  await fresh.send(7, status);
+  check(fresh.events.join() === [injected, sent].join(),
+    'O.6 a freshly committed document is injected into first, with no probe');
+
+  const silent = loadSendSessionStatus(async () => undefined);
+  let threw = false;
+  try { await silent.send(7, status); } catch (_e) { threw = true; }
+  check(!threw && silent.events.join() === [sent, injected, sent].join(),
+    'O.7 a page that never answers is tried once more and does not throw');
+  check(silent.debug.length === 1 && silent.debug[0].message === 'sendSessionStatus delivery failed'
+    && silent.debug[0].data.error === 'Status not acknowledged', 'O.8 the undelivered status is logged, with its reason');
+
+  // background.js bookkeeping: which documents cannot hold a content script yet.
+  const fs = require('fs');
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const block = (startText, endText) => {
+    const start = bg.indexOf(startText);
+    const end = start >= 0 ? bg.indexOf(endText, start) : -1;
+    return end > start ? bg.slice(start, end) : '';
+  };
+  check(block('chrome.webNavigation.onCommitted.addListener((details) => {', '\n});\n')
+    .includes('contentScriptAbsentTabs.add(tabId);'), 'O.9 a main-frame commit marks the tab as holding no content script');
+  check(block("if (port.name === 'content-script') {", 'port.onMessage.addListener(')
+    .includes('contentScriptAbsentTabs.delete(tabId);'), 'O.10 a content-script port connecting clears the mark');
+  check(block("case 'contentScriptReady':", 'replayMcpVisualSessionForTab(tabId')
+    .includes('contentScriptAbsentTabs.delete(tabId);'), 'O.11 contentScriptReady from the main frame clears the mark');
+  check(block('chrome.tabs.onRemoved.addListener((tabId) => {\n  contentScriptPorts.delete(tabId);', '\n});\n')
+    .includes('contentScriptAbsentTabs.delete(tabId);'), 'O.12 closing the tab clears the mark');
+}
+
 (async () => {
   await caseA();
   await caseB();
@@ -614,6 +716,7 @@ async function caseN() {
   await caseL();
   await caseM();
   await caseN();
+  await caseO();
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
   process.exit(failed > 0 ? 1 : 0);

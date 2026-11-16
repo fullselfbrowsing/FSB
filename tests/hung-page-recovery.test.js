@@ -296,6 +296,64 @@ test('an injection that never settles does not pin the tab past its timeout', as
   assert.equal(injections, 2);
 });
 
+// A document that committed since the last ready signal cannot hold a content
+// script, so probing it before the injection only spends timeouts. On Safari a
+// send to a tab with no receiver does not fail fast, which left the overlay
+// dark on a page an agent had just opened.
+function unlockedInjection({ absent, failFirstInjection = false }) {
+  const start = background.indexOf('async function ensureContentScriptInjectedUnlocked(');
+  const end = background.indexOf('\nfunction fsbTriggerObserveWatchdogName(', start);
+  const source = background.slice(start, end).replace('1000 * Math.pow(2, attempt - 1)', '5');
+  const events = [];
+  let fileInjections = 0;
+  const context = {
+    Date, Math, setTimeout, setInterval, clearInterval,
+    CONTENT_SCRIPT_FILES: ['content/init.js'],
+    contentScriptPorts: new Map(),
+    contentScriptReadyStatus: new Map(),
+    contentScriptHealth: new Map(),
+    contentScriptAbsentTabs: new Set(absent ? [9] : []),
+    automationLogger: { logComm() {}, debug() {} },
+    pageLoadWatcher: { pingContentScript: async () => false },
+    checkContentScriptHealth: async () => {
+      events.push('probe');
+      return context.contentScriptReadyStatus.has(9);
+    },
+    chrome: {
+      tabs: { get: async () => ({ id: 9, status: 'complete', url: 'https://example.com/' }) },
+      runtime: {},
+      scripting: { executeScript: async (details) => {
+        if (!details.files) return;
+        events.push('inject');
+        if (failFirstInjection && ++fileInjections === 1) throw new Error('Frame was removed');
+        // The injected script reports ready, as content/lifecycle.js does.
+        context.contentScriptReadyStatus.set(9, { ready: true, timestamp: Date.now() });
+      } }
+    }
+  };
+  const ensure = vm.runInNewContext(`${source}\nensureContentScriptInjectedUnlocked`, context);
+  return { ensure, events, context };
+}
+
+test('a freshly committed document is injected into without probing it first', async () => {
+  const { ensure, events, context } = unlockedInjection({ absent: true });
+  assert.equal(await ensure(9, 1), true);
+  assert.deepEqual(events, ['inject', 'probe']);
+  assert.equal(context.contentScriptAbsentTabs.has(9), false);
+});
+
+test('a document that may already hold a content script is still probed before injecting', async () => {
+  const { ensure, events } = unlockedInjection({ absent: false });
+  assert.equal(await ensure(9, 1), true);
+  assert.deepEqual(events, ['probe', 'inject', 'probe']);
+});
+
+test('only the first attempt skips the probe after a failed injection', async () => {
+  const { ensure, events } = unlockedInjection({ absent: true, failFirstInjection: true });
+  assert.equal(await ensure(9, 2), true);
+  assert.deepEqual(events, ['inject', 'probe', 'inject', 'probe']);
+});
+
 test('an undelivered mutation is reported as not executed', async () => {
   const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
   const end = bridge.indexOf('\n  async _handleGetTabs(', start);

@@ -1166,16 +1166,24 @@ async function sendSessionStatus(tabId, statusData) {
     overlayState,
     ...(statusData?.sessionId ? { sessionId: statusData.sessionId } : {})
   };
+  // Only an answer from the overlay handler counts as delivered. Chrome rejects
+  // a send to a tab with no content script, but Safari does not fail fast, so
+  // an empty answer has to take the re-injection path as well.
+  const deliver = async (timeoutMessage) => {
+    const response = await Promise.race([chrome.tabs.sendMessage(tabId, payload, { frameId: 0 }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), 750))]);
+    if (!response || typeof response !== 'object') throw new Error('Status not acknowledged');
+  };
   try {
-    await Promise.race([chrome.tabs.sendMessage(tabId, payload, { frameId: 0 }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Status probe timed out')), 750))]);
+    // A freshly committed document holds no content script yet: skip the probe.
+    if (contentScriptAbsentTabs.has(tabId)) throw new Error('No content script in this document yet');
+    await deliver('Status probe timed out');
   } catch (firstErr) {
     // First attempt failed -- try re-injecting the content script and retry once
     try {
       await Promise.race([ensureContentScriptInjected(tabId, 1),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Status reinjection timed out')), 1000))]);
-      await Promise.race([chrome.tabs.sendMessage(tabId, payload, { frameId: 0 }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Status retry timed out')), 750))]);
+      await deliver('Status retry timed out');
     } catch (retryErr) {
       automationLogger.debug('sendSessionStatus delivery failed', {
         tabId, phase: statusData.phase, error: retryErr.message
@@ -5317,6 +5325,19 @@ let contentScriptHealth = new Map();
 // Track active content script ports per tab for persistent connections
 const contentScriptPorts = new Map();
 
+// Tabs whose main frame committed a new document that no content script has
+// reported in from yet. Content scripts only arrive through executeScript, so
+// such a document cannot answer a message: probing it only burns timeouts, and
+// Safari does not fail a send to a tab with no receiver quickly. A worker
+// restart empties the set, which simply falls back to probing.
+const contentScriptAbsentTabs = new Set();
+
+// For a caller that has just had no answer from a tab's content script: there
+// is none there, so the next injection can skip its probes.
+function fsbNoteContentScriptAbsent(tabId) {
+  if (Number.isFinite(tabId)) contentScriptAbsentTabs.add(tabId);
+}
+
 // Listen for persistent port connections from content scripts
 chrome.runtime.onConnect.addListener((port) => {
   armMcpBridge('runtime.onConnect');
@@ -5353,6 +5374,7 @@ chrome.runtime.onConnect.addListener((port) => {
       connectedAt: Date.now(),
       lastHeartbeat: Date.now()
     });
+    contentScriptAbsentTabs.delete(tabId);
     enforceMapLimit(contentScriptPorts, MAX_CONTENT_SCRIPT_ENTRIES);
     debugLog('[FSB Background] Port stored for tab:', tabId);
 
@@ -5422,6 +5444,9 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     contentScriptPorts.delete(tabId);
   }
 
+  // The new document starts without a content script.
+  contentScriptAbsentTabs.add(tabId);
+
   // Phase 243 plan 02 (BG-04 / D-03): emit a LOG-04
   // 'agent-tab-user-navigation' diagnostic when the user (typed,
   // auto_bookmark, reload, link) navigates an agent-owned tab. The
@@ -5475,6 +5500,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   contentScriptPorts.delete(tabId);
   contentScriptReadyStatus.delete(tabId);
   contentScriptHealth.delete(tabId);
+  contentScriptAbsentTabs.delete(tabId);
   // A closed tab cannot still be acting or watching; drop its icon claims so
   // they cannot outrank a live one.
   try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.dropTab(tabId); } catch (_e) { /* icon is presentation-only */ }
@@ -6062,9 +6088,15 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
         return true;
       }
 
+      // A document that committed since the last ready signal cannot hold a
+      // content script yet, so there is nothing to probe: the checks below
+      // would only spend their timeouts before the injection. First attempt
+      // only, so a failed injection still gets the full path on a retry.
+      const knownAbsent = attempt === 1 && contentScriptAbsentTabs.has(tabId);
+
       // Then check if we already received a ready signal
       const readyStatus = contentScriptReadyStatus.get(tabId);
-      if (readyStatus && readyStatus.ready) {
+      if (!knownAbsent && readyStatus && readyStatus.ready) {
         automationLogger.logComm(null, 'health', 'ready_signal', true, { tabId, source: 'cached' });
         // Still do a health check to be sure
         const isHealthy = await checkContentScriptHealth(tabId);
@@ -6079,7 +6111,7 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
       }
 
       // Check if content script is already healthy (might be from previous injection)
-      const isHealthy = await checkContentScriptHealth(tabId);
+      const isHealthy = !knownAbsent && await checkContentScriptHealth(tabId);
       if (isHealthy) {
         automationLogger.logComm(null, 'health', 'healthCheck', true, { tabId, source: 'existing' });
         contentScriptReadyStatus.set(tabId, { ready: true, timestamp: Date.now() });
@@ -6088,7 +6120,7 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
 
       // Check if script might already be injected but not responsive
       // Prevent double injection by checking port existence
-      const existingPorts = chrome.runtime.getContexts?.({
+      const existingPorts = knownAbsent ? null : chrome.runtime.getContexts?.({
         contextTypes: ['TAB'],
         tabIds: [tabId]
       });
@@ -6103,7 +6135,7 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
       }
 
       // Check if content script was recently healthy - likely just needs time to reconnect
-      const recentHealth = contentScriptHealth.get(tabId);
+      const recentHealth = knownAbsent ? null : contentScriptHealth.get(tabId);
       if (recentHealth && Date.now() - recentHealth.lastCheck < 30000 && recentHealth.healthy) {
         automationLogger.debug('Content script was recently healthy, skipping re-injection', { tabId });
         // Just wait a bit more for reconnection instead of re-injecting
@@ -6141,6 +6173,8 @@ async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
         world: 'ISOLATED',  // Explicitly specify isolated world
         injectImmediately: true  // Don't wait for document_idle
       });
+      // The document now holds a content script.
+      contentScriptAbsentTabs.delete(tabId);
 
       // Wait for ready signal or timeout
       automationLogger.logComm(null, 'receive', 'ready_signal', true, { tabId, status: 'waiting' });
@@ -12546,6 +12580,7 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
             url: request.url || sender.url,
             frameId: frameId
           });
+          contentScriptAbsentTabs.delete(tabId);
           debugLog('[FSB Background] Tab marked as ready:', tabId);
           automationLogger.logInit('content_script', 'ready', { tabId, frameId, readyState: request.readyState, retry: request.retry || false });
           replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' })
