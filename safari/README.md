@@ -13,7 +13,7 @@ npm run test:safari       # 716 assertions across 16 suites (one needs macOS + s
 ## Why there is no fork
 
 15 test files read `extension/` source and assert on its exact contents. Two
-pin counts: `background.js` is pinned to 334 script-import mentions / 330 call
+pin counts: `background.js` is pinned to 330 script-import mentions / 326 call
 sites, and the tool registry is pinned by SHA-256 (cross-checked against
 `mcp/ai/tool-definitions.cjs`). So Safari behaviour is delivered by, in order
 of preference:
