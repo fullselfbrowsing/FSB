@@ -9,11 +9,15 @@ Anything else is tinted: Safari keeps only the alpha and paints it gray, or
 the accent color while the extension is active on the page.
 
 FSB's artwork (icon*.png) is black and white, so Safari drew the opaque tile
-as a solid square. Nearly all of a tile is plate, so on Safari the plate
-carries the color: the same artwork in FSB orange with black lettering
-(white -> INK, black -> PLATE). Every pixel of the plate has a spread of 255,
-so the toolbar frames stay in color even when action-icon.js dims them to
-half alpha.
+as a solid square. A white tile with black lettering is just as colorless. So
+on Safari the tile is white with black lettering (white -> INK, black ->
+PLATE), and the white itself carries the color: it is mixed with 16% of FSB
+orange (#ff8c00), which reads as white in a toolbar and gives nearly every
+pixel a spread of 41. Probed on real files, Safari accepts a mix of 10% (spread
+25) and tints anything weaker; 16% keeps the tile clear of the cutoff on a
+wide-gamut display too, where the same color measures about 14% less. Drawn at
+half alpha the spread halves and falls under the rule, so action-icon.js warms
+its dimmed frame separately.
 
 Sizes: 16/32 and 19/38 (the toolbar's 1x and 2x, depending on the macOS
 version), plus 48 and 64. 16 comes from icon16.png and 48 from icon48.png,
@@ -29,8 +33,12 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "extension", "assets")
 SIZES = (16, 19, 32, 38, 48, 64)
-PLATE = (255, 140, 0)  # black plate -> FSB orange (#ff8c00)
-INK = (0, 0, 0)        # white lettering -> black
+ORANGE = (255, 140, 0)    # FSB orange (#ff8c00)
+WARMTH = 0.16             # share of ORANGE mixed into the white plate
+# black plate -> warm white, #ffedd6. utils/action-icon.js repaints the same
+# color under its frames (TINTED_PLATE), so keep the two in step.
+PLATE = tuple(round(255 + (c - 255) * WARMTH) for c in ORANGE)
+INK = (0, 0, 0)           # white lettering -> black
 DRAWN = {16: "icon16.png", 48: "icon48.png"}
 
 

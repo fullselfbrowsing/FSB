@@ -43,16 +43,21 @@
   // 25/255 or more. Any other icon is tinted. Safari keeps only its alpha and
   // paints it gray, or the accent color while the extension is active, so the
   // black-and-white tile below came out as a solid square. A platform whose
-  // adapter reports tintsGrayscaleToolbarIcon draws the tile in FSB orange with
-  // black lettering instead. The plate alone then keeps every frame in color,
-  // dimmed ones included. Orange accents would vanish into that plate, so the
-  // orbit, sweep and glow are drawn white there. Undefined FsbPlatform (Chrome,
-  // every Node harness) leaves all of this off.
+  // adapter reports tintsGrayscaleToolbarIcon draws a white tile with black
+  // lettering instead, and pure white would be tinted just the same. So the
+  // white is mixed with 16% of FSB orange: it still reads as white in a
+  // toolbar, and its spread of 41 keeps nearly every pixel of every frame in
+  // color (Safari accepts 25). Half alpha halves that spread, so the dimmed
+  // frame is warmed further. Every animation keeps its own orange there.
+  // Undefined FsbPlatform (Chrome, every Node harness) leaves all of this off.
   var TINTED_TOOLBAR = !!(typeof globalThis !== 'undefined' && globalThis.FsbPlatform
     && globalThis.FsbPlatform.caps && globalThis.FsbPlatform.caps.tintsGrayscaleToolbarIcon === true);
   var TINTED_GLYPH_PATHS = { 16: 'assets/safari-toolbar-16.png', 32: 'assets/safari-toolbar-32.png' };
-  var TINTED_PLATE = '#ff8c00';
-  var TINTED_ACCENT = '#ffffff';
+  // The plate scripts/generate-safari-toolbar-icons.py paints into those tiles.
+  var TINTED_PLATE = '#ffedd6';
+  // Laid over the dimmed frame, which is drawn at half alpha: it lifts the
+  // plate's spread to 84, so 42 is left once the alpha halves it.
+  var TINTED_DIM_WASH = 'rgba(255, 140, 0, 0.2)';
 
   // ---- Locked geometry + cadence -----------------------------------------
   var FRAME_INTERVAL_MS = 66;        // ~15fps. chrome.alarms floors at 30s.
@@ -82,17 +87,16 @@
   var SWEEP_FILL_FRACTION = 0.38;
   var SWEEP_FROM_PCT = -1.20;        // translateX(-120%), of the fill's own width
   var SWEEP_TO_PCT = 3.20;           // translateX(320%)
-  // A faint light band on the black plate. Safari's orange plate under a white
-  // fill needs the opposite, a faint dark band.
+  // A faint light band on the black plate. Safari's white plate needs the
+  // opposite, a faint dark band.
   var SWEEP_TRACK_COLOR = TINTED_TOOLBAR ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)';
 
   // ---- Breathe (watching) -------------------------------------------------
   // Canonical cadence: the .badge-dot fsb-trigger-badge-dot keyframe, 2.4s
   // ease-in-out. The dot also scales 1 -> 1.15; the icon does not, because
   // rescaling the mark at 16px aliases it. The glow colour is the dot's own
-  // static box-shadow colour, except on Safari, where it would vanish into the
-  // orange plate.
-  var GLOW_RGB = TINTED_TOOLBAR ? '255, 255, 255' : '255, 140, 0';
+  // static box-shadow colour.
+  var GLOW_RGB = '255, 140, 0';
   // The plate the lockup sits on. Repainting it is not the "opaque background"
   // the notes warn against -- the artwork already carries this exact tile; this
   // just keeps it solid while the mark above it fades.
@@ -170,13 +174,6 @@
     // A trigger watch. fsb-trigger-badge-dot cadence.
     breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS }
   };
-
-  // The table above stays the canonical source. On Safari's orange plate the
-  // orbit and sweep keep their timing and shape but are drawn white.
-  if (TINTED_TOOLBAR) {
-    STATES.sweep.from = STATES.sweep.to = TINTED_ACCENT;
-    STATES.orbit.from = STATES.orbit.to = TINTED_ACCENT;
-  }
 
   // Highest claim wins. A watch outranks everything on every tab: it is the one
   // state the user armed deliberately and is waiting on.
@@ -332,7 +329,13 @@
   // adds only where the scratch is non-black, so the halo hugs the lettering and
   // the plate contributes nothing. A filter on the tile itself would halo the
   // SQUARE. The mask is always the black-and-white artwork: the tile itself,
-  // except on Safari, whose orange tile carries black lettering.
+  // except on Safari, whose white tile carries black lettering.
+  //
+  // Nothing can be added to Safari's near-white plate, so there the same halo is
+  // built the other way round. 'difference' against white inverts the mask to a
+  // black mark on white, 'lighter' then lifts the mark to the glow colour and
+  // leaves the white alone, and 'multiply' puts it on the tile: white times
+  // anything is a no-op, so again only the halo around the lettering shows.
   function drawMarkGlow(ctx, size, mask, spec, offset, drawn) {
     var scratch = scratchFor(size);
     scratch.globalCompositeOperation = 'source-over';
@@ -340,12 +343,19 @@
     scratch.filter = 'none';
     scratch.clearRect(0, 0, size, size);
     scratch.drawImage(mask, offset, offset, drawn, drawn);
-    scratch.globalCompositeOperation = 'multiply';
+    if (TINTED_TOOLBAR) {
+      scratch.globalCompositeOperation = 'difference';
+      scratch.fillStyle = '#ffffff';
+      scratch.fillRect(0, 0, size, size);
+      scratch.globalCompositeOperation = 'lighter';
+    } else {
+      scratch.globalCompositeOperation = 'multiply';
+    }
     scratch.fillStyle = alphaColor(GLOW_RGB, 1);
     scratch.fillRect(0, 0, size, size);
     scratch.globalCompositeOperation = 'source-over';
 
-    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = TINTED_TOOLBAR ? 'multiply' : 'lighter';
     ctx.globalAlpha = spec.glowAlpha;
     ctx.filter = 'blur(' + (spec.glowRatio * size).toFixed(2) + 'px)';
     ctx.drawImage(scratch.canvas, 0, 0);
@@ -357,7 +367,7 @@
   // The design's breathe animates the LOCKUP inside a static black plate -- the
   // plate itself never moves. Fading the artwork instead fades the whole icon,
   // because the artwork IS the plate. So the plate is painted solid first and the
-  // mark composited over it: plate-on-plate (black, or Safari's orange) is a
+  // mark composited over it: plate-on-plate (black, or Safari's warm white) is a
   // no-op, so only the lettering varies. Dim is deliberately different -- a
   // dropped relay recedes the whole icon, and it outranks the glow because
   // grayscale would fight an orange halo.
@@ -367,12 +377,20 @@
 
     if (spec.dimmed === true) {
       ctx.globalAlpha = DIM_ALPHA;
-      // Grayed and then halved, the orange plate would sit right at Safari's
-      // 25/255 threshold. Halving it alone leaves a spread of 128.
+      // Grayed, Safari's tile would lose the faint color that keeps it from
+      // being tinted, and halved it keeps too little: a spread of 20 where
+      // Safari wants 25. So it is halved without the filter, then warmed.
       ctx.filter = TINTED_TOOLBAR ? 'none' : DIM_FILTER;
       ctx.drawImage(bitmap, offset, offset, drawn, drawn);
       ctx.globalAlpha = 1;
       ctx.filter = 'none';
+      if (TINTED_TOOLBAR) {
+        // 'source-atop' colors what is already there and leaves its alpha alone.
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = TINTED_DIM_WASH;
+        ctx.fillRect(0, 0, size, size);
+        ctx.globalCompositeOperation = 'source-over';
+      }
       return;
     }
 
