@@ -8,8 +8,9 @@
   <link rel="stylesheet" href="onboarding.css">
 </head>
 <body>
-  <main class="ob" data-screen-label="FSB Onboarding">
+  <main class="ob ob3" data-screen-label="FSB Onboarding">
     <div class="ob-glow" aria-hidden="true"></div>
+    <div class="ob3-bloom" aria-hidden="true"></div>
     <header class="ob-top">
       <div class="ob-top-l">
         <span class="fsb-mark" translate="no" aria-label="FSB">
@@ -24,15 +25,15 @@
       </div>
     </header>
 
-    <section class="ob-stage">
-      <div class="ob-card" id="obCard">
-        <div class="ob-stepper" aria-label="Onboarding progress">
-          <div class="ob-track"><div class="ob-track-fill" id="obTrackFill"></div></div>
-          <div class="ob-nodes" id="obNodes"></div>
-        </div>
-        <div id="obScreen"></div>
-      </div>
-    </section>
+    <!-- Every step is a plane on the z axis: the page script fills the planes and the depth engine flies between them. -->
+    <div class="ob3-stage" id="obStage" data-depth-stage tabindex="0" role="region" aria-label="FSB onboarding. Scroll, swipe or use the arrow keys to move between steps." data-i18n-attr="aria-label:entry_stage_aria"></div>
+
+    <nav class="fsb-depth-rail" id="obNodes" aria-label="Onboarding steps" data-i18n-attr="aria-label:entry_rail_aria"></nav>
+
+    <div class="ob3-cue" id="obCue" aria-hidden="true">
+      <span class="ob3-cue-text" id="obCueText"></span>
+      <span class="ob3-cue-line"><span class="ob3-cue-fill" id="obTrackFill"></span></span>
+    </div>
 
     <div class="ob-toast" id="obToast" role="status" aria-live="polite">
       <i class="fa-solid fa-circle-check"></i>
@@ -42,6 +43,7 @@
   <script src="../utils/ui-locale.js"></script>
   <script src="../utils/copy-exact.js"></script>
   <script src="../ai/model-discovery.js"></script>
+  <script src="onboarding-depth.js"></script>
   <script src="onboarding.js"></script>
 </body>
 </html>

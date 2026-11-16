@@ -1720,7 +1720,7 @@
     "message": "69 MCP tools"
   },
   "entry_feat_tools_sub": {
-    "message": "From your coding agent"
+    "message": "From your agent"
   },
   "entry_get_started": {
     "message": "Get started"
@@ -1744,7 +1744,7 @@
     "message": "Recommended"
   },
   "entry_agent_desc": {
-    "message": "Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 69 tools, no API key, nothing to configure in the browser."
+    "message": "Give Grok Bot, Muse, Dots, OpenClaw, Hermes or your coding agent a real browser over MCP. No API key, nothing to configure in the browser."
   },
   "entry_in_browser": {
     "message": "In this browser"
@@ -1800,11 +1800,17 @@
   "entry_mcp_3": {
     "message": "Ask your agent to browse. It drives FSB's DOM engine for you."
   },
-  "entry_claw_name": {
-    "message": "Set it up for your Claw"
+  "entry_agents_card_name": {
+    "message": "Running an always-on agent?"
   },
-  "entry_claw_desc": {
-    "message": "Guided OpenClaw install in the control panel"
+  "entry_agents_card_desc": {
+    "message": "Grok Bot, Muse, Dots, OpenClaw and Hermes drive FSB over MCP too. See how on the Agents page."
+  },
+  "entry_clawhub_lead": {
+    "message": "On OpenClaw or Hermes? The fastest route is the"
+  },
+  "entry_clawhub_link": {
+    "message": "FSB Skill on ClawHub"
   },
   "entry_prefer_key": {
     "message": "Prefer your own key?"
@@ -2192,6 +2198,79 @@
   },
   "entry_toast_copied": {
     "message": "Install command copied"
+  },
+  "entry_toast_panel": {
+    "message": "Opening the control panel"
+  },
+  "entry_explore": {
+    "message": "Explore FSB"
+  },
+  "entry_panel_opened": {
+    "message": "Control panel opened"
+  },
+  "entry_more_panel": {
+    "message": "There's always much more to discover about FSB. It all lives in the control panel."
+  },
+  "entry_connect_heading": {
+    "message": "Connect $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_aria": {
+    "message": "$NAME$ API key",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_lm_url_aria": {
+    "message": "LM Studio server URL"
+  },
+  "entry_cue_begin": {
+    "message": "Scroll to begin"
+  },
+  "entry_nudge_path": {
+    "message": "Pick a path to continue"
+  },
+  "entry_nudge_key": {
+    "message": "Add a key, or skip to MCP"
+  },
+  "entry_nudge_local": {
+    "message": "Start LM Studio, or skip to MCP"
+  },
+  "entry_stage_aria": {
+    "message": "FSB onboarding. Scroll, swipe or use the arrow keys to move between steps."
+  },
+  "entry_rail_aria": {
+    "message": "Onboarding steps"
+  },
+  "entry_rail_back": {
+    "message": "Back to $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_current": {
+    "message": "$STEP$, current step",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_ahead": {
+    "message": "$STEP$, not reached yet",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
   },
   "entry_onboarding_tag": {
     "message": "Onboarding"

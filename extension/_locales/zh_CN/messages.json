@@ -1720,7 +1720,7 @@
     "message": "69 个 MCP 工具"
   },
   "entry_feat_tools_sub": {
-    "message": "来自你的编程代理"
+    "message": "来自你的代理"
   },
   "entry_get_started": {
     "message": "开始使用"
@@ -1744,7 +1744,7 @@
     "message": "推荐"
   },
   "entry_agent_desc": {
-    "message": "在 Claude Code、Cursor、VS Code、OpenClaw 等中把 FSB 用作 MCP 服务器。69 个工具，无需 API 密钥，浏览器里不用配置。"
+    "message": "通过 MCP 为 Grok Bot、Muse、Dots、OpenClaw、Hermes 或你的编程代理提供真正的浏览器。无需 API 密钥，浏览器里不用配置。"
   },
   "entry_in_browser": {
     "message": "在此浏览器中"
@@ -1800,11 +1800,17 @@
   "entry_mcp_3": {
     "message": "让你的代理去浏览。它会为你驱动 FSB 的 DOM 引擎。"
   },
-  "entry_claw_name": {
-    "message": "为你的 Claw 进行设置"
+  "entry_agents_card_name": {
+    "message": "在运行常驻代理？"
   },
-  "entry_claw_desc": {
-    "message": "在控制面板中引导安装 OpenClaw"
+  "entry_agents_card_desc": {
+    "message": "Grok Bot、Muse、Dots、OpenClaw 和 Hermes 也能通过 MCP 驱动 FSB。具体方法见代理页面。"
+  },
+  "entry_clawhub_lead": {
+    "message": "在用 OpenClaw 或 Hermes？最快的方式是"
+  },
+  "entry_clawhub_link": {
+    "message": "ClawHub 上的 FSB Skill"
   },
   "entry_prefer_key": {
     "message": "更想用自己的密钥？"
@@ -2192,6 +2198,79 @@
   },
   "entry_toast_copied": {
     "message": "已复制安装命令"
+  },
+  "entry_toast_panel": {
+    "message": "正在打开控制面板"
+  },
+  "entry_explore": {
+    "message": "探索 FSB"
+  },
+  "entry_panel_opened": {
+    "message": "控制面板已打开"
+  },
+  "entry_more_panel": {
+    "message": "关于 FSB 总有更多可发现的内容。一切都在控制面板里。"
+  },
+  "entry_connect_heading": {
+    "message": "连接 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_aria": {
+    "message": "$NAME$ API 密钥",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_lm_url_aria": {
+    "message": "LM Studio 服务器 URL"
+  },
+  "entry_cue_begin": {
+    "message": "滚动以开始"
+  },
+  "entry_nudge_path": {
+    "message": "选择一条路径以继续"
+  },
+  "entry_nudge_key": {
+    "message": "添加密钥，或跳到 MCP"
+  },
+  "entry_nudge_local": {
+    "message": "启动 LM Studio，或跳到 MCP"
+  },
+  "entry_stage_aria": {
+    "message": "FSB 初始设置。滚动、滑动或使用方向键在步骤之间切换。"
+  },
+  "entry_rail_aria": {
+    "message": "初始设置步骤"
+  },
+  "entry_rail_back": {
+    "message": "返回 $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_current": {
+    "message": "$STEP$，当前步骤",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_ahead": {
+    "message": "$STEP$，尚未到达",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
   },
   "entry_onboarding_tag": {
     "message": "初始设置"

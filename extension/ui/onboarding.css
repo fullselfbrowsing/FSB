@@ -198,121 +198,6 @@ a:hover {
   margin-left: 0.01em;
 }
 
-.ob-stage {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 24px 54px;
-}
-
-.ob-card {
-  width: 100%;
-  max-width: 600px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg), 0 0 70px rgba(255, 107, 53, 0.07);
-  padding: 30px 36px 24px;
-  position: relative;
-}
-
-.ob-stepper {
-  position: relative;
-  height: 30px;
-  margin: 2px 6px 42px;
-}
-
-.ob-track {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  left: 15px;
-  right: 15px;
-  height: 5px;
-  background: var(--bg-elevated);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.ob-track-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--primary-gradient);
-  border-radius: 999px;
-  transition: width var(--transition-slow);
-}
-
-.ob-nodes {
-  position: relative;
-  height: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.ob-node {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.76rem;
-  font-weight: 700;
-  font-family: "Space Mono", monospace;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  transition: all var(--transition-base);
-  position: relative;
-}
-
-.ob-node.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #111827;
-  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
-}
-
-.ob-node.done {
-  background: var(--primary-gradient);
-  border-color: transparent;
-  color: #fff;
-}
-
-.ob-node.click {
-  cursor: pointer;
-}
-
-.ob-node.click:hover {
-  transform: scale(1.12);
-}
-
-.ob-node-lab {
-  position: absolute;
-  top: 36px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.58rem;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  white-space: nowrap;
-  font-weight: 700;
-}
-
-.ob-node.active .ob-node-lab {
-  color: var(--text-secondary);
-}
-
-.ob-screen {
-  min-height: 272px;
-  display: flex;
-  flex-direction: column;
-}
-
 .ob-eyebrow {
   font-family: "Space Mono", monospace;
   font-size: 0.64rem;
@@ -444,11 +329,6 @@ a:hover {
   transform: none;
 }
 
-.ob-btn-block {
-  width: 100%;
-  margin-top: 18px;
-}
-
 .ob-btn-wide {
   padding: 13px 32px;
   font-size: 0.96rem;
@@ -459,24 +339,6 @@ a:hover {
   color: #22c55e;
   background: rgba(34, 197, 94, 0.08);
   box-shadow: none;
-}
-
-.ob-welcome {
-  align-items: center;
-  text-align: center;
-}
-
-.ob-welcome h1 {
-  font-size: 1.95rem;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  line-height: 1.14;
-  margin: 0 0 13px;
-}
-
-.ob-welcome .ob-sub {
-  max-width: 438px;
-  margin: 0 auto;
 }
 
 .ob-welcome-ver {
@@ -1001,18 +863,6 @@ a:hover {
   box-shadow: var(--shadow-glow);
 }
 
-.ob-claw-ic {
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  border-radius: 8px;
-  background: rgba(255, 107, 53, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-}
-
 .ob-claw-body {
   flex: 1;
   min-width: 0;
@@ -1091,6 +941,72 @@ a:hover {
   -webkit-mask-size: contain;
   mask-size: contain;
   filter: blur(var(--ig-blur, 0));
+}
+
+/* client and agent logos, drawn in currentColor through .install-glyph */
+.ob-lg-all {
+  -webkit-mask-image: url('../assets/onboarding/providers/all.svg');
+  mask-image: url('../assets/onboarding/providers/all.svg');
+}
+
+.ob-lg-antigravity {
+  -webkit-mask-image: url('../assets/onboarding/providers/antigravity.svg');
+  mask-image: url('../assets/onboarding/providers/antigravity.svg');
+}
+
+.ob-lg-claude {
+  -webkit-mask-image: url('../assets/onboarding/providers/claude.svg');
+  mask-image: url('../assets/onboarding/providers/claude.svg');
+}
+
+.ob-lg-cline {
+  -webkit-mask-image: url('../assets/onboarding/providers/cline.svg');
+  mask-image: url('../assets/onboarding/providers/cline.svg');
+}
+
+.ob-lg-cursor {
+  -webkit-mask-image: url('../assets/onboarding/providers/cursor.svg');
+  mask-image: url('../assets/onboarding/providers/cursor.svg');
+}
+
+.ob-lg-gemini {
+  -webkit-mask-image: url('../assets/onboarding/providers/google.png');
+  mask-image: url('../assets/onboarding/providers/google.png');
+}
+
+.ob-lg-grokbot {
+  -webkit-mask-image: url('../assets/onboarding/providers/grok-bot.png');
+  mask-image: url('../assets/onboarding/providers/grok-bot.png');
+}
+
+.ob-lg-hermes {
+  -webkit-mask-image: url('../assets/onboarding/providers/hermes.png');
+  mask-image: url('../assets/onboarding/providers/hermes.png');
+}
+
+.ob-lg-meta {
+  -webkit-mask-image: url('../assets/onboarding/providers/meta.svg');
+  mask-image: url('../assets/onboarding/providers/meta.svg');
+}
+
+.ob-lg-openai {
+  -webkit-mask-image: url('../assets/onboarding/providers/openai.svg');
+  mask-image: url('../assets/onboarding/providers/openai.svg');
+}
+
+.ob-lg-openclaw {
+  -webkit-mask-image: url('../assets/onboarding/providers/openclaw.svg');
+  mask-image: url('../assets/onboarding/providers/openclaw.svg');
+}
+
+.ob-lg-opencode {
+  -webkit-mask-image: url('../assets/onboarding/providers/opencode.svg');
+  mask-image: url('../assets/onboarding/providers/opencode.svg');
+}
+
+.ob-lg-vscode {
+  -webkit-mask-image: url('../assets/onboarding/providers/vscode.svg');
+  mask-image: url('../assets/onboarding/providers/vscode.svg');
 }
 
 .install-mark .install-glyph {
@@ -1236,7 +1152,7 @@ a:hover {
   color: var(--primary);
 }
 
-.install-fan-icon .install-glyph, .ob-claw-ic .install-glyph {
+.install-fan-icon .install-glyph {
   width: 17px;
   height: 17px;
 }
@@ -1419,18 +1335,6 @@ a:hover {
   background: rgba(255, 107, 53, 0.08);
 }
 
-.ob-done {
-  align-items: stretch;
-}
-
-.ob-done-top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 10px;
-}
-
 .ob-done-badge {
   width: 60px;
   height: 60px;
@@ -1442,47 +1346,6 @@ a:hover {
   color: #fff;
   font-size: 1.45rem;
   box-shadow: 0 0 0 8px rgba(255, 107, 53, 0.1), var(--shadow-glow);
-}
-
-.ob-done-top .ob-sub {
-  max-width: 400px;
-}
-
-.ob-summary {
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  margin-top: 20px;
-}
-
-.ob-sum-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  gap: 14px;
-}
-
-.ob-sum-row + .ob-sum-row {
-  border-top: 1px solid var(--border-color);
-}
-
-.ob-sum-k {
-  font-size: 0.64rem;
-  letter-spacing: 0.09em;
-  color: var(--text-muted);
-  font-weight: 700;
-}
-
-.ob-sum-v {
-  font-size: 0.84rem;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .mono {
@@ -1593,20 +1456,8 @@ a:hover {
 }
 
 @media (max-width: 640px) {
-  .ob-card {
-    padding: 24px 18px 20px;
-  }
-
   .ob-feat-row {
     flex-direction: column;
-  }
-
-  .ob-node-lab {
-    display: none;
-  }
-
-  .ob-welcome h1 {
-    font-size: 1.6rem;
   }
 
   .ob-h {
@@ -1632,5 +1483,794 @@ a:hover {
 
   .install-base {
     display: none;
+  }
+}
+
+/* ---- the room: every step is a plane on the z axis, the page itself never scrolls ---- */
+.ob3 {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ob3 .ob-top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+}
+
+.ob3 .ob-glow {
+  position: absolute;
+  inset: -14% -10%;
+  background: radial-gradient(ellipse 48.3% 40.6% at 50% 15.6%,rgba(255,107,53,.16),transparent 70%);
+  translate: calc((var(--prog,0) - .5) * 16%) 0;
+  transition: translate 1.6s cubic-bezier(.16,1,.3,1);
+}
+
+.ob3-bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 1200px;
+  height: 1200px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side,rgba(255,107,53,.3),rgba(255,107,53,.09) 42%,transparent 72%);
+  opacity: 0;
+  transform: translate(-50%,-50%) scale(.3);
+  pointer-events: none;
+  will-change: transform,opacity;
+}
+
+[data-theme="light"] .ob3-bloom {
+  background: radial-gradient(closest-side,rgba(255,107,53,.2),rgba(255,107,53,.06) 42%,transparent 72%);
+}
+
+.ob3-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  outline: none;
+  touch-action: none;
+}
+
+.ob3-layer {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: 62px 24px 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ob3-fit {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  transform-origin: 50% 50%;
+}
+
+.ob3-col {
+  width: min(680px,100%);
+  display: flex;
+  flex-direction: column;
+}
+
+[data-theme="light"] .ob3-layer {
+  transition: opacity .35s ease;
+}
+
+[data-theme="light"] .ob3-layer[inert] {
+  opacity: .3;
+}
+
+/* ---- type scale for planes (the base compact sizes read too small on an open plane) ---- */
+.ob3 .ob-eyebrow {
+  font-size: .7rem;
+  margin-bottom: 14px;
+}
+
+.ob3 .ob-h {
+  font-size: 2.3rem;
+  letter-spacing: -.03em;
+  line-height: 1.12;
+  margin-bottom: 12px;
+}
+
+.ob3 .ob-sub {
+  font-size: 1.02rem;
+}
+
+.ob3 .ob-nav {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 30px;
+}
+
+.ob3 .ob-toast {
+  bottom: 86px;
+}
+
+/* welcome */
+.ob3-welcome {
+  width: min(860px,100%);
+  align-items: center;
+  text-align: center;
+}
+
+.ob3-welcome h1 {
+  font-size: clamp(2.5rem,5.4vw,4.4rem);
+  font-weight: 800;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+  margin: 0 0 22px;
+}
+
+.ob3-welcome .ob-sub {
+  max-width: 600px;
+  font-size: 1.1rem;
+  margin: 0 auto;
+}
+
+.ob3-welcome .ob-feat-row {
+  max-width: 660px;
+  margin-top: 36px;
+  gap: 14px;
+}
+
+.ob3-welcome .ob-feat {
+  padding: 18px 14px;
+  background: color-mix(in srgb,var(--bg-elevated) 72%,transparent);
+}
+
+.ob3-welcome .ob-feat i {
+  font-size: 1.1rem;
+}
+
+.ob3-welcome .ob-feat b {
+  font-size: .86rem;
+}
+
+.ob3-welcome .ob-feat span {
+  font-size: .72rem;
+}
+
+.ob3-welcome .ob-nav-center {
+  margin-top: 36px;
+}
+
+.ob3-welcome .ob-btn-wide {
+  padding: 15px 38px;
+  font-size: 1.02rem;
+}
+
+/* path: two doors side by side; once one is chosen the other falls back */
+.ob3-path {
+  width: min(780px,100%);
+}
+
+.ob3-path .ob-paths {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 16px;
+  margin: 28px 0 12px;
+}
+
+.ob3-path .ob-path {
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 24px 26px;
+}
+
+.ob3-path .ob-path-check {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  margin: 0;
+}
+
+.ob3-path .ob-path-name {
+  font-size: 1.15rem;
+}
+
+.ob3-path .ob-path-desc {
+  font-size: .88rem;
+  line-height: 1.55;
+}
+
+.ob3-path .ob-path > * {
+  transition: opacity .35s ease;
+}
+
+.ob3-path .ob-paths.has-sel .ob-path:not(.sel):not(:hover):not(:focus-visible) > * {
+  opacity: .45;
+}
+
+.ob3-path .ob-note {
+  font-size: .84rem;
+}
+
+/* mcp */
+.ob3-mcp .install-label {
+  font-size: .76rem;
+}
+
+.ob3-mcp .install-bar {
+  padding: 16px 16px 16px 20px;
+}
+
+.ob3-mcp .install-cmd {
+  font-size: 1rem;
+}
+
+.ob3-mcp .ob-mcp-steps {
+  margin-top: 22px;
+  gap: 12px;
+}
+
+.ob3-mcp .ob-mcp-step {
+  font-size: .9rem;
+}
+
+.ob3-mcp .ob-claw {
+  margin-top: 18px;
+}
+
+/* the always-on agents the Agents page leads with, as overlapping marks */
+.ob3-agents-marks {
+  display: flex;
+  flex: none;
+  padding-left: 9px;
+}
+
+.ob3-agents-mark {
+  width: 34px;
+  height: 34px;
+  margin-left: -9px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  background: color-mix(in srgb,var(--primary) 13%,var(--bg-elevated));
+  border: 2px solid var(--bg-elevated);
+}
+
+.ob3-agents-mark .install-glyph {
+  width: 17px;
+  height: 17px;
+}
+
+.ob3-skill {
+  margin-top: 12px;
+  font-size: .84rem;
+}
+
+.ob3-skill a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ob3-skill a:hover {
+  text-decoration: underline;
+}
+
+/* provider: a grid instead of a list */
+.ob3-provider {
+  width: min(740px,100%);
+}
+
+.ob3-provider .ob-hint {
+  margin: 6px 0 20px;
+}
+
+.ob3-provider .ob-hint-body, .ob3-apikey .oc-body {
+  font-size: .86rem;
+}
+
+.ob3-provider .ob-providers {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+}
+
+.ob3-provider .ob-prov {
+  padding: 13px 16px;
+}
+
+.ob3-provider .ob-prov-note {
+  grid-column: 1 / -1;
+  font-size: .8rem;
+}
+
+/* api key */
+.ob3-apikey .ob-optional-card {
+  margin: 6px 0 22px;
+}
+
+.ob3-apikey .ob-input {
+  padding: 14px 42px 14px 16px;
+  font-size: .95rem;
+}
+
+.ob3-apikey .ob-status-msg, .ob3-apikey .ob-help {
+  font-size: .8rem;
+}
+
+/* pin */
+.ob3-pinstage {
+  margin-top: 22px;
+}
+
+.ob3-pin .ob-toolbar {
+  margin: 0 0 96px;
+  padding: 11px 13px;
+}
+
+.ob3-pin .ob-pin-pop {
+  top: 42px;
+}
+
+.ob3-pin .ob-confirm {
+  font-size: .9rem;
+  padding: 11px 18px;
+}
+
+/* done: the end of the tunnel. The wordmark sits far back; the setup floats in front of it */
+.ob3-layer[data-end] {
+  padding-bottom: max(84px,30vh);
+}
+
+.ob3-layer[data-end] .ob3-fit {
+  position: relative;
+  z-index: 1;
+}
+
+.ob3-end {
+  width: min(1000px,100%);
+  align-items: center;
+  text-align: center;
+}
+
+.ob3-end-mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -.36em;
+  z-index: 0;
+  display: flex;
+  justify-content: center;
+  font-size: clamp(180px,min(40vw,60vh),600px);
+  line-height: 1;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom,#000 22%,transparent 74%);
+  mask-image: linear-gradient(to bottom,#000 22%,transparent 74%);
+}
+
+.ob3-end-mark::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: min(1100px,90vw);
+  height: 80%;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side,rgba(255,107,53,.26),transparent);
+  pointer-events: none;
+}
+
+.ob3-end-mark .fsb-mark {
+  font-size: 1em;
+  color: color-mix(in srgb,var(--text-primary) 10%,transparent);
+}
+
+.ob3-end-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.ob3-end .ob-h {
+  font-size: clamp(2.3rem,4.2vw,3.3rem);
+  margin-bottom: 0;
+}
+
+.ob3-end-top .ob-sub {
+  max-width: 460px;
+}
+
+.ob3-end-groups {
+  display: grid;
+  grid-template-columns: repeat(var(--n,5),minmax(0,1fr));
+  gap: 28px;
+  width: 100%;
+  margin-top: 44px;
+}
+
+.ob3-end-group {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.ob3-end-label {
+  font-size: .64rem;
+  font-weight: 600;
+  letter-spacing: .22em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ob3-end-line {
+  display: block;
+  width: 24px;
+  height: 1.5px;
+  margin: 12px auto 14px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+.ob3-end-v {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 300;
+  color: var(--text-primary);
+}
+
+.ob3-end-v.mono {
+  font-size: .9rem;
+  font-weight: 400;
+}
+
+.ob3-end-cta {
+  margin-top: 44px;
+}
+
+.ob3-end-cta .ob-btn {
+  margin-top: 0;
+  width: auto;
+  min-width: 260px;
+  padding: 14px 34px;
+  font-size: 1rem;
+}
+
+.ob3-end .ob-done-more {
+  margin-top: 18px;
+  font-size: .84rem;
+}
+
+.ob3-end-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 36px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 max(28px,calc((100% - 1152px) / 2));
+  font-size: .8rem;
+  color: var(--text-muted);
+  pointer-events: auto;
+}
+
+.ob3-end-meta .ob-done-links {
+  margin-top: 0;
+}
+
+/* ---- states inside a step change in depth too ---- */
+/* a choice comes toward you, what was not chosen falls back */
+.ob3-path .ob-paths.has-sel .ob-path.sel {
+  scale: 1.035;
+}
+
+.ob3-path .ob-paths.has-sel .ob-path:not(.sel) {
+  scale: .955;
+}
+
+.ob3-provider .ob-prov.sel {
+  scale: 1.02;
+}
+
+/* a key that fails recoils; one that passes comes forward before the step moves on */
+@keyframes ob3Recoil {
+  0% { transform: perspective(700px) translate3d(0,0,0); }
+  22% { transform: perspective(700px) translate3d(-9px,0,-64px); }
+  48% { transform: perspective(700px) translate3d(7px,0,-28px); }
+  72% { transform: perspective(700px) translate3d(-3px,0,-8px); }
+  100% { transform: perspective(700px) translate3d(0,0,0); }
+}
+
+@keyframes ob3Accept {
+  0% { transform: perspective(700px) translateZ(0); }
+  45% { transform: perspective(700px) translateZ(30px); }
+  100% { transform: perspective(700px) translateZ(0); }
+}
+
+.ob3-field.is-bad .ob-field {
+  animation: ob3Recoil .55s cubic-bezier(.3,.6,.3,1);
+}
+
+.ob3-field.is-ok .ob-field {
+  animation: ob3Accept .5s cubic-bezier(.3,.6,.3,1);
+}
+
+/* pinned: FSB comes up out of the menu and lands in the toolbar */
+.ob3-tb-fsb {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 0;
+  height: 30px;
+  margin-left: -10px;
+  border-radius: 8px;
+  opacity: 0;
+  scale: 2.4;
+  translate: 14px 44px;
+  filter: blur(5px);
+  transition: width .5s cubic-bezier(.16,1,.3,1),margin-left .5s cubic-bezier(.16,1,.3,1),opacity .35s ease,scale .7s cubic-bezier(.16,1,.3,1),translate .7s cubic-bezier(.16,1,.3,1),filter .5s ease;
+}
+
+.ob3-tb-fsb img {
+  display: block;
+  border-radius: 4px;
+}
+
+.ob3-tb-fsb.on {
+  width: 30px;
+  margin-left: 0;
+  opacity: 1;
+  scale: 1;
+  translate: 0 0;
+  filter: none;
+}
+
+/* opening FSB lights the wordmark */
+.ob3-end-mark .fsb-mark {
+  transition: color 1.4s ease;
+}
+
+.ob3-end-mark::before {
+  transition: opacity 1.4s ease;
+  opacity: .5;
+}
+
+.ob3-end-mark.is-live .fsb-mark {
+  color: color-mix(in srgb,var(--primary) 36%,transparent);
+}
+
+.ob3-end-mark.is-live::before {
+  opacity: 1;
+}
+
+/* ---- step index on the right edge (the showcase's plane rail) ---- */
+.fsb-depth-rail {
+  position: absolute;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.fsb-depth-go {
+  appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 0 0 12px;
+  color: var(--text-muted);
+  font-family: "Space Mono",monospace;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.fsb-depth-lbl {
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity .25s ease,transform .25s ease;
+  white-space: nowrap;
+}
+
+.fsb-depth-tick {
+  display: block;
+  flex: none;
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text-muted);
+  opacity: .3;
+  transition: width .3s ease,background-color .3s ease,opacity .3s ease;
+}
+
+.fsb-depth-go.is-done .fsb-depth-tick {
+  opacity: .75;
+}
+
+.fsb-depth-go:not(:disabled):hover .fsb-depth-lbl, .fsb-depth-go:focus-visible .fsb-depth-lbl {
+  opacity: 1;
+  transform: none;
+}
+
+.fsb-depth-go:not(:disabled):hover .fsb-depth-tick {
+  width: 22px;
+  opacity: 1;
+}
+
+.fsb-depth-go:disabled {
+  cursor: default;
+}
+
+.fsb-depth-go.is-active {
+  color: var(--text-primary);
+}
+
+.fsb-depth-go.is-active .fsb-depth-tick {
+  width: 32px;
+  background: var(--primary);
+  opacity: 1;
+}
+
+.fsb-depth-go:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- cue at the bottom edge: where you are, and how far through ---- */
+.ob3-cue {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 30;
+  transform: translateX(-50%);
+  height: 56px;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  pointer-events: none;
+  --cue: 0;
+  color: color-mix(in srgb,rgba(255,107,53,.85) calc(var(--cue) * 100%),var(--text-muted));
+}
+
+.ob3-cue-text {
+  display: block;
+  font-size: .64rem;
+  font-weight: 600;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translateY(calc(var(--cue) * -2px));
+}
+
+.ob3-cue-line {
+  display: block;
+  position: relative;
+  width: 84px;
+  height: 1.5px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb,var(--text-muted) 38%,transparent);
+  transform: translateY(calc(var(--cue) * -6px));
+}
+
+.ob3-cue-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: var(--primary);
+  transition: width .7s cubic-bezier(.16,1,.3,1);
+}
+
+.ob3-cue.is-nudge {
+  color: var(--primary);
+}
+
+@media (max-width: 760px) {
+  .ob3-layer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .ob3 .ob-h {
+    font-size: 1.7rem;
+  }
+
+  .ob3-path .ob-paths, .ob3-provider .ob-providers {
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .ob3-path .ob-path {
+    flex-direction: row;
+    padding: 18px;
+  }
+
+  .ob3-path .ob-path-check {
+    position: static;
+  }
+
+  .ob3-end-groups {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 22px 14px;
+    margin-top: 30px;
+  }
+
+  .ob3-end-cta {
+    margin-top: 30px;
+  }
+
+  .ob3-end-meta {
+    bottom: 76px;
+    justify-content: center;
+    gap: 22px;
+    padding: 0 20px;
+  }
+
+  .ob3-layer[data-end] {
+    padding-bottom: max(120px,24vh);
+  }
+
+  .fsb-depth-rail {
+    right: 6px;
+  }
+
+  .fsb-depth-lbl {
+    display: none;
+  }
+
+  .fsb-depth-tick {
+    width: 10px;
+  }
+
+  .fsb-depth-go.is-active .fsb-depth-tick {
+    width: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob3-bloom {
+    display: none;
+  }
+
+  .ob3-field .ob-field {
+    animation: none !important;
+  }
+
+  .ob3-tb-fsb {
+    transition: opacity .2s ease;
+    scale: 1;
+    translate: 0 0;
+    filter: none;
+  }
+
+  .ob3-cue-fill {
+    transition: none;
   }
 }
