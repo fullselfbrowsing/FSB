@@ -5,10 +5,11 @@
  *
  * The server owns the calibration profile. A profile is a versioned JSON file
  * in ./profiles/, keyed by the pinned model and INSTRUMENT_HASH, so V3 can
- * recalibrate without a Chrome Web Store release. Phase 67 ships only the
- * explicit UNCALIBRATED profile (profiles/uncalibrated.json): every threshold
- * is null, every meetsThreshold is false and calibration.status is
- * 'uncalibrated', so no Jev decision acts and no Jev flag contributes.
+ * recalibrate without a Chrome Web Store release. The default is the explicit
+ * UNCALIBRATED profile (profiles/uncalibrated.json): every threshold is null,
+ * every meetsThreshold is false and calibration.status is 'uncalibrated', so
+ * no Jev decision acts and no Jev flag contributes. No profile ships for the
+ * decision instrument. One ships for the bind instrument (profiles/bind-*.json).
  *
  * Served-model checks (D-25):
  *   - a served model is in the pinned family when it equals the pin or is the
