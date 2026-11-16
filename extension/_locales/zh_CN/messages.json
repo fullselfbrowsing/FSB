@@ -2231,7 +2231,7 @@
     "message": "LM Studio 服务器 URL"
   },
   "entry_cue_begin": {
-    "message": "滚动以开始"
+    "message": "开始"
   },
   "entry_nudge_path": {
     "message": "选择一条路径以继续"
@@ -2243,13 +2243,21 @@
     "message": "启动 LM Studio，或跳到 MCP"
   },
   "entry_stage_aria": {
-    "message": "FSB 初始设置。滚动、滑动或使用方向键在步骤之间切换。"
+    "message": "FSB 初始设置。滑动或使用方向键在步骤之间切换。"
   },
   "entry_rail_aria": {
     "message": "初始设置步骤"
   },
   "entry_rail_back": {
     "message": "返回 $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "前往 $STEP$",
     "placeholders": {
       "step": {
         "content": "$1"

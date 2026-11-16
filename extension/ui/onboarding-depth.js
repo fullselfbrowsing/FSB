@@ -10,9 +10,9 @@
      it one element after another, the chosen element is the last to pass, and the next step grows
      out of the same spot. Going back runs the same flight in reverse. Switching between the two
      setup tracks is a sidestep instead: Agent lives to the left, in-browser to the right, the way
-     the two cards sit on the path step. Scrolling, swiping and the
-     arrow keys fly the camera too, but only as far as the wizard allows: a step that still needs
-     an answer gives a little and springs back. It only writes inline styles on nodes onboarding.js rendered;
+     the two cards sit on the path step. Swipes, the arrow keys and the step rail fly the camera
+     too, but only as far as the wizard allows: a step that still needs an answer gives a little
+     and springs back. The mouse wheel does not move between steps. It only writes inline styles on nodes onboarding.js rendered;
      onboarding.js never writes the style attribute of a node it has already rendered. */
   function obDepth(root, comp) {
     var doc = root.ownerDocument, win = doc.defaultView || window;
@@ -21,6 +21,8 @@
     var cueEl = root.querySelector('.ob3-cue'), bloomEl = root.querySelector('.ob3-bloom');
     var reduce = !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
     var P = 1200, BASE = reduce ? 0.3 : 0.12;
+    // Every step's content rests at 95% of its fitted size, so the room reads a little further away.
+    var ZOOM = 0.95;
     var T_FWD = 594, T_BACK = 522, T_SIDE = 623, SPREAD = 188;
     var layers = {}, order = [];
     Array.prototype.forEach.call(stage.querySelectorAll('.ob3-layer'), function (el) {
@@ -30,7 +32,7 @@
     });
     var items = [], parents = [], geo = [], W = 0, H = 0;
     var g = 0, gDir = 0, running = false, raf = 0, lastT = 0, alive = true, cueLast = -1;
-    var gesturing = false, swallow = false, idle = 0, lastEvt = 0, lastAbs = 0, touch = null;
+    var gesturing = false, touch = null;
     var vp = { x: 0, y: 0, tx: 0, ty: 0 }, flight = null, press = null;
 
     function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
@@ -85,7 +87,7 @@
         if (fit) {
           var cs = win.getComputedStyle(L.el), h = fit.offsetHeight;
           var avail = L.el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 24;
-          s = h > 0 ? Math.min(1, avail / h) : 1;
+          s = (h > 0 ? Math.min(1, avail / h) : 1) * ZOOM;
         }
         var tf = s < 0.999 ? 'scale(' + s.toFixed(4) + ')' : '';
         if (fit && fit.style.transform !== tf) fit.style.transform = tf;
@@ -298,7 +300,7 @@
       kick();
     }
 
-    // ---- gestures: scroll, swipe and keys move the camera as far as the wizard allows ----
+    // ---- gestures: swipes and keys move the camera as far as the wizard allows ----
     function owns(e) { var t = e.target; return !!(t && t.closest && t.closest('[data-depth-own]')); }
     function bounds() { return [comp.canStep(-1) ? -1 : -0.15, comp.canStep(1) ? 1 : 0.15]; }
     // a gesture takes the camera by hand: drop any flight in progress and point at the way out
@@ -320,27 +322,15 @@
       if (!gesturing) return;
       gesturing = false;
       var dir = g > 0.1 ? 1 : g < -0.1 ? -1 : 0;
-      if (dir && comp.canStep(dir)) { swallow = true; comp.step(dir); return; }
+      if (dir && comp.canStep(dir)) { comp.step(dir); return; }
       if (dir > 0) comp.nudge();
       g = 0; gDir = 0; aim(null); kick();
     }
+    // The wheel does not move between steps. It is still held so the room never rubber-bands;
+    // pinch-zoom and areas that scroll on their own keep it.
     function onWheel(e) {
       if (e.ctrlKey || owns(e)) return;
-      var dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? stage.clientHeight : 1);
-      if (Math.abs(e.deltaX) > Math.abs(dy)) return;
       e.preventDefault();
-      var now = win.performance.now(), gap = now - lastEvt, ad = Math.abs(dy), prev = lastAbs;
-      lastEvt = now; lastAbs = ad;
-      // one swipe = a push plus its momentum tail; the tail only decays. After a step, the rest of that swipe is eaten.
-      var cont = gap < 400 && !(ad > prev * 1.5 + 4);
-      if (!cont) swallow = false;
-      if (swallow) return;
-      win.clearTimeout(idle);
-      idle = win.setTimeout(settle, 160);
-      var b = bounds();
-      g = clamp(g + dy / (stage.clientHeight * 0.75), b[0], b[1]);
-      grab();
-      kick();
     }
     function onKey(e) {
       var tg = e.target, tag = tg && tg.tagName;
@@ -406,7 +396,7 @@
         if (mo) mo.disconnect();
         links.forEach(function (l) { l.removeEventListener('load', relayout); });
         win.removeEventListener('load', relayout);
-        [t1, t2, t3, relayT, idle].forEach(function (t) { win.clearTimeout(t); });
+        [t1, t2, t3, relayT].forEach(function (t) { win.clearTimeout(t); });
         win.cancelAnimationFrame(raf);
       }
     };

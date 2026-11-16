@@ -2231,7 +2231,7 @@
     "message": "URL сервера LM Studio"
   },
   "entry_cue_begin": {
-    "message": "Прокрутите, чтобы начать"
+    "message": "Начать"
   },
   "entry_nudge_path": {
     "message": "Выберите способ, чтобы продолжить"
@@ -2243,13 +2243,21 @@
     "message": "Запустите LM Studio или перейдите к MCP"
   },
   "entry_stage_aria": {
-    "message": "Начало работы с FSB. Прокручивайте, проводите пальцем или используйте клавиши со стрелками, чтобы переходить между шагами."
+    "message": "Начало работы с FSB. Проводите пальцем или используйте клавиши со стрелками, чтобы переходить между шагами."
   },
   "entry_rail_aria": {
     "message": "Шаги начала работы"
   },
   "entry_rail_back": {
     "message": "Вернуться: $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "Перейти: $STEP$",
     "placeholders": {
       "step": {
         "content": "$1"

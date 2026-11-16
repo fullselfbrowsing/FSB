@@ -161,8 +161,8 @@ function createHarness(initialStore, options) {
 
   assert.strictEqual(
     sha256(ONBOARDING_HTML_PATH),
-    '9593883ce0233ae4ea92c2a682de56d3a59db23072ae1d63c913ee7f3442bdac',
-    'onboarding.html hash rolled for the depth-room stage, rail and cue'
+    'c2b75c8a5ca86333e4a73200136bb118a1d5f3845d88e59cd5a7296bddd5c3e3',
+    'onboarding.html hash rolled: the stage label no longer mentions scrolling, which the wheel no longer does'
   );
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),

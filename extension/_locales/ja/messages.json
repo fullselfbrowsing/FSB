@@ -2231,7 +2231,7 @@
     "message": "LM Studio サーバーの URL"
   },
   "entry_cue_begin": {
-    "message": "スクロールして開始"
+    "message": "開始"
   },
   "entry_nudge_path": {
     "message": "続けるには経路を選んでください"
@@ -2243,13 +2243,21 @@
     "message": "LM Studio を起動するか、MCP へ進んでください"
   },
   "entry_stage_aria": {
-    "message": "FSB の初期設定。スクロール、スワイプ、または矢印キーでステップを移動できます。"
+    "message": "FSB の初期設定。スワイプまたは矢印キーでステップを移動できます。"
   },
   "entry_rail_aria": {
     "message": "初期設定のステップ"
   },
   "entry_rail_back": {
     "message": "$STEP$ に戻る",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "$STEP$ に進む",
     "placeholders": {
       "step": {
         "content": "$1"

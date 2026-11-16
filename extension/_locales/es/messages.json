@@ -2231,7 +2231,7 @@
     "message": "URL del servidor de LM Studio"
   },
   "entry_cue_begin": {
-    "message": "Desplázate para empezar"
+    "message": "Empezar"
   },
   "entry_nudge_path": {
     "message": "Elige un camino para continuar"
@@ -2243,13 +2243,21 @@
     "message": "Inicia LM Studio o salta a MCP"
   },
   "entry_stage_aria": {
-    "message": "Puesta en marcha de FSB. Desplázate, desliza o usa las flechas para moverte entre los pasos."
+    "message": "Puesta en marcha de FSB. Desliza o usa las flechas para moverte entre los pasos."
   },
   "entry_rail_aria": {
     "message": "Pasos de la puesta en marcha"
   },
   "entry_rail_back": {
     "message": "Volver a $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "Ir a $STEP$",
     "placeholders": {
       "step": {
         "content": "$1"
