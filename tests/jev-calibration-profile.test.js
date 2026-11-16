@@ -15,7 +15,12 @@
  *   - validateProfile and loadProfiles (per-file failures are skipped, it
  *     never throws);
  *   - the throw contract 67-09 relies on: selectProfile and applyCalibration
- *     never catch, so a fault in their inputs reaches the caller unchanged.
+ *     never catch, so a fault in their inputs reaches the caller unchanged;
+ *   - the bind slot: null in the shipped profile, keyed to the bind
+ *     instrument's own hash (a version 1 profile never calibrates bind and a
+ *     bind profile never calibrates a version 1 kind), and a bind decision
+ *     meets its threshold only when calibrated, both orders agree on a
+ *     candidate and the lower confidence reaches it.
  *
  * Run: node tests/jev-calibration-profile.test.js
  */
@@ -33,6 +38,7 @@ const PROFILES = path.join(JEV_DIR, 'profiles');
 
 const { CONTRACT } = require(path.join(JEV_DIR, 'contract.js'));
 const { INSTRUMENT_HASH, INSTRUMENT_VERSION } = require(path.join(JEV_DIR, 'instrument.js'));
+const { BIND_INSTRUMENT_HASH, BIND_INSTRUMENT_VERSION } = require(path.join(JEV_DIR, 'bind-instrument.js'));
 
 const PIN_DIRECT = 'jev-1.13.0';
 const PIN_OPENROUTER = 'typesafe/jev-1.13';
@@ -133,8 +139,8 @@ function shippedProfileSection(cal) {
   check('the note is the D-28 text', raw.note === UNCALIBRATED_NOTE, raw.note);
   check('model, snapshot, instrumentVersion and instrumentHash are null',
     raw.model === null && raw.snapshot === null && raw.instrumentVersion === null && raw.instrumentHash === null);
-  check('every threshold is null',
-    deepEqual(raw.thresholds, { operation: null, target: null, completion: null, stuck: null, risk: null }));
+  check('every threshold is null, the bind slot included',
+    deepEqual(raw.thresholds, { operation: null, target: null, completion: null, stuck: null, risk: null, bind: null }));
   check('UNCALIBRATED_PROFILE deep-equals the file', deepEqual(cal.UNCALIBRATED_PROFILE, raw));
   check('UNCALIBRATED_PROFILE is deep-frozen', isDeepFrozen(cal.UNCALIBRATED_PROFILE));
   check('validateProfile accepts it', deepEqual(cal.validateProfile(raw), { ok: true, errors: [] }));
@@ -517,6 +523,158 @@ function faultSection(cal) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// The bind slot, keyed to the bind instrument's own hash
+// ---------------------------------------------------------------------------
+
+const NULL_V1 = { operation: null, target: null, completion: null, stuck: null, risk: null };
+
+function bindProfile(overrides) {
+  return calibratedProfile(Object.assign({
+    profileId: 'typesafe-jev-1.13-bind-test',
+    instrumentVersion: BIND_INSTRUMENT_VERSION,
+    instrumentHash: BIND_INSTRUMENT_HASH,
+    thresholds: Object.assign({}, NULL_V1, { bind: 0.9 }),
+  }, overrides || {}));
+}
+
+function bindChoice(choice, confidence) {
+  const probabilities = { none_of_the_above: 0.02, c1: 0.02, c2: 0.02, c3: 0.02 };
+  probabilities[choice] = 0.94;
+  return { type: 'choice', choice, confidence, probabilities };
+}
+
+function bindAnswers(fwdChoice, fwdConfidence, revChoice, revConfidence) {
+  return { bind_fwd: bindChoice(fwdChoice, fwdConfidence), bind_rev: bindChoice(revChoice, revConfidence) };
+}
+
+function bindSection(cal) {
+  console.log('\n[the bind slot: uncalibrated by default, keyed to the bind instrument hash]');
+  const U = cal.UNCALIBRATED_PROFILE;
+  const v1 = calibratedProfile();
+  const bp = bindProfile();
+  const runBind = (profile, answersValue, extra) => cal.applyCalibration(Object.assign({
+    profile, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT, answers: answersValue, kinds: ['bind'],
+    instrumentHash: BIND_INSTRUMENT_HASH,
+  }, extra || {}));
+
+  check('the bind instrument hash differs from INSTRUMENT_HASH', BIND_INSTRUMENT_HASH !== INSTRUMENT_HASH);
+  check('UNCALIBRATED_PROFILE has a null bind slot', U.thresholds.bind === null);
+
+  const shipped = runBind(U, bindAnswers('c2', 1, 'c2', 1));
+  check('under the shipped UNCALIBRATED profile a bind answer is uncalibrated, threshold null, meetsThreshold false',
+    shipped.calibration.status === 'uncalibrated' && shipped.decisions.bind.threshold === null
+      && shipped.decisions.bind.meetsThreshold === false, show(shipped));
+  check('the bind decision has exactly the KEYS.bindDecision keys in order',
+    deepEqual(Object.keys(shipped.decisions.bind), CONTRACT.KEYS.bindDecision));
+  check('decisions hold exactly the bind kind', deepEqual(Object.keys(shipped.decisions), ['bind']));
+  const loaded = cal.loadProfiles();
+  check('selection over the shipped profiles is UNCALIBRATED for the bind hash',
+    cal.selectProfile(loaded, { model: PIN_OPENROUTER, instrumentHash: BIND_INSTRUMENT_HASH }) === U);
+
+  check('a bind profile is valid', deepEqual(cal.validateProfile(bp), { ok: true, errors: [] }), show(cal.validateProfile(bp)));
+  check('selectProfile picks the bind profile only for the bind hash',
+    cal.selectProfile([U, v1, bp], { model: PIN_OPENROUTER, instrumentHash: BIND_INSTRUMENT_HASH }) === bp
+      && cal.selectProfile([U, v1, bp], { model: PIN_OPENROUTER, instrumentHash: INSTRUMENT_HASH }) === v1);
+  check('a version 1 profile alone is never selected for the bind hash',
+    cal.selectProfile([U, v1], { model: PIN_OPENROUTER, instrumentHash: BIND_INSTRUMENT_HASH }) === U);
+  check('a bind profile alone is never selected for INSTRUMENT_HASH',
+    cal.selectProfile([U, bp], { model: PIN_OPENROUTER, instrumentHash: INSTRUMENT_HASH }) === U);
+
+  const v1OnBind = runBind(v1, bindAnswers('c2', 1, 'c2', 1));
+  check('a version 1 calibrated profile does not calibrate bind (uncalibrated, threshold null)',
+    v1OnBind.calibration.status === 'uncalibrated' && v1OnBind.decisions.bind.threshold === null
+      && v1OnBind.decisions.bind.meetsThreshold === false, show(v1OnBind));
+  const v1WithBindSlot = calibratedProfile({ thresholds: Object.assign({}, v1.thresholds, { bind: 0.5 }) });
+  check('a version 1 profile holding a bind threshold is refused by validateProfile',
+    cal.validateProfile(v1WithBindSlot).ok === false);
+  check('and it still does not calibrate bind', runBind(v1WithBindSlot, bindAnswers('c2', 1, 'c2', 1)).decisions.bind.meetsThreshold === false);
+
+  const bindOnV1 = cal.applyCalibration({
+    profile: bp, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT, answers: answers({ operation: 1, target: 1, completion: 0, stuck: 1, risk: 1 }),
+    kinds: CONTRACT.KINDS.slice(),
+  });
+  check('a bind profile does not calibrate the version 1 kinds (uncalibrated, every threshold null)',
+    bindOnV1.calibration.status === 'uncalibrated'
+      && Object.values(bindOnV1.decisions).every((d) => d.threshold === null && d.meetsThreshold === false), show(bindOnV1));
+  check('a bind profile holding a version 1 threshold is refused by validateProfile',
+    cal.validateProfile(bindProfile({ thresholds: Object.assign({}, NULL_V1, { operation: 0.9, bind: 0.9 }) })).ok === false);
+  check('a calibrated bind profile with a null bind threshold is refused (it calibrates nothing)',
+    cal.validateProfile(bindProfile({ thresholds: Object.assign({}, NULL_V1, { bind: null }) })).ok === false);
+  check('a version 1 profile with an explicit null bind slot is valid',
+    cal.validateProfile(calibratedProfile({ thresholds: Object.assign({}, v1.thresholds, { bind: null }) })).ok === true);
+  for (const bad of [1.01, -0.01, Number.NaN, '0.9', true]) {
+    check(`a bind threshold of ${show(bad)} is refused`,
+      cal.validateProfile(bindProfile({ thresholds: Object.assign({}, NULL_V1, { bind: bad }) })).ok === false);
+  }
+  check("an uncalibrated profile with a non-null bind slot is refused",
+    cal.validateProfile(Object.assign(clone(U), { thresholds: Object.assign({}, NULL_V1, { bind: 0.5 }) })).ok === false);
+
+  console.log('\n[bind meetsThreshold: calibrated AND agree AND a candidate AND min confidence >= threshold]');
+  const meets = (fc, fv, rc, rv) => runBind(bp, bindAnswers(fc, fv, rc, rv)).decisions.bind;
+  const both = meets('c2', 0.95, 'c2', 0.92);
+  check('both orders on c2 above 0.9 meet the threshold', both.meetsThreshold === true && both.threshold === 0.9
+    && both.agree === true && both.choice === 'c2' && both.confidenceFwd === 0.95 && both.confidenceRev === 0.92, show(both));
+  check('calibration is {status:calibrated, profileId} for the bind profile',
+    deepEqual(runBind(bp, bindAnswers('c2', 0.95, 'c2', 0.92)).calibration, { status: 'calibrated', profileId: bp.profileId }));
+  check('exactly at the threshold in both orders meets', meets('c1', 0.9, 'c1', 0.9).meetsThreshold === true);
+  check('the reverse order below the threshold does not meet', meets('c2', 0.99, 'c2', 0.8999).meetsThreshold === false);
+  check('the forward order below the threshold does not meet', meets('c2', 0.8999, 'c2', 0.99).meetsThreshold === false);
+  const split = meets('c2', 0.99, 'c3', 0.99);
+  check('disagreeing orders never meet, and choice and probabilities come from the forward order',
+    split.meetsThreshold === false && split.agree === false && split.choice === 'c2' && split.probabilities.c2 === 0.94
+      && split.confidenceRev === 0.99, show(split));
+  const none = meets('none_of_the_above', 0.99, 'none_of_the_above', 0.99);
+  check('both orders agreeing on none_of_the_above never meet', none.meetsThreshold === false && none.agree === true
+    && none.choice === 'none_of_the_above');
+  const changed = runBind(bp, bindAnswers('c2', 1, 'c2', 1), { servedModel: 'typesafe/jev-1.13-20261001' });
+  check('a changed snapshot gives snapshot_changed with a null threshold',
+    changed.calibration.status === 'snapshot_changed' && changed.decisions.bind.threshold === null
+      && changed.decisions.bind.meetsThreshold === false);
+  const input = bindAnswers('c2', 0.95, 'c2', 0.92);
+  const before = clone(input);
+  const fresh = runBind(bp, input).decisions.bind;
+  check('probabilities are a fresh plain object copied from the forward answer',
+    fresh.probabilities !== input.bind_fwd.probabilities && Object.getPrototypeOf(fresh.probabilities) === Object.prototype
+      && deepEqual(fresh.probabilities, input.bind_fwd.probabilities));
+  check('the answers are not mutated', deepEqual(input, before));
+
+  const rand = mulberry32(0xb1d);
+  let violations = 0;
+  for (let i = 0; i < 200; i += 1) {
+    const ids = ['none_of_the_above', 'c1', 'c2', 'c3'];
+    const fc = ids[Math.floor(rand() * ids.length)];
+    const rc = rand() < 0.7 ? fc : ids[Math.floor(rand() * ids.length)];
+    const fv = rand();
+    const rv = rand();
+    const d = runBind(bp, bindAnswers(fc, fv, rc, rv)).decisions.bind;
+    const expected = fc === rc && fc !== 'none_of_the_above' && Math.min(fv, rv) >= 0.9;
+    if (d.meetsThreshold !== expected) violations += 1;
+    if (runBind(U, bindAnswers(fc, fv, rc, rv)).decisions.bind.meetsThreshold !== false) violations += 1;
+  }
+  check('200 seeded bind answers follow the rule exactly, and never meet under UNCALIBRATED', violations === 0, `${violations} violations`);
+
+  console.log('\n[bind and version 1 kinds never mix]');
+  const mixedDefault = attempt(() => cal.applyCalibration({
+    profile: U, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT, answers: bindAnswers('c1', 1, 'c1', 1), kinds: ['bind'],
+  }));
+  check('bind asked without the bind instrument hash throws a TypeError',
+    mixedDefault.threw === true && mixedDefault.error instanceof TypeError);
+  const mixedV1 = attempt(() => cal.applyCalibration({
+    profile: U, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT, answers: answers(), kinds: ['operation'],
+    instrumentHash: BIND_INSTRUMENT_HASH,
+  }));
+  check('a version 1 kind asked with the bind instrument hash throws a TypeError', mixedV1.threw === true && mixedV1.error instanceof TypeError);
+  const missingRev = attempt(() => runBind(U, { bind_fwd: bindChoice('c1', 1) }));
+  check('a missing reverse answer throws a TypeError', missingRev.threw === true && missingRev.error instanceof TypeError);
+  const noulRev = attempt(() => runBind(U, { bind_fwd: bindChoice('c1', 1), bind_rev: { type: 'noul', noul: 0.5 } }));
+  check('a reverse answer of the wrong primitive throws a TypeError', noulRev.threw === true && noulRev.error instanceof TypeError);
+  check('calibrationStatus keys on the given instrument hash',
+    cal.calibrationStatus({ profile: bp, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT, instrumentHash: BIND_INSTRUMENT_HASH }) === 'calibrated'
+      && cal.calibrationStatus({ profile: bp, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT }) === 'uncalibrated'
+      && cal.calibrationStatus({ profile: v1, configuredModel: PIN_OPENROUTER, servedModel: SNAPSHOT, instrumentHash: BIND_INSTRUMENT_HASH }) === 'uncalibrated');
+}
+
 function main() {
   console.log('--- jev-calibration-profile (JEV-05, JEV-07) ---');
   const cal = loadModule();
@@ -534,6 +692,7 @@ function main() {
   validateSection(cal);
   loadSection(cal);
   faultSection(cal);
+  bindSection(cal);
   console.log(`\n=== jev-calibration-profile results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
 }

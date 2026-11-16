@@ -347,7 +347,8 @@ function initializeDatabase(db) {
     -- jev_decisions: per-decision Jev accounting; body-free (no goal, URL, origin, title, text, label, element id, hash key or IP); 7-day retention.
     -- One row per upstream attempt only (Pitfall 13). input_tokens and cost_usd are NULL when unknown,
     -- never 0, and carry their source (D-23). served_model is stored verbatim from the upstream response.
-    -- kinds holds sorted CONTRACT.KINDS members joined with ','. hash_key_present is 0/1 only (D-07).
+    -- kinds holds sorted CONTRACT.KINDS members joined with ',', or 'bind' alone; for a bind row
+    -- element_count is its candidate count. hash_key_present is 0/1 only (D-07).
     CREATE TABLE IF NOT EXISTS jev_decisions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       decision_id TEXT NOT NULL,

@@ -441,6 +441,253 @@ describe('createDepthEngine', () => {
         expect(vibrate).toHaveBeenCalledTimes(3);
       });
     });
+
+    // An iPhone cannot vibrate from script: it ticks only when a finger taps a native
+    // switch or a label for one. This browser is made to look like one (or, with a
+    // flag turned off, like a phone that is not) before the engine starts.
+    describe('on a phone that ticks only for a tapped switch', () => {
+      function phone(is: { vibrates?: boolean; switches?: boolean; touches?: boolean } = {}): void {
+        if (!is.vibrates) Object.defineProperty(navigator, 'vibrate', { value: undefined, configurable: true });
+        if (is.switches !== false) Object.defineProperty(HTMLInputElement.prototype, 'switch', { value: false, configurable: true, writable: true });
+        spyOnProperty(Navigator.prototype, 'maxTouchPoints', 'get').and.returnValue(is.touches === false ? 0 : 5);
+      }
+      const labels = (): HTMLLabelElement[] => Array.from(root.querySelectorAll<HTMLLabelElement>('label[data-depth-tick]'));
+      const switchOf = (i: number): HTMLInputElement => rail()[i].querySelector<HTMLInputElement>('label[data-depth-tick] > input')!;
+      // The part of an entry inside its border, which is what a label over it is laid out against.
+      function inside(b: HTMLElement): { left: number; top: number; right: number; bottom: number } {
+        const r = b.getBoundingClientRect();
+        const left = r.left + b.clientLeft;
+        const top = r.top + b.clientTop;
+        return { left, top, right: left + b.clientWidth, bottom: top + b.clientHeight };
+      }
+      // Page rules a test adds, as a phone's own width would.
+      let rules: HTMLStyleElement | undefined;
+
+      afterEach(() => {
+        delete (navigator as unknown as { vibrate?: unknown }).vibrate;
+        delete (HTMLInputElement.prototype as unknown as { switch?: unknown }).switch;
+        rules?.remove();
+        rules = undefined;
+      });
+
+      it('puts a label for a hidden switch over each rail entry and the strip beside it', () => {
+        phone();
+        build([120, 120, 120]);
+        expect(labels().length).toBe(3);
+        rail().forEach((b, i) => {
+          const label = labels()[i];
+          expect(label.parentElement).toBe(b);
+          expect(label.getAttribute('aria-hidden')).toBe('true');
+          const sw = switchOf(i);
+          expect(sw.type).toBe('checkbox');
+          expect(sw.hasAttribute('switch')).toBeTrue();
+          expect(sw.tabIndex).toBe(-1);
+          expect(sw.name).toBe('');
+          expect(getComputedStyle(sw).visibility).toBe('hidden');
+          const box = inside(b);
+          const r = label.getBoundingClientRect();
+          expect(r.left).toBeCloseTo(box.left, 0);
+          expect(r.top).toBeCloseTo(box.top, 0);
+          expect(r.bottom).toBeCloseTo(box.bottom, 0);
+          // The rail's own 6px beside its entries, out to the screen edge.
+          expect(r.right).toBeCloseTo(box.right + 6, 0);
+        });
+      });
+
+      it('keeps each label over its own entry when the rule that placed the entries stops applying', () => {
+        // On a phone held upright the rail's rules place each entry; turned sideways the
+        // window is too wide for those rules, and they stop applying.
+        rules = document.head.appendChild(document.createElement('style'));
+        rules.textContent = '.fsb-depth-go { position: relative; }';
+        phone();
+        build([120, 120, 120]);
+        rules.remove();
+        rail().forEach((b, i) => {
+          const box = inside(b);
+          const r = labels()[i].getBoundingClientRect();
+          expect(r.left).toBeCloseTo(box.left, 0);
+          expect(r.top).toBeCloseTo(box.top, 0);
+          expect(r.bottom).toBeCloseTo(box.bottom, 0);
+          expect(r.right).toBeCloseTo(box.right + 6, 0);
+        });
+      });
+
+      it('measures the strip beside the entries again when the window changes', async () => {
+        phone();
+        build([120, 120, 120]);
+        const stage = root.querySelector<HTMLElement>('[data-depth-stage]')!;
+        const b = rail()[1];
+        const label = labels()[1];
+        const reach = (): number => label.getBoundingClientRect().right - inside(b).right;
+        // Turning a phone changes the rail's rules and the window's size together.
+        function turn(edge: number, width: number): void {
+          bar().style.paddingRight = `${edge}px`;
+          stage.style.right = 'auto';
+          stage.style.width = `${width}px`;
+        }
+        turn(0, window.innerWidth - 20);
+        await until(() => Math.abs(reach()) < 0.5);
+        expect(reach()).toBeCloseTo(0, 0);
+        turn(6, window.innerWidth);
+        await until(() => Math.abs(reach() - 6) < 0.5);
+        expect(reach()).toBeCloseTo(6, 0);
+      });
+
+      it('reaches the rail\'s far edge beside an entry narrower than the rest', () => {
+        phone();
+        build([120, 120, 120]);
+        // As on the page: entries held against the screen edge, each as wide as what it
+        // holds, and the current one's tick the longest.
+        const nav = bar();
+        nav.style.alignItems = 'flex-end';
+        rail().forEach((b, i) => {
+          b.style.width = '';
+          b.style.paddingLeft = i ? '22px' : '30px';
+        });
+        const outer = nav.getBoundingClientRect();
+        const left = outer.left + nav.clientLeft;
+        rail().forEach((b, i) => {
+          const r = labels()[i].getBoundingClientRect();
+          // From the rail's far side, where a tap opens this entry too, out to the screen edge.
+          expect(r.left).toBeCloseTo(left, 0);
+          expect(r.right).toBeCloseTo(outer.right, 0);
+        });
+      });
+
+      it('adds nothing where the phone can vibrate', () => {
+        phone({ vibrates: true });
+        build([120, 120, 120]);
+        expect(labels().length).toBe(0);
+        expect(rail().map((b) => b.style.position)).toEqual(['', '', '']);
+        expect(rail().map((b) => b.style.alignSelf)).toEqual(['', '', '']);
+      });
+
+      it('adds nothing where there is no switch control', () => {
+        phone({ switches: false });
+        build([120, 120, 120]);
+        expect(labels().length).toBe(0);
+      });
+
+      it('adds nothing where there is no touch screen', () => {
+        phone({ touches: false });
+        build([120, 120, 120]);
+        expect(labels().length).toBe(0);
+      });
+
+      it('lets a tap on an entry reach the switch, and opens the entry once', async () => {
+        phone();
+        build([120, 120, 120]);
+        const focus = spyOn(root.querySelector<HTMLElement>('[data-depth-stage]')!, 'focus').and.callThrough();
+        labels()[1].click();
+        // The label handed the click on. Had the engine cancelled it, the switch would
+        // not have moved, and on an iPhone nothing would have been felt.
+        expect(switchOf(1).checked).toBeTrue();
+        // The switch's own click came back up through the entry and was left alone.
+        expect(focus).toHaveBeenCalledTimes(1);
+        await settle(1);
+        expect(seen).toEqual([0, 1]);
+      });
+
+      it('keeps a tap on the entry the camera is on from the switch', async () => {
+        phone();
+        build([120, 120, 120]);
+        // The camera is already there: nothing moves, so nothing ticks.
+        labels()[0].click();
+        expect(switchOf(0).checked).toBeFalse();
+        engine!.go(2);
+        await settle(2);
+        labels()[2].click();
+        expect(switchOf(2).checked).toBeFalse();
+        labels()[0].click();
+        expect(switchOf(0).checked).toBeTrue();
+        await settle(0);
+      });
+
+      it('still slides along the rail when the finger comes down on a label', async () => {
+        phone();
+        build([120, 120, 120, 120]);
+        const start = labels()[1];
+        const [x, y] = mid(1);
+        touch('touchstart', [[x, y]], start);
+        touch('touchmove', [[x, y + 6]], start);
+        touch('touchmove', [[x, mid(3)[1]]], start);
+        touch('touchend', [], start);
+        await settle(3);
+        expect(marked()).toBe(3);
+      });
+
+      it('keeps the click a short slide leaves behind from the switch', async () => {
+        phone();
+        build([120, 120, 120]);
+        // From the foot of the second entry a few pixels into the third: short enough
+        // for a browser to still count it as a tap where the finger came down.
+        const start = labels()[1];
+        const foot = rail()[1].getBoundingClientRect().bottom;
+        const x = mid(1)[0];
+        touch('touchstart', [[x, foot - 1]], start);
+        touch('touchmove', [[x, foot + 4]], start);
+        touch('touchend', [], start);
+        start.click();
+        // The slide already opened the third entry; this click opens nothing, so it
+        // must not tick either.
+        expect(switchOf(1).checked).toBeFalse();
+        await settle(2);
+        await new Promise((r) => setTimeout(r, 400));
+        labels()[1].click();
+        expect(switchOf(1).checked).toBeTrue();
+        await settle(1);
+      });
+
+      it('lets a tap that drifts a few pixels on an entry tick, and opens it once', async () => {
+        phone();
+        build([120, 120, 120]);
+        const focus = spyOn(root.querySelector<HTMLElement>('[data-depth-stage]')!, 'focus').and.callThrough();
+        // Past the few pixels at which a finger on the rail starts to slide, and still on
+        // the entry: the slide opens it, and a browser still counts the touch as a tap.
+        const start = labels()[1];
+        const [x, y] = mid(1);
+        touch('touchstart', [[x, y]], start);
+        touch('touchmove', [[x, y + 5]], start);
+        touch('touchend', [], start);
+        start.click();
+        expect(switchOf(1).checked).toBeTrue();
+        // The slide opened the entry; its click does not open it again.
+        expect(focus).not.toHaveBeenCalled();
+        await settle(1);
+        expect(seen).toEqual([0, 1]);
+      });
+
+      it('keeps a tap that drifts on the entry the camera is on silent', async () => {
+        phone();
+        build([120, 120, 120]);
+        const start = labels()[0];
+        const [x, y] = mid(0);
+        touch('touchstart', [[x, y]], start);
+        touch('touchmove', [[x, y + 5]], start);
+        touch('touchend', [], start);
+        start.click();
+        expect(switchOf(0).checked).toBeFalse();
+        await new Promise((r) => setTimeout(r, 200));
+        expect(seen).toEqual([0]);
+      });
+
+      it('keeps one label per entry as the rail changes, and takes them away with the engine', () => {
+        phone();
+        build([120, 120, 120]);
+        engine!.refreshRail();
+        expect(labels().length).toBe(3);
+        // An entry rendered later gets one; an entry rendered afresh gets its own back.
+        bar().insertAdjacentHTML('beforeend', entry(2));
+        labels()[0].remove();
+        engine!.refreshRail();
+        expect(rail().map((b) => b.querySelectorAll('label[data-depth-tick]').length)).toEqual([1, 1, 1, 1]);
+        engine!.destroy();
+        engine = undefined;
+        expect(labels().length).toBe(0);
+        expect(rail().map((b) => b.style.position)).toEqual(['', '', '', '']);
+        expect(rail().map((b) => b.style.alignSelf)).toEqual(['', '', '', '']);
+      });
+    });
   });
 
   describe('wheel', () => {

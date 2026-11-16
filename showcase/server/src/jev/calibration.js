@@ -27,6 +27,14 @@
  * (CONTRACT.NOUL_DIRECTION). This matches scripts/bench/shadow/lib/select.mjs
  * toProfileThresholds, which writes completion as 1 - t.
  *
+ * Bind: a profile may also hold a `bind` threshold. The bind instrument
+ * (./bind-instrument.js) has its own hash, and a profile is keyed by exactly
+ * one hash, so a profile for the decision instrument never calibrates a bind
+ * answer and a bind profile never calibrates a version 1 kind. validateProfile
+ * also refuses a profile that fills a slot of the other instrument. A bind
+ * decision meets its threshold only when both question orders agree on a
+ * candidate (never the catch-all) and the lower confidence reaches it.
+ *
  * Fault handling: selectProfile, applyCalibration, calibrationStatus and
  * servedModelInFamily never trap errors. An exception raised while reading
  * their inputs reaches the caller unchanged and is never turned into
@@ -41,8 +49,14 @@ const path = require('path');
 
 const { CONTRACT } = require('./contract');
 const { INSTRUMENT_HASH } = require('./instrument');
+const { BIND_INSTRUMENT_HASH, BIND_QUESTION_KEYS } = require('./bind-instrument');
 
 const PROFILES_DIR = path.join(__dirname, 'profiles');
+
+// Every threshold slot a profile may hold. The version 1 kinds are required;
+// the bind slot is optional, and a missing bind slot reads as null, so a
+// profile written before bind existed stays valid and never calibrates bind.
+const THRESHOLD_KINDS = [...CONTRACT.KINDS, ...CONTRACT.BIND_KINDS];
 
 const PROFILE_KEYS = ['schemaVersion', 'profileId', 'status', 'note', 'model', 'snapshot', 'instrumentVersion',
   'instrumentHash', 'thresholds'];
@@ -125,10 +139,10 @@ function validateProfile(profile) {
   if (!isPlainObject(thresholds)) {
     errors.push('thresholds must be an object');
   } else {
-    if (Object.keys(thresholds).some((key) => !CONTRACT.KINDS.includes(key))) errors.push('unknown threshold key');
-    for (const kind of CONTRACT.KINDS) {
+    if (Object.keys(thresholds).some((key) => !THRESHOLD_KINDS.includes(key))) errors.push('unknown threshold key');
+    for (const kind of THRESHOLD_KINDS) {
       if (!hasOwn(thresholds, kind)) {
-        errors.push(`missing threshold ${kind}`);
+        if (!CONTRACT.BIND_KINDS.includes(kind)) errors.push(`missing threshold ${kind}`);
         continue;
       }
       const value = thresholds[kind];
@@ -137,6 +151,15 @@ function validateProfile(profile) {
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
         errors.push(`threshold ${kind} must be null or a number in [0, 1]`);
       }
+    }
+    // Each instrument fills only its own slots: a profile for the bind
+    // instrument holds only the bind threshold, and any other profile never
+    // holds one.
+    const forBind = profile.instrumentHash === BIND_INSTRUMENT_HASH;
+    const foreign = THRESHOLD_KINDS.filter((kind) => CONTRACT.BIND_KINDS.includes(kind) !== forBind);
+    if (foreign.some((kind) => hasOwn(thresholds, kind) && thresholds[kind] !== null)) {
+      errors.push(forBind ? 'a bind instrument profile holds only the bind threshold'
+        : 'only a bind instrument profile may hold a bind threshold');
     }
   }
 
@@ -223,12 +246,14 @@ function selectProfile(profiles, { model, instrumentHash } = {}) {
 
 /**
  * 'calibrated', 'snapshot_changed' or 'uncalibrated' for this profile, the
- * configured pin and the model the upstream reported.
+ * configured pin, the model the upstream reported and the hash of the
+ * instrument that asked (INSTRUMENT_HASH unless given).
  */
-function calibrationStatus({ profile, configuredModel, servedModel }) {
+function calibrationStatus({ profile, configuredModel, servedModel, instrumentHash }) {
+  const expectedHash = instrumentHash === undefined ? INSTRUMENT_HASH : instrumentHash;
   if (!isPlainObject(profile) || profile.status !== 'calibrated') return 'uncalibrated';
   if (typeof configuredModel !== 'string' || profile.model !== configuredModel) return 'uncalibrated';
-  if (profile.instrumentHash !== INSTRUMENT_HASH) return 'uncalibrated';
+  if (profile.instrumentHash !== expectedHash) return 'uncalibrated';
   if (!servedModelInFamily(servedModel, configuredModel)) return 'uncalibrated';
   if (profile.snapshot !== null && servedModel !== profile.snapshot) return 'snapshot_changed';
   return 'calibrated';
@@ -244,16 +269,10 @@ function choiceDecision(answer, threshold) {
   if (answer === null || typeof answer !== 'object' || answer.type !== 'choice') {
     throw new TypeError('calibration: expected a choice answer');
   }
-  const probabilities = {};
-  for (const key of Object.keys(answer.probabilities)) {
-    Object.defineProperty(probabilities, key, {
-      value: answer.probabilities[key], enumerable: true, writable: true, configurable: true,
-    });
-  }
   return {
     choice: answer.choice,
     confidence: answer.confidence,
-    probabilities,
+    probabilities: copyProbabilities(answer.probabilities),
     threshold,
     meetsThreshold: threshold !== null && answer.confidence >= threshold,
   };
@@ -271,18 +290,72 @@ function noulDecision(kind, answer, threshold) {
   return { p, threshold, meetsThreshold };
 }
 
+function copyProbabilities(source) {
+  const probabilities = {};
+  for (const key of Object.keys(source)) {
+    Object.defineProperty(probabilities, key, {
+      value: source[key], enumerable: true, writable: true, configurable: true,
+    });
+  }
+  return probabilities;
+}
+
+/**
+ * The bind decision from the forward-order and reverse-order answers. choice
+ * and probabilities come from the forward answer; agree is true when both
+ * orders chose the same option. It meets its threshold only when there is a
+ * threshold (which needs a calibrated status), both orders agree, the choice
+ * is a candidate rather than the catch-all, and the lower of the two
+ * confidences is at or above the threshold.
+ */
+function bindDecision(answers, threshold) {
+  const forward = answers[BIND_QUESTION_KEYS.forward];
+  const reverse = answers[BIND_QUESTION_KEYS.reverse];
+  for (const answer of [forward, reverse]) {
+    if (answer === null || typeof answer !== 'object' || answer.type !== 'choice') {
+      throw new TypeError('calibration: expected two choice answers for bind');
+    }
+  }
+  const agree = forward.choice === reverse.choice;
+  return {
+    choice: forward.choice,
+    confidenceFwd: forward.confidence,
+    confidenceRev: reverse.confidence,
+    agree,
+    probabilities: copyProbabilities(forward.probabilities),
+    threshold,
+    meetsThreshold: threshold !== null
+      && agree
+      && forward.choice !== CONTRACT.RESERVED_OPTION_KEY
+      && Math.min(forward.confidence, reverse.confidence) >= threshold,
+  };
+}
+
 /**
  * Turn validated upstream answers into the D-15 decisions for exactly the
  * requested kinds. Returns {calibration:{status, profileId}, decisions}.
  * When the status is not 'calibrated', every threshold is null and every
  * meetsThreshold false. A missing answer, an answer of the wrong primitive
  * or an unknown kind throws a TypeError.
+ *
+ * instrumentHash names the instrument that asked (INSTRUMENT_HASH unless
+ * given); the profile counts as calibrated only for that hash. The bind kind
+ * is answered only by the bind instrument and the version 1 kinds only by
+ * any other instrument; a mix throws a TypeError.
  */
-function applyCalibration({ profile, configuredModel, servedModel, answers, kinds }) {
-  const status = calibrationStatus({ profile, configuredModel, servedModel });
+function applyCalibration({ profile, configuredModel, servedModel, answers, kinds, instrumentHash }) {
+  const hash = instrumentHash === undefined ? INSTRUMENT_HASH : instrumentHash;
+  const bindInstrument = hash === BIND_INSTRUMENT_HASH;
+  const status = calibrationStatus({ profile, configuredModel, servedModel, instrumentHash: hash });
   const calibrated = status === 'calibrated';
   const decisions = {};
   for (const kind of kinds) {
+    if (CONTRACT.BIND_KINDS.includes(kind)) {
+      if (!bindInstrument) throw new TypeError('calibration: bind is answered only by the bind instrument');
+      decisions[kind] = bindDecision(answers, calibrated ? thresholdFor(profile, kind) : null);
+      continue;
+    }
+    if (bindInstrument) throw new TypeError('calibration: the bind instrument answers only bind');
     const answer = answers[kind];
     const threshold = calibrated ? thresholdFor(profile, kind) : null;
     if (CONTRACT.CHOICE_KINDS.includes(kind)) decisions[kind] = choiceDecision(answer, threshold);

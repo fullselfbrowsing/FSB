@@ -19,6 +19,11 @@
  *   7. one upstream attempt -> 502 / 504 typed fallbacks, or
  *   8. calibration + the exact D-15 ok body -> 200
  *
+ * A version 2 (bind) request takes the same pipeline with the bind instrument
+ * (../jev/bind-instrument.js): its own instrumentVersion in the body and the
+ * ledger, its candidate count as the ledger's element count, and calibration
+ * keyed to the bind instrument's hash. Version 1 requests are unchanged.
+ *
  * Ledger policy (Pitfall 13, Pitfall 9, D-24): a per-decision row and one
  * allowlisted log line exist for every request that reached the upstream
  * attempt and for no other request. decisionId is drawn as the first statement
@@ -46,6 +51,7 @@ const express = require('express');
 const { CONTRACT } = require('../jev/contract');
 const { validateRequest } = require('../jev/validator');
 const { INSTRUMENT_VERSION, INSTRUMENT_HASH, buildUpstreamBody } = require('../jev/instrument');
+const { BIND_INSTRUMENT_VERSION, BIND_INSTRUMENT_HASH, buildBindUpstreamBody } = require('../jev/bind-instrument');
 const { loadProfiles, selectProfile, applyCalibration } = require('../jev/calibration');
 const { callUpstream } = require('../jev/upstream');
 const {
@@ -70,6 +76,26 @@ const PARSER_ERROR_TYPES = Object.freeze([
 
 const LOG_LEDGER_FAILED = '[jev] ledger write failed';
 const LOG_SPEND_SEED_FAILED = '[jev] spend seed failed';
+
+// The instrument that answers a validated request, picked by its schema
+// version. Each names its own version and calibration hash; itemCount is the
+// element (version 1) or candidate (bind) count kept in the ledger.
+const DECISION_INSTRUMENT = Object.freeze({
+  version: INSTRUMENT_VERSION,
+  hash: INSTRUMENT_HASH,
+  buildBody: buildUpstreamBody,
+  itemCount: (request) => request.elements.length,
+});
+const BIND_INSTRUMENT = Object.freeze({
+  version: BIND_INSTRUMENT_VERSION,
+  hash: BIND_INSTRUMENT_HASH,
+  buildBody: buildBindUpstreamBody,
+  itemCount: (request) => request.candidates.length,
+});
+
+function instrumentFor(request) {
+  return request.v === CONTRACT.BIND_SCHEMA_VERSION ? BIND_INSTRUMENT : DECISION_INSTRUMENT;
+}
 
 /** In-process, fleet-wide (single Fly machine) semaphore with no queue (Pattern 4). */
 function createSemaphore(max) {
@@ -274,6 +300,7 @@ function createJevRouter({
     let capUsd = 0;
     let dayUtc = null;
     let request = null;
+    let instrument = null;
     let built = null;
     let upstream = null;
     let decisionId = null;
@@ -284,9 +311,9 @@ function createJevRouter({
         decisionId,
         createdAtMs: Math.floor(startedAt),
         outcome,
-        instrumentVersion: INSTRUMENT_VERSION,
+        instrumentVersion: instrument.version,
         kinds: request.kinds,
-        elementCount: request.elements.length,
+        elementCount: instrument.itemCount(request),
         requestBytes: built.bytes,
         hashKeyPresent,
       };
@@ -313,6 +340,7 @@ function createJevRouter({
         return;
       }
       request = verdict.request;
+      instrument = instrumentFor(request);
 
       // 4. The fleet-wide daily spend ceiling (D-06). Checked before the
       //    instrument is built, so a spent day refuses without that work.
@@ -323,7 +351,7 @@ function createJevRouter({
       }
 
       // 5. The server-owned instrument within the byte budget (D-10, D-12).
-      built = buildUpstreamBody(request, { model: config.model, byteBudget: upstreamByteBudget });
+      built = instrument.buildBody(request, { model: config.model, byteBudget: upstreamByteBudget });
       if (!built.ok) {
         refuse(res, 'payload_too_large', startedAt);
         return;
@@ -369,20 +397,22 @@ function createJevRouter({
 
       // 8. Calibration, per request. A fault here reaches the outer catch
       //    (the 67-03 throw contract): there is no local fallback.
-      const profile = selectProfile(profiles, { model: config.model, instrumentHash: INSTRUMENT_HASH });
+      //    Each instrument is calibrated only by a profile keyed to its own hash.
+      const profile = selectProfile(profiles, { model: config.model, instrumentHash: instrument.hash });
       const calibrated = applyCalibration({
         profile,
         configuredModel: config.model,
         servedModel: upstream.servedModel,
         answers: upstream.answers,
         kinds: request.kinds,
+        instrumentHash: instrument.hash,
       });
 
       const latencyMs = elapsedSince(startedAt);
       const body = {
         ok: true,
         decisionId,
-        instrumentVersion: INSTRUMENT_VERSION,
+        instrumentVersion: instrument.version,
         servedModel: upstream.servedModel,
         calibration: { status: calibrated.calibration.status, profileId: calibrated.calibration.profileId },
         decisions: calibrated.decisions,

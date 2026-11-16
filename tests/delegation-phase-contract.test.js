@@ -181,6 +181,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/jev-gateway-ledger.test.js',
   'node tests/jev-gateway-router.test.js',
   'node tests/jev-gateway-log-hygiene.test.js',
+  'node tests/server-jev-gateway-boot.test.js',
   'node tests/jev-state.test.js',
   'node tests/jev-contract-parity.test.js',
   'node tests/jev-client.test.js',

@@ -101,6 +101,19 @@ const EXPECTED_CONTRACT = {
     profileIdChars: 64,
   },
   BUDGETS: { bodyLimitBytes: 49152, requestByteBudget: 20000, upstreamByteBudget: 28000 },
+  BIND_SCHEMA_VERSION: 2,
+  BIND_KINDS: ['bind'],
+  BIND_CANDIDATE_ID_PATTERN: '^c([1-9]|1[0-6])$',
+  BIND_CAPS: {
+    targetChars: 200,
+    originChars: 256,
+    pathChars: 512,
+    titleChars: 200,
+    roleChars: 32,
+    labelChars: 80,
+    contextChars: 120,
+    candidates: 16,
+  },
   KEYS: {
     request: ['v', 'kinds', 'goal', 'page', 'elements', 'recentActions', 'offeredOps', 'proposedAction'],
     requestRequired: ['v', 'kinds', 'goal', 'page', 'elements', 'recentActions', 'offeredOps'],
@@ -115,6 +128,12 @@ const EXPECTED_CONTRACT = {
     noulDecision: ['p', 'threshold', 'meetsThreshold'],
     usage: ['inputTokens', 'source'],
     cost: ['usd', 'source'],
+    bindRequest: ['v', 'kinds', 'target', 'page', 'candidates'],
+    bindPage: ['origin', 'title', 'path'],
+    bindPageRequired: ['origin', 'title'],
+    bindCandidate: ['id', 'role', 'label', 'context'],
+    bindCandidateRequired: ['id', 'role', 'label'],
+    bindDecision: ['choice', 'confidenceFwd', 'confidenceRev', 'agree', 'probabilities', 'threshold', 'meetsThreshold'],
   },
   APPROVAL_KEY_DENYLIST: ['approv', 'authori[sz]', 'allow', 'skip', 'bypass', 'consent', 'confirm', 'permit', 'grant', 'override'],
 };
@@ -168,6 +187,22 @@ function contractSection() {
     CONTRACT.BUDGETS.requestByteBudget < CONTRACT.BUDGETS.upstreamByteBudget
     && CONTRACT.BUDGETS.upstreamByteBudget < 32000);
 
+  const candidateId = new RegExp(CONTRACT.BIND_CANDIDATE_ID_PATTERN);
+  check('BIND_CANDIDATE_ID_PATTERN accepts exactly c1..c16',
+    Array.from({ length: 16 }, (_v, i) => `c${i + 1}`).every((id) => candidateId.test(id))
+    && ['c0', 'c17', 'c01', 'C1', 'c', 'c1a', 'e1', 'none_of_the_above'].every((id) => !candidateId.test(id)));
+  check('a candidate id can never collide with an element id, an operation or the catch-all',
+    Array.from({ length: 16 }, (_v, i) => `c${i + 1}`).every((id) => !new RegExp(CONTRACT.ELEMENT_ID_PATTERN).test(id)
+      && !CONTRACT.OPERATIONS.includes(id) && id !== CONTRACT.RESERVED_OPTION_KEY));
+  check('the bind kind is not a version 1 kind', CONTRACT.BIND_KINDS.every((kind) => !CONTRACT.KINDS.includes(kind)));
+  check('the bind request version is above version 1', CONTRACT.BIND_SCHEMA_VERSION === CONTRACT.SCHEMA_VERSION + 1);
+  check('the bind candidate key set has no value slot',
+    !CONTRACT.KEYS.bindCandidate.includes('value') && !CONTRACT.KEYS.bindPage.includes('text'));
+  check('bindPageRequired and bindCandidateRequired are subsets of their key sets',
+    CONTRACT.KEYS.bindPageRequired.every((key) => CONTRACT.KEYS.bindPage.includes(key))
+    && CONTRACT.KEYS.bindCandidateRequired.every((key) => CONTRACT.KEYS.bindCandidate.includes(key)));
+  check('16 candidates plus the catch-all fit the 255-option Choice cap', CONTRACT.BIND_CAPS.candidates + 1 <= 255);
+
   let threw = false;
   try {
     CONTRACT.KINDS.push('extra');
@@ -215,8 +250,10 @@ function denyListSection() {
   const { CONTRACT, isApprovalLikeKey } = contractModule;
   const allKeys = [];
   for (const name of Object.keys(CONTRACT.KEYS)) allKeys.push(...CONTRACT.KEYS[name]);
-  // Decision-map keys and Choice option keys are wire keys too.
+  // Decision-map keys and Choice option keys are wire keys too, and so are the
+  // bind kind, its two question keys and every candidate id.
   allKeys.push(...CONTRACT.KINDS, ...CONTRACT.OPERATIONS, CONTRACT.RESERVED_OPTION_KEY);
+  allKeys.push(...CONTRACT.BIND_KINDS, 'bind_fwd', 'bind_rev', ...Array.from({ length: 16 }, (_v, i) => `c${i + 1}`));
   const hits = allKeys.filter((key) => isApprovalLikeKey(key));
   check('no request, response, decision or option key is approval-like', hits.length === 0, show(hits));
   for (const key of ['skipConfirmation', 'authorize', 'approved', 'humanApproved', 'AUTHORISED', 'userConsent',

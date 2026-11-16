@@ -12,6 +12,7 @@
     "target": null,
     "completion": null,
     "stuck": null,
-    "risk": null
+    "risk": null,
+    "bind": null
   }
 }

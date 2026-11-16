@@ -21,7 +21,9 @@
  *   - no column can hold a goal, URL, origin, title, text, label, element id,
  *     hash key or IP; unknown row keys are ignored;
  *   - outcome, kinds, sources and calibration status must be CONTRACT members,
- *     so no caller string is ever stored;
+ *     so no caller string is ever stored; a bind decision is stored with kinds
+ *     'bind' and its candidate count as element_count, never the target,
+ *     a label or any other request text;
  *   - usage and cost keep their source labels and are NULL when unknown,
  *     never 0; the served model is stored verbatim;
  *   - TypeError messages are fixed strings that never quote a value, and this
@@ -149,7 +151,15 @@ function isHttpStatus(value) {
   return Number.isSafeInteger(value) && value >= 100 && value <= 599;
 }
 
+/** Exactly CONTRACT.BIND_KINDS: a bind decision is never mixed with a version 1 kind. */
+function isBindKinds(kinds) {
+  return Array.isArray(kinds) && kinds.length === CONTRACT.BIND_KINDS.length
+    && kinds.every((kind, index) => kind === CONTRACT.BIND_KINDS[index]);
+}
+
+/** A non-empty, duplicate-free list of CONTRACT.KINDS members, or exactly CONTRACT.BIND_KINDS. */
 function isContractKinds(kinds) {
+  if (isBindKinds(kinds)) return true;
   if (!Array.isArray(kinds) || kinds.length === 0 || kinds.length > CONTRACT.KINDS.length) return false;
   const seen = new Set();
   for (const kind of kinds) {
@@ -394,7 +404,8 @@ function formatDecisionLog(row) {
   const r = isPlainObject(row) ? row : {};
   const nullable = (value, ok) => (ok(value) ? value : null);
   const kinds = Array.isArray(r.kinds)
-    ? [...new Set(r.kinds.filter((k) => typeof k === 'string' && CONTRACT.KINDS.includes(k)))].sort()
+    ? [...new Set(r.kinds.filter((k) => typeof k === 'string'
+      && (CONTRACT.KINDS.includes(k) || CONTRACT.BIND_KINDS.includes(k))))].sort()
     : [];
   const payload = {
     decisionId: nullable(r.decisionId, isDecisionId),

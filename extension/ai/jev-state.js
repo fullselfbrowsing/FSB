@@ -19,6 +19,11 @@
  *   Elements have no slot for a field's contents, URLs become origin + path,
  *   text and labels are scrubbed and injection-filtered, and the request is
  *   held to the D-12 byte budget.
+ * - buildBindRequest: the request v2 builder for the bind decision (which of
+ *   at most 16 candidate controls a short description names). It applies the
+ *   same scrub, filter, caps and drops, numbers the candidates c1..cN and
+ *   returns an idMap back to the caller's own ids. validateRequest and
+ *   validateGatewayResponse dispatch on the request's schema version.
  *
  * Inert by design (D-17): loading this file reads no browser API, makes no
  * network call, schedules nothing and touches no storage. Nothing in the
@@ -138,6 +143,24 @@
     // UTF-8 bytes (D-12).
     BUDGETS: { bodyLimitBytes: 49152, requestByteBudget: 20000, upstreamByteBudget: 28000 },
 
+    // Request version 2 asks one bind question: which of at most 16 candidate
+    // controls is the one the driving agent described in `target`, or none.
+    BIND_SCHEMA_VERSION: 2,
+    BIND_KINDS: ['bind'],
+    // c1..c16, numbered in request order.
+    BIND_CANDIDATE_ID_PATTERN: '^c([1-9]|1[0-6])$',
+    // Code points.
+    BIND_CAPS: {
+      targetChars: 200,
+      originChars: 256,
+      pathChars: 512,
+      titleChars: 200,
+      roleChars: 32,
+      labelChars: 80,
+      contextChars: 120,
+      candidates: 16
+    },
+
     KEYS: {
       request: ['v', 'kinds', 'goal', 'page', 'elements', 'recentActions', 'offeredOps', 'proposedAction'],
       requestRequired: ['v', 'kinds', 'goal', 'page', 'elements', 'recentActions', 'offeredOps'],
@@ -152,7 +175,14 @@
       choiceDecision: ['choice', 'confidence', 'probabilities', 'threshold', 'meetsThreshold'],
       noulDecision: ['p', 'threshold', 'meetsThreshold'],
       usage: ['inputTokens', 'source'],
-      cost: ['usd', 'source']
+      cost: ['usd', 'source'],
+      // Request version 2. A candidate has no value slot, like an element.
+      bindRequest: ['v', 'kinds', 'target', 'page', 'candidates'],
+      bindPage: ['origin', 'title', 'path'],
+      bindPageRequired: ['origin', 'title'],
+      bindCandidate: ['id', 'role', 'label', 'context'],
+      bindCandidateRequired: ['id', 'role', 'label'],
+      bindDecision: ['choice', 'confidenceFwd', 'confidenceRev', 'agree', 'probabilities', 'threshold', 'meetsThreshold']
     },
 
     // D-29: case-insensitive regex sources. No wire key may match any of them.
@@ -449,11 +479,70 @@
     return true;
   }
 
+  // Request version 2 (the bind decision), in the server's order.
+  var BIND_CAPS = CONTRACT.BIND_CAPS;
+  var BIND_CANDIDATE_ID_RE = new RegExp(CONTRACT.BIND_CANDIDATE_ID_PATTERN);
+
+  function isBindKinds(kinds) {
+    return Array.isArray(kinds) && kinds.length === CONTRACT.BIND_KINDS.length
+      && kinds.every(function sameKind(kind, index) { return kind === CONTRACT.BIND_KINDS[index]; });
+  }
+
+  function validTarget(target) {
+    return typeof target === 'string' && target.trim().length > 0 && codePointLength(target) <= BIND_CAPS.targetChars;
+  }
+
+  function validBindPage(page) {
+    if (!hasExactKeys(page, KEYS.bindPage, KEYS.bindPageRequired)) return false;
+    if (!isStringWithin(page.origin, BIND_CAPS.originChars) || !ORIGIN_RE.test(page.origin)) return false;
+    if (!isStringWithin(page.title, BIND_CAPS.titleChars)) return false;
+    if (hasOwn(page, 'path')) {
+      if (!isStringWithin(page.path, BIND_CAPS.pathChars) || page.path.charAt(0) !== '/') return false;
+      if (page.path.indexOf('?') !== -1 || page.path.indexOf('#') !== -1) return false;
+    }
+    return true;
+  }
+
+  function validCandidate(candidate, index) {
+    if (!hasExactKeys(candidate, KEYS.bindCandidate, KEYS.bindCandidateRequired)) return false;
+    var id = candidate.id;
+    if (typeof id !== 'string' || !BIND_CANDIDATE_ID_RE.test(id) || id !== 'c' + (index + 1)) return false;
+    if (!isStringWithin(candidate.role, BIND_CAPS.roleChars) || candidate.role.length === 0) return false;
+    if (!isStringWithin(candidate.label, BIND_CAPS.labelChars)) return false;
+    if (hasOwn(candidate, 'context') && !isStringWithin(candidate.context, BIND_CAPS.contextChars)) return false;
+    return true;
+  }
+
+  function validCandidates(candidates) {
+    if (!Array.isArray(candidates) || candidates.length === 0 || candidates.length > BIND_CAPS.candidates) return false;
+    return candidates.every(validCandidate);
+  }
+
+  function validBindShape(body) {
+    if (!hasExactKeys(body, KEYS.bindRequest, KEYS.bindRequest)) return false;
+    if (body.v !== CONTRACT.BIND_SCHEMA_VERSION) return false;
+    if (!isBindKinds(body.kinds)) return false;
+    if (!validTarget(body.target)) return false;
+    if (!validBindPage(body.page)) return false;
+    return validCandidates(body.candidates);
+  }
+
+  function isBindRequest(body) {
+    return isPlainObject(body) && body.v === CONTRACT.BIND_SCHEMA_VERSION;
+  }
+
   /**
-   * Validate one request with the server's rules and reason order.
+   * Validate one request with the server's rules and reason order. A body
+   * whose v is 2 is held to the bind rules (a secret in the target gives
+   * sensitive_goal); anything else to version 1's.
    * @returns {{ok:true}|{ok:false, reason:'invalid_request'|'sensitive_goal'}}
    */
   function validateRequest(body) {
+    if (isBindRequest(body)) {
+      if (!validBindShape(body)) return { ok: false, reason: 'invalid_request' };
+      if (matchesSecret(body.target)) return { ok: false, reason: 'sensitive_goal' };
+      return { ok: true };
+    }
     if (!validShape(body)) return { ok: false, reason: 'invalid_request' };
     if (matchesSecret(body.goal)) return { ok: false, reason: 'sensitive_goal' };
     return { ok: true };
@@ -550,6 +639,54 @@
     return true;
   }
 
+  /** Bind options: the catch-all, or a candidate id the request sent. */
+  function candidateOptionFilter(request) {
+    var ids = new Set();
+    if (Array.isArray(request.candidates)) {
+      request.candidates.forEach(function collect(candidate) {
+        if (isPlainObject(candidate) && typeof candidate.id === 'string' && BIND_CANDIDATE_ID_RE.test(candidate.id)) {
+          ids.add(candidate.id);
+        }
+      });
+    }
+    return function isCandidateOption(key) {
+      return key === RESERVED_OPTION_KEY || ids.has(key);
+    };
+  }
+
+  /**
+   * One bind decision. Beyond the threshold pair, meetsThreshold can only be
+   * true when both orders agree on a candidate (never the catch-all) and the
+   * lower confidence reaches the threshold, exactly as the gateway sets it.
+   */
+  function validBindDecision(decision, isOption, calibrated) {
+    if (!hasExactKeys(decision, KEYS.bindDecision, KEYS.bindDecision)) return false;
+    var probabilities = decision.probabilities;
+    if (!isPlainObject(probabilities)) return false;
+    var options = Object.keys(probabilities);
+    if (options.length === 0) return false;
+    for (var i = 0; i < options.length; i += 1) {
+      if (!isOption(options[i]) || !isUnitInterval(probabilities[options[i]])) return false;
+    }
+    if (typeof decision.choice !== 'string' || !hasOwn(probabilities, decision.choice)) return false;
+    if (!isUnitInterval(decision.confidenceFwd) || !isUnitInterval(decision.confidenceRev)) return false;
+    if (typeof decision.agree !== 'boolean') return false;
+    if (!validThresholdPair(decision, calibrated)) return false;
+    if (decision.meetsThreshold) {
+      if (!decision.agree || decision.choice === RESERVED_OPTION_KEY) return false;
+      if (Math.min(decision.confidenceFwd, decision.confidenceRev) < decision.threshold) return false;
+    }
+    return true;
+  }
+
+  /** A bind answer holds exactly one decision, under the bind kind. */
+  function validBindDecisions(decisions, request, calibrated) {
+    if (!isPlainObject(decisions)) return false;
+    var kind = CONTRACT.BIND_KINDS[0];
+    if (Object.keys(decisions).length !== 1 || !hasOwn(decisions, kind)) return false;
+    return validBindDecision(decisions[kind], candidateOptionFilter(request), calibrated);
+  }
+
   /** inputTokens is null exactly when the source is 'unavailable' (never 0). */
   function validUsage(usage) {
     if (!hasExactKeys(usage, KEYS.usage, KEYS.usage)) return false;
@@ -576,8 +713,13 @@
     if (!hasExactKeys(calibration, KEYS.calibration, KEYS.calibration)) return false;
     if (CONTRACT.CALIBRATION_STATUSES.indexOf(calibration.status) === -1) return false;
     if (!isStringBetween(calibration.profileId, 1, CAPS.profileIdChars)) return false;
-    if (!isPlainObject(request) || !validKinds(request.kinds)) return false;
-    if (!validDecisions(body.decisions, request, calibration.status === 'calibrated')) return false;
+    if (isBindRequest(request)) {
+      if (!isBindKinds(request.kinds)) return false;
+      if (!validBindDecisions(body.decisions, request, calibration.status === 'calibrated')) return false;
+    } else {
+      if (!isPlainObject(request) || !validKinds(request.kinds)) return false;
+      if (!validDecisions(body.decisions, request, calibration.status === 'calibrated')) return false;
+    }
     if (!validUsage(body.usage) || !validCost(body.cost)) return false;
     return isNonNegativeFinite(body.latencyMs);
   }
@@ -1060,6 +1202,106 @@
     };
   }
 
+  /**
+   * Build a request v2 (the bind decision) from a typed candidate list. As in
+   * buildRequest, nothing that could hold a field's contents, a selector or
+   * the caller's ids is copied: each kept candidate is rebuilt as {id, role,
+   * label, context?} with id c1..cN in the caller's order, and idMap (never
+   * sent) maps those ids back to the caller's own ids, such as snapshot refs.
+   *
+   * input: {target, url, title?, includePath?, candidates:[{id, role, label?,
+   *   context?, inputType?, autocomplete?, purpose?:{sensitive?}, hidden?}],
+   *   vaultFilledIds? (array or Set of caller ids)}
+   *
+   * - A secret in the target means nothing is built (sensitive_goal). The
+   *   target's URLs lose their query and fragment, then it is
+   *   injection-filtered and capped at 200 code points.
+   * - The page is the URL's origin and the cleaned title. Its path is sent
+   *   only when includePath is true.
+   * - Candidates the version 1 builder would drop (password, hidden and file
+   *   inputs, payment and one-time-code autocomplete, purpose.sensitive,
+   *   hidden elements, vault-filled fields) are dropped here too and counted.
+   *   Role, label and context are scrubbed, injection-filtered and capped.
+   * - 1 to 16 candidates must remain. More than 16 is refused rather than
+   *   cut, because a dropped candidate could be the one described.
+   *
+   * @returns {{ok:true, request:object, idMap:object, stats:{dropped:{sensitive:number}, bytes:number}}
+   *   |{ok:false, reason:'invalid_request'|'sensitive_goal'}}
+   */
+  function buildBindRequest(input, options) {
+    var byteBudget = options && options.byteBudget !== undefined ? options.byteBudget : CONTRACT.BUDGETS.requestByteBudget;
+    if (typeof byteBudget !== 'number' || !(byteBudget > 0)) return invalidRequest();
+    if (!isPlainObject(input)) return invalidRequest();
+
+    var title = orEmptyString(input.title);
+    var vault = input.vaultFilledIds === undefined || input.vaultFilledIds === null ? [] : input.vaultFilledIds;
+    if (typeof input.target !== 'string' || typeof input.url !== 'string' || typeof title !== 'string'
+      || !Array.isArray(input.candidates) || !(Array.isArray(vault) || isSetLike(vault))) {
+      return invalidRequest();
+    }
+
+    // A target holding a secret never leaves the machine; nothing is built.
+    if (matchesSecret(input.target)) return { ok: false, reason: 'sensitive_goal' };
+
+    var reduced = toOriginPath(input.url);
+    if (reduced === null) return invalidRequest();
+
+    var vaultIds = new Set(Array.from(vault, function asKey(id) { return String(id); }));
+    var seenIds = new Set();
+    var droppedSensitive = 0;
+    var kept = [];
+    for (var i = 0; i < input.candidates.length; i += 1) {
+      var candidate = input.candidates[i];
+      if (!isPlainObject(candidate) || !isCallerId(candidate.id)) return invalidRequest();
+      var idKey = String(candidate.id);
+      if (seenIds.has(idKey)) return invalidRequest();
+      seenIds.add(idKey);
+      var label = orEmptyString(candidate.label);
+      var hasContext = candidate.context !== undefined && candidate.context !== null;
+      if (typeof candidate.role !== 'string' || typeof label !== 'string'
+        || (hasContext && typeof candidate.context !== 'string')) {
+        return invalidRequest();
+      }
+      if (isSensitiveElement(candidate, vaultIds)) {
+        droppedSensitive += 1;
+        continue;
+      }
+      var role = cleanField(candidate.role, BIND_CAPS.roleChars);
+      if (role.length === 0) return invalidRequest();
+      var out = { id: 'c' + (kept.length + 1), role: role, label: cleanField(label, BIND_CAPS.labelChars) };
+      if (hasContext) out.context = cleanField(candidate.context, BIND_CAPS.contextChars);
+      kept.push({ callerId: candidate.id, candidate: out });
+    }
+    if (kept.length === 0 || kept.length > BIND_CAPS.candidates) return invalidRequest();
+
+    var target = cleanField(reduceGoalUrls(input.target), BIND_CAPS.targetChars);
+    var page = { origin: reduced.origin, title: cleanField(title, BIND_CAPS.titleChars) };
+    if (input.includePath === true) page.path = truncateCodePoints(reduced.path, BIND_CAPS.pathChars);
+
+    var request = {
+      v: CONTRACT.BIND_SCHEMA_VERSION,
+      kinds: CONTRACT.BIND_KINDS.slice(),
+      target: target,
+      page: page,
+      candidates: kept.map(function emit(entry) { return entry.candidate; })
+    };
+    var bytes = utf8ByteLength(JSON.stringify(request));
+    if (bytes > byteBudget) return invalidRequest();
+    var verdict = validateRequest(request);
+    if (!verdict.ok) return { ok: false, reason: verdict.reason };
+
+    // The map stays on this machine.
+    var idMap = {};
+    kept.forEach(function mapBack(entry) { idMap[entry.candidate.id] = entry.callerId; });
+
+    return {
+      ok: true,
+      request: request,
+      idMap: idMap,
+      stats: { dropped: { sensitive: droppedSensitive }, bytes: bytes }
+    };
+  }
+
   var api = {
     CONTRACT: CONTRACT,
     isApprovalLikeKey: isApprovalLikeKey,
@@ -1073,6 +1315,7 @@
     validateRequest: validateRequest,
     validateGatewayResponse: validateGatewayResponse,
     buildRequest: buildRequest,
+    buildBindRequest: buildBindRequest,
     toOriginPath: toOriginPath,
     reduceGoalUrls: reduceGoalUrls,
     utf8ByteLength: utf8ByteLength,

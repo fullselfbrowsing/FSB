@@ -135,6 +135,27 @@ const CONTRACT = deepFreeze({
   // OpenRouter's ~32,000-byte long-context trigger.
   BUDGETS: { bodyLimitBytes: 49152, requestByteBudget: 20000, upstreamByteBudget: 28000 },
 
+  // Request version 2 asks one bind question: which of at most 16 candidate
+  // controls is the one the driving agent described in `target`, or none of
+  // them. Version 1 requests keep every rule above unchanged.
+  BIND_SCHEMA_VERSION: 2,
+  BIND_KINDS: ['bind'],
+  // Candidate ids are c1..c16, numbered in request order. They can never
+  // collide with an element id, an operation or the catch-all.
+  BIND_CANDIDATE_ID_PATTERN: '^c([1-9]|1[0-6])$',
+  // Code points. Every field at its cap still fits far below the upstream
+  // byte budget, so a bind request is never shrunk.
+  BIND_CAPS: {
+    targetChars: 200,
+    originChars: 256,
+    pathChars: 512,
+    titleChars: 200,
+    roleChars: 32,
+    labelChars: 80,
+    contextChars: 120,
+    candidates: 16,
+  },
+
   KEYS: {
     request: ['v', 'kinds', 'goal', 'page', 'elements', 'recentActions', 'offeredOps', 'proposedAction'],
     requestRequired: ['v', 'kinds', 'goal', 'page', 'elements', 'recentActions', 'offeredOps'],
@@ -150,6 +171,15 @@ const CONTRACT = deepFreeze({
     noulDecision: ['p', 'threshold', 'meetsThreshold'],
     usage: ['inputTokens', 'source'],
     cost: ['usd', 'source'],
+    // Request version 2. A candidate has no value slot, like an element.
+    bindRequest: ['v', 'kinds', 'target', 'page', 'candidates'],
+    bindPage: ['origin', 'title', 'path'],
+    bindPageRequired: ['origin', 'title'],
+    bindCandidate: ['id', 'role', 'label', 'context'],
+    bindCandidateRequired: ['id', 'role', 'label'],
+    // choice and probabilities come from the forward-order question; agree is
+    // true when the reverse-order question chose the same option.
+    bindDecision: ['choice', 'confidenceFwd', 'confidenceRev', 'agree', 'probabilities', 'threshold', 'meetsThreshold'],
   },
 
   // D-29: case-insensitive regex sources. No wire key may match any of them.
