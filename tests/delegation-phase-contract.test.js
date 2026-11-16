@@ -217,6 +217,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/content-script-known-empty.test.js',
   'node tests/mcp-read-tool-content-params.test.js',
   'node tests/mcp-execute-js-promise.test.js',
+  'node tests/mcp-visual-tick-nonblocking.test.js',
 ]);
 
 const SKOPEO_ROOT_TEST_COMMANDS = Object.freeze([

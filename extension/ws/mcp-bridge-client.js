@@ -1772,6 +1772,13 @@ class MCPBridgeClient {
    * BEFORE the underlying action executes. See .planning/v0.9.62-CONTRACT.md
    * Field Bundle section and .planning/phases/256-.../256-CONTEXT.md ordering.
    *
+   * Callers start the tick and dispatch the action without waiting for it:
+   * the tick only drives the overlay, and on a tab without a content script
+   * it would otherwise hold every action for its full 750 ms cap. The overlay
+   * may therefore light up just after the action starts. The returned
+   * promise never rejects; _clearVisualSessionIfFinal waits for it so a
+   * final clear always lands after the tick.
+   *
    * Sidecar field SHAPE (per Phase 256 Plan 02):
    *   payload.visualSession = { visualReason, client, isFinal }
    *
@@ -1884,7 +1891,7 @@ class MCPBridgeClient {
    * COMPLETE-02 (immediate clear post-change_report), COMPLETE-03
    * (idempotent on no active session -- delegated to clearVisualSession).
    */
-  async _clearVisualSessionIfFinal(tabId, agentId, payload) {
+  async _clearVisualSessionIfFinal(tabId, agentId, payload, pendingTick) {
     if (typeof MCPVisualSessionLifecycleUtils === 'undefined') return;
     if (typeof MCPVisualSessionLifecycleUtils.clearVisualSession !== 'function') return;
     const sidecar = payload && payload.visualSession;
@@ -1892,6 +1899,8 @@ class MCPBridgeClient {
     if (sidecar.isFinal !== true) return;
     if (!Number.isFinite(tabId) || tabId <= 0) return;
     if (typeof agentId !== 'string' || !agentId) return;
+    // A tick still in flight would re-create the session after this clear.
+    if (pendingTick) await pendingTick;
     try {
       await Promise.race([MCPVisualSessionLifecycleUtils.clearVisualSession(tabId, { reason: 'is_final' }),
         new Promise((resolve) => setTimeout(resolve, 750))]);
@@ -2124,12 +2133,12 @@ class MCPBridgeClient {
         if (resolvedTabId !== null) {
           const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
           this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
-          await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
+          const visualTick = this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload).catch(() => {});
           // Phase 257 -- explicit completion. When the caller marks this
           // bootstrap call as the final action of the task, clear the visual
           // session immediately rather than waiting for the 60s sliding-window
           // timer. Gated by sidecar.isFinal === true inside the helper.
-          await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload);
+          await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload, visualTick);
         }
       }
       return dispatched;
@@ -2153,8 +2162,8 @@ class MCPBridgeClient {
           if (resolvedTabId !== null) {
             const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
             this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
-            await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
-            await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload);
+            const visualTick = this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload).catch(() => {});
+            await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload, visualTick);
           }
         }
         return dispatched;
@@ -2175,8 +2184,9 @@ class MCPBridgeClient {
     // Runs AFTER resolveAgentTabOrError approves the tab + agent pairing
     // (v0.9.60 ownership gate) and BEFORE the underlying executeFn fires.
     // TIMEOUT-05 ownership-gating-wins: this line is unreachable when
-    // resolved.success === false above.
-    await this._recordVisualSessionTickIfPresent(tabId, agentId, payload);
+    // resolved.success === false above. The action does not wait for the
+    // tick; only a final clear does.
+    const visualTick = this._recordVisualSessionTickIfPresent(tabId, agentId, payload).catch(() => {});
 
     const routeParams = {
       ...params,
@@ -2263,7 +2273,7 @@ class MCPBridgeClient {
     // change_report resolves (wrapWithChangeReport awaits the report before
     // returning) so the user sees the action's effect land first, then the
     // overlay vanishes. Gated by sidecar.isFinal === true inside the helper.
-    await this._clearVisualSessionIfFinal(tabId, agentId, payload);
+    await this._clearVisualSessionIfFinal(tabId, agentId, payload, visualTick);
 
     return actionResult;
   }
