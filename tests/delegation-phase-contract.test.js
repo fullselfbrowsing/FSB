@@ -221,6 +221,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/mcp-visual-tick-nonblocking.test.js',
   'node tests/mcp-empty-change-report-wire.test.js',
   'node tests/mcp-compact-result-json.test.js',
+  'node tests/change-report-settle-shortcuts.test.js',
 ]);
 
 const SKOPEO_ROOT_TEST_COMMANDS = Object.freeze([

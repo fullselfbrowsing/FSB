@@ -2475,12 +2475,15 @@ const tools = {
             }
             clickDispatched = true;
             element.click();
-            await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+            const fallbackStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
             return {
               success: true,
               clicked: params.selector,
               hadEffect: true,
               scrolled: false,
+              // True only when the stability wait after the click saw the page
+              // settle; the service worker then skips its own settle wait.
+              pageStable: !!(fallbackStability && fallbackStability.stable === true),
               method: 'programmatic_click_obscured_fallback',
               verification: { verified: false, reason: 'obscured_fallback_no_verification' },
               elementInfo: { tag: element.tagName, text: (element.innerText || '').substring(0, 50), wasScrolledIntoView: false },
@@ -2591,7 +2594,10 @@ const tools = {
       element.dispatchEvent(new MouseEvent('click', mouseEventInit));
 
       // VERIFY-04: Wait for page stability (REPLACE fixed 300ms with dynamic stability detection)
-      await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      const clickStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      // True only when that wait saw the page settle; the service worker then
+      // skips its own settle wait before taking the change report.
+      const pageStable = !!(clickStability && clickStability.stable === true);
 
       // VERIFY-04: Capture post-state and verify using SHARED utilities
       const postState = captureActionState(element, 'click');
@@ -2659,6 +2665,7 @@ const tools = {
           mayHaveExecuted: true,
           clicked: params.selector,
           hadEffect: false,
+          pageStable,
           error: 'Click was dispatched but its effect could not be confirmed. Inspect the page before retrying.',
           verification
         };
@@ -2687,6 +2694,7 @@ const tools = {
         clicked: params.selector,
         hadEffect: true,
         scrolled: wasScrolled,
+        pageStable,
         verification: {
           localChanges: verification.localChanges,
           confidence: verification.confidence,
@@ -3494,7 +3502,11 @@ const tools = {
       }
 
       // Wait for page stability before capturing post-state
-      await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      const typeStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      // True only when that wait saw the page settle and no Enter was pressed
+      // (Enter can submit a form); the service worker then skips its own
+      // settle wait before taking the change report.
+      const pageStable = !!(typeStability && typeStability.stable === true) && !params.pressEnter;
 
       // Capture post-state for verification
       const postState = captureActionState(element, 'type');
@@ -3528,6 +3540,7 @@ const tools = {
         selectorIndex: selectorIndex,
         usedFallback: selectorIndex > 0,
         hadEffect: true,
+        pageStable,
         verification: {
           verified: verification.verified,
           reason: verification.reason,

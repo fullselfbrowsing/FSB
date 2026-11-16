@@ -4556,6 +4556,9 @@ async function handleFailTaskRoute({ params, payload }) {
 //   from utils/action-verification.js (importScripted into the SW). They run
 //   in SW context with serialized mutation records.
 // - 500ms safety net (D-09) caps total wait. partial:true is set on hit.
+//   click and type_text skip the wait when their content script reports
+//   pageStable; execute_js ends it 150 ms after the script when the harvest
+//   has recorded nothing.
 // - Cross-origin transition (D-08) skips DOM inspection and emits URL-only
 //   report with cross_origin:true.
 // - All harvest failures are swallowed (try/catch); the underlying action
@@ -4566,6 +4569,12 @@ async function handleFailTaskRoute({ params, payload }) {
 
 const _CHANGE_REPORT_SAFETY_NET_MS = 500;
 const _PAGE_INJECTION_TIMEOUT_MS = 750;
+// execute_js: how long after the script returns a harvest with nothing
+// recorded ends the settle wait.
+const _CHANGE_REPORT_QUIET_EXIT_MS = 150;
+// Tools whose content script waits for page stability after acting and
+// reports the outcome as pageStable.
+const _CONTENT_SETTLED_TOOLS = Object.freeze(['click', 'type_text']);
 let _changeReportSeq = 0;
 
 // Page-context harvest start: captures beforeState and starts a scoped
@@ -4940,6 +4949,64 @@ function _fsbWaitStableInPage() {
   } catch (_) { return Promise.resolve(true); }
 }
 
+// Page-context harvest peek: reports how many mutations the harvest observer
+// has recorded so far and whether the URL is still the one captured at
+// harvest start, without stopping the harvest. ok:false when the harvest has
+// no live observer, so nothing can be concluded.
+function _fsbHarvestPeekInPage(token) {
+  try {
+    const handles = window.__fsbChangeReportHandles || {};
+    const handle = handles[token];
+    if (!handle || !handle.observer) return { ok: false };
+    const startUrl = handle.beforeState ? handle.beforeState.url : null;
+    return { ok: true, mutationCount: handle.mutationCount, urlUnchanged: window.location.href === startUrl };
+  } catch (_) {
+    return { ok: false };
+  }
+}
+
+async function _safeGetTab(tabId) {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.get !== 'function') return null;
+    return (await chrome.tabs.get(tabId)) || null;
+  } catch (_) { return null; }
+}
+
+// Waits for the page to go quiet after an action. Resolves 'stable' when the
+// in-page waiter saw 300 ms without a mutation (it gives up at 450 ms), or
+// 'safety' when the 500 ms safety net wins first. With quietExit, it also
+// resolves 'quiet' 150 ms after the action when the harvest has recorded no
+// mutation, the URL is unchanged and the tab is not loading a new document;
+// once anything is recorded, only the waiter and the safety net can end it.
+function _awaitChangeReportSettle(tabId, harvestToken, quietExit) {
+  return new Promise((resolve) => {
+    let done = false;
+    let quietTimer = null;
+    const safetyTimer = setTimeout(() => finish('safety'), _CHANGE_REPORT_SAFETY_NET_MS);
+    function finish(winner) {
+      if (done) return;
+      done = true;
+      clearTimeout(safetyTimer);
+      if (quietTimer !== null) clearTimeout(quietTimer);
+      resolve(winner);
+    }
+    _injectFn(tabId, _fsbWaitStableInPage, []).then(() => finish('stable'), () => finish('stable'));
+    if (!quietExit) return;
+    quietTimer = setTimeout(() => {
+      quietTimer = null;
+      if (done) return;
+      Promise.all([_injectFn(tabId, _fsbHarvestPeekInPage, [harvestToken]), _safeGetTab(tabId)])
+        .then(([peek, tab]) => {
+          const loading = !tab || tab.status === 'loading'
+            || (typeof tab.pendingUrl === 'string' && tab.pendingUrl.length > 0);
+          if (!loading && peek && peek.ok === true && peek.mutationCount === 0 && peek.urlUnchanged === true) {
+            finish('quiet');
+          }
+        }, () => { /* the waiter or the safety net still ends the wait */ });
+    }, _CHANGE_REPORT_QUIET_EXIT_MS);
+  });
+}
+
 // Resolve the buildChangeReport / applyChangeReportSizeCap exports. In SW
 // context they live on globalThis (importScripts'd). In Node tests they
 // live on require().
@@ -4996,11 +5063,8 @@ async function _injectFn(tabId, func, args) {
 }
 
 async function _safeGetTabUrl(tabId) {
-  try {
-    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.get !== 'function') return null;
-    const t = await chrome.tabs.get(tabId);
-    return (t && typeof t.url === 'string') ? t.url : null;
-  } catch (_) { return null; }
+  const t = await _safeGetTab(tabId);
+  return (t && typeof t.url === 'string') ? t.url : null;
 }
 
 function _originOf(url) {
@@ -5299,14 +5363,22 @@ async function wrapWithChangeReport(ctx) {
 
   if (!startedHarvest) return expectCtx ? await _attachExpectResult(response, expectCtx, tabId, null) : response;
 
+  // click and type_text already waited for page stability in the content
+  // script after acting. When that wait saw the page settle, the report is
+  // taken now; when it did not run or timed out, the settle wait below runs.
+  const canonicalTool = (toolDef && typeof toolDef.name === 'string') ? toolDef.name : toolName;
+  const contentSettled = _CONTENT_SETTLED_TOOLS.indexOf(canonicalTool) !== -1
+    && !!response && typeof response === 'object' && response.pageStable === true;
+
   // Race waitStable vs 500ms safety net. partial:true on safety hit.
+  // execute_js may also end early when nothing has been recorded.
   let partial = false;
-  try {
-    const stableP = _injectFn(tabId, _fsbWaitStableInPage, []);
-    const safetyP = new Promise((resolve) => setTimeout(() => resolve('safety'), _CHANGE_REPORT_SAFETY_NET_MS));
-    const winner = await Promise.race([stableP, safetyP]);
-    partial = (winner === 'safety');
-  } catch (_) { partial = true; }
+  if (!contentSettled) {
+    try {
+      const winner = await _awaitChangeReportSettle(tabId, harvestToken, canonicalTool === 'execute_js');
+      partial = (winner === 'safety');
+    } catch (_) { partial = true; }
+  }
 
   try {
     const afterUrl = await _safeGetTabUrl(tabId);
