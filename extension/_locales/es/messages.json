@@ -1720,7 +1720,7 @@
     "message": "Todas las herramientas MCP"
   },
   "entry_feat_tools_sub": {
-    "message": "Desde tu agente de código"
+    "message": "Desde tu agente"
   },
   "entry_get_started": {
     "message": "Empezar"
@@ -1744,7 +1744,7 @@
     "message": "Recomendado"
   },
   "entry_agent_desc": {
-    "message": "Usa FSB como servidor MCP en Claude Code, Cursor, VS Code, OpenClaw y más. Sin clave de API y sin configurar nada en el navegador."
+    "message": "Dale a Grok Bot, Muse, Dots, OpenClaw, Hermes o a tu agente de código un navegador real por MCP. Sin clave de API y sin configurar nada en el navegador."
   },
   "entry_in_browser": {
     "message": "En este navegador"
@@ -1800,11 +1800,17 @@
   "entry_mcp_3": {
     "message": "Pide a tu agente que navegue. Él maneja el motor DOM de FSB."
   },
-  "entry_claw_name": {
-    "message": "Configúralo para tu Claw"
+  "entry_agents_card_name": {
+    "message": "¿Usas un agente siempre activo?"
   },
-  "entry_claw_desc": {
-    "message": "Instalación guiada de OpenClaw en el panel de control"
+  "entry_agents_card_desc": {
+    "message": "Grok Bot, Muse, Dots, OpenClaw y Hermes también controlan FSB por MCP. Mira cómo en la página de agentes."
+  },
+  "entry_clawhub_lead": {
+    "message": "¿Usas OpenClaw o Hermes? La vía más rápida es la"
+  },
+  "entry_clawhub_link": {
+    "message": "Skill de FSB en ClawHub"
   },
   "entry_prefer_key": {
     "message": "¿Prefieres tu propia clave?"
@@ -2192,6 +2198,79 @@
   },
   "entry_toast_copied": {
     "message": "Comando de instalación copiado"
+  },
+  "entry_toast_panel": {
+    "message": "Abriendo el panel de control"
+  },
+  "entry_explore": {
+    "message": "Explorar FSB"
+  },
+  "entry_panel_opened": {
+    "message": "Panel de control abierto"
+  },
+  "entry_more_panel": {
+    "message": "Siempre hay mucho más que descubrir de FSB. Todo está en el panel de control."
+  },
+  "entry_connect_heading": {
+    "message": "Conecta $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_aria": {
+    "message": "Clave de API de $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_lm_url_aria": {
+    "message": "URL del servidor de LM Studio"
+  },
+  "entry_cue_begin": {
+    "message": "Desplázate para empezar"
+  },
+  "entry_nudge_path": {
+    "message": "Elige un camino para continuar"
+  },
+  "entry_nudge_key": {
+    "message": "Añade una clave o salta a MCP"
+  },
+  "entry_nudge_local": {
+    "message": "Inicia LM Studio o salta a MCP"
+  },
+  "entry_stage_aria": {
+    "message": "Puesta en marcha de FSB. Desplázate, desliza o usa las flechas para moverte entre los pasos."
+  },
+  "entry_rail_aria": {
+    "message": "Pasos de la puesta en marcha"
+  },
+  "entry_rail_back": {
+    "message": "Volver a $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_current": {
+    "message": "$STEP$, paso actual",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_ahead": {
+    "message": "$STEP$, aún no alcanzado",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
   },
   "entry_onboarding_tag": {
     "message": "Puesta en marcha"

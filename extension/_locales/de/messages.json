@@ -1720,7 +1720,7 @@
     "message": "Alle MCP-Werkzeuge"
   },
   "entry_feat_tools_sub": {
-    "message": "Von deinem Programmieragenten"
+    "message": "Von deinem Agenten"
   },
   "entry_get_started": {
     "message": "Loslegen"
@@ -1744,7 +1744,7 @@
     "message": "Empfohlen"
   },
   "entry_agent_desc": {
-    "message": "Nutze FSB als MCP-Server in Claude Code, Cursor, VS Code, OpenClaw und weiteren. Kein API-Schlüssel, nichts im Browser einzurichten."
+    "message": "Gib Grok Bot, Muse, Dots, OpenClaw, Hermes oder deinem Programmieragenten einen echten Browser über MCP. Kein API-Schlüssel, nichts im Browser einzurichten."
   },
   "entry_in_browser": {
     "message": "In diesem Browser"
@@ -1800,11 +1800,17 @@
   "entry_mcp_3": {
     "message": "Bitte deinen Agenten zu browsen. Er steuert die DOM-Engine von FSB für dich."
   },
-  "entry_claw_name": {
-    "message": "Für deinen Claw einrichten"
+  "entry_agents_card_name": {
+    "message": "Läuft bei dir ein Agent rund um die Uhr?"
   },
-  "entry_claw_desc": {
-    "message": "Geführte OpenClaw-Installation im Kontrollzentrum"
+  "entry_agents_card_desc": {
+    "message": "Auch Grok Bot, Muse, Dots, OpenClaw und Hermes steuern FSB über MCP. Wie das geht, zeigt die Agenten-Seite."
+  },
+  "entry_clawhub_lead": {
+    "message": "Mit OpenClaw oder Hermes? Am schnellsten geht es mit dem"
+  },
+  "entry_clawhub_link": {
+    "message": "FSB-Skill auf ClawHub"
   },
   "entry_prefer_key": {
     "message": "Lieber einen eigenen Schlüssel?"
@@ -2192,6 +2198,79 @@
   },
   "entry_toast_copied": {
     "message": "Installationsbefehl kopiert"
+  },
+  "entry_toast_panel": {
+    "message": "Das Kontrollzentrum wird geöffnet"
+  },
+  "entry_explore": {
+    "message": "FSB erkunden"
+  },
+  "entry_panel_opened": {
+    "message": "Kontrollzentrum geöffnet"
+  },
+  "entry_more_panel": {
+    "message": "Über FSB gibt es immer mehr zu entdecken. Alles davon findest du im Kontrollzentrum."
+  },
+  "entry_connect_heading": {
+    "message": "$NAME$ verbinden",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_aria": {
+    "message": "$NAME$-API-Schlüssel",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_lm_url_aria": {
+    "message": "Server-URL von LM Studio"
+  },
+  "entry_cue_begin": {
+    "message": "Scrolle, um zu beginnen"
+  },
+  "entry_nudge_path": {
+    "message": "Wähle einen Weg, um fortzufahren"
+  },
+  "entry_nudge_key": {
+    "message": "Füge einen Schlüssel hinzu oder spring zu MCP"
+  },
+  "entry_nudge_local": {
+    "message": "Starte LM Studio oder spring zu MCP"
+  },
+  "entry_stage_aria": {
+    "message": "FSB-Ersteinrichtung. Scrolle, wische oder nutze die Pfeiltasten, um zwischen den Schritten zu wechseln."
+  },
+  "entry_rail_aria": {
+    "message": "Schritte der Ersteinrichtung"
+  },
+  "entry_rail_back": {
+    "message": "Zurück zu $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_current": {
+    "message": "$STEP$, aktueller Schritt",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_ahead": {
+    "message": "$STEP$, noch nicht erreicht",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
   },
   "entry_onboarding_tag": {
     "message": "Ersteinrichtung"

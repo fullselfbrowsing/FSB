@@ -1720,7 +1720,7 @@
     "message": "MCP ツール一式"
   },
   "entry_feat_tools_sub": {
-    "message": "コーディングエージェントから"
+    "message": "エージェントから"
   },
   "entry_get_started": {
     "message": "はじめる"
@@ -1744,7 +1744,7 @@
     "message": "推奨"
   },
   "entry_agent_desc": {
-    "message": "Claude Code、Cursor、VS Code、OpenClaw などで FSB を MCP サーバーとして使います。API キー不要、ブラウザの設定も不要です。"
+    "message": "Grok Bot、Muse、Dots、OpenClaw、Hermes やコーディングエージェントに、MCP 経由で本物のブラウザを。API キー不要、ブラウザの設定も不要です。"
   },
   "entry_in_browser": {
     "message": "このブラウザで"
@@ -1800,11 +1800,17 @@
   "entry_mcp_3": {
     "message": "エージェントに閲覧を頼むと、FSB の DOM エンジンを動かします。"
   },
-  "entry_claw_name": {
-    "message": "Claw 向けに設定"
+  "entry_agents_card_name": {
+    "message": "常時稼働のエージェントを使っていますか？"
   },
-  "entry_claw_desc": {
-    "message": "コントロールパネルでの OpenClaw ガイド付きインストール"
+  "entry_agents_card_desc": {
+    "message": "Grok Bot、Muse、Dots、OpenClaw、Hermes も MCP で FSB を操作できます。方法はエージェントのページで。"
+  },
+  "entry_clawhub_lead": {
+    "message": "OpenClaw や Hermes をお使いなら、いちばん早いのは"
+  },
+  "entry_clawhub_link": {
+    "message": "ClawHub の FSB Skill"
   },
   "entry_prefer_key": {
     "message": "自分の鍵を使いますか？"
@@ -2192,6 +2198,79 @@
   },
   "entry_toast_copied": {
     "message": "インストールコマンドをコピーしました"
+  },
+  "entry_toast_panel": {
+    "message": "コントロールパネルを開きます"
+  },
+  "entry_explore": {
+    "message": "FSB を探索"
+  },
+  "entry_panel_opened": {
+    "message": "コントロールパネルを開きました"
+  },
+  "entry_more_panel": {
+    "message": "FSB について知ることはまだたくさんあります。すべてコントロールパネルにあります。"
+  },
+  "entry_connect_heading": {
+    "message": "$NAME$ に接続",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_aria": {
+    "message": "$NAME$ の API キー",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_lm_url_aria": {
+    "message": "LM Studio サーバーの URL"
+  },
+  "entry_cue_begin": {
+    "message": "スクロールして開始"
+  },
+  "entry_nudge_path": {
+    "message": "続けるには経路を選んでください"
+  },
+  "entry_nudge_key": {
+    "message": "鍵を追加するか、MCP へ進んでください"
+  },
+  "entry_nudge_local": {
+    "message": "LM Studio を起動するか、MCP へ進んでください"
+  },
+  "entry_stage_aria": {
+    "message": "FSB の初期設定。スクロール、スワイプ、または矢印キーでステップを移動できます。"
+  },
+  "entry_rail_aria": {
+    "message": "初期設定のステップ"
+  },
+  "entry_rail_back": {
+    "message": "$STEP$ に戻る",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_current": {
+    "message": "$STEP$（現在のステップ）",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_ahead": {
+    "message": "$STEP$（未到達）",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
   },
   "entry_onboarding_tag": {
     "message": "初期設定"

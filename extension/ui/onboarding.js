@@ -5,6 +5,17 @@
   const VERSION = chrome.runtime.getManifest().version;
   const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
   const ROTATE_MS = 1800;
+  const KEY_ACCEPT_MS = 520;
+  const NUDGE_MS = 2200;
+  const AGENTS_PAGE_URL = 'https://full-selfbrowsing.com/agents';
+  const CLAWHUB_SKILL_URL = 'https://clawhub.ai/lakshmanturlapati/full-selfbrowsing';
+
+  // Every step is a plane in the room, in the order the planes sit on the z axis.
+  // 'setup' is only a placeholder on the route before a path is chosen; it has no plane.
+  const STEPS = ['welcome', 'path', 'mcp', 'provider', 'apikey', 'pin', 'done'];
+  // Steps of the two setup tracks. Switching between them is a sidestep, not a flight:
+  // Agent lives to the left, in-browser to the right, as the two cards sit on the path step.
+  const TRACK_STEPS = ['mcp', 'provider', 'apikey'];
 
   const PROVIDER_KEY_FIELDS = {
     xai: 'apiKey',
@@ -32,20 +43,24 @@
     { id: 'lmstudio', name: 'LM Studio', icon: 'fa-solid fa-cube', tag: 'Local / No Key', tagClass: 'ob-tag-local', local: true }
   ];
 
+  // `logo` names an .ob-lg-* mask class in onboarding.css. The first half fans up from
+  // the copy button, the second half fans down.
   const INSTALL_CLIENTS = [
-    { id: 'claude-code', name: 'Claude Code', logo: 'claude.svg', flag: '--claude-code', cmd: 'npx -y fsb-mcp-server@latest install --claude-code' },
-    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude.svg', flag: '--claude-desktop', cmd: 'npx -y fsb-mcp-server@latest install --claude-desktop' },
-    { id: 'cursor', name: 'Cursor', logo: 'cursor.svg', flag: '--cursor', cmd: 'npx -y fsb-mcp-server@latest install --cursor' },
-    { id: 'vscode', name: 'VS Code', logo: 'vscode.svg', flag: '--vscode', cmd: 'npx -y fsb-mcp-server@latest install --vscode' },
-    { id: 'antigravity', name: 'Antigravity', logo: 'antigravity.svg', flag: '--antigravity', cmd: 'npx -y fsb-mcp-server@latest install --antigravity' },
-    { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: 'npx -y fsb-mcp-server@latest install --codex' },
-    { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: 'npx -y fsb-mcp-server@latest install --opencode' },
-    { id: 'cline', name: 'Cline', logo: 'cline.svg', flag: '--cline', cmd: 'npx -y fsb-mcp-server@latest install --cline' },
-    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server@latest' },
-    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: 'npx -y fsb-mcp-server@latest install --all' }
+    { id: 'claude-code', name: 'Claude Code', logo: 'claude', flag: '--claude-code', cmd: 'npx -y fsb-mcp-server@latest install --claude-code' },
+    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude', flag: '--claude-desktop', cmd: 'npx -y fsb-mcp-server@latest install --claude-desktop' },
+    { id: 'cursor', name: 'Cursor', logo: 'cursor', flag: '--cursor', cmd: 'npx -y fsb-mcp-server@latest install --cursor' },
+    { id: 'vscode', name: 'VS Code', logo: 'vscode', flag: '--vscode', cmd: 'npx -y fsb-mcp-server@latest install --vscode' },
+    { id: 'antigravity', name: 'Antigravity', logo: 'antigravity', flag: '--antigravity', cmd: 'npx -y fsb-mcp-server@latest install --antigravity' },
+    { id: 'codex', name: 'Codex', logo: 'openai', flag: '--codex', cmd: 'npx -y fsb-mcp-server@latest install --codex' },
+    { id: 'opencode', name: 'OpenCode', logo: 'opencode', flag: '--opencode', cmd: 'npx -y fsb-mcp-server@latest install --opencode' },
+    { id: 'cline', name: 'Cline', logo: 'cline', flag: '--cline', cmd: 'npx -y fsb-mcp-server@latest install --cline' },
+    { id: 'gemini', name: 'Gemini CLI', logo: 'gemini', flag: '--gemini', cmd: 'npx -y fsb-mcp-server@latest install --gemini' },
+    { id: 'all', name: 'All Clients', logo: 'all', flag: '--all', cmd: 'npx -y fsb-mcp-server@latest install --all' }
   ];
 
-  const ROLL_CLIENTS = INSTALL_CLIENTS.slice(0, 8);
+  // The clients the install bar cycles through, in the order it shows them.
+  const ROLL_CLIENTS = ['claude-code', 'claude-desktop', 'cursor', 'vscode', 'antigravity', 'codex', 'gemini', 'opencode', 'cline']
+    .map((id) => INSTALL_CLIENTS.find((client) => client.id === id));
   const ALL_INSTALL_CLIENT_IDS = [
     'claude-code',
     'claude-desktop',
@@ -54,8 +69,11 @@
     'antigravity',
     'codex',
     'opencode',
-    'cline'
+    'cline',
+    'gemini'
   ];
+  // The always-on agents the Agents page leads with: Grok Bot, Muse, Dots, OpenClaw, Hermes.
+  const AGENT_MARKS = ['grokbot', 'meta', 'openai', 'openclaw', 'hermes'];
   const FSB_AGENT_PROVIDERS_STORAGE_KEY = 'fsbAgentProviders';
   function ob(key, english, subs) {
     const locale = globalThis.fsbUiLocale;
@@ -117,18 +135,28 @@
     paused: false,
     fanOpen: false,
     copied: null,
+    // What the last step opened: 'panel' (control panel), 'fsb' (side panel) or false.
     opened: false,
     skipped: false,
-    toast: ''
+    toast: '',
+    nudge: ''
   };
 
   const els = {};
+  // step -> { el: its <section>, html: the markup last patched into it }
+  const planes = {};
+  const handlers = [];
+  let depth = null;
+  let seen = null;
+  let railHtml = '';
   let rollTimer = null;
   let rafId = null;
   let copiedTimer = null;
   let toastTimer = null;
   let fanCloseTimer = null;
   let hoverTimer = null;
+  let nudgeTimer = null;
+  let acceptTimer = null;
   let currentWindowId = null;
   let copyClickMutationTail = Promise.resolve();
   let lmstudioDiscoveryGeneration = 0;
@@ -141,13 +169,18 @@
 
   async function init() {
     els.root = document.querySelector('.ob');
-    els.screen = document.getElementById('obScreen');
+    els.screen = document.getElementById('obStage');
     els.nodes = document.getElementById('obNodes');
     els.trackFill = document.getElementById('obTrackFill');
+    els.cue = document.getElementById('obCue');
+    els.cueText = document.getElementById('obCueText');
     els.stepLabel = document.getElementById('obStepLabel');
     els.toast = document.getElementById('obToast');
     els.toastMsg = document.getElementById('obToastMsg');
 
+    buildPlanes();
+    bindInteractions();
+    listen();
     setupTheme();
     await loadInitialState();
     // Resolve a concrete window id now (async is safe here, well before the
@@ -160,6 +193,7 @@
       }
     } catch (_e) { /* fall back to no-windowId open in openFsb() */ }
     render();
+    startDepth();
     if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
       if (typeof fsbUiLocale.onChange === 'function') fsbUiLocale.onChange(() => render());
       fsbUiLocale.boot().then(() => {
@@ -198,25 +232,165 @@
     }
   }
 
-  function route() {
-    if (state.path === 'mcp') return ['welcome', 'path', 'mcp', 'pin', 'done'];
-    if (state.path === 'byok') return ['welcome', 'path', 'provider', 'apikey', 'pin', 'done'];
+  function route(path = state.path) {
+    if (path === 'mcp') return ['welcome', 'path', 'mcp', 'pin', 'done'];
+    if (path === 'byok') return ['welcome', 'path', 'provider', 'apikey', 'pin', 'done'];
     return ['welcome', 'path', 'setup', 'pin', 'done'];
   }
+
+  // ---- the room ----
+
+  function buildPlanes() {
+    STEPS.forEach((step) => {
+      const section = document.createElement('section');
+      section.className = 'ob3-layer';
+      section.dataset.step = step;
+      if (step === 'done') section.setAttribute('data-end', '');
+      els.screen.appendChild(section);
+      planes[step] = { el: section, html: '' };
+    });
+  }
+
+  function startDepth() {
+    const engine = globalThis.FSBOnboardingDepth;
+    if (!engine || typeof engine.create !== 'function') return;
+    depth = engine.create(els.root, { canStep, step: stepBy, nudge });
+    seen = { screen: state.screen, path: state.path };
+    if (depth) depth.set(targets(), 0, true);
+    setProgress();
+  }
+
+  // Each step's distance from the one in focus; steps off the route get none.
+  function targets() {
+    const r = route();
+    const current = r.indexOf(state.screen);
+    const out = {};
+    STEPS.forEach((step) => {
+      const index = r.indexOf(step);
+      out[step] = index < 0 ? null : index - current;
+    });
+    return out;
+  }
+
+  // How far through the route: the glow drifts across the room with it.
+  function setProgress() {
+    if (!els.root || !els.root.style || typeof els.root.style.setProperty !== 'function') return;
+    const r = route();
+    const index = Math.max(0, r.indexOf(state.screen));
+    els.root.style.setProperty('--prog', String(r.length > 1 ? Math.round((index / (r.length - 1)) * 1000) / 1000 : 0));
+  }
+
+  // After a render: if the step or the route changed, fly the camera there.
+  function syncDepth() {
+    if (!depth || !seen) return;
+    const prev = seen;
+    if (prev.screen === state.screen && prev.path === state.path) return;
+    seen = { screen: state.screen, path: state.path };
+    setProgress();
+    const was = route(prev.path).indexOf(prev.screen);
+    const now = route().indexOf(state.screen);
+    const dir = now > was ? 1 : now < was ? -1 : prev.screen !== state.screen ? 1 : 0;
+    const switchedTrack = prev.path && state.path && prev.path !== state.path
+      && TRACK_STEPS.includes(prev.screen) && TRACK_STEPS.includes(state.screen);
+    const side = switchedTrack ? (state.path === 'byok' ? 1 : -1) : 0;
+    depth.set(targets(), dir, false, side);
+    // The control that was pressed now sits on a plane that has left; keep the keyboard on the stage.
+    if (prev.screen !== state.screen) {
+      const active = document.activeElement;
+      if (!active || active === document.body || (active.closest && active.closest('.ob3-layer[inert]'))) depth.focus();
+    }
+  }
+
+  // Whether a scroll, swipe or arrow key may move on from this step.
+  function canStep(dir) {
+    const r = route();
+    const index = r.indexOf(state.screen);
+    if (dir < 0) return stepBefore(r, index) !== null;
+    if (index < 0 || index >= r.length - 1) return false;
+    if (state.screen === 'path') return !!state.path;
+    if (state.screen === 'apikey') return state.keyStatus === 'valid';
+    return true;
+  }
+
+  function stepBy(dir) {
+    if (dir > 0) goNext();
+    else goBack();
+  }
+
+  // A step that still needs an answer says so in the cue.
+  function nudge() {
+    let message = '';
+    if (state.screen === 'path') message = ob('entry_nudge_path', 'Pick a path to continue');
+    else if (state.screen === 'apikey') {
+      message = currentProvider().local
+        ? ob('entry_nudge_local', 'Start LM Studio, or skip to MCP')
+        : ob('entry_nudge_key', 'Add a key, or skip to MCP');
+    }
+    if (!message) return;
+    clearTimeout(nudgeTimer);
+    state.nudge = message;
+    render();
+    nudgeTimer = setTimeout(() => {
+      state.nudge = '';
+      render();
+    }, NUDGE_MS);
+  }
+
+  // The nearest earlier step that has a plane to land on.
+  function stepBefore(r, index) {
+    for (let i = index - 1; i >= 0; i--) {
+      if (STEPS.includes(r[i])) return r[i];
+    }
+    return null;
+  }
+
+  // ---- rendering ----
 
   function render() {
     els.root.dataset.theme = state.theme;
 
     renderStepper();
-    if (state.screen === 'welcome') renderWelcome();
-    else if (state.screen === 'path') renderPath();
-    else if (state.screen === 'mcp') renderMcp();
-    else if (state.screen === 'provider') renderProvider();
-    else if (state.screen === 'apikey') renderApiKey();
-    else if (state.screen === 'pin') renderPin();
-    else renderDone();
+    STEPS.forEach((step) => {
+      const plane = planes[step];
+      if (!plane) return;
+      const label = planeLabel(step);
+      if (plane.el.getAttribute('aria-label') !== label) plane.el.setAttribute('aria-label', label);
+      const html = planeHtml(step);
+      if (html === plane.html) return;
+      plane.html = html;
+      morph(plane.el, html);
+    });
+    syncDoneGrid();
 
     renderToast();
+    syncDepth();
+    // Arriving on the LM Studio step starts model discovery once.
+    if (state.screen === 'apikey'
+        && currentProvider().local
+        && state.lmstudioDiscoveryStatus === 'idle'
+        && lmstudioDiscoveryTimer === null) {
+      void discoverLmStudioModels();
+    }
+  }
+
+  function planeHtml(step) {
+    if (step === 'welcome') return welcomeHtml();
+    if (step === 'path') return pathHtml();
+    if (step === 'mcp') return mcpHtml();
+    if (step === 'provider') return providerHtml();
+    if (step === 'apikey') return apiKeyHtml();
+    if (step === 'pin') return pinHtml();
+    return doneHtml();
+  }
+
+  function planeLabel(step) {
+    if (step === 'welcome') return stepLabel('welcome');
+    if (step === 'path') return ob('entry_pick_path', 'Pick Your Path');
+    if (step === 'mcp') return ob('entry_install_h', 'Install the FSB MCP server');
+    if (step === 'provider') return ob('entry_choose_provider', 'Choose your AI provider');
+    if (step === 'apikey') return keyHeading(currentProvider());
+    if (step === 'pin') return ob('entry_pin_h', "Pin FSB so it's one click away");
+    return ob('entry_all_set', "You're all set.");
   }
 
   function renderStepper() {
@@ -224,155 +398,497 @@
     const currentIndex = Math.max(0, r.indexOf(state.screen));
     els.stepLabel.textContent = ob('entry_step', 'Step $CURRENT$ of $TOTAL$', { current: currentIndex + 1, total: r.length });
     els.trackFill.style.width = r.length > 1 ? `${Math.round((currentIndex / (r.length - 1)) * 100)}%` : '0%';
-    els.nodes.innerHTML = r.map((step, index) => {
+    if (els.cue) els.cue.classList.toggle('is-nudge', !!state.nudge);
+    if (els.cueText) {
+      els.cueText.textContent = state.nudge
+        || (state.screen === 'welcome' ? ob('entry_cue_begin', 'Scroll to begin') : stepLabel(state.screen));
+    }
+    const html = r.map((step, index) => {
       const done = index < currentIndex;
-      const cls = done ? 'done click' : index === currentIndex ? 'active' : '';
-      const content = done ? '<i class="fa-solid fa-check"></i>' : String(index + 1);
-      return `<button class="ob-node ${cls}" type="button" data-step="${escapeAttr(step)}" ${done ? '' : 'disabled'}>${content}<span class="ob-node-lab">${escapeHtml(stepLabel(step))}</span></button>`;
+      const current = index === currentIndex;
+      const reachable = done && STEPS.includes(step);
+      const label = stepLabel(step);
+      const cls = done ? ' is-done' : current ? ' is-active' : '';
+      const aria = reachable
+        ? ob('entry_rail_back', 'Back to $STEP$', { step: label })
+        : current
+          ? ob('entry_rail_current', '$STEP$, current step', { step: label })
+          : done ? label : ob('entry_rail_ahead', '$STEP$, not reached yet', { step: label });
+      return `<button class="fsb-depth-go${cls}" type="button" data-step="${escapeAttr(step)}" aria-label="${escapeAttr(aria)}"${current ? ' aria-current="step"' : ''}${reachable ? '' : ' disabled'}><span class="fsb-depth-lbl">${escapeHtml(label)}</span><span class="fsb-depth-tick" aria-hidden="true"></span></button>`;
     }).join('');
-    els.nodes.querySelectorAll('.ob-node.click').forEach((button) => {
-      button.addEventListener('click', () => {
-        state.screen = button.dataset.step;
-        render();
-      });
-    });
+    if (html !== railHtml) {
+      railHtml = html;
+      morph(els.nodes, html);
+    }
   }
 
-  function renderWelcome() {
-    els.screen.innerHTML = `
-      <div class="ob-screen ob-welcome">
-        <h1>${escapeHtml(ob('entry_future_lead', 'The future of'))} <span class="highlight">${escapeHtml(ob('entry_future_word', 'autonomous'))}</span> ${escapeHtml(ob('entry_future_tail', 'browsing.'))}</h1>
-        <p class="ob-sub">${escapeHtml(ob('entry_welcome_sub', "You made the right call. Your agents are about to experience the best autonomous browsing engine of their lifetime. Pure DOM precision, no vision, no guessing. They'll never go back to clicking blind."))}</p>
-        <div class="ob-feat-row">
-          <div class="ob-feat"><i class="fa-solid fa-bolt"></i><b>${escapeHtml(ob('entry_feat_api', 'Direct API'))}</b><span>${escapeHtml(ob('entry_feat_api_sub', 'Talks to apps, not just clicks'))}</span></div>
-          <div class="ob-feat"><i class="fa-solid fa-compass"></i><b>${escapeHtml(ob('entry_feat_guides', '130+ guides'))}</b><span>${escapeHtml(ob('entry_feat_guides_sub', 'Across 17 categories'))}</span></div>
-          <div class="ob-feat"><i class="fa-solid fa-plug"></i><b>${escapeHtml(ob('entry_feat_tools', 'Full MCP toolset'))}</b><span>${escapeHtml(ob('entry_feat_tools_sub', 'From your coding agent'))}</span></div>
+  function welcomeHtml() {
+    return `
+      <div class="ob3-fit">
+        <div class="ob3-col ob3-welcome">
+          <h1 data-di="0">${escapeHtml(ob('entry_future_lead', 'The future of'))} <span class="highlight">${escapeHtml(ob('entry_future_word', 'autonomous'))}</span> ${escapeHtml(ob('entry_future_tail', 'browsing.'))}</h1>
+          <p class="ob-sub" data-di="0.3">${escapeHtml(ob('entry_welcome_sub', "You made the right call. Your agents are about to experience the best autonomous browsing engine of their lifetime. Pure DOM precision, no vision, no guessing. They'll never go back to clicking blind."))}</p>
+          <div class="ob-feat-row">
+            <div class="ob-feat" data-di="0.5"><i class="fa-solid fa-bolt"></i><b>${escapeHtml(ob('entry_feat_api', 'Direct API'))}</b><span>${escapeHtml(ob('entry_feat_api_sub', 'Talks to apps, not just clicks'))}</span></div>
+            <div class="ob-feat" data-di="0.58"><i class="fa-solid fa-compass"></i><b>${escapeHtml(ob('entry_feat_guides', '130+ guides'))}</b><span>${escapeHtml(ob('entry_feat_guides_sub', 'Across 17 categories'))}</span></div>
+            <div class="ob-feat" data-di="0.66"><i class="fa-solid fa-plug"></i><b>${escapeHtml(ob('entry_feat_tools', 'Full MCP toolset'))}</b><span>${escapeHtml(ob('entry_feat_tools_sub', 'From your agent'))}</span></div>
+          </div>
+          <div class="ob-nav ob-nav-center" data-di="0.8"><button class="ob-btn ob-btn-primary ob-btn-wide" id="obGetStarted" type="button" data-door="primary">${escapeHtml(ob('entry_get_started', 'Get started'))} <i class="fa-solid fa-arrow-right"></i></button></div>
+          <button class="ob-skip ob-skip-center" id="obWelcomeSkip" type="button" data-di="0.9">${escapeHtml(ob('entry_skip_setup', 'Skip setup for now'))}</button>
+          <div class="ob-welcome-ver" data-di="1"><span class="version-tag" translate="no">v${escapeHtml(VERSION)}</span></div>
         </div>
-        <div class="ob-nav ob-nav-center"><button class="ob-btn ob-btn-primary ob-btn-wide" id="obGetStarted" type="button">${escapeHtml(ob('entry_get_started', 'Get started'))} <i class="fa-solid fa-arrow-right"></i></button></div>
-        <button class="ob-skip ob-skip-center" id="obWelcomeSkip" type="button">${escapeHtml(ob('entry_skip_setup', 'Skip setup for now'))}</button>
-        <div class="ob-welcome-ver"><span class="version-tag" translate="no">v${escapeHtml(VERSION)}</span></div>
       </div>
     `;
-    bind('#obGetStarted', 'click', goNext);
-    bind('#obWelcomeSkip', 'click', () => finishOnboarding({ skipped: true, path: null }));
   }
 
-  function renderPath() {
-    els.screen.innerHTML = `
-      <div class="ob-screen">
-        <div class="ob-eyebrow">${escapeHtml(ob('entry_pick_path', 'Pick Your Path'))}</div>
-        <h2 class="ob-h">${escapeHtml(ob('entry_how_run', 'How do you want to run FSB?'))}</h2>
-        <p class="ob-sub">${escapeHtml(ob('entry_two_ways', 'Two ways in. Set up one now and add the other anytime in Settings.'))}</p>
-        <div class="ob-paths">
-          <button class="ob-path ${state.path === 'mcp' ? 'sel' : ''}" type="button" id="obPickMcp">
-            <div class="ob-path-ic"><i class="fa-solid fa-plug"></i></div>
-            <div class="ob-path-body">
-              <div class="ob-path-head"><span class="ob-path-name">${escapeHtml(ob('entry_agent', 'Agent'))}</span><span class="ob-badge">${escapeHtml(ob('entry_recommended', 'Recommended'))}</span></div>
-              <div class="ob-path-desc">${escapeHtml(ob('entry_agent_desc', 'Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. No API key, nothing to configure in the browser.'))}</div>
-            </div>
-            <div class="ob-path-check"><i class="fa-solid fa-check"></i></div>
-          </button>
-          <button class="ob-path ${state.path === 'byok' ? 'sel' : ''}" type="button" id="obPickByok">
-            <div class="ob-path-ic"><i class="fa-solid fa-comments"></i></div>
-            <div class="ob-path-body">
-              <div class="ob-path-head"><span class="ob-path-name">${escapeHtml(ob('entry_in_browser', 'In this browser'))}</span><span class="ob-badge-soft">${escapeHtml(ob('entry_byok', 'BYOK'))}</span></div>
-              <div class="ob-path-desc">${escapeHtml(ob('entry_byok_desc', 'Chat with FSB in the side panel. Bring your own key from xAI, Anthropic or Google, or run a local model with no key at all.'))}</div>
-            </div>
-            <div class="ob-path-check"><i class="fa-solid fa-check"></i></div>
-          </button>
+  function pathHtml() {
+    return `
+      <div class="ob3-fit">
+        <div class="ob3-col ob3-path">
+          <div class="ob-eyebrow" data-di="0">${escapeHtml(ob('entry_pick_path', 'Pick Your Path'))}</div>
+          <h2 class="ob-h" data-di="0.08">${escapeHtml(ob('entry_how_run', 'How do you want to run FSB?'))}</h2>
+          <p class="ob-sub" data-di="0.2">${escapeHtml(ob('entry_two_ways', 'Two ways in. Set up one now and add the other anytime in Settings.'))}</p>
+          <div class="ob-paths${state.path ? ' has-sel' : ''}">
+            <button class="ob-path${state.path === 'mcp' ? ' sel' : ''}" type="button" id="obPickMcp" data-door="always" data-di="0.35" aria-pressed="${state.path === 'mcp'}">
+              <div class="ob-path-ic"><i class="fa-solid fa-plug"></i></div>
+              <div class="ob-path-body">
+                <div class="ob-path-head"><span class="ob-path-name">${escapeHtml(ob('entry_agent', 'Agent'))}</span><span class="ob-badge">${escapeHtml(ob('entry_recommended', 'Recommended'))}</span></div>
+                <div class="ob-path-desc">${escapeHtml(ob('entry_agent_desc', 'Give Grok Bot, Muse, Dots, OpenClaw, Hermes or your coding agent a real browser over MCP. No API key, nothing to configure in the browser.'))}</div>
+              </div>
+              <div class="ob-path-check"><i class="fa-solid fa-check"></i></div>
+            </button>
+            <button class="ob-path${state.path === 'byok' ? ' sel' : ''}" type="button" id="obPickByok" data-door="always" data-di="0.47" aria-pressed="${state.path === 'byok'}">
+              <div class="ob-path-ic"><i class="fa-solid fa-comments"></i></div>
+              <div class="ob-path-body">
+                <div class="ob-path-head"><span class="ob-path-name">${escapeHtml(ob('entry_in_browser', 'In this browser'))}</span><span class="ob-badge-soft">${escapeHtml(ob('entry_byok', 'BYOK'))}</span></div>
+                <div class="ob-path-desc">${escapeHtml(ob('entry_byok_desc', 'Chat with FSB in the side panel. Bring your own key from xAI, Anthropic or Google, or run a local model with no key at all.'))}</div>
+              </div>
+              <div class="ob-path-check"><i class="fa-solid fa-check"></i></div>
+            </button>
+          </div>
+          <div class="ob-note" data-di="0.6"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(ob('entry_most_people', 'Most people start with MCP, the fastest and cheapest way to use FSB.'))}</div>
+          ${navHtml({ di: '0.75', nextDisabled: !state.path, skipLabel: ob('entry_skip_mcp', 'Skip to MCP'), skipId: 'obSkipPath' })}
         </div>
-        <div class="ob-note"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(ob('entry_most_people', 'Most people start with MCP, the fastest and cheapest way to use FSB.'))}</div>
-        ${navHtml({ nextDisabled: !state.path, skipLabel: ob('entry_skip_mcp', 'Skip to MCP'), skipId: 'obSkipPath' })}
       </div>
     `;
-    bind('#obPickMcp', 'click', () => { state.path = 'mcp'; render(); });
-    bind('#obPickByok', 'click', () => { state.path = 'byok'; render(); });
-    bindNav();
-    bind('#obSkipPath', 'click', () => { state.path = 'mcp'; state.screen = 'mcp'; render(); });
   }
 
-  function renderMcp() {
+  function mcpHtml() {
     const current = ROLL_CLIENTS[state.iconIndex];
     const half = Math.ceil(INSTALL_CLIENTS.length / 2);
-    els.screen.innerHTML = `
-      <div class="ob-screen">
-        <div class="ob-eyebrow">${escapeHtml(ob('entry_mcp_eyebrow', 'Recommended Path / MCP'))}</div>
-        <h2 class="ob-h">${escapeHtml(ob('entry_install_h', 'Install the FSB MCP server'))}</h2>
-        <p class="ob-sub">${escapeHtml(ob('entry_one_command', 'One command. Pick your agent. FSB registers itself automatically. No API key needed.'))}</p>
-        <div class="install-widget" id="obInstallWidget" style="margin-top:18px">
-          <div class="install-label">${escapeHtml(ob('entry_one_command_short', 'One command. Pick your agent.'))}</div>
-          <div class="install-bar">
-            <span class="install-mark ${state.morphing ? 'is-morphing' : ''}"><span class="install-glyph" role="img" aria-label="${escapeAttr(current.name)}" style="${maskStyle(current.logo)}"></span></span>
-            <button class="install-cmd" type="button" id="obCopyCurrent" title="${escapeAttr(ob('entry_copy_command', 'Copy command'))}">
-              <span class="install-base" translate="no">${BASE_INSTALL_COMMAND}</span>
-              <span class="install-flag ${state.morphing ? 'is-morphing' : ''}" translate="no">${escapeHtml(state.token)}</span>
-            </button>
-            <div class="install-copy-wrap" id="obCopyWrap">
-              <button class="install-copy ${state.copied === 'current' ? 'copied' : ''}" type="button" id="obCopyIcon" aria-label="${escapeAttr(ob('entry_copy_install', 'Copy install command'))}"><i class="${state.copied === 'current' ? 'fa-solid fa-check' : 'fa-regular fa-copy'}"></i></button>
-              ${fanHtml(INSTALL_CLIENTS.slice(0, half), 'install-fan-up', -1)}
-              ${fanHtml(INSTALL_CLIENTS.slice(half), 'install-fan-down', 1)}
+    return `
+      <div class="ob3-fit">
+        <div class="ob3-col ob3-mcp">
+          <div class="ob-eyebrow" data-di="0">${escapeHtml(ob('entry_mcp_eyebrow', 'Recommended Path / MCP'))}</div>
+          <h2 class="ob-h" data-di="0.08">${escapeHtml(ob('entry_install_h', 'Install the FSB MCP server'))}</h2>
+          <p class="ob-sub" data-di="0.2">${escapeHtml(ob('entry_one_command', 'One command. Pick your agent. FSB registers itself automatically. No API key needed.'))}</p>
+          <div class="install-widget" id="obInstallWidget" data-di="0.35" style="margin-top:26px">
+            <div class="install-label">${escapeHtml(ob('entry_one_command_short', 'One command. Pick your agent.'))}</div>
+            <div class="install-bar">
+              <span class="install-mark${state.morphing ? ' is-morphing' : ''}"><span class="install-glyph ob-lg-${current.logo}" role="img" aria-label="${escapeAttr(current.name)}"></span></span>
+              <button class="install-cmd" type="button" id="obCopyCurrent" title="${escapeAttr(ob('entry_copy_command', 'Copy command'))}">
+                <span class="install-base" translate="no">${BASE_INSTALL_COMMAND}</span>
+                <span class="install-flag${state.morphing ? ' is-morphing' : ''}" translate="no">${escapeHtml(state.token)}</span>
+              </button>
+              <div class="install-copy-wrap" id="obCopyWrap" data-depth-own>
+                <button class="install-copy${state.copied === 'current' ? ' copied' : ''}" type="button" id="obCopyIcon" aria-label="${escapeAttr(ob('entry_copy_install', 'Copy install command'))}"><i class="${state.copied === 'current' ? 'fa-solid fa-check' : 'fa-regular fa-copy'}"></i></button>
+                ${fanHtml(INSTALL_CLIENTS.slice(0, half), 'install-fan-up', -1)}
+                ${fanHtml(INSTALL_CLIENTS.slice(half), 'install-fan-down', 1)}
+              </div>
             </div>
           </div>
+          <div class="ob-mcp-steps">
+            <div class="ob-mcp-step" data-di="0.5"><span class="n">1</span><span>${escapeHtml(ob('entry_mcp_1a', 'Run the command in your terminal.'))} <b>${escapeHtml(ob('entry_mcp_1b', 'Hover copy'))}</b> ${escapeHtml(ob('entry_mcp_1c', 'to pick a specific client.'))}</span></div>
+            <div class="ob-mcp-step" data-di="0.57"><span class="n">2</span><span>${escapeHtml(ob('entry_mcp_2a', "FSB writes itself into your agent's MCP config."))} <b>${escapeHtml(ob('entry_mcp_2b', 'Every FSB tool'))}</b>${escapeHtml(ob('entry_mcp_2c', ', zero manual JSON.'))}</span></div>
+            <div class="ob-mcp-step" data-di="0.64"><span class="n">3</span><span>${escapeHtml(ob('entry_mcp_3', "Ask your agent to browse. It drives FSB's DOM engine for you."))}</span></div>
+          </div>
+          <a class="ob-claw" href="${AGENTS_PAGE_URL}" target="_blank" rel="noopener" data-di="0.72">
+            <span class="ob3-agents-marks" aria-hidden="true">${AGENT_MARKS.map((logo) => `<span class="ob3-agents-mark"><span class="install-glyph ob-lg-${logo}"></span></span>`).join('')}</span>
+            <span class="ob-claw-body"><span class="ob-claw-name">${escapeHtml(ob('entry_agents_card_name', 'Running an always-on agent?'))}</span><span class="ob-claw-desc">${escapeHtml(ob('entry_agents_card_desc', 'Grok Bot, Muse, Dots, OpenClaw and Hermes drive FSB over MCP too. See how on the Agents page.'))}</span></span>
+            <i class="fa-solid fa-arrow-up-right-from-square ob-claw-go"></i>
+          </a>
+          <div class="ob-note ob3-skill" data-di="0.77"><i class="fa-solid fa-circle-info"></i><span>${escapeHtml(ob('entry_clawhub_lead', 'On OpenClaw or Hermes? The fastest route is the'))} <a href="${CLAWHUB_SKILL_URL}" target="_blank" rel="noopener">${escapeHtml(ob('entry_clawhub_link', 'FSB Skill on ClawHub'))}</a>.</span></div>
+          ${navHtml({ di: '0.82', skipLabel: ob('entry_prefer_key', 'Prefer your own key?'), skipId: 'obUseByok', skipArrow: true })}
         </div>
-        <div class="ob-mcp-steps">
-          <div class="ob-mcp-step"><span class="n">1</span><span>${escapeHtml(ob('entry_mcp_1a', 'Run the command in your terminal.'))} <b>${escapeHtml(ob('entry_mcp_1b', 'Hover copy'))}</b> ${escapeHtml(ob('entry_mcp_1c', 'to pick a specific client.'))}</span></div>
-          <div class="ob-mcp-step"><span class="n">2</span><span>${escapeHtml(ob('entry_mcp_2a', "FSB writes itself into your agent's MCP config."))} <b>${escapeHtml(ob('entry_mcp_2b', 'Every FSB tool'))}</b>${escapeHtml(ob('entry_mcp_2c', ', zero manual JSON.'))}</span></div>
-          <div class="ob-mcp-step"><span class="n">3</span><span>${escapeHtml(ob('entry_mcp_3', "Ask your agent to browse. It drives FSB's DOM engine for you."))}</span></div>
-        </div>
-        <a class="ob-claw" href="#" id="obOpenClaw">
-          <span class="ob-claw-ic"><span class="install-glyph" role="img" aria-label="OpenClaw" style="${maskStyle('openclaw.svg')}"></span></span>
-          <span class="ob-claw-body"><span class="ob-claw-name">${escapeHtml(ob('entry_claw_name', 'Set it up for your Claw'))}</span><span class="ob-claw-desc">${escapeHtml(ob('entry_claw_desc', 'Guided OpenClaw install in the control panel'))}</span></span>
-          <i class="fa-solid fa-arrow-up-right-from-square ob-claw-go"></i>
-        </a>
-        ${navHtml({ skipLabel: ob('entry_prefer_key', 'Prefer your own key?'), skipId: 'obUseByok', skipArrow: true })}
       </div>
     `;
-    bindMcpInteractions();
-    bindNav();
-    bind('#obUseByok', 'click', () => { state.path = 'byok'; state.screen = 'provider'; render(); });
-    bind('#obOpenClaw', 'click', (event) => {
-      event.preventDefault();
-      openInternalPage('ui/control_panel.html#sync');
-    });
   }
 
-  function renderProvider() {
-    els.screen.innerHTML = `
-      <div class="ob-screen">
-        <div class="ob-eyebrow">${escapeHtml(ob('entry_byok_eyebrow', 'In-Browser / BYOK'))}</div>
-        <h2 class="ob-h">${escapeHtml(ob('entry_choose_provider', 'Choose your AI provider'))}</h2>
-        <div class="ob-hint"><i class="fa-solid fa-wand-magic-sparkles"></i><div class="ob-hint-body"><b>${escapeHtml(ob('entry_dont_need', "You don't actually need this."))}</b> ${escapeHtml(ob('entry_best_way', 'The best way to run FSB is through MCP. No key, no cost ceiling.'))} <button class="ob-link" type="button" id="obUseMcpFromProvider">${escapeHtml(ob('entry_setup_mcp', 'Set up MCP instead'))}</button></div></div>
-        <div class="ob-providers">
-          ${PROVIDERS.map(providerButtonHtml).join('')}
-          <div class="ob-prov-note"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(ob('entry_once_key', 'Once your key is set, FSB lists every available text model automatically.'))}</div>
+  function providerHtml() {
+    return `
+      <div class="ob3-fit">
+        <div class="ob3-col ob3-provider">
+          <div class="ob-eyebrow" data-di="0">${escapeHtml(ob('entry_byok_eyebrow', 'In-Browser / BYOK'))}</div>
+          <h2 class="ob-h" data-di="0.08">${escapeHtml(ob('entry_choose_provider', 'Choose your AI provider'))}</h2>
+          <div class="ob-hint" data-di="0.2"><i class="fa-solid fa-wand-magic-sparkles"></i><div class="ob-hint-body"><b>${escapeHtml(ob('entry_dont_need', "You don't actually need this."))}</b> ${escapeHtml(ob('entry_best_way', 'The best way to run FSB is through MCP. No key, no cost ceiling.'))} <button class="ob-link" type="button" id="obUseMcpFromProvider">${escapeHtml(ob('entry_setup_mcp', 'Set up MCP instead'))}</button></div></div>
+          <div class="ob-providers">
+            ${PROVIDERS.map(providerButtonHtml).join('')}
+            <div class="ob-prov-note" data-di="0.62"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(ob('entry_once_key', 'Once your key is set, FSB lists every available text model automatically.'))}</div>
+          </div>
+          ${navHtml({ di: '0.75', skipLabel: ob('entry_skip_mcp', 'Skip to MCP'), skipId: 'obUseMcpFromProviderSkip' })}
         </div>
-        ${navHtml({ skipLabel: ob('entry_skip_mcp', 'Skip to MCP'), skipId: 'obUseMcpFromProviderSkip' })}
       </div>
     `;
-    PROVIDERS.forEach((provider) => {
-      bind(`#obProvider-${provider.id}`, 'click', () => selectProvider(provider.id));
-    });
-    bind('#obUseMcpFromProvider', 'click', useMcp);
-    bind('#obUseMcpFromProviderSkip', 'click', useMcp);
-    bindNav({ beforeNext: persistProviderSelection });
   }
 
-  function renderApiKey() {
+  function apiKeyHtml() {
     const provider = currentProvider();
     const local = !!provider.local;
     const localSelectionReady = !local || (
       state.lmstudioDiscoveryStatus === 'ready'
       && !!state.lmstudioModel
     );
-    els.screen.innerHTML = `
-      <div class="ob-screen">
-        <div class="ob-eyebrow">${escapeHtml(ob('entry_byok_eyebrow', 'In-Browser / BYOK'))}</div>
-        <h2 class="ob-h">${escapeHtml(ob('entry_key_heading', 'Add your $NAME$ key', { name: provider.name }))}</h2>
-        <div class="ob-optional-card"><i class="fa-solid fa-circle-info oc-ic"></i><div class="oc-body"><b>${escapeHtml(ob('entry_optional', 'This step is optional.'))}</b> ${escapeHtml(ob('entry_shines', 'FSB shines brightest through MCP, so you can skip the key entirely.'))} <button class="ob-link" type="button" id="obUseMcpFromKey">${escapeHtml(ob('entry_skip_use_mcp', 'Skip and use MCP'))}</button></div></div>
-        ${local ? localFieldHtml() : apiKeyFieldHtml(provider)}
-        ${navHtml({ nextLabel: state.validating ? ob('entry_checking', 'Checking...') : ob('entry_continue', 'Continue'), nextDisabled: state.validating || !localSelectionReady, skipLabel: ob('entry_skip_mcp', 'Skip to MCP'), skipId: 'obUseMcpFromKeySkip' })}
+    // A key that fails recoils; one that passes comes forward before the step moves on.
+    const busy = state.validating || (local && state.lmstudioDiscoveryStatus === 'loading');
+    const bad = state.keyStatus === 'invalid' || (local && state.lmstudioDiscoveryStatus === 'error');
+    const fieldState = busy ? '' : bad ? ' is-bad' : state.keyStatus === 'valid' ? ' is-ok' : '';
+    return `
+      <div class="ob3-fit">
+        <div class="ob3-col ob3-apikey">
+          <div class="ob-eyebrow" data-di="0">${escapeHtml(ob('entry_byok_eyebrow', 'In-Browser / BYOK'))}</div>
+          <h2 class="ob-h" data-di="0.08">${escapeHtml(keyHeading(provider))}</h2>
+          <div class="ob-optional-card" data-di="0.2"><i class="fa-solid fa-circle-info oc-ic"></i><div class="oc-body"><b>${escapeHtml(ob('entry_optional', 'This step is optional.'))}</b> ${escapeHtml(ob('entry_shines', 'FSB shines brightest through MCP, so you can skip the key entirely.'))} <button class="ob-link" type="button" id="obUseMcpFromKey">${escapeHtml(ob('entry_skip_use_mcp', 'Skip and use MCP'))}</button></div></div>
+          <div class="ob3-field${fieldState}" data-di="0.38">
+            ${local ? localFieldHtml() : apiKeyFieldHtml(provider)}
+          </div>
+          ${navHtml({ di: '0.6', nextLabel: state.validating ? ob('entry_checking', 'Checking...') : ob('entry_continue', 'Continue'), nextDisabled: state.validating || !localSelectionReady, skipLabel: ob('entry_skip_mcp', 'Skip to MCP'), skipId: 'obUseMcpFromKeySkip' })}
+        </div>
       </div>
     `;
+  }
+
+  function keyHeading(provider) {
+    return provider.local
+      ? ob('entry_connect_heading', 'Connect $NAME$', { name: provider.name })
+      : ob('entry_key_heading', 'Add your $NAME$ key', { name: provider.name });
+  }
+
+  function pinHtml() {
+    return `
+      <div class="ob3-fit">
+        <div class="ob3-col ob3-pin">
+          <div class="ob-eyebrow" data-di="0">${escapeHtml(ob('entry_almost', 'Almost There'))}</div>
+          <h2 class="ob-h" data-di="0.08">${escapeHtml(ob('entry_pin_h', "Pin FSB so it's one click away"))}</h2>
+          <p class="ob-sub" data-di="0.2">${escapeHtml(ob('entry_pin_sub', "That's the only step. FSB's permissions switch on automatically the moment Chrome installs it. Nothing for you to toggle."))}</p>
+          <div class="ob3-pinstage" data-di="0.38">
+            <div class="ob-toolbar">
+              <div class="ob-tb-dots"><span></span><span></span><span></span></div>
+              <div class="ob-tb-omni"><i class="fa-solid fa-lock"></i> full-selfbrowsing.com</div>
+              <span class="ob3-tb-fsb${state.pinned ? ' on' : ''}" aria-hidden="true"><img src="${ASSET_ROOT}/icon48.png" alt="" width="18" height="18"></span>
+              <div class="ob-tb-puzzle${state.pinned ? '' : ' pulse'}">
+                <i class="fa-solid fa-puzzle-piece"></i>
+                <div class="ob-pin-pop">
+                  <div class="ob-pin-row hl"><img class="pi" src="${ASSET_ROOT}/icon48.png" alt="FSB" width="20" height="20"><span class="pn" translate="no">FSB</span><i class="fa-solid fa-thumbtack pp${state.pinned ? ' on' : ''}"></i></div>
+                  <div class="ob-pin-row"><span class="pi"></span><span class="pn" style="color:var(--text-muted)">${escapeHtml(ob('entry_other_ext', 'Other extension'))}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="ob-confirm${state.pinned ? ' done' : ''}" type="button" id="obPinned" data-di="0.55" aria-pressed="${state.pinned}"><i class="fa-solid fa-thumbtack"></i> ${escapeHtml(state.pinned ? ob('entry_pinned', 'FSB pinned') : ob('entry_ive_pinned', "I've pinned FSB"))}</button>
+          ${navHtml({ di: '0.7', skipLabel: ob('entry_skip_step', 'Skip this step'), skipId: 'obSkipPin' })}
+        </div>
+      </div>
+    `;
+  }
+
+  // The end of the tunnel: the wordmark sits far back, the setup floats in front of it.
+  function doneHtml() {
+    const summary = getSummary();
+    // Agent setups have nothing to open in the browser, so the last step leads into the
+    // control panel instead. Every other setup opens the side panel.
+    const explore = state.path === 'mcp';
+    const isOpen = state.opened === (explore ? 'panel' : 'fsb');
+    const openIcon = explore ? 'fa-solid fa-compass' : 'fa-solid fa-arrow-up-right-from-square';
+    const openLabel = explore
+      ? (isOpen ? ob('entry_panel_opened', 'Control panel opened') : ob('entry_explore', 'Explore FSB'))
+      : (isOpen ? ob('entry_running', 'FSB is running') : ob('entry_open', 'Open FSB'));
+    const more = explore
+      ? `<span>${escapeHtml(ob('entry_more_panel', "There's always much more to discover about FSB. It all lives in the control panel."))}</span>`
+      : `<span>${escapeHtml(ob('entry_more', "There's always much more to discover about FSB. Check it out in the"))} <button class="ob-link" type="button" id="obOpenPanel">${escapeHtml(ob('entry_control_panel', 'Control Panel'))}</button>.</span>`;
+    return `
+      <div class="ob3-fit">
+        <div class="ob3-col ob3-end">
+          <div class="ob3-end-top">
+            <div class="ob-done-badge" data-di="0"><i class="fa-solid fa-check"></i></div>
+            <h2 class="ob-h" data-di="0.1">${escapeHtml(ob('entry_all_set', "You're all set."))}</h2>
+            <p class="ob-sub" data-di="0.2">${escapeHtml(ob('entry_ready_sub', "FSB is ready. Here's your setup. Change anything later in Settings."))}</p>
+          </div>
+          <div class="ob3-end-groups" style="--n:${summary.length}">
+            ${summary.map((row, index) => `<div class="ob3-end-group" data-di="${Math.round((0.3 + index * 0.07) * 100) / 100}"><div><div class="ob3-end-label">${escapeHtml(row.k)}</div><span class="ob3-end-line" aria-hidden="true"></span><div class="ob3-end-v${row.mono ? ' mono' : ''}">${row.ok ? '<i class="fa-solid fa-circle-check vok"></i>' : ''}${escapeHtml(row.v)}</div></div></div>`).join('')}
+          </div>
+          <div class="ob3-end-cta" data-di="0.55"><button class="ob-btn ob-btn-primary${isOpen ? ' done' : ''}" id="obOpenFsb" type="button"><i class="${openIcon}"></i> ${escapeHtml(openLabel)}</button></div>
+          <div class="ob-done-more" data-di="0.62"><i class="fa-solid fa-sliders"></i> ${more}</div>
+        </div>
+      </div>
+      <div class="ob3-end-mark${isOpen ? ' is-live' : ''}" aria-hidden="true" data-di="0.7"><div><span class="fsb-mark" translate="no"><span class="fsb-row"><span class="fsb-f">F</span><span class="fsb-s">S</span><svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true"><path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path></svg></span></span></div></div>
+      <div class="ob3-end-meta" data-di="0.5">
+        <span class="version-tag" translate="no">v${escapeHtml(VERSION)}</span>
+        <div class="ob-done-links">
+          <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i> GitHub</a>
+          <a href="https://discord.gg/fullselfbrowsing" target="_blank" rel="noopener"><i class="fa-brands fa-discord"></i> Discord</a>
+          <a href="https://full-selfbrowsing.com" target="_blank" rel="noopener"><i class="fa-solid fa-book"></i> ${escapeHtml(ob('entry_docs', 'Docs'))}</a>
+        </div>
+      </div>
+    `;
+  }
+
+  // morph() leaves style attributes alone, so the summary's column count is set here.
+  function syncDoneGrid() {
+    const plane = planes.done;
+    const grid = plane && plane.el.querySelector('.ob3-end-groups');
+    if (grid) grid.style.setProperty('--n', String(getSummary().length));
+  }
+
+  function navHtml(options = {}) {
+    const nextLabel = options.nextLabel || ob('entry_continue', 'Continue');
+    const skipLabel = options.skipLabel || '';
+    const skip = skipLabel ? `<button class="ob-skip" type="button" id="${escapeAttr(options.skipId)}">${escapeHtml(skipLabel)}${options.skipArrow ? ' &rarr;' : ''}</button>` : '';
+    return `
+      <div class="ob-nav" data-di="${escapeAttr(options.di || '0.75')}">
+        <button class="ob-back" type="button" data-nav="back"><i class="fa-solid fa-arrow-left"></i> ${escapeHtml(ob('entry_back', 'Back'))}</button>
+        <div class="ob-nav-r">
+          ${skip}
+          <button class="ob-btn ob-btn-primary" type="button" data-nav="next" data-door="primary" ${options.nextDisabled ? 'disabled' : ''}>${escapeHtml(nextLabel)} <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+      </div>
+    `;
+  }
+
+  function fanHtml(clients, placementClass, direction) {
+    return `<div class="install-fan ${placementClass}${state.fanOpen ? ' open' : ''}" role="menu">
+      ${clients.map((client, index) => {
+        const t = clients.length > 1 ? index / (clients.length - 1) : 0;
+        const dx = -Math.round((1 - Math.cos(t * (Math.PI * 0.42))) * 60);
+        const rot = (direction * t * 6).toFixed(1);
+        return `
+          <button class="install-fan-item${state.copied === client.id ? ' copied' : ''}" type="button" role="menuitem" data-copy-client="${escapeAttr(client.id)}" style="--dx:${dx}px;--rot:${rot}deg">
+            <span class="install-fan-icon"><span class="install-glyph ob-lg-${client.logo}" role="img" aria-label="${escapeAttr(client.name)}"></span></span>
+            <span class="install-fan-name" translate="no">${escapeHtml(client.name)}</span>
+            <span class="install-fan-flag" translate="no">${escapeHtml(client.flag)}</span>
+            <i class="install-fan-copyicon ${state.copied === client.id ? 'fa-solid fa-check' : 'fa-regular fa-copy'}"></i>
+          </button>
+        `;
+      }).join('')}
+    </div>`;
+  }
+
+  function providerButtonHtml(provider, index) {
+    const selected = state.provider === provider.id;
+    const icon = provider.icon
+      ? `<i class="${provider.icon}"></i>`
+      : `<img class="${provider.noInvert ? 'no-inv' : ''}" src="${ASSET_ROOT}/providers/${escapeAttr(provider.logo)}" alt="${escapeAttr(provider.name)}" width="20" height="20">`;
+    const tagLabel = provider.tag === 'Recommended'
+      ? ob('entry_recommended', 'Recommended')
+      : provider.tag === 'Free Tier'
+        ? ob('entry_free_tier', 'Free Tier')
+        : provider.tag === 'Local / No Key'
+          ? ob('entry_local_nokey', 'Local / No Key')
+          : provider.tag;
+    const tag = provider.tag ? `<span class="ob-prov-tag ${provider.tagClass || ''}">${escapeHtml(tagLabel)}</span>` : '';
+    return `
+      <button class="ob-prov${selected ? ' sel' : ''}" type="button" id="obProvider-${escapeAttr(provider.id)}" data-provider="${escapeAttr(provider.id)}" data-door="next" data-di="${Math.round((0.3 + index * 0.05) * 100) / 100}" aria-pressed="${selected}">
+        <div class="ob-prov-ic">${icon}</div>
+        <div class="ob-prov-body"><div class="ob-prov-name" translate="no">${escapeHtml(provider.name)}</div></div>
+        ${tag}
+        <div class="ob-prov-radio"></div>
+      </button>
+    `;
+  }
+
+  function localFieldHtml() {
+    const discovering = state.lmstudioDiscoveryStatus === 'loading';
+    const discoveryFailed = state.lmstudioDiscoveryStatus === 'error';
+    const statusIcon = state.validating || discovering
+      ? '<i class="fa-solid fa-spinner spin"></i>'
+      : state.keyStatus === 'valid'
+        ? '<i class="fa-solid fa-circle-check ok"></i>'
+        : state.keyStatus === 'invalid' || discoveryFailed
+          ? '<i class="fa-solid fa-circle-xmark bad"></i>'
+          : state.lmstudioDiscoveryStatus === 'ready'
+            ? '<i class="fa-solid fa-circle-check ok"></i>'
+            : '';
+    const statusClass = state.keyStatus === 'invalid' || discoveryFailed ? 'bad' : 'ok';
+    const msg = state.keyMessage || state.lmstudioDiscoveryMessage || ob('entry_discovering', 'Discovering loaded chat models...');
+    const modelOptions = state.lmstudioModels.length > 0
+      ? `${state.lmstudioModels.length > 1 && !state.lmstudioModel
+          ? `<option value="" disabled selected>${escapeHtml(ob('entry_choose_model', 'Choose a loaded model...'))}</option>`
+          : ''}${state.lmstudioModels.map(model => `
+          <option value="${escapeAttr(model.id)}" ${model.id === state.lmstudioModel ? 'selected' : ''}>${escapeHtml(model.displayName)}</option>
+        `).join('')}`
+      : `<option value="">${discovering ? escapeHtml(ob('entry_discovering_models', 'Discovering models...')) : escapeHtml(ob('entry_no_models', 'No compatible models available'))}</option>`;
+    return `
+      <div class="ob-field">
+        <div class="ob-input-row">
+          <div class="ob-input-wrap"><input class="ob-input" id="obLocalUrlInput" value="${escapeAttr(state.lmstudioBaseUrl)}" spellcheck="false" aria-label="${escapeAttr(ob('entry_lm_url_aria', 'LM Studio server URL'))}"></div>
+          <div class="ob-status">${statusIcon}</div>
+        </div>
+        <label class="ob-model-label" for="obLocalModelSelect">${escapeHtml(ob('entry_loaded_model', 'Loaded chat model'))}</label>
+        <select class="ob-input ob-model-select" id="obLocalModelSelect" data-depth-own ${state.lmstudioModels.length === 0 || discovering ? 'disabled' : ''}>
+          ${modelOptions}
+        </select>
+        <div class="ob-status-msg ${statusClass}">${escapeHtml(msg)}</div>
+      </div>
+    `;
+  }
+
+  function apiKeyFieldHtml(provider) {
+    const statusIcon = state.validating ? '<i class="fa-solid fa-spinner spin"></i>' : state.keyStatus === 'valid' ? '<i class="fa-solid fa-circle-check ok"></i>' : state.keyStatus === 'invalid' ? '<i class="fa-solid fa-circle-xmark bad"></i>' : '';
+    const statusClass = state.keyStatus === 'valid' ? 'ok' : state.keyStatus === 'invalid' ? 'bad' : '';
+    const last4 = state.apiKey.slice(-4);
+    const msg = state.keyMessage || (state.keyStatus === 'valid' && last4 ? ob('entry_key_valid', 'Key ending in $LAST$ is valid', { last: last4 }) : '');
+    return `
+      <div class="ob-field">
+        <div class="ob-input-row">
+          <div class="ob-input-wrap">
+            <input class="ob-input" id="obKeyInput" type="${state.revealed ? 'text' : 'password'}" value="${escapeAttr(state.apiKey)}" placeholder="${escapeAttr(ob('entry_paste_key', 'Paste your $NAME$ API key', { name: provider.name }))}" spellcheck="false" autocomplete="off" aria-label="${escapeAttr(ob('entry_key_aria', '$NAME$ API key', { name: provider.name }))}">
+            <button class="ob-eye" type="button" id="obRevealKey" aria-label="${escapeAttr(ob('entry_toggle_key', 'Toggle key visibility'))}"><i class="${state.revealed ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye'}"></i></button>
+          </div>
+          <div class="ob-status">${statusIcon}</div>
+        </div>
+        <div class="ob-status-msg ${statusClass}">${escapeHtml(msg)}</div>
+        <div class="ob-help">${escapeHtml(ob('entry_get_key', 'Get your key from'))} <a href="${escapeAttr(provider.keyUrl)}" target="_blank" rel="noopener">${escapeHtml(provider.urlName)}</a> - ${escapeHtml(ob('entry_stored_locally', 'stored locally in your browser.'))} <button class="ob-mini" type="button" id="obPasteKey">${escapeHtml(ob('entry_paste_clip', 'Paste from clipboard'))}</button></div>
+      </div>
+    `;
+  }
+
+  /* Patch `target` so its children match `html`, keeping every node whose tag is unchanged.
+     The planes must keep their nodes: the depth engine holds them and writes their inline
+     styles, CSS transitions (a chosen card coming forward, the pinned icon landing) need the
+     node that had the old class, and an input keeps its caret. So existing nodes get their
+     attributes and text updated in place, and only a node whose tag changed is replaced.
+     The style attribute of an existing node is never written: those styles belong to the
+     depth engine. */
+  function morph(target, html) {
+    if (typeof document.createElement !== 'function' || !target.childNodes) {
+      target.innerHTML = html;
+      return;
+    }
+    const template = document.createElement('template');
+    template.innerHTML = html.trim();
+    morphChildren(target, template.content);
+  }
+
+  function morphChildren(from, to) {
+    let current = from.firstChild;
+    Array.from(to.childNodes).forEach((next) => {
+      if (!current) {
+        from.appendChild(next);
+        return;
+      }
+      const following = current.nextSibling;
+      if (current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) {
+        from.replaceChild(next, current);
+      } else if (current.nodeType === 1) {
+        morphAttributes(current, next);
+        morphChildren(current, next);
+        syncFormValue(current, next);
+      } else if (current.nodeValue !== next.nodeValue) {
+        current.nodeValue = next.nodeValue;
+      }
+      current = following;
+    });
+    while (current) {
+      const following = current.nextSibling;
+      from.removeChild(current);
+      current = following;
+    }
+  }
+
+  function morphAttributes(el, next) {
+    Array.from(el.attributes).forEach(({ name }) => {
+      if (name !== 'style' && !next.hasAttribute(name)) el.removeAttribute(name);
+    });
+    Array.from(next.attributes).forEach(({ name, value }) => {
+      if (name !== 'style' && el.getAttribute(name) !== value) el.setAttribute(name, value);
+    });
+  }
+
+  // A value attribute stops driving an input once it has been edited; carry state across,
+  // except into the control that has focus (that one is the source of the state).
+  function syncFormValue(el, next) {
+    if (el === document.activeElement) return;
+    if (el.tagName === 'INPUT') {
+      const value = next.getAttribute('value') || '';
+      if (el.value !== value) el.value = value;
+    } else if (el.tagName === 'SELECT') {
+      const selected = next.querySelector('option[selected]');
+      if (selected && el.value !== selected.value) el.value = selected.value;
+    }
+  }
+
+  // ---- interaction ----
+
+  // Handlers are registered once and dispatched from the page root, because the planes
+  // keep their nodes across renders and per-node listeners would pile up.
+  function bind(selector, eventName, handler) {
+    handlers.push({ selector, eventName, handler });
+  }
+
+  function listen() {
+    const types = [];
+    handlers.forEach(({ eventName }) => { if (!types.includes(eventName)) types.push(eventName); });
+    types.forEach((type) => {
+      // mouseenter/mouseleave do not bubble: catch them on the way down and match the element itself.
+      const exact = type === 'mouseenter' || type === 'mouseleave';
+      els.root.addEventListener(type, (event) => {
+        const target = event.target;
+        if (!target || target.nodeType !== 1) return;
+        handlers.forEach(({ selector, eventName, handler }) => {
+          if (eventName !== type) return;
+          const el = exact ? (target.matches(selector) ? target : null) : target.closest(selector);
+          if (el && els.root.contains(el)) handler(event, el);
+        });
+      }, exact);
+    });
+  }
+
+  function bindInteractions() {
+    bind('[data-nav="back"]', 'click', goBack);
+    bind('[data-nav="next"]', 'click', () => {
+      if (state.screen === 'apikey') continueFromKey();
+      else goNext();
+    });
+    bind('.fsb-depth-go[data-step]', 'click', (event, button) => {
+      if (!button.disabled) goTo(button.dataset.step);
+    });
+
+    bind('#obGetStarted', 'click', goNext);
+    bind('#obWelcomeSkip', 'click', () => finishOnboarding({ skipped: true, path: null }));
+
+    bind('#obPickMcp', 'click', () => { state.path = 'mcp'; state.nudge = ''; render(); });
+    bind('#obPickByok', 'click', () => { state.path = 'byok'; state.nudge = ''; render(); });
+    bind('#obSkipPath', 'click', useMcp);
+
+    bind('#obCopyCurrent', 'click', () => {
+      const current = ROLL_CLIENTS[state.iconIndex];
+      copyCommand(BASE_INSTALL_COMMAND + ' ' + current.flag, 'current');
+    });
+    bind('#obCopyIcon', 'click', () => {
+      const current = ROLL_CLIENTS[state.iconIndex];
+      copyCommand(BASE_INSTALL_COMMAND + ' ' + current.flag, 'current');
+    });
+    bind('#obInstallWidget', 'mouseenter', () => { state.paused = true; });
+    bind('#obInstallWidget', 'mouseleave', () => { state.paused = false; });
+    bind('#obCopyWrap', 'mouseenter', () => {
+      clearTimeout(hoverTimer);
+      clearTimeout(fanCloseTimer);
+      hoverTimer = setTimeout(() => { state.fanOpen = true; render(); }, 420);
+    });
+    bind('#obCopyWrap', 'mouseleave', () => {
+      clearTimeout(hoverTimer);
+      clearTimeout(fanCloseTimer);
+      fanCloseTimer = setTimeout(() => { state.fanOpen = false; render(); }, 260);
+    });
+    bind('[data-copy-client]', 'click', (event, button) => {
+      const client = INSTALL_CLIENTS.find((item) => item.id === button.dataset.copyClient);
+      if (client) copyCommand(client.cmd, client.id);
+    });
+    bind('#obUseByok', 'click', () => { state.path = 'byok'; state.screen = 'provider'; state.nudge = ''; render(); });
+
+    bind('[data-provider]', 'click', (event, button) => selectProvider(button.dataset.provider));
+    bind('#obUseMcpFromProvider', 'click', useMcp);
+    bind('#obUseMcpFromProviderSkip', 'click', useMcp);
+
     bind('#obUseMcpFromKey', 'click', useMcp);
     bind('#obUseMcpFromKeySkip', 'click', useMcp);
     bind('#obKeyInput', 'input', (event) => {
@@ -393,133 +909,21 @@
       state.lmstudioModel = String(event.target.value || '');
       state.keyStatus = 'idle';
       state.keyMessage = '';
-      const nextButton = els.screen.querySelector('#obNext');
+      const nextButton = planes.apikey && planes.apikey.el.querySelector('[data-nav="next"]');
       if (nextButton) nextButton.disabled = !state.lmstudioModel;
+      if (planes.apikey) planes.apikey.html = '';
     });
     bind('#obRevealKey', 'click', () => { state.revealed = !state.revealed; render(); });
     bind('#obPasteKey', 'click', pasteFromClipboard);
-    bindNav({ beforeNext: validateAndContinue });
-    if (local && state.lmstudioDiscoveryStatus === 'idle' && lmstudioDiscoveryTimer === null) {
-      void discoverLmStudioModels();
-    }
-  }
 
-  function renderPin() {
-    els.screen.innerHTML = `
-      <div class="ob-screen">
-        <div class="ob-eyebrow">${escapeHtml(ob('entry_almost', 'Almost There'))}</div>
-        <h2 class="ob-h">${escapeHtml(ob('entry_pin_h', "Pin FSB so it's one click away"))}</h2>
-        <p class="ob-sub">${escapeHtml(ob('entry_pin_sub', "That's the only step. FSB's permissions switch on automatically the moment Chrome installs it. Nothing for you to toggle."))}</p>
-        <div class="ob-toolbar">
-          <div class="ob-tb-dots"><span></span><span></span><span></span></div>
-          <div class="ob-tb-omni"><i class="fa-solid fa-lock"></i> full-selfbrowsing.com</div>
-          <div class="ob-tb-puzzle ${state.pinned ? '' : 'pulse'}">
-            <i class="fa-solid fa-puzzle-piece"></i>
-            <div class="ob-pin-pop">
-              <div class="ob-pin-row hl"><img class="pi" src="${ASSET_ROOT}/icon48.png" alt="FSB" width="20" height="20"><span class="pn" translate="no">FSB</span><i class="fa-solid fa-thumbtack pp ${state.pinned ? 'on' : ''}"></i></div>
-              <div class="ob-pin-row"><span class="pi"></span><span class="pn" style="color:var(--text-muted)">${escapeHtml(ob('entry_other_ext', 'Other extension'))}</span></div>
-            </div>
-          </div>
-        </div>
-        <button class="ob-confirm ${state.pinned ? 'done' : ''}" type="button" id="obPinned"><i class="fa-solid fa-thumbtack"></i> ${escapeHtml(state.pinned ? ob('entry_pinned', 'FSB pinned') : ob('entry_ive_pinned', "I've pinned FSB"))}</button>
-        ${navHtml({ skipLabel: ob('entry_skip_step', 'Skip this step'), skipId: 'obSkipPin' })}
-      </div>
-    `;
     bind('#obPinned', 'click', () => { state.pinned = !state.pinned; render(); });
     bind('#obSkipPin', 'click', goNext);
-    bindNav();
-  }
 
-  function renderDone() {
-    const summary = getSummary();
-    els.screen.innerHTML = `
-      <div class="ob-screen ob-done">
-        <div class="ob-done-top">
-          <div class="ob-done-badge"><i class="fa-solid fa-check"></i></div>
-          <h2 class="ob-h" style="margin-bottom:0">${escapeHtml(ob('entry_all_set', "You're all set."))}</h2>
-          <p class="ob-sub">${escapeHtml(ob('entry_ready_sub', "FSB is ready. Here's your setup. Change anything later in Settings."))}</p>
-        </div>
-        <div class="ob-summary">
-          ${summary.map((row) => `<div class="ob-sum-row"><span class="ob-sum-k">${escapeHtml(row.k)}</span><span class="ob-sum-v ${row.mono ? 'mono' : ''}">${row.ok ? '<i class="fa-solid fa-circle-check vok"></i>' : ''}${escapeHtml(row.v)}</span></div>`).join('')}
-        </div>
-        <button class="ob-btn ob-btn-primary ob-btn-block ${state.opened ? 'done' : ''}" id="obOpenFsb" type="button"><i class="fa-solid fa-arrow-up-right-from-square"></i> ${escapeHtml(state.opened ? ob('entry_running', 'FSB is running') : ob('entry_open', 'Open FSB'))}</button>
-        <div class="ob-done-more"><i class="fa-solid fa-sliders"></i> ${escapeHtml(ob('entry_more', "There's always much more to discover about FSB. Check it out in the"))} <button class="ob-link" type="button" id="obOpenPanel">${escapeHtml(ob('entry_control_panel', 'Control Panel'))}</button>.</div>
-        <div class="ob-done-links">
-          <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i> GitHub</a>
-          <a href="https://discord.gg/fullselfbrowsing" target="_blank" rel="noopener"><i class="fa-brands fa-discord"></i> Discord</a>
-          <a href="https://full-selfbrowsing.com" target="_blank" rel="noopener"><i class="fa-solid fa-book"></i> ${escapeHtml(ob('entry_docs', 'Docs'))}</a>
-        </div>
-      </div>
-    `;
-    bind('#obOpenFsb', 'click', openFsb);
-    bind('#obOpenPanel', 'click', () => openInternalPage('ui/control_panel.html'));
-  }
-
-  function navHtml(options = {}) {
-    const nextLabel = options.nextLabel || ob('entry_continue', 'Continue');
-    const skipLabel = options.skipLabel || '';
-    const skip = skipLabel ? `<button class="ob-skip" type="button" id="${escapeAttr(options.skipId)}">${escapeHtml(skipLabel)}${options.skipArrow ? ' &rarr;' : ''}</button>` : '';
-    return `
-      <div class="ob-nav">
-        <button class="ob-back" type="button" id="obBack"><i class="fa-solid fa-arrow-left"></i> ${escapeHtml(ob('entry_back', 'Back'))}</button>
-        <div class="ob-nav-r">
-          ${skip}
-          <button class="ob-btn ob-btn-primary" type="button" id="obNext" ${options.nextDisabled ? 'disabled' : ''}>${escapeHtml(nextLabel)} <i class="fa-solid fa-arrow-right"></i></button>
-        </div>
-      </div>
-    `;
-  }
-
-  function bindNav(options = {}) {
-    bind('#obBack', 'click', goBack);
-    bind('#obNext', 'click', async () => {
-      if (options.beforeNext) {
-        const ok = await options.beforeNext();
-        if (ok === false) return;
-      }
-      goNext();
+    bind('#obOpenFsb', 'click', () => {
+      if (state.path === 'mcp') exploreFsb();
+      else openFsb();
     });
-  }
-
-  function fanHtml(clients, placementClass, direction) {
-    return `<div class="install-fan ${placementClass} ${state.fanOpen ? 'open' : ''}" role="menu">
-      ${clients.map((client, index) => {
-        const t = clients.length > 1 ? index / (clients.length - 1) : 0;
-        const dx = -Math.round((1 - Math.cos(t * (Math.PI * 0.42))) * 60);
-        const rot = (direction * t * 6).toFixed(1);
-        return `
-          <button class="install-fan-item ${state.copied === client.id ? 'copied' : ''}" type="button" role="menuitem" data-copy-client="${escapeAttr(client.id)}" style="--dx:${dx}px;--rot:${rot}deg">
-            <span class="install-fan-icon"><span class="install-glyph" role="img" aria-label="${escapeAttr(client.name)}" style="${maskStyle(client.logo)}"></span></span>
-            <span class="install-fan-name" translate="no">${escapeHtml(client.name)}</span>
-            <span class="install-fan-flag" translate="no">${escapeHtml(client.flag || 'manual')}</span>
-            <i class="install-fan-copyicon ${state.copied === client.id ? 'fa-solid fa-check' : 'fa-regular fa-copy'}"></i>
-          </button>
-        `;
-      }).join('')}
-    </div>`;
-  }
-
-  function providerButtonHtml(provider) {
-    const selected = state.provider === provider.id ? 'sel' : '';
-    const icon = provider.icon
-      ? `<i class="${provider.icon}"></i>`
-      : `<img class="${provider.noInvert ? 'no-inv' : ''}" src="${ASSET_ROOT}/providers/${escapeAttr(provider.logo)}" alt="${escapeAttr(provider.name)}" width="20" height="20">`;
-    const tagLabel = provider.tag === 'Recommended'
-      ? ob('entry_recommended', 'Recommended')
-      : provider.tag === 'Free Tier'
-        ? ob('entry_free_tier', 'Free Tier')
-        : provider.tag === 'Local / No Key'
-          ? ob('entry_local_nokey', 'Local / No Key')
-          : provider.tag;
-    const tag = provider.tag ? `<span class="ob-prov-tag ${provider.tagClass || ''}">${escapeHtml(tagLabel)}</span>` : '';
-    return `
-      <button class="ob-prov ${selected}" type="button" id="obProvider-${escapeAttr(provider.id)}">
-        <div class="ob-prov-ic">${icon}</div>
-        <div class="ob-prov-body"><div class="ob-prov-name" translate="no">${escapeHtml(provider.name)}</div></div>
-        ${tag}
-        <div class="ob-prov-radio"></div>
-      </button>
-    `;
+    bind('#obOpenPanel', 'click', () => openInternalPage('ui/control_panel.html'));
   }
 
   function scheduleLmStudioDiscovery() {
@@ -604,17 +1008,18 @@
     return true;
   }
 
-  // In-place status reset for the key/URL inputs. A full render() on every
-  // keystroke rebuilds els.screen.innerHTML, destroying the focused input --
-  // the caret jumps out after each character. Only the status icon + message
-  // depend on keystrokes (Continue's disabled state keys on state.validating
-  // alone), so update those two nodes surgically and leave the input alone.
+  // In-place status reset for the key/URL inputs, so a keystroke never re-renders.
+  // Only the status icon, message and the field's recoil/accept state depend on it.
+  // The plane's cached markup no longer matches, so the next render patches it in full.
   function resetKeyStatusIdle() {
     state.keyStatus = 'idle';
     state.keyMessage = '';
+    if (planes.apikey) planes.apikey.html = '';
     const provider = currentProvider();
+    const field = els.screen.querySelector('.ob3-field');
     const icon = els.screen.querySelector('.ob-status');
     const msgEl = els.screen.querySelector('.ob-status-msg');
+    if (field) field.classList.remove('is-bad', 'is-ok');
     if (provider.local) {
       const loading = state.lmstudioDiscoveryStatus === 'loading';
       const failed = state.lmstudioDiscoveryStatus === 'error';
@@ -639,101 +1044,12 @@
     }
   }
 
-  function localFieldHtml() {
-    const discovering = state.lmstudioDiscoveryStatus === 'loading';
-    const discoveryFailed = state.lmstudioDiscoveryStatus === 'error';
-    const statusIcon = state.validating || discovering
-      ? '<i class="fa-solid fa-spinner spin"></i>'
-      : state.keyStatus === 'valid'
-        ? '<i class="fa-solid fa-circle-check ok"></i>'
-        : state.keyStatus === 'invalid' || discoveryFailed
-          ? '<i class="fa-solid fa-circle-xmark bad"></i>'
-          : state.lmstudioDiscoveryStatus === 'ready'
-            ? '<i class="fa-solid fa-circle-check ok"></i>'
-            : '';
-    const statusClass = state.keyStatus === 'invalid' || discoveryFailed ? 'bad' : 'ok';
-    const msg = state.keyMessage || state.lmstudioDiscoveryMessage || ob('entry_discovering', 'Discovering loaded chat models...');
-    const modelOptions = state.lmstudioModels.length > 0
-      ? `${state.lmstudioModels.length > 1 && !state.lmstudioModel
-          ? `<option value="" disabled selected>${escapeHtml(ob('entry_choose_model', 'Choose a loaded model...'))}</option>`
-          : ''}${state.lmstudioModels.map(model => `
-          <option value="${escapeAttr(model.id)}" ${model.id === state.lmstudioModel ? 'selected' : ''}>${escapeHtml(model.displayName)}</option>
-        `).join('')}`
-      : `<option value="">${discovering ? escapeHtml(ob('entry_discovering_models', 'Discovering models...')) : escapeHtml(ob('entry_no_models', 'No compatible models available'))}</option>`;
-    return `
-      <div class="ob-field">
-        <div class="ob-input-row">
-          <div class="ob-input-wrap"><input class="ob-input" id="obLocalUrlInput" value="${escapeAttr(state.lmstudioBaseUrl)}" spellcheck="false"></div>
-          <div class="ob-status">${statusIcon}</div>
-        </div>
-        <label class="ob-model-label" for="obLocalModelSelect">${escapeHtml(ob('entry_loaded_model', 'Loaded chat model'))}</label>
-        <select class="ob-input ob-model-select" id="obLocalModelSelect" ${state.lmstudioModels.length === 0 || discovering ? 'disabled' : ''}>
-          ${modelOptions}
-        </select>
-        <div class="ob-status-msg ${statusClass}">${escapeHtml(msg)}</div>
-      </div>
-    `;
-  }
-
-  function apiKeyFieldHtml(provider) {
-    const statusIcon = state.validating ? '<i class="fa-solid fa-spinner spin"></i>' : state.keyStatus === 'valid' ? '<i class="fa-solid fa-circle-check ok"></i>' : state.keyStatus === 'invalid' ? '<i class="fa-solid fa-circle-xmark bad"></i>' : '';
-    const statusClass = state.keyStatus === 'valid' ? 'ok' : state.keyStatus === 'invalid' ? 'bad' : '';
-    const last4 = state.apiKey.slice(-4);
-    const msg = state.keyMessage || (state.keyStatus === 'valid' && last4 ? ob('entry_key_valid', 'Key ending in $LAST$ is valid', { last: last4 }) : '');
-    return `
-      <div class="ob-field">
-        <div class="ob-input-row">
-          <div class="ob-input-wrap">
-            <input class="ob-input" id="obKeyInput" type="${state.revealed ? 'text' : 'password'}" value="${escapeAttr(state.apiKey)}" placeholder="${escapeAttr(ob('entry_paste_key', 'Paste your $NAME$ API key', { name: provider.name }))}" spellcheck="false" autocomplete="off">
-            <button class="ob-eye" type="button" id="obRevealKey" aria-label="${escapeAttr(ob('entry_toggle_key', 'Toggle key visibility'))}"><i class="${state.revealed ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye'}"></i></button>
-          </div>
-          <div class="ob-status">${statusIcon}</div>
-        </div>
-        <div class="ob-status-msg ${statusClass}">${escapeHtml(msg)}</div>
-        <div class="ob-help">${escapeHtml(ob('entry_get_key', 'Get your key from'))} <a href="${escapeAttr(provider.keyUrl)}" target="_blank" rel="noopener">${escapeHtml(provider.urlName)}</a> - ${escapeHtml(ob('entry_stored_locally', 'stored locally in your browser.'))} <button class="ob-mini" type="button" id="obPasteKey">${escapeHtml(ob('entry_paste_clip', 'Paste from clipboard'))}</button></div>
-      </div>
-    `;
-  }
-
-  // Surgical open/close for the install-fan menu. A full render() on hover
-  // rebuilds els.screen.innerHTML, replacing the .install-fan nodes with new
-  // ones that already have (or lack) the "open" class from first paint --
-  // the CSS transition never sees a "before" frame, so it snaps instead of
-  // animating. Toggle the class on the existing nodes instead so the
-  // transition has something to interpolate from.
-  function setFanOpen(open) {
-    els.screen.querySelectorAll('.install-fan').forEach((fan) => fan.classList.toggle('open', open));
-  }
-
-  function bindMcpInteractions() {
-    const current = ROLL_CLIENTS[state.iconIndex];
-    bind('#obCopyCurrent', 'click', () => copyCommand(BASE_INSTALL_COMMAND + ' ' + current.flag, 'current'));
-    bind('#obCopyIcon', 'click', () => copyCommand(BASE_INSTALL_COMMAND + ' ' + current.flag, 'current'));
-    bind('#obInstallWidget', 'mouseenter', () => { state.paused = true; });
-    bind('#obInstallWidget', 'mouseleave', () => { state.paused = false; });
-    bind('#obCopyWrap', 'mouseenter', () => {
-      clearTimeout(hoverTimer);
-      clearTimeout(fanCloseTimer);
-      hoverTimer = setTimeout(() => { state.fanOpen = true; setFanOpen(true); }, 420);
-    });
-    bind('#obCopyWrap', 'mouseleave', () => {
-      clearTimeout(hoverTimer);
-      clearTimeout(fanCloseTimer);
-      fanCloseTimer = setTimeout(() => { state.fanOpen = false; setFanOpen(false); }, 260);
-    });
-    els.screen.querySelectorAll('[data-copy-client]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const client = INSTALL_CLIENTS.find((item) => item.id === button.dataset.copyClient);
-        if (client) copyCommand(client.cmd, client.id);
-      });
-    });
-  }
-
   function goNext() {
     const r = route();
     const index = r.indexOf(state.screen);
     if (index >= 0 && index < r.length - 1) {
       state.screen = r[index + 1];
+      state.nudge = '';
       if (state.screen === 'done') {
         finishOnboarding({ skipped: false, path: state.path }, { renderDone: false });
       }
@@ -743,14 +1059,21 @@
 
   function goBack() {
     const r = route();
-    const index = r.indexOf(state.screen);
-    if (index > 0) {
-      state.screen = r[index - 1];
-      render();
-    }
+    const previous = stepBefore(r, r.indexOf(state.screen));
+    if (previous) goTo(previous);
   }
 
-  async function selectProvider(providerId) {
+  function goTo(step) {
+    if (!STEPS.includes(step) || step === state.screen) return;
+    state.screen = step;
+    state.nudge = '';
+    render();
+  }
+
+  // Provider choices stay in onboarding state until the key validates. Persisting the
+  // provider before its model is known creates an invalid provider/model pair if the
+  // user closes onboarding midway through setup.
+  function selectProvider(providerId) {
     state.provider = providerId;
     state.apiKey = '';
     state.keyStatus = 'idle';
@@ -762,11 +1085,19 @@
     render();
   }
 
-  async function persistProviderSelection() {
-    // Provider choices are staged in onboarding state. Persisting the provider
-    // before its model is discovered creates an invalid provider/model pair if
-    // the user closes onboarding midway through setup.
-    return true;
+  // The key is acknowledged first (it comes forward), then the camera moves on.
+  async function continueFromKey() {
+    if (state.keyStatus === 'valid') {
+      goNext();
+      return;
+    }
+    const ok = await validateAndContinue();
+    if (!ok) return;
+    render();
+    clearTimeout(acceptTimer);
+    acceptTimer = setTimeout(() => {
+      if (state.screen === 'apikey' && state.keyStatus === 'valid') goNext();
+    }, KEY_ACCEPT_MS);
   }
 
   async function validateAndContinue() {
@@ -850,6 +1181,7 @@
     state.skipped = !!options.skipped;
     state.path = options.path || state.path;
     state.screen = 'done';
+    state.nudge = '';
     await storageSet({
       fsbOnboardingCompleted: true,
       fsbOnboardingPath: state.path || '',
@@ -862,6 +1194,7 @@
   function useMcp() {
     state.path = 'mcp';
     state.screen = 'mcp';
+    state.nudge = '';
     render();
   }
 
@@ -889,7 +1222,7 @@
       openPromise = Promise.reject(error);
     }
 
-    state.opened = true;
+    state.opened = 'fsb';
     showToast(ob('entry_toast_ready', 'FSB is ready. Opening the side panel'));
     render();
 
@@ -900,6 +1233,13 @@
       .catch(() => {
         openPopupFallback();
       });
+  }
+
+  function exploreFsb() {
+    state.opened = 'panel';
+    showToast(ob('entry_toast_panel', 'Opening the control panel'));
+    render();
+    openInternalPage('ui/control_panel.html');
   }
 
   function openPopupFallback() {
@@ -1105,11 +1445,6 @@
     return url || 'http://localhost:1234';
   }
 
-  function maskStyle(fileName) {
-    const url = `${ASSET_ROOT}/providers/${fileName}`;
-    return `-webkit-mask-image:url('${url}');mask-image:url('${url}')`;
-  }
-
   function showToast(message) {
     clearTimeout(toastTimer);
     state.toast = message;
@@ -1156,11 +1491,6 @@
     });
   }
 
-  function bind(selector, eventName, handler) {
-    const el = els.screen.querySelector(selector) || document.querySelector(selector);
-    if (el) el.addEventListener(eventName, handler);
-  }
-
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -1180,6 +1510,9 @@
     clearTimeout(toastTimer);
     clearTimeout(fanCloseTimer);
     clearTimeout(hoverTimer);
+    clearTimeout(nudgeTimer);
+    clearTimeout(acceptTimer);
     if (rafId) cancelAnimationFrame(rafId);
+    if (depth) depth.destroy();
   });
 })();
