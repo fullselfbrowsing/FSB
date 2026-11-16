@@ -335,7 +335,7 @@ async function partA() {
     const response = await getSettings({ agentId: 'agent_ok' });
     check(response && response.success === true, 'read-all succeeds');
     const settings = (response && response.settings) || {};
-    check(Object.keys(settings).length === 36, 'read-all returns the 36 schema keys (got ' + Object.keys(settings).length + ')');
+    check(Object.keys(settings).length === 37, 'read-all returns the 37 schema keys (got ' + Object.keys(settings).length + ')');
     check(Array.isArray(response.readOnly) && response.readOnly.length === 11, 'read-all lists the 11 read-only keys');
     checkDeep(response.readOnly, PRODUCTION_SCHEMA.readOnlyKeys(), 'readOnly is the schema read-only list');
     for (const key of SECRET_KEYS.filter((k) => k !== 'openrouterApiKey')) {

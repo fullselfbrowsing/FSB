@@ -4784,12 +4784,6 @@
   "panel_01003693b8": {
     "message": "Der Anbieter wurde außerhalb dieses Bereichs geändert. Aktualisiere die Modelle, um weitere aufzulisten."
   },
-  "copy_1ca28d1918": {
-    "message": "Für diesen Tab aus"
-  },
-  "copy_dc069f34dd": {
-    "message": "Skopeo einschalten"
-  },
   "copy_bd47072fe5": {
     "message": "Skopeo ausschalten"
   },
@@ -4798,36 +4792,6 @@
   },
   "copy_f262cf94ab": {
     "message": "Keine Tastenkombination zugewiesen · In den Chrome-Tastenkombinationen festlegen"
-  },
-  "copy_b7fb9f7ede": {
-    "message": "Skopeo für diesen Tab"
-  },
-  "copy_94b2c61b4b": {
-    "message": "Esc Esc: Skopeo in diesem Tab ausschalten"
-  },
-  "copy_3432134e77": {
-    "message": "Skopeo kann sich bei diesem Layout nicht sicher öffnen."
-  },
-  "copy_48ba5c84b7": {
-    "message": "Verkleinere die Ansicht oder ändere die Fenstergröße und versuche es dann erneut."
-  },
-  "copy_99536455cd": {
-    "message": "Wird in diesem Tab gestartet…"
-  },
-  "copy_e656694252": {
-    "message": "An · Dezent"
-  },
-  "copy_f0bbe1ab9e": {
-    "message": "Skopeo kann auf dieser Seite nicht ausgeführt werden."
-  },
-  "copy_caf87bac3d": {
-    "message": "Öffne eine normale Webseite und versuche es dann erneut."
-  },
-  "copy_6e4dce91aa": {
-    "message": "Skopeo wurde nicht gestartet."
-  },
-  "copy_f4d25b46e3": {
-    "message": "Der Seite wurde nichts hinzugefügt. Versuche es erneut."
   },
   "copy_595462a32d": {
     "message": "Tastenkombination: $SHORTCUT$ · Ändern",
@@ -6612,5 +6576,14 @@
   },
   "copy_2d03873447": {
     "message": "Keine automatische Verlängerung angegeben"
+  },
+  "panel_27d47cf198": {
+    "message": "Öffnet sich per Tastenkombination im aktuellen Tab"
+  },
+  "panel_4a66fe40ce": {
+    "message": "Skopeo aktivieren"
+  },
+  "panel_f43c6b3ac7": {
+    "message": "Wenn aktiviert, schaltet die Tastenkombination Skopeo im aktuellen Tab ein oder aus, und zweimal Esc schließt es. Wenn du diese Option ausschaltest, wird Skopeo in allen Tabs geschlossen."
   }
 }

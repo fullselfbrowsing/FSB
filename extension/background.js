@@ -2028,6 +2028,7 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
 
   const COMMAND = 'toggle-skopeo-current-tab';
   const STORAGE_PREFIX = 'skopeoSession:';
+  const ENABLED_KEY = 'fsbSkopeoEnabled';
   const PREPARED_REASON = 'prepared-awaiting-commit';
   const CONTENT_ACTIONS = new Set([
     'skopeo:prepared',
@@ -8021,7 +8022,11 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     if (PUBLIC_ACTIONS.has(request.action)) {
       if (!exactKeys(request, ['action', 'tabId'])) return unsupported(request.tabId, 'Skopeo request fields are invalid.');
       if (!positiveInteger(request.tabId)) return unsupported(request.tabId, 'Choose a valid tab before using Skopeo.');
-      if (request.action === 'skopeo:toggle-tab') return toggleTab(request.tabId);
+      if (request.action === 'skopeo:toggle-tab') {
+        // While Skopeo is switched off a toggle only reports the state of the tab.
+        if (!(await skopeoEnabled())) return getStatus(request.tabId);
+        return toggleTab(request.tabId);
+      }
       return getStatus(request.tabId);
     }
     return handleContentMessage(request, sender);
@@ -8040,8 +8045,44 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     return true;
   }
 
+  // The Skopeo switch in Advanced Settings. Only an explicit false turns
+  // Skopeo off; a missing key, a failed read or a worker without local
+  // storage leave it on, as it was before the switch existed.
+  async function skopeoEnabled() {
+    try {
+      if (!chrome.storage || !chrome.storage.local ||
+          typeof chrome.storage.local.get !== 'function') return true;
+      const stored = await chrome.storage.local.get([ENABLED_KEY]);
+      return !stored || stored[ENABLED_KEY] !== false;
+    } catch (_error) {
+      return true;
+    }
+  }
+
+  // Turning the switch off closes Skopeo in every tab that has it open.
+  async function turnOffEverywhere() {
+    let bag;
+    try {
+      bag = await chrome.storage.session.get(null);
+    } catch (_error) {
+      return { success: false, closed: 0 };
+    }
+    let closed = 0;
+    for (const key of Object.keys(bag || {})) {
+      if (!key.startsWith(STORAGE_PREFIX)) continue;
+      const tabId = Number(key.slice(STORAGE_PREFIX.length));
+      if (key !== storageKey(tabId)) continue;
+      const record = bag[key];
+      if (!validRecord(record, tabId) || record.status === 'off') continue;
+      const response = await terminateGeneration(tabId, record.generation, 'toggle-off');
+      if (response && response.status === 'off') closed += 1;
+    }
+    return { success: true, closed: closed };
+  }
+
   async function handleCommand(command, tab) {
     if (command !== COMMAND || !tab || !positiveInteger(tab.id)) return false;
+    if (!(await skopeoEnabled())) return false;
     await toggleTab(tab.id);
     return true;
   }
@@ -8203,6 +8244,8 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     getStatus: getStatus,
     handleContentMessage: handleContentMessage,
     handleCommand: handleCommand,
+    skopeoEnabled: skopeoEnabled,
+    turnOffEverywhere: turnOffEverywhere,
     handleNavigation: handleNavigation,
     handleSameDocumentRoute: handleSameDocumentRoute,
     handleTabRemoved: handleTabRemoved,
@@ -8217,6 +8260,13 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     chrome.commands.onCommand.addListener(function (command, tab) {
       if (command !== COMMAND) return;
       Promise.resolve(handleCommand(command, tab)).catch(function () {});
+    });
+  }
+  if (chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area !== 'local' || !changes || !changes[ENABLED_KEY] ||
+          changes[ENABLED_KEY].newValue !== false) return;
+      Promise.resolve(turnOffEverywhere()).catch(function () {});
     });
   }
   if (chrome.tabs && chrome.tabs.onUpdated) {

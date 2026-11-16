@@ -155,7 +155,7 @@ function buildRegistry() {
     'debugMode', 'domOptimization', 'prioritizeViewport', 'animatedActionHighlights',
     'showSidepanelProgress', 'enableLogin', 'captchaSolverEnabled', 'sttProvider',
     'voiceInputEnabled', 'autoRefineSiteMaps', 'fsbChangeReportsEnabled', 'fsbJevFastModeEnabled',
-    'fsbMcpSessionRecordingEnabled', 'autoAnalyzeToggle', 'fsbTelemetryOptOut'
+    'fsbMcpSessionRecordingEnabled', 'autoAnalyzeToggle', 'fsbTelemetryOptOut', 'fsbSkopeoEnabled'
   ]) {
     const el = reg(makeEl('input', id));
     el.type = 'checkbox';
@@ -572,7 +572,7 @@ sync.applyToForm({
   animatedActionHighlights: false, showSidepanelProgress: false, enableLogin: false,
   captchaSolverEnabled: true, autoRefineSiteMaps: false, fsbTriggerCap: 99,
   fsbChangeReportsEnabled: false, fsbMcpSessionRecordingEnabled: false, fsbMcpSessionRetentionDays: 400,
-  autoAnalyzeMemories: false, fsbTelemetryOptOut: true
+  autoAnalyzeMemories: false, fsbTelemetryOptOut: true, fsbSkopeoEnabled: false
 }, c.deps);
 check(registry.get('debugMode').checked === true, 'debugMode checked');
 check(registry.get('domOptimization').checked === false, 'domOptimization unchecked');
@@ -589,6 +589,7 @@ check(registry.get('fsbChangeReportsEnabled').checked === false && registry.get(
   'change-report and recording toggles updated');
 check(String(registry.get('fsbMcpSessionRetentionDays').value) === '365', 'retention days clamp to 365 like the load path');
 check(registry.get('autoAnalyzeToggle').checked === false, 'autoAnalyzeToggle follows autoAnalyzeMemories');
+check(registry.get('fsbSkopeoEnabled').checked === false, 'the Skopeo switch follows an outside fsbSkopeoEnabled write');
 check(registry.get('fsbTelemetryOptOut').checked === false, 'the telemetry toggle is inverse: opted out shows unchecked');
 const ariaOff = registry.get('fsbTelemetryOptOut').getAttribute('aria-label');
 check(typeof ariaOff === 'string' && INSTALL_IDENTITY_UI_SOURCE.includes("'" + ariaOff + "'"),

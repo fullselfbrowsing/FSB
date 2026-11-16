@@ -771,8 +771,9 @@ assert.equal(sha256(htmlSource
   // Rolled for the UI locale work: ui-locale.js and copy-exact.js scripts and
   // data-i18n keys on static copy. Rolled again for the Skopeo control row,
   // which sits outside the delegation surface, and again for that row's
-  // data-i18n keys. No delegation control was added.
-  'cdf4c12ccc040387ce31e4fca1d8cdcceb3b607ddf09cdd2f0cabc590b539cb8',
+  // data-i18n keys. Rolled once more when that row moved to Advanced
+  // Settings. No delegation control was added.
+  'cdd94600df72e6bfceb97c5ba55066ce5905bd958e8ddda8d1d142c9adc17369',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
@@ -781,9 +782,10 @@ assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
 // Rolled when the prefers-reduced-motion block gained .pixel-letter coverage:
 // the block already silenced the delegation spinner and status dot, but the
-// automation loader kept animating for users who asked it not to.
+// automation loader kept animating for users who asked it not to. Rolled
+// again when the Skopeo row and its styles moved out of the side panel.
 assert.equal(sha256(delegationCssSource),
-  '252a6ef96c275815f0ef60e6eb4feb4eb8143eb6cc48dc03096eb19557fe31b0',
+  '83bf63d8ecdfb1f508361c4b4231ae910cb2a1addd32a71eb6e576baea063524',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

@@ -1063,8 +1063,8 @@ async function partEndToEnd() {
         checkDeep(parsed && Object.keys(parsed).sort(), ['readOnly', 'settings'], 'read-all parses to {settings, readOnly}');
         const settings = (parsed && parsed.settings) || {};
         const productionKeys = PRODUCTION_SCHEMA.keys();
-        check(productionKeys.length === 36 && Object.keys(settings).length === productionKeys.length,
-          'read-all returns every schema key (36 today, got ' + Object.keys(settings).length + ')');
+        check(productionKeys.length === 37 && Object.keys(settings).length === productionKeys.length,
+          'read-all returns every schema key (37 today, got ' + Object.keys(settings).length + ')');
         checkDeep(Object.keys(settings).sort(), productionKeys.slice().sort(), 'read-all keys are the schema keys');
         check(settings.apiKey === '[set]', "the stored apiKey reads as '[set]'");
         check(parsed && Array.isArray(parsed.readOnly) && parsed.readOnly.length === 11, 'read-all lists 11 read-only keys');

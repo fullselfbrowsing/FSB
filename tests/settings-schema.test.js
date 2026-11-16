@@ -101,6 +101,7 @@ const EXPECTED_ENTRIES = [
   { key: 'fsbTelemetryOptOut', type: 'boolean', cls: 'writable', default: false },
   { key: 'serverUrl', type: 'string', cls: 'endpoint', default: 'https://full-selfbrowsing.com' },
   { key: 'serverHashKey', type: 'string', cls: 'secret', default: '' },
+  { key: 'fsbSkopeoEnabled', type: 'boolean', cls: 'writable', default: true },
   { key: 'fsbJevFastModeEnabled', type: 'boolean', cls: 'writable', default: false },
 ];
 const EXPECTED_KEYS = EXPECTED_ENTRIES.map((entry) => entry.key);
@@ -187,11 +188,11 @@ for (const name of ['create', 'originOnly', 'safeKeyLabel']) {
 
 console.log('\n--- the 36-key contract (D-09) ---');
 checkDeep(schema.keys(), EXPECTED_KEYS, 'keys() lists the 36 contract keys in order');
-check(schema.keys().length === 36, 'there are exactly 36 keys');
+check(schema.keys().length === 37, 'there are exactly 37 keys');
 checkDeep(schema.readOnlyKeys(), EXPECTED_READ_ONLY, 'readOnlyKeys() lists the 8 secrets and 3 endpoints in entry order');
 check(schema.readOnlyKeys().length === 11, 'there are exactly 11 read-only keys');
-check(schema.keys().filter((key) => schema.isWritable(key)).length === 25, '25 keys are writable');
-check(schema.entries.length === 36, 'entries holds 36 entries');
+check(schema.keys().filter((key) => schema.isWritable(key)).length === 26, '26 keys are writable');
+check(schema.entries.length === 37, 'entries holds 37 entries');
 EXPECTED_ENTRIES.forEach((expected, index) => {
   const entry = schema.entries[index];
   checkDeep({ ...entry }, expected, `entry ${index + 1} ${expected.key} matches the contract`);
@@ -243,10 +244,10 @@ check(throwsTypeError(() => { schema.entries.push({ key: 'x' }); }), 'pushing in
 check(throwsTypeError(() => { schema.entries[0].key = 'hijacked'; }), 'renaming a production entry throws in strict mode');
 check(throwsTypeError(() => { schema.get('sttProvider').values.push('other'); }), 'extending an enum throws in strict mode');
 check(throwsTypeError(() => { schema.CODES.UNKNOWN_KEY = 'x'; }), 'CODES cannot be rewritten');
-check(schema.keys().length === 36 && schema.entries[0].key === 'providerKind', 'the production schema is intact after tamper attempts');
+check(schema.keys().length === 37 && schema.entries[0].key === 'providerKind', 'the production schema is intact after tamper attempts');
 const keysCopy = schema.keys();
 keysCopy.push('extra');
-check(schema.keys().length === 36, 'keys() returns a fresh array each call');
+check(schema.keys().length === 37, 'keys() returns a fresh array each call');
 
 console.log('\n--- get / isWritable / safeKeyLabel ---');
 check(schema.get('apiKey') === schema.entries[4], 'get(apiKey) returns its entry');
@@ -512,9 +513,9 @@ const fixture = schema.create([
 check(fixture !== schema, 'create returns a new instance');
 check(Object.isFrozen(fixture) && Object.isFrozen(fixture.entries), 'the fixture instance and its entries are frozen');
 check(fixture.keys().includes(FIXTURE_KEY), 'the fixture schema lists the fixture key');
-check(fixture.keys().length === 37, 'the fixture schema has 37 keys');
+check(fixture.keys().length === 38, 'the fixture schema has 38 keys');
 check(!schema.keys().includes(FIXTURE_KEY) && schema.get(FIXTURE_KEY) === null, 'the production schema does not see the fixture key');
-check(schema.keys().length === 36, 'the production schema still has 36 keys');
+check(schema.keys().length === 37, 'the production schema still has 37 keys');
 check(fixture.isWritable(FIXTURE_KEY) === true, 'the fixture key is writable');
 check(fixture.projectAll({}, {}).settings[FIXTURE_KEY] === false, 'the fixture key reads its default');
 check(fixture.projectAll({ [FIXTURE_KEY]: true }, {}).settings[FIXTURE_KEY] === true, 'the fixture key reads a stored value');
@@ -558,7 +559,7 @@ const BAD_ENTRIES = [
 for (const [label, entries] of BAD_ENTRIES) {
   check(throwsTypeError(() => schema.create(entries)), `create rejects ${label}`);
 }
-check(schema.keys().length === 36, 'rejected create calls leave the production schema untouched');
+check(schema.keys().length === 37, 'rejected create calls leave the production schema untouched');
 
 console.log('\n--- config.js scope safety ---');
 const topLevel = CONFIG_SOURCE.split('\n').filter((line) => /^(const|let|class|function|var) /.test(line));
@@ -604,7 +605,7 @@ try {
   swError = err;
 }
 check(swError === null, `config.js loads in an SW-like scope${swError ? ` (${swError.message})` : ''}`);
-check(vm.runInContext('self.FsbSettingsSchema.keys().length', swContext) === 36, 'the SW scope exposes self.FsbSettingsSchema');
+check(vm.runInContext('self.FsbSettingsSchema.keys().length', swContext) === 37, 'the SW scope exposes self.FsbSettingsSchema');
 check(vm.runInContext('typeof FsbAgentCapRecommendation === "undefined" && typeof FsbDelegationProviders === "undefined"', swContext),
   'config.js does not need the SW-only globals at load');
 check(chromeCalls === 1, 'loading config.js makes only the Config cache listener chrome call');
@@ -1258,8 +1259,8 @@ function extractSaveSettingsKeys(sourceText) {
   return null;
 }
 
-// The four control-panel writers outside saveSettings (D-09).
-const OTHER_PANEL_WRITERS = ['autoAnalyzeMemories', 'fsbTelemetryOptOut', 'serverUrl', 'serverHashKey'];
+// The five control-panel writers outside saveSettings (D-09).
+const OTHER_PANEL_WRITERS = ['autoAnalyzeMemories', 'fsbTelemetryOptOut', 'serverUrl', 'serverHashKey', 'fsbSkopeoEnabled'];
 
 // Keys the panel or Config knows that are deliberately not settings (D-09).
 const EXCLUDED_FROM_SCHEMA = {
@@ -1302,8 +1303,9 @@ runSection('D-09 inventory parity: schema keys equal every control-panel writer'
   check(!OPTIONS_SOURCE.includes('fsb_sunset_notice_dismissed'),
     'options.js no longer writes the retired fsb_sunset_notice_dismissed flag');
 
-  // The four writers outside saveSettings still exist.
+  // The five writers outside saveSettings still exist.
   check(OPTIONS_SOURCE.includes('chrome.storage.local.set({ autoAnalyzeMemories'), 'options.js still writes autoAnalyzeMemories');
+  check(OPTIONS_SOURCE.includes('chrome.storage.local.set({ fsbSkopeoEnabled'), 'options.js writes fsbSkopeoEnabled from the Advanced Settings switch');
   check(OPTIONS_SOURCE.includes('chrome.storage.local.set({ serverUrl, serverHashKey'), 'options.js still writes serverUrl and serverHashKey together');
   check(/var FSB_TELEMETRY_OPT_OUT_KEY = 'fsbTelemetryOptOut';/.test(INSTALL_IDENTITY_SOURCE),
     'install-identity.js FSB_TELEMETRY_OPT_OUT_KEY is fsbTelemetryOptOut');
@@ -1449,6 +1451,8 @@ async function runDefaultParity() {
     'options.js FSB_DEFAULT_SERVER_URL equals the schema serverUrl default');
   check(OPTIONS_SOURCE.includes('result.autoAnalyzeMemories !== false'), 'options.js still reads autoAnalyzeMemories as default true');
   check(schemaDefaultFor('autoAnalyzeMemories') === true, 'the schema autoAnalyzeMemories default is true');
+  check(OPTIONS_SOURCE.includes('result.fsbSkopeoEnabled !== false'), 'options.js reads fsbSkopeoEnabled as default true');
+  check(schemaDefaultFor('fsbSkopeoEnabled') === true, 'the schema fsbSkopeoEnabled default is true');
 
   // fsbAgentCap is a computed default, not a divergence: its fallback equals options.js 8.
   check(!('fsbAgentCap' in KNOWN_DEFAULT_DIVERGENCES), 'fsbAgentCap is not in KNOWN_DEFAULT_DIVERGENCES');

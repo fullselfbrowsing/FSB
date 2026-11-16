@@ -420,14 +420,12 @@ function runPart4() {
      'Part 4.1 -- activation sends exact tab identity to the unified synchronizer');
 
   if (syncBody) {
+    // Skopeo moved to Advanced Settings, so the side panel no longer
+    // activates it per tab; the commit still precedes the owner refresh.
     var commitIndex = syncBody.indexOf('_activeTabIdSnapshot = incomingTabId');
-    var activationIndex = syncBody.indexOf('FSBSkopeoSidepanelController.activateTab(incomingTabId)');
     var ownerRefreshIndex = syncBody.indexOf('await refreshActiveTabOwnership(incomingTabId, syncGeneration)');
-    var activationSites = (syncBody.match(/FSBSkopeoSidepanelController\.activateTab\(incomingTabId\)/g) || []).length;
-    var activationIsChangeGated = /if \(tabChanged\) \{[\s\S]*?FSBSkopeoSidepanelController[\s\S]*?\.activateTab\(incomingTabId\)/.test(syncBody);
-    ok(commitIndex !== -1 && activationIndex > commitIndex && ownerRefreshIndex > activationIndex
-       && activationSites === 1 && activationIsChangeGated,
-       'Part 4.2 -- each changed tab is committed before its one Skopeo activation');
+    ok(commitIndex !== -1 && ownerRefreshIndex > commitIndex && !/Skopeo/i.test(spSrc),
+       'Part 4.2 -- each changed tab is committed before the owner refresh, with no Skopeo activation');
 
     var generationFences = (syncBody.match(/syncGeneration !== _activeTabSurfaceSyncGeneration/g) || []).length;
     var fencesOwnerRefresh = /await refreshActiveTabOwnership\([^;]+;\s*if \(syncGeneration !== _activeTabSurfaceSyncGeneration\) return false;/.test(syncBody);

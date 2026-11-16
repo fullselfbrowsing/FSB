@@ -301,6 +301,9 @@ function initializeDashboard() {
   loadPaymentVaultStatus();
   initCredentialVaultListeners();
 
+  // Skopeo switch and shortcut in Advanced Settings
+  initSkopeoSettings();
+
   // Setup theme
   setupTheme();
   
@@ -7067,6 +7070,59 @@ function cancelPairing() {
 
 // ===== Memory Dashboard =====
 
+// Skopeo in Advanced Settings. The switch is saved on change, outside Save,
+// like the auto-analyze toggle; the background closes Skopeo in every tab
+// when it goes off. The shortcut itself opens Skopeo on a tab.
+const SKOPEO_COMMAND = 'toggle-skopeo-current-tab';
+
+function formatSkopeoShortcut(shortcut) {
+  if (typeof shortcut !== 'string' || shortcut.trim().length === 0) return null;
+  const raw = shortcut.trim();
+  if (raw === 'Alt+Space') return '\u2325 Space';
+  return raw.split('+').map((part) => part.trim()).filter(Boolean).join(' ');
+}
+
+async function refreshSkopeoShortcut() {
+  const label = document.getElementById('fsbSkopeoShortcutLabel');
+  if (!label) return;
+  let shortcut = null;
+  try {
+    const commands = await chrome.commands.getAll();
+    const command = Array.isArray(commands) ? commands.find((entry) => entry && entry.name === SKOPEO_COMMAND) : null;
+    shortcut = formatSkopeoShortcut(command && command.shortcut);
+  } catch (_error) {
+    shortcut = null;
+  }
+  if (shortcut) fsbUiSet(label, 'Shortcut: $SHORTCUT$ \u00b7 Change shortcut', { SHORTCUT: shortcut });
+  else fsbUiSet(label, 'Shortcut not assigned \u00b7 Set in Chrome shortcuts');
+}
+
+function initSkopeoSettings() {
+  const toggle = document.getElementById('fsbSkopeoEnabled');
+  if (toggle) {
+    chrome.storage.local.get('fsbSkopeoEnabled', (result) => {
+      toggle.checked = result.fsbSkopeoEnabled !== false; // default true
+    });
+    toggle.addEventListener('change', () => {
+      chrome.storage.local.set({ fsbSkopeoEnabled: toggle.checked });
+    });
+  }
+  const shortcutButton = document.getElementById('fsbSkopeoShortcut');
+  if (shortcutButton) {
+    shortcutButton.addEventListener('click', () => {
+      try {
+        const created = chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+        if (created && typeof created.catch === 'function') created.catch(() => {});
+      } catch (_error) {
+        // The shortcuts page is a convenience; the switch works without it.
+      }
+    });
+    refreshSkopeoShortcut();
+    // Coming back from the Chrome shortcuts page shows the new shortcut.
+    window.addEventListener('focus', () => { refreshSkopeoShortcut(); });
+  }
+}
+
 let memorySearchDebounce = null;
 
 function initializeMemorySection() {
@@ -9475,6 +9531,7 @@ function initializeSyncSection() {
       refreshStepperFor(deps, 'fsbMcpSessionRetentionDays');
     },
     autoAnalyzeMemories: (value, deps) => setControlChecked(deps, 'autoAnalyzeToggle', value !== false),
+    fsbSkopeoEnabled: (value, deps) => setControlChecked(deps, 'fsbSkopeoEnabled', value !== false),
     fsbTelemetryOptOut: (value, deps) => {
       // Inverse toggle: checked means telemetry is on.
       const toggle = deps.getElement('fsbTelemetryOptOut');

@@ -801,6 +801,36 @@
               </div>
             </div>
 
+            <!-- Skopeo: one switch for the whole extension; the shortcut opens it on a tab -->
+            <div class="settings-card full-width" id="skopeoSettings">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-binoculars"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3 translate="no">Skopeo</h3>
+                  <p data-i18n="panel_27d47cf198">Opens on the current tab from a keyboard shortcut</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="fsbSkopeoEnabled" checked>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label" data-i18n="panel_4a66fe40ce">Enable Skopeo</span>
+                      <span class="toggle-desc" data-i18n="panel_f43c6b3ac7">When on, the shortcut turns Skopeo on or off in the current tab, and pressing Esc twice closes it. Turning this off closes Skopeo in every tab.</span>
+                    </div>
+                  </label>
+                  <button type="button" class="form-secondary-btn" id="fsbSkopeoShortcut" style="margin-top: 12px;" aria-label="Open Chrome shortcut settings" data-i18n-attr="aria-label:copy_14893d4a92">
+                    <i class="fas fa-keyboard"></i> <span class="form-secondary-btn__label" id="fsbSkopeoShortcutLabel" data-i18n="copy_f262cf94ab">Shortcut not assigned &#183; Set in Chrome shortcuts</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div class="adv-sub"><i class="fas fa-user-shield"></i><span data-i18n="panel_915c0ef81c">Privacy &amp; Developer</span><span class="adv-sub-rule"></span></div>
             <div class="settings-card full-width" id="voiceInputSettings">
               <div class="settings-card-header">

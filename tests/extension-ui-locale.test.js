@@ -344,13 +344,7 @@ for (const [file, exactMap, texts] of [
     'the provider became unavailable', 'the agent process could not be started', 'the agent process could not be verified',
     'the agent spoke an unexpected protocol', 'the connection to the local agent service was lost',
     'the local agent service shut down', 'an earlier agent process did not shut down',
-    'an earlier agent run was not cleaned up', 'the start was cancelled',
-    'Off for this tab', 'Turn on Skopeo', 'Turn off Skopeo', 'Open Chrome shortcut settings',
-    'Shortcut not assigned · Set in Chrome shortcuts', 'Shortcut: $SHORTCUT$ · Change shortcut',
-    'Esc Esc: turn off Skopeo in this tab', 'Skopeo can’t open safely on this layout.',
-    'Zoom out or resize the page, then try again.', 'Starting on this tab…', 'On · Ambient',
-    'Skopeo can’t run on this page.', 'Open a standard web page, then try again.', 'Skopeo didn’t start.',
-    'Nothing was added to the page. Try again.', 'Try again'
+    'an earlier agent run was not cleaned up', 'the start was cancelled'
   ]],
   ['extension/ui/popup.js', sidePanelMap, ['Error occurred', 'Task completed', 'Task partially completed']],
   ['extension/ui/options.js', controlPanelMap, [
@@ -381,11 +375,12 @@ for (const [file, exactMap, texts] of [
     'The local FSB service did not publish a usable session. Restart it and try again.',
     'The local FSB agent service could not be reached. Try again.',
     'Install the FSB native helper for this browser and extension, then try again.',
-    'Select a supported agent provider.', 'Connection test failed'
+    'Select a supported agent provider.', 'Connection test failed',
+    'Shortcut not assigned · Set in Chrome shortcuts', 'Shortcut: $SHORTCUT$ · Change shortcut'
   ]]
 ]) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
-  // A literal may spell punctuation as a \u escape, as the Skopeo row does.
+  // A literal may spell punctuation as a \u escape, as the Skopeo shortcut button does.
   const escaped = (text) => text.replace(/’/g, '\\u2019').replace(/…/g, '\\u2026').replace(/·/g, '\\u00b7');
   const missing = texts.filter((text) => ![text, escaped(text)]
     .some((form) => source.includes("'" + form.replace(/'/g, "\\'") + "'")));

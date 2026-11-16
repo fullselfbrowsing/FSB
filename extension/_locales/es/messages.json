@@ -4784,12 +4784,6 @@
   "panel_01003693b8": {
     "message": "El proveedor cambió fuera de este panel. Actualiza los modelos para ver más."
   },
-  "copy_1ca28d1918": {
-    "message": "Desactivado en esta pestaña"
-  },
-  "copy_dc069f34dd": {
-    "message": "Activar Skopeo"
-  },
   "copy_bd47072fe5": {
     "message": "Desactivar Skopeo"
   },
@@ -4798,36 +4792,6 @@
   },
   "copy_f262cf94ab": {
     "message": "Sin atajo asignado · Configúralo en los atajos de Chrome"
-  },
-  "copy_b7fb9f7ede": {
-    "message": "Skopeo en esta pestaña"
-  },
-  "copy_94b2c61b4b": {
-    "message": "Esc Esc: desactiva Skopeo en esta pestaña"
-  },
-  "copy_3432134e77": {
-    "message": "Skopeo no puede abrirse de forma segura con este diseño."
-  },
-  "copy_48ba5c84b7": {
-    "message": "Reduce el zoom o cambia el tamaño de la página e inténtalo de nuevo."
-  },
-  "copy_99536455cd": {
-    "message": "Iniciando en esta pestaña…"
-  },
-  "copy_e656694252": {
-    "message": "Activado · Discreto"
-  },
-  "copy_f0bbe1ab9e": {
-    "message": "Skopeo no puede ejecutarse en esta página."
-  },
-  "copy_caf87bac3d": {
-    "message": "Abre una página web normal e inténtalo de nuevo."
-  },
-  "copy_6e4dce91aa": {
-    "message": "Skopeo no se inició."
-  },
-  "copy_f4d25b46e3": {
-    "message": "No se añadió nada a la página. Inténtalo de nuevo."
   },
   "copy_595462a32d": {
     "message": "Atajo: $SHORTCUT$ · Cambiar atajo",
@@ -6612,5 +6576,14 @@
   },
   "copy_2d03873447": {
     "message": "Sin renovación automática indicada"
+  },
+  "panel_27d47cf198": {
+    "message": "Se abre en la pestaña actual con un atajo de teclado"
+  },
+  "panel_4a66fe40ce": {
+    "message": "Activar Skopeo"
+  },
+  "panel_f43c6b3ac7": {
+    "message": "Cuando está activado, el atajo activa o desactiva Skopeo en la pestaña actual, y pulsar Esc dos veces lo cierra. Si desactivas esta opción, Skopeo se cierra en todas las pestañas."
   }
 }

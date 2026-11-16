@@ -406,10 +406,10 @@ if (typeof module !== 'undefined' && module.exports) {
   var ENTRY_FIELDS = ['key', 'type', 'cls', 'default', 'min', 'max', 'values', 'maxLength', 'group'];
   var TYPE_ONLY_FIELDS = { min: 'integer', max: 'integer', values: 'enum', maxLength: 'string' };
 
-  // D-09 inventory: saveSettings' object order (options.js), then the four
-  // other control-panel writers (autoAnalyzeMemories, fsbTelemetryOptOut and
-  // the Sync keys). Defaults are the effective ones the consuming code uses
-  // (D-12); Config.defaults above stays unchanged.
+  // D-09 inventory: saveSettings' object order (options.js), then the five
+  // other control-panel writers (autoAnalyzeMemories, fsbTelemetryOptOut,
+  // the Sync keys and fsbSkopeoEnabled). Defaults are the effective ones the
+  // consuming code uses (D-12); Config.defaults above stays unchanged.
   var PRODUCTION_ENTRIES = [
     { key: 'providerKind', type: 'enum', cls: 'writable', default: 'api', values: ['api', 'agent'], group: 'provider' },
     { key: 'agentProviderId', type: 'string', cls: 'writable', default: '', maxLength: 64, group: 'provider' },
@@ -449,6 +449,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // Effective default: ws-client.js and the panel Sync use this host (Config.defaults says fly.dev).
     { key: 'serverUrl', type: 'string', cls: 'endpoint', default: 'https://full-selfbrowsing.com' },
     { key: 'serverHashKey', type: 'string', cls: 'secret', default: '' },
+    // The Skopeo switch in Advanced Settings, written outside saveSettings; on by default.
+    { key: 'fsbSkopeoEnabled', type: 'boolean', cls: 'writable', default: true },
     // Phase 68 (AUTO-01): the autopilot fast mode switch, off by default.
     { key: 'fsbJevFastModeEnabled', type: 'boolean', cls: 'writable', default: false }
   ];

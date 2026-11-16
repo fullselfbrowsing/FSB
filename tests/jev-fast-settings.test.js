@@ -222,8 +222,8 @@ function loadOptionsDefaultSettings() {
     'FsbSettingsSchema.get(fsbJevFastModeEnabled) is {key, type:boolean, cls:writable, default:false}');
   const keys = schema.keys();
   ok(keys[keys.length - 1] === KEY, 'fsbJevFastModeEnabled is the last schema entry');
-  ok(keys.length === 36, 'keys().length is 36 (got ' + keys.length + ')');
-  ok(keys.filter((k) => schema.isWritable(k)).length === 25, '25 keys are writable');
+  ok(keys.length === 37, 'keys().length is 37 (got ' + keys.length + ')');
+  ok(keys.filter((k) => schema.isWritable(k)).length === 26, '26 keys are writable');
   ok(schema.isWritable(KEY) === true, 'fsbJevFastModeEnabled is writable over MCP');
   ok(schema.readOnlyKeys().length === 11 && !schema.readOnlyKeys().includes(KEY), 'readOnlyKeys() stays at 11 and excludes the switch');
   ok(sameJson(schema.parseValue(KEY, 'true'), { ok: true, value: true }), "parseValue(fsbJevFastModeEnabled, 'true') is {ok:true, value:true}");
