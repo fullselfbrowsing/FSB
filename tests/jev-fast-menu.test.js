@@ -180,14 +180,14 @@ check('the fast-mode registry never resets or renumbers FSB.refMap (D-14)', () =
   const { refMap, jevRefMap } = loadRefMapAndRegistry(kit.cryptoStub());
   const e = [1, 2, 3].map((n) => kit.makeElement({ tag: 'button', text: `B${n}` }));
   refMap.reset();
-  e.forEach((el, i) => refMap.register(el, `#b${i + 1}`, 'button', `B${i + 1}`));
+  const refs = e.map((el, i) => refMap.register(el, `#b${i + 1}`, 'button', `B${i + 1}`));
   const generationBefore = refMap.generationId;
   jevRefMap.reset();
   const others = [4, 5, 6, 7].map((n) => kit.makeElement({ tag: 'button', text: `B${n}` }));
   others.forEach((el, i) => jevRefMap.register(el, 'button', `B${i + 4}`));
   assert.equal(jevRefMap.size, 4);
-  const resolved = refMap.resolve('e2');
-  assert.ok(resolved && resolved.element === e[1], 'e2 still points at the same element');
+  const resolved = refMap.resolve(refs[1]);
+  assert.ok(resolved && resolved.element === e[1], 'the second ref still points at the same element');
   assert.equal(refMap.generationId, generationBefore, 'refMap generation unchanged');
   assert.equal(refMap.size, 3);
 });
@@ -1269,7 +1269,7 @@ check('kept entries are registered in FSB.jevRefMap in output order; FSB.refMap 
   const list = buttons(4, (i) => `Item ${i + 1}`);
   page(list);
   F.refMap.reset();
-  list.slice(0, 3).forEach((node, i) => F.refMap.register(node, `#b${i + 1}`, 'button', `Item ${i + 1}`));
+  const refs = list.slice(0, 3).map((node, i) => F.refMap.register(node, `#b${i + 1}`, 'button', `Item ${i + 1}`));
   const generationBefore = F.refMap.generationId;
   stubPool(list.slice().reverse());
   const before = F.jevRefMap.generation.split('-');
@@ -1287,7 +1287,7 @@ check('kept entries are registered in FSB.jevRefMap in output order; FSB.refMap 
   });
   assert.equal(F.refMap.generationId, generationBefore);
   assert.equal(F.refMap.size, 3);
-  assert.equal(F.refMap.resolve('e2').element, list[1]);
+  assert.equal(F.refMap.resolve(refs[1]).element, list[1]);
 });
 
 check('url, title and moreBelow come from the page; moreBelow needs more than MORE_BELOW_PX below', () => {

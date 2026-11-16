@@ -633,13 +633,19 @@
    * resolves to its original element or to nothing, never to another element.
    * reset() starts a new snapshot generation and drops entries whose element
    * is gone; it never renumbers. The counter starts again only in a new
-   * document, which loads a new content script and a new RefMap.
+   * document, which loads a new content script and a new RefMap. Each RefMap
+   * numbers from its own random base, so a ref copied from another page, or
+   * from before the content script was re-injected, is almost never a number
+   * this document issues and fails as unknown instead of naming an element.
    */
   class RefMap {
     constructor() {
       this.map = new Map();    // ref -> { element: WeakRef, selector, role, name }
       this.refsByElement = new WeakMap();    // element -> ref
-      this.counter = 0;        // highest ref number issued in this document
+      // Refs of this document are e<base+1>, e<base+2>, ... The base is a
+      // random multiple of 1000 between 1000 and 900000.
+      this.base = 1000 * (1 + Math.floor(Math.random() * 900));
+      this.counter = this.base;   // highest ref number issued in this document
       this.generationId = 0;
       this.generationUrl = '';
     }
@@ -670,7 +676,9 @@
 
     // True when this document issued the ref, whether or not its element remains.
     issued(ref) {
-      return typeof ref === 'string' && /^e[1-9]\d*$/.test(ref) && Number(ref.slice(1)) <= this.counter;
+      if (typeof ref !== 'string' || !/^e[1-9]\d*$/.test(ref)) return false;
+      const n = Number(ref.slice(1));
+      return n > this.base && n <= this.counter;
     }
 
     // null: never issued in this document. stale: issued, but its element was

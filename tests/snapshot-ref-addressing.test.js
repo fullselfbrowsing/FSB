@@ -473,6 +473,28 @@ test('a ref this document never issued is refused as unknown', () => {
   assert.deepEqual(ctx.toolCalls, []);
 });
 
+test('a ref from another document is unknown here, and refs never start at e1', () => {
+  // Two content-script loads stand for two documents (a navigation or a
+  // re-injection). Each numbers its refs from its own random base.
+  const pageA = loadContentScripts();
+  buildForm(pageA);
+  const refsA = [...snapshot(pageA).matchAll(/`(e\d+):/g)].map((m) => m[1]);
+  const pageB = loadContentScripts();
+  buildForm(pageB);
+  const refsB = [...snapshot(pageB).matchAll(/`(e\d+):/g)].map((m) => m[1]);
+  assert.ok(refsA.length > 0 && refsB.length > 0);
+  for (const ref of [...refsA, ...refsB]) assert.ok(Number(ref.slice(1)) > 1000, `${ref} is above the smallest base`);
+  const overlap = refsA.filter((ref) => refsB.includes(ref));
+  // Bases are multiples of 1000 drawn from 900 values, so two loads share
+  // numbers only when they draw the same base.
+  if (overlap.length === 0) {
+    const outcome = pageB.execute('click', { selector: refsA[0] });
+    assert.equal(outcome.result, null);
+    assert.match(outcome.refused[0].error, /^Unknown ref /);
+    assert.deepEqual(pageB.toolCalls, []);
+  }
+});
+
 test('an input wrapped in its label appears in the page snapshot', () => {
   const ctx = loadContentScripts();
   const page = buildForm(ctx);
