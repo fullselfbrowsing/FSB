@@ -1338,19 +1338,21 @@ check('recentHandles: selector, ref (through FSB.refMap.resolve) and a unique ro
   page(list.concat([outside]));
   F.refMap.reset();
   F.refMap.register(list[3], '#b4', 'button', 'Dup');
-  F.refMap.register(list[1], '#b2', 'button', 'Bravo');
+  // Refs are never reused within a document, so read the issued ref instead of assuming e2.
+  const bravoRef = F.refMap.register(list[1], '#b2', 'button', 'Bravo');
   const refGeneration = F.refMap.generationId;
+  const refCount = F.refMap.size;
   F.querySelectorWithShadow = (selector) => ({ '#b1': list[0], '#gone': outside }[selector] || null);
   stubPool(list);
   const menu = build({
     recent: [
       { selector: '#b1' },
-      { ref: 'e2' },
+      { ref: bravoRef },
       { role: 'button', name: 'Alpha' },
       { role: 'button', name: 'Dup' },
       { selector: '#gone' },
       { selector: '#missing' },
-      { ref: 'e9' },
+      { ref: 'e9999' },
       {},
       'junk',
       null,
@@ -1359,7 +1361,7 @@ check('recentHandles: selector, ref (through FSB.refMap.resolve) and a unique ro
   });
   assert.deepEqual(menu.recentHandles, ['j1', 'j2', 'j1', null, null, null, null, null, null, null]);
   assert.equal(F.refMap.generationId, refGeneration, 'refMap not reset');
-  assert.equal(F.refMap.size, 2);
+  assert.equal(F.refMap.size, refCount);
   F.querySelectorWithShadow = () => null;
   assert.deepEqual(build().recentHandles, []);
 });
@@ -1933,11 +1935,11 @@ check('the jev branch is the first target-resolution branch and the menu case ex
   assert.match(branch, /refStale: true[\s\S]*?\n\s*return;/);
 });
 
-check('non-jev: a stale e-ref still answers with the existing refStale text and dispatches nothing', () => {
+check('non-jev: a stale e-ref answers refStale, says it was not executed and dispatches nothing', () => {
   const h = messagingHarness({
     fsb: {
       resolveRef: () => null,
-      refMap: { getInfo: () => ({ role: 'button', name: 'Next', selector: '#next' }) },
+      refMap: { getInfo: () => ({ role: 'button', name: 'Next', selector: '#next' }), issued: () => true },
     },
   });
   const params = { ref: 'e5' };
@@ -1945,22 +1947,26 @@ check('non-jev: a stale e-ref still answers with the existing refStale text and 
   assert.equal(outcome, undefined, 'returned before the handler');
   assert.deepEqual(plain(h.calls.responses), [{
     success: false,
-    error: 'Element ref "e5" (button "Next") is stale. The page has changed. Use elements from the current snapshot.',
+    error: 'Element ref "e5" (button "Next") is stale: its element is no longer on the page. The action was not executed. Take a fresh get_page_snapshot and use its refs.',
     tool: 'click',
     refStale: true,
+    outcome: 'failed',
+    mayHaveExecuted: false,
   }]);
   assert.equal(params.selector, undefined);
-  const unknown = messagingHarness({ fsb: { resolveRef: () => null, refMap: { getInfo: () => null } } });
+  const unknown = messagingHarness({ fsb: { resolveRef: () => null, refMap: { getInfo: () => null, issued: () => false } } });
   runPrelude({ action: 'executeAction', tool: 'click', params: { ref: 'e9' } }, unknown);
   assert.deepEqual(plain(unknown.calls.responses), [{
     success: false,
-    error: 'Unknown ref "e9". Use refs from the latest page snapshot.',
+    error: 'Unknown ref "e9": this page never issued it (the page may have reloaded or navigated since that snapshot). The action was not executed. Take a fresh get_page_snapshot and use its refs.',
     tool: 'click',
     refStale: true,
+    outcome: 'failed',
+    mayHaveExecuted: false,
   }]);
 });
 
-check('non-jev: an e-ref that resolves sets its selector and caches the element, as before', () => {
+check('non-jev: an e-ref that resolves keeps the ref as its selector and never swaps in the stored CSS selector', () => {
   const target = el({ tag: 'button', attrs: { id: 'next' }, text: 'Next' });
   const h = messagingHarness({
     fsb: {
@@ -1971,10 +1977,8 @@ check('non-jev: an e-ref that resolves sets its selector and caches the element,
   const params = { ref: 'e2' };
   const outcome = runPrelude({ action: 'executeAction', tool: 'click', params }, h);
   assert.equal(outcome, 'continued');
-  assert.equal(params.selector, '#next');
-  assert.equal(h.calls.cacheSets.length, 1);
-  assert.equal(h.calls.cacheSets[0].selector, '#next');
-  assert.equal(h.calls.cacheSets[0].element, target);
+  assert.equal(params.selector, 'e2');
+  assert.equal(h.calls.cacheSets.length, 0);
   assert.equal(h.calls.responses.length, 0);
 });
 
@@ -2321,9 +2325,11 @@ check('armed: a ref the COMPACT REF branch resolved is observed through the sele
       refMap: { getInfo: () => ({ role: 'link', name: 'Docs', selector: '#docs' }) },
     },
   });
+  // querySelectorWithShadow resolves a ref through the ref map, as selectors.js does.
+  F.querySelectorWithShadow = (selector) => (selector === 'e4' ? f.docs : null);
   const params = { ref: 'e4' };
   runThroughGuard({ action: 'executeAction', tool: 'hover', params }, h, events);
-  assert.equal(params.selector, '#docs');
+  assert.equal(params.selector, 'e4');
   assert.equal(observation(sent).handle, entryOf(f.menu, 'Docs').handle);
 });
 

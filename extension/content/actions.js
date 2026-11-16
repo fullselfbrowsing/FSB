@@ -2265,7 +2265,7 @@ const tools = {
   scrollToElement: async (params) => {
     const selector = params.selector;
     if (!selector) return { success: false, error: 'No selector provided' };
-    const element = document.querySelector(selector);
+    const element = FSB.querySelectorWithShadow(selector);
     if (!element) return { success: false, error: `Element not found: ${selector}` };
     const position = params.position || 'center';
     element.scrollIntoView({ behavior: 'smooth', block: position === 'center' ? 'center' : 'start' });

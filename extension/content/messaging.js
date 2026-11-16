@@ -1062,28 +1062,37 @@
             FSB.elementCache.set(params.selector, jevVerdict.element);
           }
 
+          // Snapshot refs ("e12") reach here as `selector`: tool-calling models
+          // and MCP clients only have a selector parameter. No page element is
+          // named e12, so querying it as CSS can only fail; resolve it as a ref.
+          if (params && !params.ref && typeof params.selector === 'string'
+              && /^e\d+$/.test(params.selector.trim())) {
+            params.ref = params.selector.trim();
+            delete params.selector;
+          }
+
           // COMPACT REF RESOLUTION
+          // A live ref keeps the ref itself as the selector. Tools look their
+          // target up through querySelectorWithShadow, which resolves a ref only
+          // through the ref map, so every lookup during the action (re-checks
+          // after scrolling included) finds this element or nothing. A stale or
+          // unknown ref is refused before anything runs, with no CSS fallback.
           if (params && params.ref && !params.selector) {
             const resolvedElement = FSB.resolveRef(params.ref);
             if (resolvedElement) {
-              const refInfo = FSB.refMap.getInfo(params.ref);
-              params.selector = refInfo?.selector;
-              if (!params.selector) {
-                const sels = FSB.generateSelectors(resolvedElement);
-                const cssSel = sels.find(s => typeof s === 'string' ? !s.startsWith('//') : !s.selector?.startsWith('//'));
-                params.selector = typeof cssSel === 'string' ? cssSel : (cssSel?.selector || sels[0]?.selector || sels[0] || '');
-              }
-              if (params.selector) FSB.elementCache.set(params.selector, resolvedElement);
-              logger.debug('Resolved ref to selector', {
-                sessionId: FSB.sessionId, ref: params.ref, selector: params.selector, role: refInfo?.role
+              params.selector = params.ref;
+              logger.debug('Resolved ref to element', {
+                sessionId: FSB.sessionId, ref: params.ref, role: FSB.refMap.getInfo(params.ref)?.role
               });
             } else {
               const refInfo = FSB.refMap.getInfo(params.ref);
-              const errorMsg = refInfo
-                ? `Element ref "${params.ref}" (${refInfo.role} "${refInfo.name}") is stale. The page has changed. Use elements from the current snapshot.`
-                : `Unknown ref "${params.ref}". Use refs from the latest page snapshot.`;
+              const issued = FSB.refMap.issued(params.ref);
+              const described = refInfo ? ` (${refInfo.role} "${refInfo.name}")` : '';
+              const errorMsg = issued
+                ? `Element ref "${params.ref}"${described} is stale: its element is no longer on the page. The action was not executed. Take a fresh get_page_snapshot and use its refs.`
+                : `Unknown ref "${params.ref}": this page never issued it (the page may have reloaded or navigated since that snapshot). The action was not executed. Take a fresh get_page_snapshot and use its refs.`;
               logger.warn('Stale or unknown ref', { sessionId: FSB.sessionId, ref: params.ref });
-              sendResponse({ success: false, error: errorMsg, tool, refStale: true });
+              sendResponse({ success: false, error: errorMsg, tool, refStale: true, outcome: 'failed', mayHaveExecuted: false });
               return;
             }
           }

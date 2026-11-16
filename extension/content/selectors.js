@@ -451,6 +451,16 @@
     return typeof selector === 'string' ? selector.trim() || null : null;
   }
 
+  /**
+   * True for the ref shape page snapshots emit ("e12"). No page element is
+   * named e12, so a selector of this shape is always a snapshot ref.
+   * @param {*} value
+   * @returns {boolean}
+   */
+  function isSnapshotRef(value) {
+    return typeof value === 'string' && /^e\d+$/.test(value);
+  }
+
   // ============================================================================
   // SHADOW DOM QUERY SUPPORT
   // ============================================================================
@@ -463,6 +473,12 @@
     if (!sanitized) {
       logger.warn('Cannot query with invalid selector', { sessionId: FSB.sessionId, selector });
       return null;
+    }
+
+    // A snapshot ref resolves only through the ref map, never as CSS, so every
+    // lookup during an action finds the ref's own element or nothing.
+    if (isSnapshotRef(sanitized)) {
+      return resolveRef(sanitized);
     }
 
     // SPEED-04: Check cache first for fast repeated lookups
@@ -560,30 +576,17 @@
   }
 
   /**
-   * Resolve a compact ref (e.g., "e1") to a DOM element.
-   * Falls back to CSS selector if the WeakRef has been garbage-collected.
+   * Resolve a compact ref (e.g., "e1") to the element it was issued for.
+   * A ref whose element was removed, or that this document never issued,
+   * resolves to null. It never falls back to the selector stored with the
+   * ref: after the page changes that selector can match a different element.
    * @param {string} ref - The compact ref string (e.g., "e1")
    * @returns {Element|null} The resolved DOM element, or null if not found
    */
   function resolveRef(ref) {
     const resolved = FSB.refMap.resolve(ref);
-    if (!resolved) return null;
-    if (!resolved.stale) {
-      // Cache the element under its selector for tool reuse
-      if (resolved.selector) FSB.elementCache.set(resolved.selector, resolved.element);
-      return resolved.element;
-    }
-    // WeakRef dead or element disconnected -> fallback to CSS selector
-    if (resolved.selector) {
-      const fallback = querySelectorWithShadow(resolved.selector);
-      if (fallback) {
-        logger.debug('Resolved stale ref via CSS fallback', {
-          sessionId: FSB.sessionId, ref, selector: resolved.selector
-        });
-      }
-      return fallback;
-    }
-    return null;
+    if (!resolved || resolved.stale) return null;
+    return resolved.element;
   }
 
   // Query all elements including shadow DOM

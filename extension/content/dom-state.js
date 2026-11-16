@@ -626,25 +626,39 @@
   /**
    * RefMap - Maps compact refs (e1, e2, ...) to DOM elements for AI communication
    * Uses WeakRef to prevent memory leaks when DOM elements are garbage-collected.
-   * Each generateCompactSnapshot() call resets and rebuilds the map.
+   *
+   * A ref names one element for the life of the document. An element keeps its
+   * ref across snapshots, and an element seen for the first time gets a number
+   * never issued before in this document, so a ref from an earlier snapshot
+   * resolves to its original element or to nothing, never to another element.
+   * reset() starts a new snapshot generation and drops entries whose element
+   * is gone; it never renumbers. The counter starts again only in a new
+   * document, which loads a new content script and a new RefMap.
    */
   class RefMap {
     constructor() {
       this.map = new Map();    // ref -> { element: WeakRef, selector, role, name }
-      this.counter = 0;
+      this.refsByElement = new WeakMap();    // element -> ref
+      this.counter = 0;        // highest ref number issued in this document
       this.generationId = 0;
       this.generationUrl = '';
     }
 
     reset() {
-      this.map.clear();
-      this.counter = 0;
+      for (const [ref, entry] of this.map) {
+        const el = entry.element.deref();
+        if (!el || !el.isConnected) this.map.delete(ref);
+      }
       this.generationId++;
     }
 
     register(element, selector, role, name) {
-      this.counter++;
-      const ref = `e${this.counter}`;
+      let ref = this.refsByElement.get(element);
+      if (!ref) {
+        this.counter++;
+        ref = `e${this.counter}`;
+        this.refsByElement.set(element, ref);
+      }
       this.map.set(ref, {
         element: new WeakRef(element),
         selector,
@@ -654,9 +668,16 @@
       return ref;
     }
 
+    // True when this document issued the ref, whether or not its element remains.
+    issued(ref) {
+      return typeof ref === 'string' && /^e[1-9]\d*$/.test(ref) && Number(ref.slice(1)) <= this.counter;
+    }
+
+    // null: never issued in this document. stale: issued, but its element was
+    // removed from the page. Neither case offers another element.
     resolve(ref) {
       const entry = this.map.get(ref);
-      if (!entry) return null;
+      if (!entry) return this.issued(ref) ? { element: null, selector: null, stale: true } : null;
       const el = entry.element.deref();
       if (!el || !el.isConnected) return { element: null, selector: entry.selector, stale: true };
       return { element: el, selector: entry.selector, stale: false };
