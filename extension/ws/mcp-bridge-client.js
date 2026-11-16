@@ -1322,6 +1322,31 @@ class MCPBridgeClient {
     this._send({ id, type: 'mcp:result', payload });
   }
 
+  // An MCP action call. When the page changed in a way the host cannot
+  // predict, runActionWithPageView (mcp-tool-dispatcher.js) adds a compact
+  // view of the page to the result: after _handleExecuteAction has handed the
+  // result to the session recorder, before the wire copy is taken. Replays
+  // call _handleExecuteAction directly and never wait for a view.
+  async _handleExecuteActionWithView(payload) {
+    const execute = () => this._handleExecuteAction(payload);
+    if (typeof runActionWithPageView !== 'function') return execute();
+    const params = (payload && payload.params && typeof payload.params === 'object') ? payload.params : {};
+    const namedTab = Number.isFinite(params.tab_id) ? params.tab_id : (Number.isFinite(params.tabId) ? params.tabId : null);
+    return runActionWithPageView({
+      toolName: payload && payload.tool,
+      tabId: namedTab,
+      params,
+      execute,
+      // Content-script results carry no tab id; the view reads the tab the
+      // action ran in, resolved the way read tools resolve it.
+      resolveTabId: async () => {
+        if (typeof globalThis.resolveAgentTabOrError !== 'function') return null;
+        const resolved = await globalThis.resolveAgentTabOrError(payload && payload.agentId, params, this);
+        return resolved && resolved.success !== false && Number.isFinite(resolved.tabId) ? resolved.tabId : null;
+      }
+    });
+  }
+
   // An action result goes to the MCP server without a change_report that
   // records nothing, so the host reads less; its absence means nothing
   // changed. pageStable, the content script's signal to the change-report
@@ -1507,7 +1532,7 @@ class MCPBridgeClient {
       }
 
       case 'mcp:execute-action':
-        return this._actionResultForWire(await this._handleExecuteAction(payload));
+        return this._actionResultForWire(await this._handleExecuteActionWithView(payload));
 
       case 'mcp:start-automation':
         return this._handleStartAutomation(payload, id);

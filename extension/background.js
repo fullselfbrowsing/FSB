@@ -13717,10 +13717,12 @@ async function collectMcpDiagnosticsSnapshot() {
 
 // Enhanced content script injection with retry logic and page load checks
 const contentScriptInjectionFlights = new Map();
-async function ensureContentScriptInjected(tabId, maxRetries = 3) {
+// options.domReady: the caller has seen the tab's document reach
+// DOMContentLoaded, so injection need not wait for the full page load.
+async function ensureContentScriptInjected(tabId, maxRetries = 3, options = {}) {
   let flight = contentScriptInjectionFlights.get(tabId);
   if (!flight) {
-    flight = ensureContentScriptInjectedUnlocked(tabId, maxRetries);
+    flight = ensureContentScriptInjectedUnlocked(tabId, maxRetries, options);
     contentScriptInjectionFlights.set(tabId, flight);
     flight.finally(() => {
       if (contentScriptInjectionFlights.get(tabId) === flight) contentScriptInjectionFlights.delete(tabId);
@@ -13737,12 +13739,14 @@ async function ensureContentScriptInjected(tabId, maxRetries = 3) {
     }, 12000))]);
 }
 
-async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
+async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3, options = {}) {
+  const domReady = !!(options && options.domReady === true);
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Wait for page to be fully loaded before health check
+      // Wait for page to be fully loaded before health check, unless the
+      // caller already saw its DOMContentLoaded.
       const tab = await chrome.tabs.get(tabId);
-      if (tab.status === 'loading') {
+      if (tab.status === 'loading' && !domReady) {
         automationLogger.logComm(null, 'health', 'tab_loading', true, { tabId, status: 'waiting' });
         await new Promise(resolve => {
           const listener = (updatedTabId, changeInfo) => {

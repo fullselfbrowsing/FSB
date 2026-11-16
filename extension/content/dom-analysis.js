@@ -2740,6 +2740,248 @@
     };
   }
 
+  // --------------------------------------------------------------------------
+  // PAGE VIEW
+  // --------------------------------------------------------------------------
+  //
+  // A compact, addressable view of the page for action results whose page the
+  // caller cannot predict (a navigation, a URL change, an opened dialog). It
+  // reuses the snapshot's element pipeline, regions, roles, names and refs:
+  //
+  //   <title> | <origin><path>
+  //   # <heading>
+  //   e<ref> <role> "<name>" = "<value>" [checked] [expanded] [disabled]
+  //   +<n> more interactive elements; get_page_snapshot gives the full list.
+  //
+  // At most PAGE_VIEW_MAX_LINES lines follow the title line, headings
+  // included, and the whole view stays within PAGE_VIEW_MAX_CHARS. An open
+  // dialog comes first, then main content, then header, navigation, sidebar
+  // and footer; within a region, document order. A heading is shown only
+  // before the first listed element under it. Every listed element is
+  // registered in FSB.refMap, so its ref works in the next call and in later
+  // snapshots of the same document. A value is shown only for a field that is
+  // not a password, hidden or file input, not a payment, one-time-code or
+  // password field by autocomplete, name or id, and not filled from the vault.
+
+  const PAGE_VIEW_MAX_LINES = 30;
+  const PAGE_VIEW_MAX_CHARS = 2000;
+  const PAGE_VIEW_REGION_ORDER = ['@dialog', '@main', '@header', '@nav', '@aside', '@footer'];
+  const PAGE_VIEW_HIDDEN_VALUE_TYPES = ['password', 'hidden', 'file'];
+  const PAGE_VIEW_NO_VALUE_TYPES = ['checkbox', 'radio', 'button', 'submit', 'reset', 'image'];
+  const PAGE_VIEW_SENSITIVE_AUTOCOMPLETE = /^(?:cc-.+|one-time-code|current-password|new-password)$/;
+  // Same terms as the change report's sensitive-field rule.
+  const PAGE_VIEW_SENSITIVE_NAME = new RegExp('(?<![a-z])(?:t?otp|pwd|cvv|cvc|cc[-_ ]?num(?:ber)?)(?![a-z])|pass(?:wd|[-_ ]?(?:word|code))|card[-_ ]?num(?:ber)?|security[-_ ]?code|one[-_ ]?time[-_ ]?(?:code|pass)', 'i');
+
+  // The selector stored with a ref, chosen as buildMarkdownSnapshot chooses
+  // it: the first non-XPath selector generateSelectors offers, else its first.
+  function pageViewSelector(el, generateSelectors) {
+    const sels = generateSelectors(el);
+    const cssSelector = sels.find(s => typeof s === 'string' ? !s.startsWith('//') : !s.selector?.startsWith('//'));
+    return typeof cssSelector === 'string' ? cssSelector : (cssSelector?.selector || sels[0]?.selector || sels[0] || '');
+  }
+
+  function pageViewClip(text, max) {
+    const clean = String(text === null || text === undefined ? '' : text).replace(/\s+/g, ' ').trim();
+    return clean.length > max ? clean.slice(0, max - 3) + '...' : clean;
+  }
+
+  // Origin and path of the page, without query string or fragment.
+  function pageViewAddress() {
+    const href = String(window.location.href || '');
+    try {
+      const url = new URL(href);
+      return (url.origin && url.origin !== 'null' ? url.origin : url.protocol) + url.pathname;
+    } catch (_e) {
+      return href.split(/[?#]/)[0];
+    }
+  }
+
+  function pageViewAttr(el, name) {
+    try {
+      return String((typeof el.getAttribute === 'function' && el.getAttribute(name)) || '');
+    } catch (_e) {
+      return '';
+    }
+  }
+
+  function pageViewValueHidden(el) {
+    const tag = String(el.tagName || '').toUpperCase();
+    if (tag === 'INPUT' && PAGE_VIEW_HIDDEN_VALUE_TYPES.includes(String(el.type || '').toLowerCase())) return true;
+    const autocomplete = pageViewAttr(el, 'autocomplete').toLowerCase();
+    if (autocomplete.split(/\s+/).some((token) => PAGE_VIEW_SENSITIVE_AUTOCOMPLETE.test(token))) return true;
+    for (const raw of [pageViewAttr(el, 'name'), pageViewAttr(el, 'id'), autocomplete]) {
+      const words = raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+      if (raw && PAGE_VIEW_SENSITIVE_NAME.test(words)) return true;
+    }
+    const marks = FSB.vaultFilledElements;
+    return !!(marks && typeof marks.has === 'function' && marks.has(el));
+  }
+
+  function pageViewValue(el) {
+    if (pageViewValueHidden(el)) return '';
+    const tag = String(el.tagName || '').toUpperCase();
+    let raw = '';
+    if (tag === 'INPUT') {
+      if (PAGE_VIEW_NO_VALUE_TYPES.includes(String(el.type || '').toLowerCase())) return '';
+      raw = el.value;
+    } else if (tag === 'TEXTAREA') {
+      raw = el.value;
+    } else if (tag === 'SELECT') {
+      const option = el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+      raw = option ? (option.text || option.value) : el.value;
+    } else if (el.isContentEditable === true || pageViewAttr(el, 'contenteditable') === 'true') {
+      raw = el.innerText || el.textContent;
+    }
+    return pageViewClip(typeof raw === 'string' ? raw : '', 40);
+  }
+
+  function pageViewStates(el) {
+    const tag = String(el.tagName || '').toUpperCase();
+    const type = String(el.type || '').toLowerCase();
+    const states = [];
+    const nativeToggle = tag === 'INPUT' && (type === 'checkbox' || type === 'radio');
+    if (nativeToggle ? el.checked === true : pageViewAttr(el, 'aria-checked').toLowerCase() === 'true') {
+      states.push('[checked]');
+    }
+    let expanded = pageViewAttr(el, 'aria-expanded').toLowerCase() === 'true';
+    const parent = el.parentElement;
+    if (!expanded && tag === 'SUMMARY' && parent && String(parent.tagName || '').toUpperCase() === 'DETAILS') {
+      expanded = typeof parent.hasAttribute === 'function' && parent.hasAttribute('open');
+    }
+    if (expanded) states.push('[expanded]');
+    if (el.disabled === true || pageViewAttr(el, 'aria-disabled').toLowerCase() === 'true') states.push('[disabled]');
+    return states;
+  }
+
+  function pageViewHeadings() {
+    let nodes;
+    try {
+      nodes = document.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]');
+    } catch (_e) {
+      return [];
+    }
+    const headings = [];
+    for (const node of nodes) {
+      if (headings.length >= 200) break;
+      if (!isVisibleForSnapshot(node)) continue;
+      try {
+        const rect = node.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+      } catch (_e) { /* keep the heading */ }
+      const text = pageViewClip(node.textContent, 80);
+      if (text) headings.push({ el: node, heading: text });
+    }
+    return headings;
+  }
+
+  // 4 = DOCUMENT_POSITION_FOLLOWING, 2 = DOCUMENT_POSITION_PRECEDING.
+  function pageViewDocumentOrder(a, b) {
+    if (a.el !== b.el && typeof a.el.compareDocumentPosition === 'function') {
+      try {
+        const position = a.el.compareDocumentPosition(b.el);
+        if (position & 4) return -1;
+        if (position & 2) return 1;
+      } catch (_e) { /* fall back to collection order */ }
+    }
+    return a.index - b.index;
+  }
+
+  /**
+   * Build the compact page view described above.
+   * @returns {{ view: string, shown: number, more: number }}
+   */
+  function buildPageView() {
+    const refMap = FSB.refMap;
+    const generateSelectors = FSB.generateSelectors;
+    refMap.reset();
+    refMap.generationUrl = window.location.href;
+
+    const title = pageViewClip(document.title || 'Untitled Page', 120);
+    const header = `${title} | ${pageViewClip(pageViewAddress(), 300)}`;
+
+    // Every visible interactive element, from the snapshot's pipeline.
+    const visible = getFilteredElements({
+      maxElements: Infinity,
+      viewportComplete: true,
+      prioritizeViewport: true,
+      taskType: 'general'
+    });
+    const items = visible.map((el) => ({ el, region: getRegion(el), heading: null }));
+    for (const heading of pageViewHeadings()) {
+      items.push({ el: heading.el, region: getRegion(heading.el), heading: heading.heading });
+    }
+    items.forEach((item, index) => { item.index = index; });
+    const regionRank = (region) => {
+      const rank = PAGE_VIEW_REGION_ORDER.indexOf(region);
+      return rank === -1 ? PAGE_VIEW_REGION_ORDER.length : rank;
+    };
+    items.sort((a, b) => (regionRank(a.region) - regionRank(b.region)) || pageViewDocumentOrder(a, b));
+
+    // A container of another listed control (a label around its input,
+    // details around its summary) is left out for the control. In document
+    // order a container's first listed descendant is the next listed element.
+    let containers = 0;
+    let previous = null;
+    for (const item of items) {
+      if (item.heading) continue;
+      if (previous && previous.region === item.region && previous.el.contains(item.el)) {
+        previous.container = true;
+        containers++;
+      }
+      previous = item;
+    }
+
+    // Room kept for the closing line.
+    const closingRoom = 80;
+    const lines = [];
+    let used = header.length;
+    let shown = 0;
+    let pending = null;
+    let region = null;
+    for (const item of items) {
+      if (item.region !== region) {
+        region = item.region;
+        pending = null;
+      }
+      if (item.heading) {
+        pending = item;
+        continue;
+      }
+      if (item.container) continue;
+      const el = item.el;
+      const role = getImplicitRole(el) || String(el.tagName || '').toLowerCase();
+      const name = pageViewClip((computeAccessibleName(el)?.name) || el.dataset?.fsbLabel || '', 60);
+      const headingLine = pending && !pending.el.contains(el) && pending.heading !== name
+        ? `# ${pending.heading}`
+        : null;
+      const needed = headingLine ? 2 : 1;
+      if (lines.length + needed > PAGE_VIEW_MAX_LINES) break;
+      const ref = refMap.register(el, pageViewSelector(el, generateSelectors), role, name);
+      let line = `${ref} ${role}`;
+      if (name) line += ` "${name}"`;
+      const value = pageViewValue(el);
+      if (value) line += ` = "${value}"`;
+      const states = pageViewStates(el);
+      if (states.length > 0) line += ` ${states.join(' ')}`;
+      const cost = line.length + 1 + (headingLine ? headingLine.length + 1 : 0);
+      if (used + cost > PAGE_VIEW_MAX_CHARS - closingRoom) break;
+      if (headingLine) lines.push(headingLine);
+      lines.push(line);
+      used += cost;
+      shown++;
+      pending = null;
+    }
+
+    const more = Math.max(0, visible.length - containers - shown);
+    if (more > 0) lines.push(`+${more} more interactive elements; get_page_snapshot gives the full list.`);
+    let view = [header, ...lines].join('\n');
+    if (view.length > PAGE_VIEW_MAX_CHARS) {
+      view = view.slice(0, PAGE_VIEW_MAX_CHARS);
+      view = view.slice(0, Math.max(view.lastIndexOf('\n'), 0)) || view;
+    }
+    return { view, shown, more };
+  }
+
   /**
    * Extract page text as markdown with no element refs.
    * Used by the readpage CLI command for content reading/summarization.
@@ -5597,6 +5839,7 @@
   FSB.bindTargetByName = bindTargetByName;
   FSB.findElementByStrategies = findElementByStrategies;
   FSB.buildMarkdownSnapshot = buildMarkdownSnapshot;
+  FSB.buildPageView = buildPageView;
   FSB.findMainContentRoot = findMainContentRoot;
   FSB.extractPageText = extractPageText;
   FSB.getStructuredDOM = getStructuredDOM;
