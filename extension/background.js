@@ -8358,8 +8358,11 @@ function fsbReplayPublicPreparation(prepared) {
 }
 
 function fsbReplayIsTrustedUiSender(sender) {
-  const extensionPrefix = `chrome-extension://${chrome.runtime.id}/`;
-  return !!(sender && sender.id === chrome.runtime.id &&
+  // The origin of this extension, as the browser spells it: chrome-extension://<id>/
+  // on Chromium. On Safari it is safari-web-extension://<uuid>/ and runtime.id is
+  // not part of it, so a prefix built from the id never matched a page there.
+  const extensionPrefix = chrome.runtime.getURL('');
+  return !!(sender && sender.id === chrome.runtime.id && extensionPrefix &&
     typeof sender.url === 'string' && sender.url.startsWith(extensionPrefix));
 }
 
