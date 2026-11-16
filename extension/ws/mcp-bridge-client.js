@@ -1322,6 +1322,22 @@ class MCPBridgeClient {
     this._send({ id, type: 'mcp:result', payload });
   }
 
+  // An action result goes to the MCP server without a change_report that
+  // records nothing, so the host reads less; its absence means nothing
+  // changed. The session recorder has already stored the full result, and
+  // the result object itself is left untouched.
+  _actionResultForWire(result) {
+    if (!result || typeof result !== 'object'
+        || !Object.prototype.hasOwnProperty.call(result, 'change_report')) {
+      return result;
+    }
+    if (typeof isEmptyChangeReport !== 'function' || !isEmptyChangeReport(result.change_report)) {
+      return result;
+    }
+    const { change_report: _omitted, ...wireResult } = result;
+    return wireResult;
+  }
+
   _sendError(id, error) {
     this._send({ id, type: 'mcp:error', payload: { success: false, error } });
   }
@@ -1489,7 +1505,7 @@ class MCPBridgeClient {
       }
 
       case 'mcp:execute-action':
-        return this._handleExecuteAction(payload);
+        return this._actionResultForWire(await this._handleExecuteAction(payload));
 
       case 'mcp:start-automation':
         return this._handleStartAutomation(payload, id);

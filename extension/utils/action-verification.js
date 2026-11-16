@@ -665,6 +665,36 @@ function applyChangeReportSizeCap(report) {
   return { report, truncated: true };
 }
 
+// Keys a change_report may carry and still record nothing. A report with any
+// other key is never treated as empty.
+const EMPTY_CHANGE_REPORT_KEYS = Object.freeze([
+  'url', 'title_changed', 'dialogs_opened', 'nodes_added', 'nodes_removed', 'attrs_changed',
+  'inputs_changed', 'focus_shift', 'mutation_count', 'settle_ms', 'truncated', 'partial', 'cross_origin'
+]);
+
+/**
+ * True when a change_report records nothing: zero mutations, the same URL and
+ * title, and no dialog, node, attribute, input or focus change. partial and
+ * settle_ms describe the wait, not the page, so they do not count.
+ */
+function isEmptyChangeReport(report) {
+  if (!report || typeof report !== 'object' || Array.isArray(report)) return false;
+  for (const key of Object.keys(report)) {
+    if (EMPTY_CHANGE_REPORT_KEYS.indexOf(key) === -1) return false;
+  }
+  const url = report.url;
+  if (!url || typeof url !== 'object' || url.changed !== false || url.before !== url.after) return false;
+  if (report.mutation_count !== 0 || report.title_changed !== false) return false;
+  if (report.truncated === true || report.cross_origin === true) return false;
+  const lists = [report.dialogs_opened, report.nodes_added, report.nodes_removed, report.attrs_changed];
+  for (let i = 0; i < lists.length; i++) {
+    if (!Array.isArray(lists[i]) || lists[i].length !== 0) return false;
+  }
+  const inputs = report.inputs_changed;
+  if (!inputs || typeof inputs !== 'object' || Object.keys(inputs).length !== 0) return false;
+  return report.focus_shift === null;
+}
+
 // =============================================================================
 // Phase 69 -- same-call `expect` evaluator (MCP-02, SC2)
 // =============================================================================
@@ -1656,6 +1686,7 @@ if (typeof module !== 'undefined' && module.exports) {
     stopMutationHarvest,
     buildChangeReport,
     applyChangeReportSizeCap,
+    isEmptyChangeReport,
     // Phase 69 additions (expect contract)
     EXPECT_TOOL_NAMES,
     EXPECT_NAV_TOOL_NAMES,
