@@ -13,7 +13,11 @@
  *   3. region and element crops are cut at device pixels;
  *   4. off-screen targets, full_page, device emulation and background tabs are
  *      refused with typed codes before anything is captured;
- *   5. a platform with CDP keeps the debugger path.
+ *   5. a platform with CDP keeps the debugger path;
+ *   6. a window that is not painting (Safari covered or minimized) gets a quick
+ *      answer instead of the caller's own timeout: the settle wait is cut short,
+ *      a frame that never comes is a typed, retryable error, and a page that
+ *      answers nothing at all hits the capture deadline.
  *
  * Run: node tests/safari-screenshot-capture.test.js
  */
@@ -51,14 +55,19 @@ function harness(opts = {}) {
   const chrome = {
     tabs: {
       get: async (id) => ({ id, windowId: 31, active: opts.active !== false, url: 'https://example.com/page' }),
-      captureVisibleTab: async (windowId, options) => {
+      captureVisibleTab: (windowId, options) => {
         calls.captures.push({ windowId, options });
-        return pngDataUrl(view.width * dpr, view.height * dpr);
+        if (opts.hang === 'capture') return new Promise(() => {});
+        return Promise.resolve(pngDataUrl(view.width * dpr, view.height * dpr));
       }
     },
     scripting: {
       executeScript: async ({ target, func, args }) => {
         calls.scripts.push({ tabId: target.tabId, name: func.name, args });
+        // A window that is not painting never reaches its next frame; a hung
+        // page answers nothing at all.
+        if (opts.hang === 'settle' && func.name === 'settleScript') return new Promise(() => {});
+        if (opts.hang === 'page' && func.name !== 'overlayInstallScript') return new Promise(() => {});
         if (func.name === 'viewportScript') return [{ result: view }];
         if (func.name === 'elementRectScript') return [{ result: opts.elementRect === undefined ? null : opts.elementRect }];
         return [{ result: true }];
@@ -166,6 +175,48 @@ function harness(opts = {}) {
     const res = await engine.capture({}, 7, { platform: h.options.platform, chrome: { tabs: h.options.chrome.tabs } });
     passAssertEqual(res.code, 'SCREENSHOT_CAPTURE_FAILED', 'no debugger API -> the CDP path\'s own error');
     passAssertEqual(h.calls.captures.length, 0, 'captureVisibleTab is not used');
+  }
+
+  console.log('\n=== 6. a window that is not painting ===');
+  const limits = { deadlineMs: 400, visibleTabSettleMs: 30, visibleTabCaptureMs: 40 };
+  {
+    const h = harness({ hang: 'settle' });
+    const started = Date.now();
+    const res = await engine.capture({}, 7, Object.assign(h.options, limits));
+    passAssert(res.success === true, 'a settle wait that never ends does not stop the capture');
+    passAssert(Date.now() - started < 300, 'it is cut short on its own limit, well inside the deadline');
+    passAssert(res.metadata.warnings.some((w) => w.code === 'SCREENSHOT_SETTLE_INCOMPLETE'), 'and the result says the page had not settled');
+    passAssertEqual(h.names()[h.names().length - 1], 'overlayRemoveScript', 'overlays are still restored');
+  }
+  {
+    const h = harness({ hang: 'settle' });
+    const started = Date.now();
+    await engine.capture({ wait_ms: 80 }, 7, Object.assign(h.options, limits));
+    passAssert(Date.now() - started >= 100, 'a requested wait_ms is added to the settle limit, not swallowed by it');
+  }
+  {
+    const h = harness({ hang: 'capture' });
+    const started = Date.now();
+    const res = await engine.capture({}, 7, Object.assign(h.options, limits));
+    passAssertEqual(res.code, 'SCREENSHOT_CAPTURE_FAILED', 'a frame that never comes is a typed error');
+    passAssertEqual(res.retryable, true, 'that can be retried');
+    passAssert(/covered or minimized/.test(res.error || res.message || ''), 'and says the window may be covered or minimized');
+    passAssert(Date.now() - started < 300, 'after its own short limit, not the capture deadline');
+    passAssertEqual(h.names()[h.names().length - 1], 'overlayRemoveScript', 'overlays are restored after the failure');
+  }
+  {
+    const h = harness({ hang: 'page' });
+    const started = Date.now();
+    const res = await engine.capture({}, 7, Object.assign(h.options, limits));
+    passAssertEqual(res.code, 'PAGE_UNRESPONSIVE', 'a page that answers nothing hits the capture deadline, as on the CDP path');
+    passAssert(Date.now() - started >= 380 && Date.now() - started < 1500, 'at the deadline, without waiting on the overlay restore');
+    passAssertEqual(h.calls.captures.length, 0, 'and nothing is captured');
+  }
+  {
+    const h = harness();
+    const res = await engine.capture({}, 7, Object.assign(h.options, limits));
+    passAssert(res.success === true && !res.metadata.warnings.some((w) => w.code === 'SCREENSHOT_SETTLE_INCOMPLETE'),
+      'a window that is painting is captured as before, with no settle warning');
   }
 
   console.log('\n---');

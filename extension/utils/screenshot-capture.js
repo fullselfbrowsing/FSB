@@ -15,6 +15,12 @@
   // A hung page never settles an injected script or a CDP command. Give up
   // before the 20s lease watchdog and the MCP call timeout do.
   const CAPTURE_DEADLINE_MS = 15000;
+  // A browser without CDP captures what is on screen, and Safari paints nothing
+  // while its window is covered or minimized: a wait for the next frame never
+  // ends there, and captureVisibleTab may never answer. Neither is a hung page,
+  // so each gets a short limit of its own inside the capture deadline.
+  const VISIBLE_TAB_SETTLE_MS = 2000;
+  const VISIBLE_TAB_CAPTURE_MS = 5000;
   const VALID_MODES = new Set(['viewport', 'full_page', 'region', 'element']);
   const VALID_COORDINATE_SPACES = new Set(['viewport', 'page']);
   const VALID_DEVICE_MODES = new Set(['current', 'desktop', 'mobile']);
@@ -471,13 +477,37 @@
     }
   }
 
+  // Rejects with late() once work has not settled in ms. The work is left
+  // running: nothing here can cancel a page script or a browser call.
+  function limited(work, ms, late) {
+    let timer = null;
+    const expiry = new Promise((_, reject) => { timer = setTimeout(() => reject(late()), ms); });
+    return Promise.race([work, expiry]).finally(() => clearTimeout(timer));
+  }
+
   async function captureVisibleTabFrame(params, targetTabId, deps) {
     const { tabs, scripting, cryptoApi, imaging, startedAt } = deps;
     const warnings = [{
       code: 'SCREENSHOT_VISIBLE_VIEWPORT_ONLY',
       message: 'Captured with tabs.captureVisibleTab: without chrome.debugger only the visible viewport of the active tab can be captured.'
     }];
+    const limitOf = (value, fallback) => (finite(value) && value > 0 ? value : fallback);
+    const settleMs = limitOf(deps.settleMs, VISIBLE_TAB_SETTLE_MS);
+    const captureMs = limitOf(deps.captureMs, VISIBLE_TAB_CAPTURE_MS);
     let overlayStyleId = null;
+    // One deadline for every step that waits on the page, as on the CDP path:
+    // a hung page becomes a typed error instead of the caller's own timeout.
+    let expiredError = null;
+    let deadlineTimer = null;
+    const expiry = new Promise((_, reject) => {
+      deadlineTimer = setTimeout(() => {
+        expiredError = new ScreenshotError('PAGE_UNRESPONSIVE',
+          'The page did not respond before the capture deadline. Navigate or close the tab to recover it.');
+        reject(expiredError);
+      }, limitOf(deps.deadlineMs, CAPTURE_DEADLINE_MS));
+    });
+    expiry.catch(() => {});
+    const bounded = (work) => Promise.race([work, expiry]);
     try {
       if (params.mode === 'full_page') {
         fail('INVALID_SCREENSHOT_ARGUMENTS', 'full_page needs chrome.debugger, which this browser does not provide. Use viewport, region or element for what is on screen.');
@@ -489,7 +519,7 @@
         fail('SCREENSHOT_CAPTURE_FAILED', 'tabs.captureVisibleTab is unavailable.');
       }
 
-      const tab = await tabs.get(targetTabId);
+      const tab = await bounded(tabs.get(targetTabId));
       if (!tab || tab.active !== true) {
         fail('SCREENSHOT_CAPTURE_FAILED',
           'Only the tab on screen can be captured here. Use switch_tab with active:true, then retry.', { retryable: true });
@@ -497,24 +527,29 @@
 
       if (!params.include_fsb_overlays) {
         overlayStyleId = `fsb-screenshot-hide-${captureId(cryptoApi)}`;
-        await executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]);
+        await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
       }
       try {
-        await executeScript(scripting, targetTabId, settleScript, [params.wait_ms]);
-      } catch (_error) {
+        // The settle wait ends on the page's next painted frame. A window that
+        // is not painting never has one, so this wait is cut short on its own.
+        await bounded(limited(executeScript(scripting, targetTabId, settleScript, [params.wait_ms]),
+          settleMs + params.wait_ms, () => new Error('The page painted no frame')));
+      } catch (error) {
+        if (error === expiredError) throw error;
         warnings.push({ code: 'SCREENSHOT_SETTLE_INCOMPLETE', message: 'The page settle wait did not complete; the live frame was captured.' });
       }
-      if (overlayStyleId) await executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]);
+      if (overlayStyleId) await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
 
-      const view = await executeScript(scripting, targetTabId, viewportScript, []);
+      const view = await bounded(executeScript(scripting, targetTabId, viewportScript, []));
       if (!view || ![view.x, view.y, view.width, view.height].every(finite) || view.width <= 0 || view.height <= 0) {
         fail('SCREENSHOT_CAPTURE_FAILED', 'Could not read the page viewport.');
       }
       let elementRect = null;
       if (params.mode === 'element') {
         try {
-          elementRect = await executeScript(scripting, targetTabId, elementRectScript, [params.selector]);
+          elementRect = await bounded(executeScript(scripting, targetTabId, elementRectScript, [params.selector]));
         } catch (error) {
+          if (error === expiredError) throw error;
           fail('SCREENSHOT_TARGET_NOT_FOUND', `Unable to resolve element ${params.selector}: ${error.message}`);
         }
       }
@@ -527,7 +562,11 @@
         fail('SCREENSHOT_REGION_OUT_OF_BOUNDS', 'Only what is on screen can be captured here. Scroll the target into view, then retry.');
       }
 
-      const screenBase64 = pngDataUrlBase64(await tabs.captureVisibleTab(tab.windowId, { format: 'png' }));
+      const screenBase64 = pngDataUrlBase64(await bounded(limited(
+        Promise.resolve(tabs.captureVisibleTab(tab.windowId, { format: 'png' })), captureMs,
+        () => new ScreenshotError('SCREENSHOT_CAPTURE_FAILED',
+          'The browser returned no frame. Its window may be covered or minimized: bring it to the front, then retry.',
+          { retryable: true }))));
       let bytes = decodeBase64(screenBase64);
       const screen = pngDimensions(bytes);
       const scale = screen.width / view.width;
@@ -577,10 +616,14 @@
         }
       };
     } catch (error) {
-      return errorResult(error);
+      return errorResult(expiredError || error);
     } finally {
+      clearTimeout(deadlineTimer);
       if (overlayStyleId) {
-        await executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]).catch(() => {});
+        // A hung page holds the restore until it answers again, so past the
+        // deadline it runs on its own instead of holding this capture open.
+        const restore = executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]).catch(() => {});
+        if (!expiredError) await restore;
       }
     }
   }
@@ -634,7 +677,10 @@
           createImageBitmap: typeof root.createImageBitmap === 'function' ? root.createImageBitmap.bind(root) : undefined,
           OffscreenCanvas: root.OffscreenCanvas
         },
-        startedAt
+        startedAt,
+        deadlineMs: options.deadlineMs,
+        settleMs: options.visibleTabSettleMs,
+        captureMs: options.visibleTabCaptureMs
       });
     }
     if (!debuggerApi || !scripting || !tabs) {

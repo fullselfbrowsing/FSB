@@ -238,7 +238,13 @@ as upside, not a dependency.
   `full_page`, device emulation and targets that are not on screen return
   `INVALID_SCREENSHOT_ARGUMENTS` or `SCREENSHOT_REGION_OUT_OF_BOUNDS`, and a tab
   that is not the active one returns a retryable `SCREENSHOT_CAPTURE_FAILED`
-  that says to `switch_tab` first.
+  that says to `switch_tab` first. Safari paints nothing while its window is
+  covered or minimized, so the wait for the page's next frame is cut short after
+  2 s there: the capture still succeeds, with `SCREENSHOT_SETTLE_INCOMPLETE`
+  (2.4 s on a covered window, where it used to hang until the caller's 45 s
+  timeout). A browser that returns no frame within 5 s gives a retryable
+  `SCREENSHOT_CAPTURE_FAILED`, and a page that answers nothing hits the same
+  15 s deadline as the CDP path, as `PAGE_UNRESPONSIVE`.
 - **Trusted input** — `press_key`, the drag family and `scroll_at` dispatch
   untrusted DOM events. They report `trusted:false, degraded:true` rather than
   claiming success, and will not work on sites gating on `event.isTrusted` or
