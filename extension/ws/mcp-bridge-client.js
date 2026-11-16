@@ -2338,17 +2338,16 @@ class MCPBridgeClient {
       throw new Error('execute_js requires a "code" parameter (string)');
     }
 
+    // A returned Promise is awaited for at most this long.
+    const promiseTimeoutMs = 10000;
+
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
-        func: (userCode) => {
-          try {
-            // Use Function constructor to execute in page context
-            // This allows return values and multi-statement code
-            const fn = new Function(userCode);
-            const result = fn();
-            // Serialize result for message passing
+        func: (userCode, settleTimeoutMs) => {
+          // Serialize result for message passing
+          const serialize = (result) => {
             if (result === undefined) return { value: 'undefined' };
             if (result === null) return { value: 'null' };
             if (typeof result === 'object') {
@@ -2356,11 +2355,49 @@ class MCPBridgeClient {
               catch { return { value: String(result) }; }
             }
             return { value: String(result) };
+          };
+          // An async function always hands back a native Promise, even when
+          // the page has replaced window.Promise, so executeScript waits for
+          // it. A rejection takes the same shape as a thrown exception.
+          const settle = async (thenable) => {
+            let timer;
+            const timedOut = {};
+            try {
+              const value = await new Promise((resolve, reject) => {
+                timer = setTimeout(() => resolve(timedOut), settleTimeoutMs);
+                thenable.then(resolve, reject);
+              });
+              if (value === timedOut) {
+                return {
+                  error: `The Promise returned by the script did not settle within ${settleTimeoutMs / 1000} s. It may still be running in the page.`,
+                  timedOut: true,
+                };
+              }
+              return serialize(value);
+            } catch (rejection) {
+              return { error: (rejection && rejection.message) || String(rejection) };
+            } finally {
+              clearTimeout(timer);
+            }
+          };
+          try {
+            // Use Function constructor to execute in page context
+            // This allows return values and multi-statement code
+            const fn = new Function(userCode);
+            const result = fn();
+            let isThenable = false;
+            try {
+              isThenable = result !== null
+                && (typeof result === 'object' || typeof result === 'function')
+                && typeof result.then === 'function';
+            } catch { isThenable = false; }
+            if (isThenable) return settle(result);
+            return serialize(result);
           } catch (execError) {
             return { error: execError.message || String(execError) };
           }
         },
-        args: [code],
+        args: [code, promiseTimeoutMs],
       });
 
       // chrome.scripting.executeScript returns an array of InjectionResult
@@ -2370,6 +2407,16 @@ class MCPBridgeClient {
       }
 
       const resultValue = injectionResult.result;
+      if (resultValue && resultValue.timedOut) {
+        // The script ran, but its work had not finished when the wait ended.
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          errorCode: 'ACTION_RESPONSE_TIMEOUT',
+          error: resultValue.error,
+        };
+      }
       if (resultValue && resultValue.error) {
         return { success: false, error: resultValue.error };
       }

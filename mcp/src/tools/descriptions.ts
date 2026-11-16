@@ -44,7 +44,7 @@ export const MCP_EXPECT_DESCRIPTION =
 // Tool name -> short MCP description.
 export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   // --- registry action tools (registerManualTools, Phase 69 plan 02) ---
-  execute_js: 'Execute JavaScript in the page as a function body; use return to send a value back (stringified; Promises are not awaited, so poll a window key for async work). Try it first for DOM reads, clicks and scrolls: it avoids overlay, viewport and CDP timeout issues. Verify a JS click with read_page. Fall back to native tools when a JS click changes nothing (click), for typing into controlled inputs (type_text), for real drags (drag_drop or drag), and for submits that need validated input (click the submit button).',
+  execute_js: 'Execute JavaScript in the page as a function body; use return to send a value back (stringified; a returned Promise is awaited for up to 10 s). Try it first for DOM reads, clicks and scrolls: it avoids overlay, viewport and CDP timeout issues. Verify a JS click with read_page. Fall back to native tools when a JS click changes nothing (click), for typing into controlled inputs (type_text), for real drags (drag_drop or drag), and for submits that need validated input (click the submit button).',
   navigate: 'Navigate the tab to a URL; returns the final URL after redirects.',
   search: 'Search the current site with its own search box, found automatically; falls back to Google when the site has none. Read results with read_page.',
   go_back: 'Go back one page in browser history; returns the new URL.',
