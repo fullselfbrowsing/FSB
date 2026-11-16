@@ -1205,6 +1205,10 @@
 
   // Named message handler function - allows Chrome to dedupe on re-injection
   function handleBackgroundMessage(request, sender, sendResponse) {
+    // content/panel-host.js answers the in-page panel's messages. Left to the
+    // switch below they would be answered first, as an unknown action.
+    if (request && typeof request.action === 'string' && request.action.indexOf('fsbPanel') === 0) return false;
+
     // Store sessionId from any incoming message for logging
     if (request.sessionId) {
       FSB.sessionId = request.sessionId;

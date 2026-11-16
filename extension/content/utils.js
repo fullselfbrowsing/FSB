@@ -90,6 +90,7 @@
     'fsb-progress-host',
     'fsb-viewport-glow-host',
     'fsb-action-glow-host',
+    'fsb-panel-host',
     'fsb-inspector-overlay',
     'fsb-inspector-panel',
     'fsb-inspector-indicator'

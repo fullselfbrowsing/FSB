@@ -12,7 +12,9 @@
  *   4. install() on Safari: chrome.debugger shim semantics
  *   5. install() on Safari: offscreen / system.memory shims
  *   6. install() idempotence
- *   7. sidePanel polyfill -> popup window, find-or-focus
+ *   7. sidePanel polyfill -> popup window, find-or-focus; 7c to 7i dock that
+ *      window beside the browser window, follow it, and restore on close;
+ *      7j to 7m the panel inside the page, and its page's calls to the worker
  *   8. resolveTargetTab() never returns an extension page
  *   9. Lattice loopback round-trip + re-entrancy cap
  *  10. CDP_DOM_FALLBACKS covers every _route:'cdp' verb
@@ -199,6 +201,567 @@ function safariLikeScope(overrides) {
   const tOpened = await tScope.chrome.sidePanel.open({});
   passAssertEqual(tOpened.surface, 'tab', 'falls back to a tab surface');
   passAssertEqual(tScope._calls.tabsCreate.length, 1, 'exactly one tabs.create in fallback');
+
+  // Safari has no side panel, so the workspace window docks to the browser
+  // window instead: it takes the left-hand 460px, the browser window moves
+  // over and narrows to make room, the workspace page follows it around, and
+  // closing the workspace hands the strip back. One set of windows and one session
+  // store are shared by the worker's adapter and the page's, as in the browser.
+  const settle = async () => { for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0)); };
+  const dockWorld = () => {
+    const wins = new Map();
+    const store = {};
+    const log = { create: [], update: [], remove: [], removed: [] };
+    const world = {
+      wins, store, log, lastFocused: null, tabWindow: null, ignoreBounds: false, ignorePosition: false, misplace: false,
+      add(win) { wins.set(win.id, Object.assign({ type: 'normal', state: 'normal' }, win)); return world; },
+      // `self` is the window windows.getCurrent() reports in this scope.
+      scope(self, overrides) {
+        return safariLikeScope((s) => {
+          const w = s.chrome.windows;
+          w.get = (id) => (wins.has(id)
+            ? Promise.resolve(Object.assign({}, wins.get(id)))
+            : Promise.reject(new Error('No window with id ' + id)));
+          w.getCurrent = () => w.get(self);
+          w.getLastFocused = () => w.get(world.lastFocused);
+          w.update = (id, info) => {
+            log.update.push([id, Object.assign({}, info)]);
+            if (!wins.has(id)) return Promise.reject(new Error('No window with id ' + id));
+            if (!(world.ignoreBounds && wins.get(id).type === 'normal')) {
+              for (const key of ['left', 'top', 'width', 'height', 'state']) {
+                if (world.ignorePosition && wins.get(id).type === 'normal' && (key === 'left' || key === 'top')) continue;
+                if (info[key] !== undefined) wins.get(id)[key] = info[key];
+              }
+            }
+            return Promise.resolve(Object.assign({}, wins.get(id)));
+          };
+          w.create = (info) => {
+            log.create.push(Object.assign({}, info));
+            const placed = world.misplace || info.left === undefined;
+            wins.set(5, {
+              id: 5, type: 'popup', state: 'normal',
+              left: placed ? 20 : info.left, top: placed ? 20 : info.top, width: info.width, height: info.height
+            });
+            return Promise.resolve(Object.assign({ tabs: [{ id: 55 }] }, wins.get(5)));
+          };
+          w.remove = (id) => { log.remove.push(id); wins.delete(id); return Promise.resolve(); };
+          w.onRemoved = { addListener(fn) { log.removed.push(fn); } };
+          s.chrome.tabs.get = (id) => Promise.resolve({ id, url: 'https://example.com/', windowId: world.tabWindow });
+          s.chrome.storage.session.get = () => Promise.resolve(JSON.parse(JSON.stringify(store)));
+          s.chrome.storage.session.set = (p) => { Object.assign(store, JSON.parse(JSON.stringify(p))); return Promise.resolve(); };
+          if (overrides) overrides(s);
+        });
+      },
+      async worker(overrides) {
+        const scope = world.scope(null, overrides);
+        const plat = loadAdapter(scope);
+        plat.install();
+        await settle();
+        return { scope, plat, open: (o) => scope.chrome.sidePanel.open(o) };
+      }
+    };
+    return world;
+  };
+  const flat = (b) => [b.left, b.top, b.width, b.height].join(' ');
+  const json = (v) => JSON.stringify(v);
+
+  console.log('\n=== 7c. the workspace docks beside the browser window it was opened from ===');
+  const dWorld = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 })
+    .add({ id: 2, left: 0, top: 0, width: 1200, height: 800 });
+  const dWorker = await dWorld.worker();
+  const dOpened = await dWorker.open({ windowId: 1 });
+  passAssertEqual(dOpened.surface, 'window', 'open() still resolves with a window surface');
+  passAssertEqual(json(dWorld.log.update[0]), json([1, { left: 560, top: 50, width: 940, height: 900 }]),
+    'the browser window moves over and narrows by the workspace width');
+  passAssertEqual(dWorld.log.create.length, 1, 'exactly one windows.create');
+  passAssertEqual(dWorld.log.create[0].type + ' ' + flat(dWorld.log.create[0]), 'popup 100 50 460 900',
+    'the workspace takes the freed strip on the left: same top and height, flush with the browser window');
+  passAssertEqual(dWorld.log.update.length, 1, 'a workspace created where it was asked for is not moved again');
+  const dDock = dWorld.store.fsbSafariWorkspace.dock;
+  passAssert(dDock && dDock.contentWindowId === 1 && dDock.panelWindowId === 5 && dDock.panelWidth === 460
+    && dDock.content.width === 940 && dDock.rev === 1, 'the dock is persisted with both window ids');
+
+  console.log('\n=== 7d. re-open re-snaps the workspace, without a second window or a second squeeze ===');
+  dWorld.log.update.length = 0;
+  await dWorker.open({ windowId: 1 });
+  passAssertEqual(dWorld.log.create.length, 1, 're-open never creates a second workspace');
+  passAssertEqual(json(dWorld.log.update), json([[5, { focused: true, left: 100, top: 50, width: 460, height: 900 }]]),
+    'one update: focus the workspace and put it back on the edge');
+  passAssertEqual(flat(dWorld.wins.get(1)), '560 50 940 900', 'the browser window is not moved or narrowed twice');
+  passAssertEqual(dWorld.store.fsbSafariWorkspace.dock.rev, 2, 'and the re-snap is stamped for the page that follows');
+
+  console.log('\n=== 7e. opening from another browser window moves the dock there ===');
+  dWorld.log.update.length = 0;
+  await dWorker.open({ windowId: 2 });
+  passAssertEqual(flat(dWorld.wins.get(1)), '100 50 1400 900', 'the window it left gets its strip back, exactly');
+  passAssertEqual(flat(dWorld.wins.get(2)), '460 0 740 800', 'the new one moves over and narrows');
+  passAssertEqual(flat(dWorld.wins.get(5)), '0 0 460 800', 'and the workspace takes its left edge');
+  passAssertEqual(dWorld.log.create.length, 1, 'still the same workspace window');
+  passAssertEqual(dWorld.store.fsbSafariWorkspace.dock.contentWindowId, 2, 'the record names the new browser window');
+
+  console.log('\n=== 7f. the workspace page follows its browser window ===');
+  const fPage = loadAdapter(dWorld.scope(5));
+  fPage.install({ loopback: false, trackTabs: false });
+  const follower = await fPage.followDock({ poll: false, settleMs: 0 });
+  passAssert(!!follower && typeof follower.tick === 'function', 'the workspace page gets a follower');
+  dWorld.log.update.length = 0;
+  await follower.tick();
+  passAssertEqual(dWorld.log.update.length, 0, 'its first look is only a baseline');
+  Object.assign(dWorld.wins.get(2), { left: 760, top: 80 });
+  await follower.tick();
+  passAssertEqual(json(dWorld.log.update), json([[5, { left: 300, top: 80, width: 460, height: 800 }]]),
+    'a moved browser window takes the workspace with it');
+  dWorld.log.update.length = 0;
+  await follower.tick();
+  passAssertEqual(dWorld.log.update.length, 0, 'and its own move does not set it off again');
+  Object.assign(dWorld.wins.get(2), { width: 900, height: 700 });
+  await follower.tick();
+  passAssertEqual(json(dWorld.log.update), json([[5, { left: 300, top: 80, width: 460, height: 700 }]]),
+    'a resized browser window keeps the workspace on its edge, at its height');
+  passAssertEqual(dWorld.wins.get(2).width, 900, 'the follower never resizes the browser window');
+  passAssertEqual(dWorld.store.fsbSafariWorkspace.dock.content.width, 900, 'and the record keeps that window current');
+  dWorld.log.update.length = 0;
+  Object.assign(dWorld.wins.get(2), { state: 'fullscreen', left: 0, top: 0, width: 1728, height: 1117 });
+  await follower.tick();
+  passAssertEqual(dWorld.log.update.length, 0, 'a fullscreen browser window is left alone');
+  Object.assign(dWorld.wins.get(2), { state: 'normal', left: 760, top: 80, width: 900, height: 700 });
+  await follower.tick();
+  passAssertEqual(dWorld.log.update.length, 0, 'and so is one that came back where it was');
+  Object.assign(dWorld.wins.get(5), { left: 2000, top: 300 });
+  await follower.tick();
+  Object.assign(dWorld.wins.get(2), { left: 800 });
+  await follower.tick();
+  passAssertEqual(dWorld.log.update.length, 0, 'a workspace the user dragged away is not pulled back');
+  await dWorker.open({ windowId: 2 });
+  passAssertEqual(flat(dWorld.wins.get(5)), '340 80 460 700', 'until the next open docks it again');
+  dWorld.log.update.length = 0;
+  await follower.tick();
+  Object.assign(dWorld.wins.get(2), { left: 900 });
+  await follower.tick();
+  passAssertEqual(json(dWorld.log.update), json([[5, { left: 440, top: 80, width: 460, height: 700 }]]),
+    'after which it follows again');
+  const otherPage = loadAdapter(dWorld.scope(2));
+  otherPage.install({ loopback: false, trackTabs: false });
+  passAssertEqual(await otherPage.followDock({ poll: false }), null, 'an extension page in a normal window follows nothing');
+  {
+    // A browser may still be moving the workspace when update() resolves. A
+    // move that lands late must not be read as the user dragging it away.
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    const worker = await world.worker();
+    await worker.open({ windowId: 1 });
+    const pageScope = world.scope(5);
+    let pending = null;
+    pageScope.chrome.windows.update = (id, info) => {
+      world.log.update.push([id, Object.assign({}, info)]);
+      pending = () => Object.assign(world.wins.get(id), info);
+      return Promise.resolve({ id });
+    };
+    const page = loadAdapter(pageScope);
+    page.install({ loopback: false, trackTabs: false });
+    const slow = await page.followDock({ poll: false, settleMs: 60 });
+    await slow.tick();
+    world.log.update.length = 0;
+    Object.assign(world.wins.get(1), { left: 700 });
+    await slow.tick();
+    passAssertEqual(json(world.log.update), json([[5, { left: 240, top: 50, width: 460, height: 900 }]]),
+      'the follower asks for the move');
+    await slow.tick();
+    pending();
+    await slow.tick();
+    Object.assign(world.wins.get(1), { left: 800 });
+    await slow.tick();
+    passAssertEqual(json(world.log.update[1]), json([5, { left: 340, top: 50, width: 460, height: 900 }]),
+      'a move that lands late is not mistaken for the user dragging the workspace');
+    pending();
+    await new Promise((r) => setTimeout(r, 90));
+    await slow.tick();
+    Object.assign(world.wins.get(5), { left: 30 });
+    await slow.tick();
+    Object.assign(world.wins.get(1), { left: 900 });
+    await slow.tick();
+    passAssertEqual(world.log.update.length, 2, 'while a drag after it has landed still detaches');
+  }
+
+  console.log('\n=== 7g. closing the workspace gives the browser window its width back ===');
+  // The page clears the window id before its window is gone, so the worker
+  // must recognise the workspace from the dock record itself.
+  fPage.closeSurface();
+  passAssertEqual(dWorld.log.remove[0], 5, 'the page closes its own workspace window');
+  passAssertEqual(dWorld.store.fsbSafariWorkspace.workspaceWindowId, null, 'and clears the window id');
+  dWorld.log.removed.forEach((fn) => fn(5));
+  await settle();
+  passAssertEqual(flat(dWorld.wins.get(2)), '440 80 1360 700', 'the browser window takes back the strip the workspace held');
+  passAssertEqual(dWorld.store.fsbSafariWorkspace.dock, null, 'and the dock is cleared');
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    const worker = await world.worker();
+    await worker.open({ windowId: 1 });
+    world.wins.get(1).width = 800;
+    world.wins.delete(5);
+    world.log.removed.forEach((fn) => fn(5));
+    await settle();
+    passAssertEqual(world.wins.get(1).width, 800, 'a browser window the user resized since is left as they made it');
+    passAssertEqual(world.store.fsbSafariWorkspace.dock, null, 'though the dock is still cleared');
+  }
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    const worker = await world.worker();
+    await worker.open({ windowId: 1 });
+    world.wins.delete(1);
+    world.log.removed.forEach((fn) => fn(1));
+    await settle();
+    passAssertEqual(world.store.fsbSafariWorkspace.dock, null, 'a closed browser window drops the dock');
+    passAssertEqual(world.store.fsbSafariWorkspace.workspaceWindowId, 5, 'and leaves the workspace open');
+  }
+
+  console.log('\n=== 7h. where it cannot dock, the workspace opens as it always did ===');
+  const floats = async (label, setup, opts) => {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    setup(world);
+    const before = flat(world.wins.get(1));
+    const worker = await world.worker();
+    await worker.open(opts || { windowId: 1 });
+    const made = world.log.create[0] || {};
+    passAssert(world.log.create.length === 1 && made.left === undefined && made.top === undefined
+      && made.width === 460 && made.height === 920, label + ': the workspace opens unplaced, at its own size');
+    passAssertEqual(flat(world.wins.get(1)), before, label + ': the browser window is as it was');
+    passAssert(!world.store.fsbSafariWorkspace.dock, label + ': no dock is recorded');
+  };
+  await floats('too narrow', (world) => { world.wins.get(1).width = 1100; });
+  await floats('fullscreen', (world) => { world.wins.get(1).state = 'fullscreen'; });
+  await floats('minimized', (world) => { world.wins.get(1).state = 'minimized'; });
+  await floats('no bounds', (world) => { delete world.wins.get(1).left; });
+  await floats('bounds ignored', (world) => { world.ignoreBounds = true; });
+  await floats('size taken but not the position', (world) => { world.ignorePosition = true; });
+  await floats('unknown window', () => {}, { windowId: 99 });
+  await floats('no window to go by', () => {}, {});
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    world.lastFocused = 1;
+    const worker = await world.worker();
+    await worker.open({});
+    passAssertEqual(flat(world.wins.get(5)), '100 50 460 900', 'with no hint it docks to the last focused browser window');
+  }
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    world.tabWindow = 1;
+    const worker = await world.worker();
+    await worker.open({ tabId: 11 });
+    passAssertEqual(flat(world.wins.get(5)), '100 50 460 900', 'a tab hint docks to that tab\'s window');
+  }
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900, state: 'maximized' });
+    const worker = await world.worker();
+    await worker.open({ windowId: 1 });
+    passAssertEqual(json(world.log.update[0]), json([1, { left: 560, top: 50, width: 940, height: 900, state: 'normal' }]),
+      'a maximized browser window is un-maximized as it is narrowed');
+  }
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    world.misplace = true;
+    const worker = await world.worker();
+    await worker.open({ windowId: 1 });
+    passAssertEqual(json(world.log.update[1]), json([5, { left: 100, top: 50, width: 460, height: 900 }]),
+      'a workspace the browser placed elsewhere is moved to the edge once');
+    passAssertEqual(world.log.update.length, 2, 'and only once');
+  }
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    const worker = await world.worker((s) => { s.chrome.windows.create = () => Promise.reject(new Error('no windows')); });
+    const opened = await worker.open({ windowId: 1 });
+    passAssertEqual(opened.surface, 'tab', 'a workspace that could not be created still falls back to a tab');
+    passAssertEqual(flat(world.wins.get(1)), '100 50 1400 900', 'and the browser window gets its strip back');
+    passAssert(!world.store.fsbSafariWorkspace.dock, 'with no dock left behind');
+  }
+
+  console.log('\n=== 7i. the dock survives a worker recycle ===');
+  {
+    const world = dockWorld().add({ id: 1, left: 100, top: 50, width: 1400, height: 900 });
+    await (await world.worker()).open({ windowId: 1 });
+    const recycled = await world.worker();
+    const state = recycled.plat._workspaceState();
+    passAssert(state.windowId === 5 && state.dock && state.dock.contentWindowId === 1 && state.dock.panelWindowId === 5,
+      'a fresh worker reads the workspace and its dock back');
+    world.log.update.length = 0;
+    await recycled.open({ windowId: 1 });
+    passAssertEqual(world.log.create.length, 1, 'and re-opens without a second workspace');
+    passAssertEqual(flat(world.wins.get(1)), '560 50 940 900', 'or a second squeeze');
+    world.wins.delete(5);
+    world.log.removed.forEach((fn) => fn(5));
+    await settle();
+    passAssertEqual(flat(world.wins.get(1)), '100 50 1400 900', 'and still restores the strip when the workspace closes');
+  }
+
+  // Where the page can hold it, the panel is FSB's own page inside the web
+  // page, placed by the worker through content/panel-host.js. One world: the
+  // browser's tabs, what each page's content script would answer, the worker's
+  // adapter, and the adapter of a panel page embedded in a tab.
+  const panelWorld = () => {
+    const store = {};
+    const log = { sent: [], created: [], removed: [], injected: [], absent: [], optionsOpened: 0, calls: [] };
+    const listeners = { updated: [], activated: [], tabRemoved: [], windowRemoved: [], connect: [] };
+    const tabs = new Map();
+    const pages = new Map();   // tabId -> { script: has a content script, shown: panel showing }
+    const world = {
+      store, log, listeners, tabs, pages, failInjection: false,
+      tab(tab, page) {
+        tabs.set(tab.id, Object.assign({ active: true, url: 'https://example.com/' }, tab));
+        pages.set(tab.id, Object.assign({ script: true, shown: false }, page));
+        return world;
+      },
+      chromeFor(self) {
+        return (s) => {
+          s.chrome.tabs.get = (id) => (tabs.has(id) ? Promise.resolve(Object.assign({}, tabs.get(id))) : Promise.reject(new Error('No tab ' + id)));
+          s.chrome.tabs.query = (q) => {
+            log.calls.push(['tabs.query', Object.assign({}, q)]);
+            return Promise.resolve(Array.from(tabs.values())
+              .filter((t) => (q.windowId == null || t.windowId === q.windowId) && (q.active == null || t.active === q.active))
+              .map((t) => Object.assign({}, t)));
+          };
+          s.chrome.tabs.update = (id, info) => { log.calls.push(['tabs.update', id, Object.assign({}, info)]); return Promise.resolve(Object.assign({}, tabs.get(id), info)); };
+          s.chrome.tabs.sendMessage = (tabId, message) => {
+            log.sent.push([tabId, message.action]);
+            const pg = pages.get(tabId);
+            // Safari resolves empty when no content script is there to answer.
+            if (!pg || !pg.script) return Promise.resolve(undefined);
+            if (message.action === 'fsbPanelShow') pg.shown = true;
+            if (message.action === 'fsbPanelHide') pg.shown = false;
+            return Promise.resolve({ success: true, shown: pg.shown });
+          };
+          s.chrome.tabs.onUpdated = { addListener: (fn) => listeners.updated.push(fn) };
+          s.chrome.tabs.onActivated = { addListener: (fn) => listeners.activated.push(fn) };
+          s.chrome.tabs.onRemoved = { addListener: (fn) => listeners.tabRemoved.push(fn) };
+          s.chrome.tabs.TAB_ID_NONE = -1;
+          s.chrome.windows.get = (id) => { log.calls.push(['windows.get', id]); return Promise.resolve({ id, type: 'normal', state: 'fullscreen' }); };
+          s.chrome.windows.create = (info) => { log.created.push(info); return Promise.resolve({ id: 5, tabs: [{ id: 55 }] }); };
+          s.chrome.windows.remove = (id) => { log.removed.push(id); return Promise.resolve(); };
+          s.chrome.windows.onRemoved = { addListener: (fn) => listeners.windowRemoved.push(fn) };
+          s.chrome.windows.onFocusChanged = { addListener() {} };
+          s.chrome.windows.WINDOW_ID_CURRENT = -2;
+          s.chrome.runtime.openOptionsPage = () => { log.optionsOpened++; return Promise.resolve(); };
+          s.chrome.runtime.onConnect = { addListener: (fn) => listeners.connect.push(fn) };
+          // A page connecting reaches the worker with the sender the browser
+          // would attach: the tab and frame the page sits in.
+          s.chrome.runtime.connect = (info) => {
+            const side = () => {
+              const handlers = { message: [], disconnect: [] };
+              return {
+                name: info.name, handlers,
+                onMessage: { addListener: (fn) => handlers.message.push(fn) },
+                onDisconnect: { addListener: (fn) => handlers.disconnect.push(fn) }
+              };
+            };
+            const near = side();
+            const far = side();
+            near.postMessage = (m) => setTimeout(() => far.handlers.message.forEach((fn) => fn(JSON.parse(JSON.stringify(m)))), 0);
+            far.postMessage = (m) => setTimeout(() => near.handlers.message.forEach((fn) => fn(JSON.parse(JSON.stringify(m)))), 0);
+            near.disconnect = () => far.handlers.disconnect.forEach((fn) => fn());
+            // The other side learns of a disconnect on a later turn, as in the browser.
+            far.disconnect = () => { world.refused = true; setTimeout(() => near.handlers.disconnect.forEach((fn) => fn()), 0); };
+            far.sender = self;
+            listeners.connect.forEach((fn) => fn(far));
+            return near;
+          };
+          s.chrome.storage.session.get = () => Promise.resolve(JSON.parse(JSON.stringify(store)));
+          s.chrome.storage.session.set = (p) => { Object.assign(store, JSON.parse(JSON.stringify(p))); return Promise.resolve(); };
+        };
+      },
+      async worker() {
+        const scope = safariLikeScope(world.chromeFor(null));
+        scope.ensureContentScriptInjected = async (tabId) => {
+          log.injected.push(tabId);
+          if (world.failInjection) throw new Error('Cannot access this page');
+          pages.get(tabId).script = true;
+          return true;
+        };
+        scope.fsbNoteContentScriptAbsent = (tabId) => log.absent.push(tabId);
+        const plat = loadAdapter(scope);
+        plat.install();
+        await settle();
+        return { scope, plat, open: (o) => scope.chrome.sidePanel.open(o) };
+      },
+      // The panel's own page: an extension page, but not the top frame.
+      async panelPage(sender) {
+        const scope = safariLikeScope(world.chromeFor(sender));
+        scope.location = { protocol: 'safari-web-extension:' };
+        scope.document = {};
+        scope.self = scope;
+        scope.top = {};
+        scope.stop = () => { scope.stopped = true; };
+        const real = scope.chrome;
+        const plat = loadAdapter(scope);
+        await settle();
+        return { scope, plat, real };
+      }
+    };
+    return world;
+  };
+  const HOST = { tab: { id: 11, windowId: 1 }, frameId: 7, url: 'safari-web-extension://sfr/ui/sidepanel.html' };
+
+  console.log('\n=== 7j. the panel opens inside the page, where the page can hold it ===');
+  {
+    const world = panelWorld().tab({ id: 11, windowId: 1 }).tab({ id: 12, windowId: 1, active: false });
+    const worker = await world.worker();
+    const opened = await worker.open({ windowId: 1 });
+    passAssertEqual(opened.surface + ' ' + opened.tabId, 'panel 11', 'a toolbar click shows the panel in the window\'s active tab');
+    passAssertEqual(json(world.log.sent), json([[11, 'fsbPanelShow']]), 'by asking that page\'s content script');
+    passAssertEqual(world.log.created.length, 0, 'and opens no window');
+    passAssertEqual(json(world.store.fsbSafariPanel), json({ windows: { 1: true } }), 'the window is recorded as having the panel on');
+    passAssertEqual(world.log.injected.length, 0, 'a page that answers is not injected into again');
+
+    world.log.sent.length = 0;
+    const closed = await worker.open({ windowId: 1 });
+    passAssert(closed.surface === 'panel' && closed.closed === true, 'a second toolbar click closes it, as Chrome\'s side panel toggles');
+    await settle();
+    passAssert(world.pages.get(11).shown === false && world.log.sent.some((m) => m[0] === 12 && m[1] === 'fsbPanelHide'),
+      'in every tab of that window');
+    passAssertEqual(json(world.store.fsbSafariPanel), json({ windows: {} }), 'and the window is no longer recorded');
+
+    await worker.open({ tabId: 11 });
+    const again = await worker.open({ tabId: 11 });
+    passAssert(world.pages.get(11).shown === true && !again.closed, 'an automation opening its tab never closes the panel it reports into');
+  }
+  {
+    const world = panelWorld().tab({ id: 11, windowId: 1 }, { script: false });
+    const worker = await world.worker();
+    const opened = await worker.open({ windowId: 1 });
+    passAssertEqual(opened.surface, 'panel', 'a page with no content script yet still gets the panel');
+    passAssertEqual(json([world.log.absent, world.log.injected]), json([[11], [11]]),
+      'after an injection that skips probing a page that has just said nothing');
+    passAssertEqual(json(world.log.sent), json([[11, 'fsbPanelShow'], [11, 'fsbPanelShow']]), 'and a second ask');
+  }
+  {
+    const world = panelWorld().tab({ id: 11, windowId: 1 });
+    const worker = await world.worker();
+    worker.plat._workspaceState().windowId = 5;
+    await worker.open({ windowId: 1 });
+    passAssertEqual(json(world.log.removed), json([5]), 'the panel replaces an open workspace window: one surface at a time');
+  }
+
+  console.log('\n=== 7k. where it cannot, the workspace window opens as before ===');
+  for (const [label, setup] of [
+    ['an extension page', (world) => world.tab({ id: 11, windowId: 1, url: 'safari-web-extension://sfr/ui/control_panel.html' })],
+    ['a page FSB may not touch', (world) => { world.tab({ id: 11, windowId: 1 }, { script: false }); world.failInjection = true; }],
+    ['a window with no tab to show it in', () => {}]
+  ]) {
+    const world = panelWorld();
+    setup(world);
+    const worker = await world.worker();
+    const opened = await worker.open({ windowId: 1 });
+    passAssert(opened.surface === 'window' && world.log.created.length === 1, label + ': falls back to the workspace window');
+    passAssert(!world.store.fsbSafariPanel || !world.store.fsbSafariPanel.windows[1], label + ': and records no panel');
+  }
+  {
+    const world = panelWorld().tab({ id: 11, windowId: 1 });
+    const scope = safariLikeScope(world.chromeFor(null));
+    const plat = loadAdapter(scope);
+    plat.install({ loopback: false, trackTabs: false });
+    await settle();
+    const opened = await scope.chrome.sidePanel.open({ windowId: 1 });
+    passAssert(opened.surface === 'window' && world.log.sent.length === 0, 'an extension page never places a panel: only the worker does');
+  }
+
+  console.log('\n=== 7l. the panel is put back as its window loads and switches pages ===');
+  {
+    const world = panelWorld().tab({ id: 11, windowId: 1 }).tab({ id: 12, windowId: 1, active: false }).tab({ id: 21, windowId: 2 });
+    const worker = await world.worker();
+    await worker.open({ windowId: 1 });
+    const fire = async (list, ...args) => { list.forEach((fn) => fn(...args)); await settle(); };
+    world.pages.get(11).shown = false;   // a navigation replaced the document
+    world.log.sent.length = 0;
+    await fire(world.listeners.updated, 11, { status: 'complete' }, world.tabs.get(11));
+    passAssert(world.pages.get(11).shown === true, 'a page that finished loading gets its panel back');
+    world.log.sent.length = 0;
+    await fire(world.listeners.updated, 11, { status: 'loading' }, world.tabs.get(11));
+    await fire(world.listeners.updated, 12, { status: 'complete' }, world.tabs.get(12));
+    await fire(world.listeners.updated, 21, { status: 'complete' }, world.tabs.get(21));
+    passAssertEqual(world.log.sent.length, 0, 'but not a page still loading, a background tab, or a window without the panel');
+    Object.assign(world.tabs.get(11), { active: false });
+    Object.assign(world.tabs.get(12), { active: true });
+    await fire(world.listeners.activated, { tabId: 12, windowId: 1 });
+    passAssert(world.pages.get(12).shown === true, 'a tab switched to gets its own panel');
+    await fire(world.listeners.activated, { tabId: 21, windowId: 2 });
+    passAssert(world.pages.get(21).shown === false, 'in a window without the panel it does not');
+    await fire(world.listeners.windowRemoved, 1);
+    passAssertEqual(json(world.store.fsbSafariPanel), json({ windows: {} }), 'a closed window is forgotten');
+    const recycled = await world.worker();
+    passAssertEqual(json(recycled.plat._panelState()), json({ windows: {} }), 'and a fresh worker reads the panel record back');
+  }
+
+  console.log('\n=== 7m. inside the panel, tab and window lookups go through the worker ===');
+  // On Safari such a lookup made from an embedded extension page takes the
+  // host page down (WebKit bug 327823), so the panel's page must never make one.
+  {
+    const world = panelWorld().tab({ id: 11, windowId: 1 }).tab({ id: 12, windowId: 1, active: false }).tab({ id: 21, windowId: 2 });
+    const worker = await world.worker();
+    await worker.open({ windowId: 1 });
+    const page = await world.panelPage(HOST);
+    const c = page.scope.chrome;
+    passAssert(page.plat.embedded === true && c !== page.real && page.scope.browser === c, 'the page\'s chrome and browser are replaced by a stand-in');
+    passAssert(Object.getPrototypeOf(c) === page.real && c.runtime === page.real.runtime && c.storage === page.real.storage,
+      'that is the browser\'s own API for everything else');
+    passAssert(c.tabs !== page.real.tabs && c.windows !== page.real.windows, 'except tabs and windows');
+    passAssert(c.tabs.onActivated === page.real.tabs.onActivated && c.windows.onFocusChanged === page.real.windows.onFocusChanged,
+      'whose events stay the browser\'s own');
+    passAssertEqual(c.tabs.TAB_ID_NONE, -1, 'and whose constants read through');
+    passAssert(typeof c.sidePanel.open === 'function', 'the usual shims are installed on top');
+
+    world.log.calls.length = 0;
+    const found = await c.tabs.query({ active: true, currentWindow: true });
+    passAssertEqual(json(found.map((t) => t.id)), json([11]), 'tabs.query is answered by the worker');
+    passAssertEqual(json(world.log.calls[0]), json(['tabs.query', { active: true, windowId: 1 }]),
+      'with "current window" meaning the window the panel sits in');
+    const viaCallback = await new Promise((resolve) => c.tabs.query({ windowId: 2 }, resolve));
+    passAssertEqual(json(viaCallback.map((t) => t.id)), json([21]), 'callback style works too');
+    passAssertEqual((await c.tabs.getCurrent()).id, 11, 'tabs.getCurrent is the tab the panel sits in');
+    world.log.calls.length = 0;
+    await c.windows.getCurrent();
+    passAssertEqual(json(world.log.calls[0]), json(['windows.get', 1]), 'windows.getCurrent is that tab\'s window');
+    world.log.calls.length = 0;
+    await c.tabs.update({ url: 'https://example.org/' });
+    passAssertEqual(json(world.log.calls[0]), json(['tabs.update', 11, { url: 'https://example.org/' }]), 'tabs.update with no id acts on that tab');
+    let refusal = null;
+    try { await c.tabs.executeScript({ code: '1' }); } catch (e) { refusal = e.message; }
+    passAssertEqual(refusal, 'tabs.executeScript is not available to the panel', 'a call that is not on the list is refused');
+    await c.runtime.openOptionsPage();
+    passAssertEqual(world.log.optionsOpened, 1, 'runtime.openOptionsPage, which opens a tab, is made by the worker too');
+
+    passAssertEqual((await page.plat.resolveTargetTab()).id, 11, 'the panel drives the page it sits in');
+    passAssertEqual((await page.plat.openWorkspace({})).surface, 'panel', 'opening the workspace from inside it is a no-op');
+    passAssertEqual(await page.plat.followDock({ poll: false }), null, 'and it follows no window');
+    page.plat.closeSurface();
+    await settle();
+    passAssert(world.pages.get(11).shown === false && !world.store.fsbSafariPanel.windows[1], 'closing it asks the worker, which hides the panel and forgets the window');
+  }
+  {
+    const world = panelWorld().tab({ id: 11, windowId: 1 });
+    await world.worker();
+    const stranger = await world.panelPage({ tab: { id: 11, windowId: 1 }, frameId: 0, url: 'https://example.com/' });
+    let refused = null;
+    try { await stranger.scope.chrome.tabs.query({}); } catch (e) { refused = e.message; }
+    passAssert(world.refused === true && refused === 'The background worker went away', 'the worker hangs up on anything but its own embedded page');
+  }
+  {
+    // A browser that will not let the global be replaced: the page must not run.
+    const world = panelWorld().tab({ id: 11, windowId: 1 });
+    const scope = safariLikeScope(world.chromeFor(HOST));
+    const real = scope.chrome;
+    Object.defineProperty(scope, 'chrome', { get: () => real, set() {}, configurable: false });
+    Object.assign(scope, { location: { protocol: 'safari-web-extension:' }, document: {}, self: scope, top: {} });
+    scope.stop = () => { scope.stopped = true; };
+    const plat = loadAdapter(scope);
+    passAssert(scope.stopped === true && plat.embedded === false && !real.sidePanel,
+      'where the stand-in cannot be installed the panel page is stopped before its own scripts run');
+  }
+  {
+    const top = safariLikeScope();
+    Object.assign(top, { location: { protocol: 'safari-web-extension:' }, document: {} });
+    top.self = top;
+    top.top = top;
+    const real = top.chrome;
+    const plat = loadAdapter(top);
+    passAssert(plat.embedded === false && top.chrome === real, 'a top-level extension page keeps the browser\'s own API');
+  }
 
   console.log('\n=== 8. resolveTargetTab() excludes extension pages ===');
   const rScope = safariLikeScope((s) => {

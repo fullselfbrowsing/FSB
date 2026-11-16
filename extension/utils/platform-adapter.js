@@ -45,6 +45,20 @@
   var CONTENT_TAB_KEY = 'fsbSafariContentTab';
   var WORKSPACE_WIDTH = 460;
   var WORKSPACE_HEIGHT = 920;
+  // Docking. Safari has no side panel, so the workspace window takes the
+  // left-hand WORKSPACE_WIDTH of the browser window it was opened from, and
+  // that window is narrowed to make room: the pair fills the original footprint.
+  var DOCK_MIN_CONTENT_WIDTH = 700;  // never squeeze the browser window below this
+  var DOCK_TOLERANCE = 2;            // px of slack when comparing window bounds
+  var DOCK_FOLLOW_MS = 400;          // follow poll, where windows.onBoundsChanged is missing
+  var DOCK_SETTLE_MS = 600;          // how long a move of the workspace may take to land
+  // The panel inside the page (content/panel-host.js) and the calls its page
+  // makes back to the worker.
+  var PANEL_STATE_KEY = 'fsbSafariPanel';
+  var PANEL_WIDTH = 420;
+  var PANEL_REPLY_MS = 1500;         // how long a tab's content script gets to answer
+  var FRAME_RPC_PORT = 'fsb-frame-rpc';
+  var FRAME_RPC_MS = 8000;           // a lookup the worker never answers must not hang the panel
   var LOOPBACK_PREFIX = 'lattice-';
   var LOOPBACK_MAX_DEPTH = 4;
 
@@ -238,7 +252,11 @@
   // Workspace surface (Safari has no sidePanel; we use a popup-type window)
   // ---------------------------------------------------------------------------
 
-  var _workspace = { path: DEFAULT_WORKSPACE_PATH, windowId: null, tabId: null, lastContentTabId: null };
+  // dock, while the workspace window is docked to a browser window:
+  //   { contentWindowId, panelWindowId, panelWidth, content, panel, rev }
+  // content and panel are { left, top, width, height } as last applied, and rev
+  // goes up every time the worker docks or re-snaps the pair.
+  var _workspace = { path: DEFAULT_WORKSPACE_PATH, windowId: null, tabId: null, lastContentTabId: null, dock: null };
   // In-flight hydrateWorkspace() read, awaited by openWorkspace().
   var _hydrating = null;
 
@@ -270,7 +288,8 @@
     payload[WORKSPACE_STATE_KEY] = {
       workspaceWindowId: _workspace.windowId,
       workspaceTabId: _workspace.tabId,
-      path: _workspace.path
+      path: _workspace.path,
+      dock: _workspace.dock
     };
     writeSession(payload);
   }
@@ -310,32 +329,606 @@
           if (saved.workspaceWindowId != null) _workspace.windowId = saved.workspaceWindowId;
           if (saved.workspaceTabId != null) _workspace.tabId = saved.workspaceTabId;
           if (typeof saved.path === 'string' && saved.path) _workspace.path = saved.path;
+          // Unlike the ids above, a cleared dock has to reach every context:
+          // the page that follows the browser window must stop when the
+          // worker undocks, and the worker must see where the page moved it.
+          if (Object.prototype.hasOwnProperty.call(saved, 'dock')) _workspace.dock = saved.dock || null;
         }
         if (data && data[CONTENT_TAB_KEY] != null) _workspace.lastContentTabId = data[CONTENT_TAB_KEY];
+        var panel = data && data[PANEL_STATE_KEY];
+        if (panel && panel.windows && typeof panel.windows === 'object') _panel.windows = panel.windows;
         resolve();
       }
       try {
-        var out = c.storage.session.get([WORKSPACE_STATE_KEY, CONTENT_TAB_KEY], apply);
+        var out = c.storage.session.get([WORKSPACE_STATE_KEY, CONTENT_TAB_KEY, PANEL_STATE_KEY], apply);
         if (out && typeof out.then === 'function') out.then(apply, function () { resolve(); });
       } catch (_e) { resolve(); }
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Docking the workspace window to a browser window
+  // ---------------------------------------------------------------------------
+
+  function boundsOf(win) {
+    return { left: win.left, top: win.top, width: win.width, height: win.height };
+  }
+
+  function hasBounds(win) {
+    if (!win) return false;
+    var values = [win.left, win.top, win.width, win.height];
+    for (var i = 0; i < values.length; i++) {
+      if (typeof values[i] !== 'number' || !isFinite(values[i])) return false;
+    }
+    return true;
+  }
+
+  function near(a, b) { return Math.abs(a - b) <= DOCK_TOLERANCE; }
+
+  function sameBounds(a, b) {
+    return near(a.left, b.left) && near(a.top, b.top) && near(a.width, b.width) && near(a.height, b.height);
+  }
+
+  /** Where the workspace sits: flush against the left edge of its browser window. */
+  function besideBounds(win, width) {
+    return { left: win.left - width, top: win.top, width: width, height: win.height };
+  }
+
+  function canDock(c) {
+    return !!(c && c.windows && typeof c.windows.get === 'function' && typeof c.windows.update === 'function');
+  }
+
+  /**
+   * The browser window the workspace should sit beside: the one a toolbar click
+   * came from, the window of the tab an automation started on, or the last
+   * focused one. Null when there is nothing to dock to, or that window is
+   * fullscreen or minimized: the workspace then floats, as it always did.
+   */
+  async function dockTarget(c, opts) {
+    if (!canDock(c)) return null;
+    var win = null;
+    try {
+      if (opts.windowId != null) {
+        win = await invoke(c.windows.get, c.windows, [opts.windowId]);
+      } else if (opts.tabId != null) {
+        var tab = c.tabs && typeof c.tabs.get === 'function'
+          ? await invoke(c.tabs.get, c.tabs, [opts.tabId]) : null;
+        if (tab && tab.windowId != null) win = await invoke(c.windows.get, c.windows, [tab.windowId]);
+      } else if (typeof c.windows.getLastFocused === 'function') {
+        win = await invoke(c.windows.getLastFocused, c.windows, [{ windowTypes: ['normal'] }]);
+      }
+    } catch (_e) { return null; }
+    if (!win || win.id == null || win.id === _workspace.windowId) return null;
+    if (win.type && win.type !== 'normal') return null;
+    if (win.state === 'fullscreen' || win.state === 'locked-fullscreen' || win.state === 'minimized') return null;
+    return hasBounds(win) ? win : null;
+  }
+
+  /**
+   * Make room for the workspace beside `win` and return the bounds it should
+   * take. Null when the pair cannot be docked, and `win` is then as it was.
+   */
+  async function dockBeside(c, win) {
+    var dock = _workspace.dock;
+    var rev = ((dock && dock.rev) || 0) + 1;
+    // Already docked to this window, and it is no wider than the dock left it:
+    // the workspace only needs putting back on its edge. A window the user has
+    // widened since is treated as new, and gives up a fresh strip.
+    if (dock && dock.contentWindowId === win.id && win.width <= dock.content.width + DOCK_TOLERANCE) {
+      dock.content = boundsOf(win);
+      dock.panel = besideBounds(win, dock.panelWidth);
+      dock.rev = rev;
+      return dock.panel;
+    }
+    if (win.width - WORKSPACE_WIDTH < DOCK_MIN_CONTENT_WIDTH) return null;
+    // The browser window gives up its left-hand strip: it moves right and narrows.
+    var update = { left: win.left + WORKSPACE_WIDTH, top: win.top, width: win.width - WORKSPACE_WIDTH, height: win.height };
+    if (win.state === 'maximized') update.state = 'normal';
+    var applied = null;
+    try {
+      await invoke(c.windows.update, c.windows, [win.id, update]);
+      // A browser may still be applying the frame when update() resolves.
+      for (var look = 0; look < 3 && !applied; look++) {
+        if (look > 0) await new Promise(function (resolve) { setTimeout(resolve, 80); });
+        var seen = await invoke(c.windows.get, c.windows, [win.id]);
+        if (hasBounds(seen) && near(seen.width, update.width) && near(seen.left, update.left)) applied = seen;
+      }
+    } catch (_e) { return null; }
+    if (!applied) {
+      // The browser did not take the new bounds, so there is no room to dock into.
+      try { await invoke(c.windows.update, c.windows, [win.id, boundsOf(win)]); } catch (_e2) { /* best effort */ }
+      return null;
+    }
+    _workspace.dock = {
+      contentWindowId: win.id,
+      panelWindowId: _workspace.windowId,
+      panelWidth: WORKSPACE_WIDTH,
+      content: boundsOf(applied),
+      panel: besideBounds(applied, WORKSPACE_WIDTH),
+      rev: rev
+    };
+    return _workspace.dock.panel;
+  }
+
+  /**
+   * Give the docked browser window its width back, but only while it still has
+   * the width the dock left it with: a window the user has resized is theirs.
+   */
+  async function undock(c) {
+    var dock = _workspace.dock;
+    if (!dock) return;
+    _workspace.dock = null;
+    persistWorkspace();
+    if (!canDock(c)) return;
+    try {
+      var win = await invoke(c.windows.get, c.windows, [dock.contentWindowId]);
+      if (!hasBounds(win) || (win.state && win.state !== 'normal')) return;
+      if (!near(win.width, dock.content.width)) return;
+      await invoke(c.windows.update, c.windows, [win.id, {
+        left: win.left - dock.panelWidth, top: win.top, width: win.width + dock.panelWidth, height: win.height
+      }]);
+    } catch (_e) { /* the browser window is gone */ }
+  }
+
+  /** Where the workspace goes for this open, or null to leave it floating. */
+  async function dockFor(c, opts) {
+    var target = await dockTarget(c, opts);
+    if (!target) return null;
+    // Docked to another browser window until now: that one gets its width back.
+    if (_workspace.dock && _workspace.dock.contentWindowId !== target.id) await undock(c);
+    return dockBeside(c, target);
+  }
+
+  /**
+   * Keep the docked workspace on the edge of its browser window while that
+   * window moves or resizes. This runs in the workspace page, which lives
+   * exactly as long as its window: the worker can be evicted at any moment and
+   * an alarm cannot fire often enough. It only ever moves the workspace, and
+   * only in answer to the browser window changing, so it cannot chase its own
+   * updates. A workspace the user drags away stays where they put it until the
+   * next open docks it again.
+   */
+  function followDock(options) {
+    options = options || {};
+    var c = api();
+    if (_frameReal) return Promise.resolve(null);
+    if (!canDock(c) || typeof c.windows.getCurrent !== 'function') return Promise.resolve(null);
+    var selfId = null;
+    // What this page last saw or applied: { rev, contentWindowId, content,
+    // panel, settleUntil, detached }. panel is null while a move is landing.
+    var last = null;
+    var settleMs = typeof options.settleMs === 'number' ? options.settleMs : DOCK_SETTLE_MS;
+    var busy = false;
+    var timer = null;
+
+    async function tick() {
+      if (busy || selfId == null) return;
+      busy = true;
+      try {
+        await hydrateWorkspace();
+        var dock = _workspace.dock;
+        if (!dock || dock.panelWindowId !== selfId) { last = null; return; }
+        var win = null;
+        // A browser window that closed leaves the dock for the worker to clear.
+        try { win = await invoke(c.windows.get, c.windows, [dock.contentWindowId]); } catch (_e) { last = null; return; }
+        var self = await invoke(c.windows.get, c.windows, [selfId]);
+        if (!hasBounds(win) || !hasBounds(self)) return;
+        if (win.state && win.state !== 'normal') return;
+        if (!last || last.rev !== dock.rev || last.contentWindowId !== dock.contentWindowId) {
+          // Docked or re-snapped by an open since this page last looked. Where
+          // the workspace itself ended up is read once the move has landed: a
+          // browser may still be applying it when the call that made it
+          // resolves, and a late landing must not read as the user's drag.
+          last = {
+            rev: dock.rev, contentWindowId: dock.contentWindowId, content: boundsOf(win),
+            panel: null, settleUntil: Date.now() + settleMs, detached: false
+          };
+          return;
+        }
+        if (last.detached) return;
+        if (!last.panel) {
+          if (Date.now() >= last.settleUntil) last.panel = boundsOf(self);
+        } else if (!sameBounds(self, last.panel)) {
+          last.detached = true;
+          return;
+        }
+        if (sameBounds(win, last.content)) return;
+        var edge = besideBounds(win, self.width);
+        await invoke(c.windows.update, c.windows, [selfId, edge]);
+        last.content = boundsOf(win);
+        last.panel = null;
+        last.settleUntil = Date.now() + settleMs;
+        // Closing the workspace restores the width against this record. An
+        // open that docked again in the meantime owns it, so re-read first.
+        await hydrateWorkspace();
+        var current = _workspace.dock;
+        if (!current || current.rev !== last.rev || current.panelWindowId !== selfId) return;
+        current.content = last.content;
+        current.panel = edge;
+        persistWorkspace();
+      } catch (_e) { /* the next change tries again */ } finally { busy = false; }
+    }
+
+    return invoke(c.windows.getCurrent, c.windows, []).then(function (self) {
+      // Only the popup-type workspace window is ever docked.
+      if (!self || self.id == null || (self.type && self.type !== 'popup')) return null;
+      selfId = self.id;
+      if (options.poll !== false) {
+        if (c.windows.onBoundsChanged && typeof c.windows.onBoundsChanged.addListener === 'function') {
+          c.windows.onBoundsChanged.addListener(function () { tick(); });
+          tick();
+        } else if (typeof globalScope.setInterval === 'function') {
+          timer = globalScope.setInterval(tick, DOCK_FOLLOW_MS);
+        }
+      }
+      return {
+        tick: tick,
+        stop: function () {
+          if (timer != null && typeof globalScope.clearInterval === 'function') globalScope.clearInterval(timer);
+          timer = null;
+        }
+      };
+    }, function () { return null; });
+  }
+
+  // ---------------------------------------------------------------------------
+  // In-page panel
+  //
+  // Safari has no side panel, and a workspace window cannot sit beside a
+  // full-screen browser window. So wherever the page can hold it, the panel is
+  // FSB's own page in an iframe that content/panel-host.js pins to the left
+  // edge of the web page. The worker places it. The page inside is the same
+  // ui/sidepanel.html the workspace window shows.
+  // ---------------------------------------------------------------------------
+
+  var _panelHost = false;         // true in the context that places panels: the worker
+  var _panel = { windows: {} };   // windowId -> true while the panel is on in that window
+
+  function persistPanel() {
+    var payload = {};
+    payload[PANEL_STATE_KEY] = { windows: _panel.windows };
+    writeSession(payload);
+  }
+
+  // The panel's page sits in a cross-origin frame, out of reach of the page
+  // inspector, so what the worker did for it goes to the extension log.
+  function panelLog(message, data) {
+    try {
+      var logger = typeof automationLogger !== 'undefined' ? automationLogger : globalScope.automationLogger;
+      if (logger && typeof logger.info === 'function') logger.info('[Panel] ' + message, data || {});
+    } catch (_e) { /* a log line is never worth a failure */ }
+  }
+
+  // Only web pages can hold the panel. A tab whose address the browser will not
+  // reveal is tried anyway: the injection settles it.
+  function canHostPanel(tab) {
+    if (!tab || tab.id == null || tab.windowId == null) return false;
+    if (tab.windowId === _workspace.windowId) return false;
+    return typeof tab.url !== 'string' || !tab.url || /^https?:\/\//i.test(tab.url);
+  }
+
+  async function panelTabFor(c, opts) {
+    try {
+      if (opts.tabId != null && typeof c.tabs.get === 'function') {
+        return await invoke(c.tabs.get, c.tabs, [opts.tabId]);
+      }
+      if (opts.windowId != null && typeof c.tabs.query === 'function') {
+        var active = await invoke(c.tabs.query, c.tabs, [{ active: true, windowId: opts.windowId }]);
+        return (active && active[0]) || null;
+      }
+    } catch (_e) { return null; }
+    return resolveTargetTab();
+  }
+
+  /** Ask the tab's content script about its panel. Its answer, or null. */
+  async function panelMessage(c, tabId, action, extra) {
+    var message = { action: action };
+    if (extra) Object.keys(extra).forEach(function (key) { message[key] = extra[key]; });
+    try {
+      var reply = await Promise.race([
+        invoke(c.tabs.sendMessage, c.tabs, [tabId, message, { frameId: 0 }]),
+        // Safari does not fail a send to a tab with no content script quickly.
+        new Promise(function (resolve) { setTimeout(function () { resolve(null); }, PANEL_REPLY_MS); })
+      ]);
+      return reply && typeof reply === 'object' ? reply : null;
+    } catch (_e) { return null; }
+  }
+
+  async function showPanel(c, tab) {
+    if (!canHostPanel(tab)) return false;
+    var show = { url: c.runtime.getURL(_workspace.path), width: PANEL_WIDTH };
+    var reply = await panelMessage(c, tab.id, 'fsbPanelShow', show);
+    if (!reply) {
+      // No content script answered, so there is none to probe: inject one.
+      var ensure = globalScope.ensureContentScriptInjected;
+      if (typeof ensure !== 'function') return false;
+      try {
+        if (typeof globalScope.fsbNoteContentScriptAbsent === 'function') globalScope.fsbNoteContentScriptAbsent(tab.id);
+      } catch (_e) { /* best effort */ }
+      try { await ensure(tab.id); } catch (_e2) { return false; }
+      reply = await panelMessage(c, tab.id, 'fsbPanelShow', show);
+    }
+    return !!(reply && reply.shown === true);
+  }
+
+  async function hidePanelIn(c, windowId) {
+    delete _panel.windows[windowId];
+    persistPanel();
+    try {
+      var tabs = await invoke(c.tabs.query, c.tabs, [{ windowId: windowId }]);
+      (tabs || []).forEach(function (tab) {
+        if (tab && tab.id != null) panelMessage(c, tab.id, 'fsbPanelHide');
+      });
+    } catch (_e) { /* the window is gone */ }
+  }
+
+  /**
+   * Show the panel for this open, or close it when a toolbar click finds it
+   * already showing, as Chrome's own side panel toggles. Null when the page
+   * cannot hold a panel, which leaves the workspace window to open instead.
+   */
+  async function openPanel(c, opts) {
+    if (!c.tabs || typeof c.tabs.sendMessage !== 'function') return null;
+    var tab = await panelTabFor(c, opts);
+    if (!canHostPanel(tab)) {
+      panelLog('this page cannot hold the panel, opening the workspace window', { tabId: tab ? tab.id : null });
+      return null;
+    }
+    // A toolbar click names its window and no tab. An automation names a tab,
+    // and must never close the panel it is about to report into.
+    var fromToolbar = opts.windowId != null && opts.tabId == null;
+    if (fromToolbar && _panel.windows[tab.windowId]) {
+      var state = await panelMessage(c, tab.id, 'fsbPanelState');
+      if (state && state.shown === true) {
+        await hidePanelIn(c, tab.windowId);
+        panelLog('closed', { windowId: tab.windowId });
+        return { surface: 'panel', tabId: tab.id, closed: true };
+      }
+    }
+    if (!(await showPanel(c, tab))) {
+      panelLog('the page did not take the panel, opening the workspace window', { tabId: tab.id });
+      return null;
+    }
+    _panel.windows[tab.windowId] = true;
+    persistPanel();
+    panelLog('shown', { tabId: tab.id, windowId: tab.windowId });
+    // One surface at a time: the panel replaces an open workspace window.
+    if (_workspace.windowId != null && c.windows && typeof c.windows.remove === 'function') {
+      try { invoke(c.windows.remove, c.windows, [_workspace.windowId]).catch(function () {}); } catch (_e) { /* ignore */ }
+    }
+    return { surface: 'panel', tabId: tab.id };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Calls from the panel's page to the worker
+  //
+  // An extension page embedded in a web page has the whole extension API on
+  // Safari, but a tabs.* or windows.* lookup made from it takes the host page
+  // down (WebKit bug 327823; seen on Safari 26.5 with tabs.query, getCurrent,
+  // windows.getCurrent, getAll and getLastFocused). Events, runtime messaging,
+  // storage and i18n are fine there. So inside the panel those two namespaces
+  // are stand-ins that ask the worker, over a port, to make the call.
+  // ---------------------------------------------------------------------------
+
+  var FRAME_RPC_METHODS = {
+    tabs: ['query', 'get', 'getCurrent', 'create', 'update', 'remove', 'reload', 'goBack', 'goForward', 'duplicate'],
+    windows: ['get', 'getAll', 'getCurrent', 'getLastFocused', 'create', 'update', 'remove']
+  };
+
+  function copyOf(source, extra) {
+    var out = {};
+    Object.keys(source || {}).forEach(function (key) { out[key] = source[key]; });
+    Object.keys(extra || {}).forEach(function (key) { out[key] = extra[key]; });
+    return out;
+  }
+
+  /** Worker side: make one call for the panel that sits in sender.tab. */
+  async function answerFrameRpc(c, call, sender) {
+    var ns = call.ns;
+    var method = call.method;
+    var args = Array.isArray(call.args) ? call.args.slice() : [];
+    var host = sender.tab;
+    if (ns === 'fsbPanel') {
+      if (method === 'hostTab') return invoke(c.tabs.get, c.tabs, [host.id]);
+      if (method === 'close') { await hidePanelIn(c, host.windowId); return true; }
+      if (method === 'openOptions') { await invoke(c.runtime.openOptionsPage, c.runtime, []); return true; }
+      throw new Error('Unknown panel call: ' + method);
+    }
+    var allowed = FRAME_RPC_METHODS[ns];
+    if (!allowed || allowed.indexOf(method) === -1 || !c[ns]) {
+      throw new Error(ns + '.' + method + ' is not available to the panel');
+    }
+    // "Current" is the tab and window the panel sits in. The worker has neither.
+    if (ns === 'tabs') {
+      if (method === 'getCurrent') return invoke(c.tabs.get, c.tabs, [host.id]);
+      if (method === 'query' && args[0] && typeof args[0] === 'object') {
+        var query = copyOf(args[0]);
+        if (query.currentWindow === true || query.lastFocusedWindow === true) {
+          delete query.currentWindow;
+          delete query.lastFocusedWindow;
+          query.windowId = host.windowId;
+        }
+        args[0] = query;
+      }
+      if (method === 'create' && args[0] && typeof args[0] === 'object' && args[0].windowId == null) {
+        args[0] = copyOf(args[0], { windowId: host.windowId });
+      }
+      var takesTabId = method === 'update' || method === 'reload' || method === 'goBack' || method === 'goForward';
+      if (takesTabId && typeof args[0] !== 'number') args.unshift(host.id);
+    } else {
+      if (method === 'getCurrent' || method === 'getLastFocused') {
+        return invoke(c.windows.get, c.windows, [host.windowId].concat(args.slice(0, 1)));
+      }
+      if ((method === 'get' || method === 'update' || method === 'remove') && args[0] === c.windows.WINDOW_ID_CURRENT
+          && typeof args[0] === 'number') {
+        args[0] = host.windowId;
+      }
+    }
+    if (typeof c[ns][method] !== 'function') throw new Error(ns + '.' + method + ' is not available to the panel');
+    return invoke(c[ns][method], c[ns], args);
+  }
+
+  /** Worker side: answer the panel pages' ports. */
+  function serveFrameRpc(c) {
+    if (!c.runtime || !c.runtime.onConnect || typeof c.runtime.onConnect.addListener !== 'function') return;
+    c.runtime.onConnect.addListener(function (port) {
+      if (!port || port.name !== FRAME_RPC_PORT) return;
+      var sender = port.sender || {};
+      // Only FSB's own page, embedded in a tab, may make these calls.
+      if (!sender.tab || sender.tab.id == null || !isExtensionUrl(sender.url) || !(sender.frameId > 0)) {
+        try { port.disconnect(); } catch (_e) { /* ignore */ }
+        return;
+      }
+      port.onMessage.addListener(function (call) {
+        if (!call || call.id == null) return;
+        var answer = function (reply) {
+          reply.id = call.id;
+          try { port.postMessage(reply); } catch (_e) { /* the panel is gone */ }
+        };
+        answerFrameRpc(c, call, sender).then(
+          function (value) {
+            panelLog('call answered', { call: call.ns + '.' + call.method, tabId: sender.tab.id });
+            answer({ value: value === undefined ? null : value });
+          },
+          function (error) {
+            var message = String((error && error.message) || error);
+            panelLog('call failed', { call: call.ns + '.' + call.method, tabId: sender.tab.id, error: message });
+            answer({ error: message });
+          }
+        );
+      });
+    });
+  }
+
+  var _frameReal = null;   // in the panel's page: the browser's own API object
+  var _rpcPort = null;
+  var _rpcSeq = 0;
+  var _rpcWaiting = {};
+
+  /** An extension page shown inside a web page: the in-page panel. */
+  function isEmbeddedPage(g) {
+    if (!isExtensionPage(g)) return false;
+    try { return g.top !== g.self; } catch (_e) { return true; }
+  }
+
+  function rpcPort() {
+    if (_rpcPort) return _rpcPort;
+    var port = _frameReal.runtime.connect({ name: FRAME_RPC_PORT });
+    port.onMessage.addListener(function (reply) {
+      var waiting = reply && _rpcWaiting[reply.id];
+      if (!waiting) return;
+      delete _rpcWaiting[reply.id];
+      if (reply.error) waiting.reject(new Error(reply.error));
+      else waiting.resolve(reply.value);
+    });
+    port.onDisconnect.addListener(function () {
+      if (_rpcPort === port) _rpcPort = null;
+      var pending = _rpcWaiting;
+      _rpcWaiting = {};
+      Object.keys(pending).forEach(function (id) { pending[id].reject(new Error('The background worker went away')); });
+    });
+    _rpcPort = port;
+    return port;
+  }
+
+  /** Panel side: have the worker make a call. Promise, or callback if one is passed. */
+  function frameRpc(ns, method, args) {
+    var list = Array.prototype.slice.call(args || []);
+    var callback = list.length && typeof list[list.length - 1] === 'function' ? list.pop() : null;
+    var promise = new Promise(function (resolve, reject) {
+      var id = ++_rpcSeq;
+      _rpcWaiting[id] = { resolve: resolve, reject: reject };
+      setTimeout(function () {
+        if (!_rpcWaiting[id]) return;
+        delete _rpcWaiting[id];
+        reject(new Error(ns + '.' + method + ' was not answered'));
+      }, FRAME_RPC_MS);
+      try {
+        rpcPort().postMessage({ id: id, ns: ns, method: method, args: list });
+      } catch (error) {
+        delete _rpcWaiting[id];
+        _rpcPort = null;
+        reject(error);
+      }
+    });
+    if (!callback) return promise;
+    promise.then(function (value) { callback(value); }, function () { callback(undefined); });
+    return undefined;
+  }
+
+  /**
+   * Panel side: swap the global chrome/browser for a copy whose tabs and
+   * windows ask the worker. The browser's own object cannot have those two
+   * replaced, but the global that names it can be. False when it could not be
+   * done, and then the page must not run.
+   */
+  function installFrameFacade(g) {
+    var real = api(g);
+    if (!real || !real.runtime || typeof real.runtime.connect !== 'function' || typeof Proxy !== 'function') return false;
+    function standIn(ns) {
+      var native = real[ns] || {};
+      return new Proxy({}, {
+        get: function (_target, name) {
+          if (typeof name !== 'string') return undefined;
+          var value = native[name];
+          // Events and constants are safe in an embedded page and stay native.
+          if (/^on[A-Z]/.test(name) || (value !== undefined && typeof value !== 'function')) return value;
+          return function () { return frameRpc(ns, name, arguments); };
+        }
+      });
+    }
+    var facade = Object.create(real);
+    ['tabs', 'windows'].forEach(function (ns) {
+      Object.defineProperty(facade, ns, { value: standIn(ns), enumerable: true, configurable: true, writable: true });
+    });
+    try {
+      g.chrome = facade;
+      g.browser = facade;
+    } catch (_e) { return false; }
+    if (g.chrome !== facade) return false;
+    _frameReal = real;
+    // runtime.openOptionsPage opens a tab from this page: the same hazard.
+    try {
+      real.runtime.openOptionsPage = function () { return frameRpc('fsbPanel', 'openOptions', arguments); };
+    } catch (_e2) { /* it stays the browser's own */ }
+    return true;
   }
 
   async function openWorkspace(opts) {
     opts = opts || {};
     var c = api();
     if (!c) throw unavailable('openWorkspace', 'no extension API');
+    // Inside the in-page panel there is nothing to open: this is it.
+    if (_frameReal) return { surface: 'panel' };
     // A stale window id is self-healing: windows.update rejects on a window the
     // user closed while the worker was down, and the catch below falls through
     // to windows.create.
     if (_hydrating) { try { await _hydrating; } catch (_e) { /* best effort */ } }
+    // The workspace page keeps the dock record current as the browser window
+    // moves, so read it again before docking against it.
+    if (canDock(c)) { try { await hydrateWorkspace(); } catch (_e) { /* best effort */ } }
     if (opts.path) _workspace.path = opts.path;
     var url = c.runtime.getURL(_workspace.path);
 
-    // 1. Focus an existing workspace window.
+    // 0. The panel inside the page, wherever the page can hold one. Only the
+    //    worker can place it. A page that asks gets the window below.
+    if (_panelHost) {
+      var inPage = await openPanel(c, opts);
+      if (inPage) return inPage;
+    }
+
+    // 1. Focus an existing workspace window, back beside the browser window
+    //    this open came from.
     if (_workspace.windowId != null && c.windows && typeof c.windows.update === 'function') {
       try {
-        await invoke(c.windows.update, c.windows, [_workspace.windowId, { focused: true }]);
+        var focus = { focused: true };
+        var spot = await dockFor(c, opts);
+        if (spot) { focus.left = spot.left; focus.top = spot.top; focus.width = spot.width; focus.height = spot.height; }
+        await invoke(c.windows.update, c.windows, [_workspace.windowId, focus]);
+        if (_workspace.dock) {
+          _workspace.dock.panelWindowId = _workspace.windowId;
+          persistWorkspace();
+        }
         return { surface: 'window', windowId: _workspace.windowId, tabId: _workspace.tabId };
       } catch (_e) { _workspace.windowId = null; }
     }
@@ -349,21 +942,41 @@
     }
 
     // 3. Create a popup-type window: a real extension page, persistent, and
-    //    parkable beside the browser so the user watches the agent work.
+    //    docked beside the browser so the user watches the agent work. Where
+    //    it cannot be docked it opens wherever the browser puts it.
     if (c.windows && typeof c.windows.create === 'function') {
+      var place = await dockFor(c, opts);
       try {
-        var win = await invoke(c.windows.create, c.windows, [{
-          url: url, type: 'popup', width: WORKSPACE_WIDTH, height: WORKSPACE_HEIGHT
-        }]);
+        var createInfo = { url: url, type: 'popup', width: WORKSPACE_WIDTH, height: WORKSPACE_HEIGHT };
+        if (place) {
+          createInfo.left = place.left;
+          createInfo.top = place.top;
+          createInfo.width = place.width;
+          createInfo.height = place.height;
+        }
+        var win = await invoke(c.windows.create, c.windows, [createInfo]);
         if (win && win.id != null) {
           _workspace.windowId = win.id;
           if (win.tabs && win.tabs.length && win.tabs[0] && win.tabs[0].id != null) {
             _workspace.tabId = win.tabs[0].id;
           }
+          if (place && _workspace.dock) {
+            _workspace.dock.panelWindowId = win.id;
+            // A browser may place a new window by its own rules: move it once.
+            if (!hasBounds(win) || !sameBounds(win, place)) {
+              try {
+                await invoke(c.windows.update, c.windows, [win.id, {
+                  left: place.left, top: place.top, width: place.width, height: place.height
+                }]);
+              } catch (_e2) { /* it stays where it opened */ }
+            }
+          }
           persistWorkspace();
           return { surface: 'window', windowId: _workspace.windowId, tabId: _workspace.tabId };
         }
       } catch (_e) { /* fall through to tab */ }
+      // No window to dock after all: the browser window gets its width back.
+      if (place) await undock(c);
     }
 
     // 4. Last resort: a plain extension tab.
@@ -386,6 +999,11 @@
       return;
     }
     if (!c) return;
+    // The in-page panel is closed by the worker, which owns its state.
+    if (_frameReal) {
+      frameRpc('fsbPanel', 'close', []).catch(function () {});
+      return;
+    }
     if (_workspace.windowId != null && c.windows && typeof c.windows.remove === 'function') {
       try { invoke(c.windows.remove, c.windows, [_workspace.windowId]).catch(function () {}); } catch (_e) { /* ignore */ }
       _workspace.windowId = null;
@@ -404,6 +1022,10 @@
    * the FSB window). So currentWindow is deliberately absent from this chain.
    */
   async function resolveTargetTab(opts) {
+    // The in-page panel drives the page it sits in.
+    if (_frameReal) {
+      try { return await frameRpc('fsbPanel', 'hostTab', []); } catch (_e) { return null; }
+    }
     var c = api();
     if (!c || !c.tabs || typeof c.tabs.query !== 'function') return null;
 
@@ -516,7 +1138,17 @@
             _workspace.lastContentTabId = tab.id;
             persistContentTab();
           }
+          // The panel lives in its page: a tab switched to needs its own.
+          if (tab && _panel.windows[tab.windowId]) showPanel(c, tab);
         }).catch(function () {});
+      }));
+    }
+    if (c.tabs.onUpdated && typeof c.tabs.onUpdated.addListener === 'function') {
+      // And so does every page loaded in a window that has the panel on.
+      c.tabs.onUpdated.addListener(whenHydrated(function (_tabId, info, tab) {
+        if (!info || info.status !== 'complete' || !tab) return;
+        if (!_panel.windows[tab.windowId] || tab.active === false) return;
+        showPanel(c, tab);
       }));
     }
     // Switching to another window whose tab is already active fires no
@@ -548,10 +1180,24 @@
     }
     if (c.windows && c.windows.onRemoved && typeof c.windows.onRemoved.addListener === 'function') {
       c.windows.onRemoved.addListener(whenHydrated(function (windowId) {
+        var dock = _workspace.dock;
+        if (dock && dock.panelWindowId === windowId) {
+          // The workspace closed: its browser window gets the width back. The
+          // record names the workspace itself, because a page that closes its
+          // own window has already cleared the id below.
+          undock(c);
+        } else if (dock && dock.contentWindowId === windowId) {
+          _workspace.dock = null;
+          persistWorkspace();
+        }
         if (windowId === _workspace.windowId) {
           _workspace.windowId = null;
           _workspace.tabId = null;
           persistWorkspace();
+        }
+        if (_panel.windows[windowId]) {
+          delete _panel.windows[windowId];
+          persistPanel();
         }
       }));
     }
@@ -768,7 +1414,13 @@
     // whether a workspace window already exists.
     _hydrating = hydrateWorkspace().then(function () { _hydrating = null; });
 
-    if (opts.trackTabs !== false) trackContentTabs();
+    if (opts.trackTabs !== false) {
+      trackContentTabs();
+      // The context that tracks tabs is the worker: it places the in-page
+      // panel and answers the calls its page cannot make for itself.
+      _panelHost = true;
+      serveFrameRpc(c);
+    }
 
     _installed = true;
     return result;
@@ -789,19 +1441,30 @@
     unavailable: unavailable,
     openWorkspace: openWorkspace,
     closeSurface: closeSurface,
+    followDock: followDock,
+    embedded: false,
+    isEmbeddedPage: isEmbeddedPage,
+    installFrameFacade: installFrameFacade,
     resolveTargetTab: resolveTargetTab,
     registerLoopback: registerLoopback,
     captureLoopback: captureLoopback,
     dispatchLoopback: dispatchLoopback,
     isLoopbackMessage: isLoopbackMessage,
     _workspaceState: function () { return _workspace; },
+    _panelState: function () { return _panel; },
     _reset: function () {
       _installed = false;
       _hydrating = null;
       _localListeners.length = 0;
       _loopbackDepth = 0;
       _capturingLoopback = false;
-      _workspace = { path: DEFAULT_WORKSPACE_PATH, windowId: null, tabId: null, lastContentTabId: null };
+      _workspace = { path: DEFAULT_WORKSPACE_PATH, windowId: null, tabId: null, lastContentTabId: null, dock: null };
+      _panel = { windows: {} };
+      _panelHost = false;
+      _frameReal = null;
+      _rpcPort = null;
+      _rpcWaiting = {};
+      FsbPlatform.embedded = false;
       FsbPlatform.id = detect(globalScope);
       FsbPlatform.caps = buildCaps(FsbPlatform.id);
     }
@@ -835,7 +1498,18 @@
   // namespaces, and wrapping a content script's sendMessage would break its
   // route to the worker.
   if (FsbPlatform.id !== 'chrome' && isExtensionPage(globalScope)) {
-    FsbPlatform.install({ loopback: false, trackTabs: false });
+    var embedded = isEmbeddedPage(globalScope);
+    if (embedded && !installFrameFacade(globalScope)) {
+      // Without the stand-ins this page's own tab lookups would take the host
+      // page down with it. Stop here: the scripts after this one never load.
+      try { globalScope.stop(); } catch (_e) { /* ignore */ }
+    } else {
+      FsbPlatform.embedded = embedded;
+      FsbPlatform.install({ loopback: false, trackTabs: false });
+      // In the workspace window this keeps it beside its browser window. Every
+      // other extension page is not a popup-type window and gets nothing.
+      if (!embedded) followDock();
+    }
   }
 
   if (typeof module !== 'undefined' && module.exports) {

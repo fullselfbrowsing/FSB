@@ -171,6 +171,82 @@ whose adapter sets `caps.tintsGrayscaleToolbarIcon`:
 `tests/safari-toolbar-icons.test.js` checks the assets against this rule. On
 macOS it also runs Safari's own classifier on them, at full and half alpha.
 
+## The panel (in place of the side panel)
+
+Safari has no side panel API for extensions (checked in Safari 26 and 27), so
+the adapter polyfills `chrome.sidePanel`. `ui/sidepanel.html` is shown in one of
+two places, and `chrome.sidePanel.open()` picks: the panel inside the page
+wherever the page can hold one, the workspace window otherwise.
+
+### Inside the page
+
+`content/panel-host.js` puts the panel's page in an iframe on the left edge of
+the web page: 420 px wide, full height, in the top layer, inside a closed shadow
+root. The page's own content gets a matching `margin-left`, and the glow that
+frames the page while an agent works reads `--fsb-panel-inset` to start after
+the panel. FSB's other overlays sit in the right-hand corners and stay where
+they are. This is the only form that works
+while Safari is in full screen, where no second window can sit beside it.
+
+- **Placing it.** Only the worker places panels. A toolbar click shows it in the
+  window's active tab, and a second click closes it, as Chrome's own side panel
+  toggles. An automation that opens the panel names a tab and never closes it.
+  The window is recorded in `storage.session` under `fsbSafariPanel`.
+- **Keeping it.** The panel lives in its page, so it is gone after every
+  navigation and absent from every other tab. The worker puts it back when a
+  page finishes loading or a tab is switched to, in windows that have it on.
+  Each time the panel's page loads afresh and restores its state.
+- **What the page inside may call.** An extension page embedded in a web page
+  has the whole extension API on Safari, but a `tabs.*` or `windows.*` lookup
+  made from it takes the host page down (WebKit bug 327823; seen on Safari 26.5
+  with `tabs.query`, `tabs.getCurrent`, `windows.getCurrent`, `getAll` and
+  `getLastFocused`). Events, runtime messaging, storage and i18n work there. So
+  when the adapter loads in an embedded page it replaces the global
+  `chrome` / `browser` with a copy whose `tabs` and `windows` ask the worker,
+  over a port named `fsb-frame-rpc`, to make the call. Events and constants stay
+  the browser's own. "Current" tab and window mean the ones the panel sits in.
+  If the global cannot be replaced, the page is stopped before its scripts run.
+- **Framing.** A page can only be framed in a web page if it is web accessible,
+  so the Safari manifest lists `ui/sidepanel.html` (and nothing else under
+  `ui/`). Safari hides extension URLs from page scripts (they read
+  `webkit-masked-url://hidden/`), so a site cannot frame it on its own, and a
+  host page's `frame-src` does not block a frame the content script adds.
+- **Limits.** A site can still cover, restyle or hide the host element, since
+  it sits in the site's own document, so a decision made in this panel deserves
+  more care than one made in a window of its own. `position: fixed` headers and
+  left-hand sidebars keep running under the panel. And the page pays for
+  loading the panel's scripts on every navigation.
+
+### The workspace window
+
+Pages that cannot hold a panel (Safari's own pages, extension pages, sites FSB
+has no access to) get a popup-type window instead, docked so that it reads as a
+side panel:
+
+- **Open.** It takes the left-hand 460 px of the browser window it was opened
+  from (the toolbar click's window, the window of the tab an automation started
+  on, or the last focused one). That window moves over and narrows by the same
+  amount, so the pair fills its original footprint and no screen size is needed.
+- **Follow.** The workspace page polls its browser window every 400 ms
+  (`windows.onBoundsChanged` is used where it exists) and moves itself to that
+  window's left edge when it moves or resizes. The page does this, not the
+  worker: it lives exactly as long as the window, and an alarm cannot fire often
+  enough. It only moves the workspace, and only in answer to the browser window
+  changing, so it cannot chase its own updates.
+- **Detach.** A workspace the user drags away stays where they put it. The next
+  toolbar click docks it again. A click in another browser window moves the dock
+  there and gives the first window its width back.
+- **Close.** The worker gives the browser window its 460 px strip back, unless
+  the user has resized it since. The dock record names the workspace window itself,
+  because a page that closes its own window clears the window id first.
+
+It does not dock, and opens wherever Safari puts it, when the browser window is
+fullscreen or minimized, when it would be left narrower than 700 px (so under
+1160 px wide), or when Safari does not apply the requested size and position
+(the adapter reads them back). The record lives in `storage.session` under
+`fsbSafariWorkspace.dock`, so it survives a worker recycle. Opening the in-page
+panel closes an open workspace window: one surface at a time.
+
 ## Remaining manual Xcode steps
 
 The converter cannot do these, and they need the Xcode UI (target membership
@@ -342,6 +418,8 @@ of its results by design, and the app already lists the roots in its own UI.
 | V8 | Can the **extension** process resolve a security-scoped bookmark the **app** created, via the App Group? This is the documented pattern, but it is the one part of upload_file that cannot be unit-tested. | fall back to `NSOpenPanel` per upload (worse UX, still functional) |
 | V9 | After Safari evicts the background worker, does the dashboard relay come back within about a minute (reconnect alarm, then the arm on worker start)? | the 5-minute telemetry alarm also wakes the worker, and that start arms the relay |
 | V10 | Does `resolveTargetTab` return the last content tab, and does `tabs.query` report the workspace window's `safari-web-extension://` URL? | the adapter rules out the workspace's tab by its window id as well as its URL, and a tab with no URL is never streamed |
+| V11 | Does Safari apply `left` / `top` / `width` / `height` from `windows.create` for a popup-type window and from `windows.update` for a normal one, and report them back from `windows.get`? | the adapter reads the bounds back and leaves the workspace floating, as before |
+| V12 | Does `ui/sidepanel.html` run inside a web page as the in-page panel, with its tab and window lookups routed through the worker? | the workspace window |
 
 ### Results (Safari 26.5, macOS 26.6, ad-hoc signed Debug build)
 
@@ -360,3 +438,5 @@ hub on :7225.
 | V8 | Not verified: needs "Grant Folder Access" in the app. Without a grant, `upload_file` returns the typed `no_granted_folders` refusal. |
 | V9 | Not verified yet. The relay could not run in the Safari worker at all; it now runs through the app on the `relay` channel. The host side is covered by tests/safari-native-bridge-channels.test.js, the Safari side still needs a device run. |
 | V10 | Not verified: needs the workspace window. |
+| V11 | Not verified yet: needs a toolbar click on a device, in a window that is not full screen. |
+| V12 | Yes for the page itself: `ui/sidepanel.html` loads in a frame the content script adds, on a plain page, under `frame-src 'none'` and under Trusted Types, and its own non-web-accessible scripts load. The panel rendered and reported READY inside a full-screen window, with the host page intact. The toolbar toggle and the put-back after navigation are covered by tests and still need a click on a device. |

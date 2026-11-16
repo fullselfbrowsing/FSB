@@ -81,6 +81,17 @@ function passAssertEqual(a, b, msg) { passAssert(a === b, msg + ' (got ' + JSON.
   passAssert(war.includes('test-data/**/*'),
     'test-data WAR entry KEPT (utils/token-comparator.js fetches it at runtime)');
 
+  console.log('\n=== 7b. the panel page can be framed inside web pages ===');
+  // Safari has no side panel, so content/panel-host.js frames ui/sidepanel.html
+  // inside the page, and only a web-accessible page can be framed there.
+  const panelEntries = (out.web_accessible_resources || []).filter((w) => (w.resources || []).includes('ui/sidepanel.html'));
+  passAssertEqual(panelEntries.length, 1, 'ui/sidepanel.html is web accessible on Safari, once');
+  passAssert(panelEntries[0] && JSON.stringify(panelEntries[0].matches) === '["<all_urls>"]'
+    && panelEntries[0].resources.length === 1, 'in an entry of its own, for every page');
+  passAssert(war.filter((r) => /^ui\//.test(r)).length === 1, 'and no other ui/ page is exposed');
+  passAssert(!JSON.stringify(SRC.web_accessible_resources || []).includes('ui/'),
+    'the Chrome manifest exposes no ui/ page: it has a real side panel');
+
   console.log('\n=== 8. content_scripts pass through byte-identical ===');
   passAssertEqual(JSON.stringify(out.content_scripts), JSON.stringify(SRC.content_scripts),
     'content_scripts unchanged (canvas-interceptor MAIN world at document_start)');

@@ -73,6 +73,9 @@ const MCP_BRIDGE_URL = 'ws://localhost:7225';
 // draws its animated frames from the 16 and 32.
 export const SAFARI_TOOLBAR_ICON_SIZES = [16, 19, 32, 38, 48, 64];
 
+// The page the in-page panel frames: utils/platform-adapter.js's workspace page.
+export const SAFARI_PANEL_PAGE = 'ui/sidepanel.html';
+
 // Paths never copied into the Safari build, with the reason each is excluded.
 // tests/safari-source-parity.test.js asserts this list is exhaustive.
 const EXCLUDE = [
@@ -140,6 +143,16 @@ export function transformManifest(manifest) {
       }))
       .filter((entry) => (entry.resources ?? []).length > 0);
   }
+
+  // Safari has no side panel, so content/panel-host.js shows the panel's own
+  // page in an iframe inside the web page, and a page can only be framed there
+  // if it is web accessible. Only the page itself needs listing: once loaded it
+  // fetches its scripts and styles as the extension. Safari hides extension
+  // URLs from page scripts, so a site cannot frame this page on its own.
+  out.web_accessible_resources = [
+    ...(out.web_accessible_resources ?? []),
+    { resources: [SAFARI_PANEL_PAGE], matches: ['<all_urls>'] }
+  ];
 
   // The direct-WebSocket experiment: Safari refuses ws://localhost from an
   // extension page unless connect-src names it. If this works, the transport

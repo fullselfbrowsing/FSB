@@ -867,6 +867,9 @@ const CONTENT_SCRIPT_FILES = [
   'content/badge-combine.js',
   'utils/ui-locale.js',
   'content/visual-feedback.js',
+  // Safari only: the platform adapter asks it to show FSB's panel inside the
+  // page. It stays silent on Chrome, which has a side panel of its own.
+  'content/panel-host.js',
   'content/phantom-stream-capture.js',
   'content/dom-stream.js',
   'content/trigger-observe.js',
