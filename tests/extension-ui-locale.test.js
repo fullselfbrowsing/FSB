@@ -996,37 +996,30 @@ function sidepanelMessageContext(api) {
     check(overlay.overlayLabel(raw) === raw, `overlay leaves ${JSON.stringify(raw)} as sent`);
   }
 
-  // A language change redraws the pill, detail and log lines the last progress
-  // write left, not only the initial Planning / Initializing... text.
+  // A language change redraws the status pill's line and its Stop label from the
+  // English they were written from.
   for (const name of ['ownedText', 'refreshOwnedChrome']) vm.runInContext(extractNamedFunction(overlaySource, name), overlay);
-  const pill = { textContent: '' };
-  const detail = { textContent: '' };
-  const logLine = { textContent: '' };
-  const eta = { textContent: '' };
+  const status = { textContent: '' };
+  const stopAttrs = {};
+  const stop = { getAttribute: (key) => stopAttrs[key], setAttribute: (key, value) => { stopAttrs[key] = String(value); } };
   const overlayRoot = {
-    querySelector: (selector) => ({ '.fsb-step-number': pill, '.fsb-step-text': detail, '.fsb-eta': eta })[selector] || null,
-    querySelectorAll: (selector) => (selector === '.fsb-log-line' ? [logLine] : [])
+    querySelector: (selector) => ({ '.pl-in': status, '.pl-stop': stop })[selector] || null,
+    querySelectorAll: () => []
   };
-  overlay.writeLabel(pill, 'Acting…');
-  overlay.writeLabel(detail, 'Watching DOM for change');
-  overlay.writeLabel(logLine, 'Reviewing page state');
-  overlay.writeActions(eta, 4);
-  check(eta.textContent === ja.entry_actions.replace('$COUNT$', '4'), 'the overlay action counter renders in the active language');
+  overlay.writeLabel(status, 'Watching DOM for change');
+  overlay.writeKeyed(stop, 'entry_stop', 'Stop', null, 'aria-label');
+  check(status.textContent === ja.entry_detail_watching && stopAttrs['aria-label'] === ja.entry_stop,
+    'the status pill line and Stop label render in the active language');
   const de = shippedCatalogs.de;
   shipped.setOverride('de');
   overlay.refreshOwnedChrome(overlayRoot);
-  check(pill.textContent === de.entry_phase_acting + '…'
-      && detail.textContent === de.entry_detail_watching
-      && logLine.textContent === de.entry_detail_reviewing
-      && eta.textContent === de.entry_actions.replace('$COUNT$', '4'),
-    'a language change redraws the overlay pill, detail, log lines and action counter');
-  detail.textContent = 'Clicked the Submit button';
-  eta.textContent = '';
+  check(status.textContent === de.entry_detail_watching && stopAttrs['aria-label'] === de.entry_stop,
+    'a language change redraws the status pill line and its Stop label');
+  status.textContent = 'Clicked the Submit button';
   shipped.setOverride('ja');
   overlay.refreshOwnedChrome(overlayRoot);
-  check(eta.textContent === '', 'a language change leaves a cleared action counter empty');
-  check(pill.textContent === ja.entry_phase_acting + '…' && detail.textContent === 'Clicked the Submit button',
-    'a language change leaves overlay text that was replaced since its label was written');
+  check(status.textContent === 'Clicked the Submit button' && stopAttrs['aria-label'] === ja.entry_stop,
+    'a language change leaves pill text that was replaced since its label was written');
 
   // The trigger badge, the crawl overlay lines and the replay speed labels are
   // written from a template and its subs, so a switch redraws them too.

@@ -418,7 +418,7 @@ assertEqual(
 );
 assertEqual(
   overlayStateUtils.mapCapabilityErrorToNote('RECIPE_CONSENT_REQUIRED'),
-  'Blocked — this site needs your approval before FSB can act here.',
+  'Blocked. This site needs your approval before FSB can act here.',
   'RECIPE_CONSENT_REQUIRED maps to the consent-required note'
 );
 assertEqual(

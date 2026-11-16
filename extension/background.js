@@ -1142,6 +1142,12 @@ async function sendSessionStatus(tabId, statusData) {
   // The toolbar icon no longer rides this pipe: every implicit visual session
   // reports the same phase, so phase cannot tell a read from a click. It is
   // driven by tool class instead -- see fsbActionIcon.noteActivity.
+  // The status pill plays the icon's motion, so a freshly raised pill gets the
+  // tab's current form and its start time with its first status.
+  if (overlayState && typeof overlayState === 'object' && globalThis.fsbActionIcon
+      && typeof globalThis.fsbActionIcon.getMotion === 'function') {
+    try { overlayState.iconMotion = globalThis.fsbActionIcon.getMotion(tabId); } catch (_e) { /* presentation-only */ }
+  }
   const payload = {
     action: 'sessionStatus',
     overlayState,
@@ -20787,6 +20793,23 @@ try {
     })).catch(() => {});
   }
 } catch (_e) { /* icon is presentation-only */ }
+
+// The on-page status pill plays the toolbar icon's motion from the same clock.
+// Each change of a tab's form or start time is pushed to that tab's top frame;
+// a tab with no content script simply refuses the message.
+const fsbPillMotionSent = new Map();
+try {
+  if (globalThis.fsbActionIcon && typeof globalThis.fsbActionIcon.onMotionChange === 'function') {
+    globalThis.fsbActionIcon.onMotionChange((tabId, motion) => {
+      if (!Number.isFinite(tabId)) return;
+      const signature = motion ? motion.form + '@' + motion.startedAt : '';
+      if (fsbPillMotionSent.get(tabId) === signature) return;
+      if (signature) fsbPillMotionSent.set(tabId, signature); else fsbPillMotionSent.delete(tabId);
+      Promise.resolve(chrome.tabs.sendMessage(tabId, { action: 'actionIconMotion', motion: motion || null }, { frameId: 0 }))
+        .catch(() => { /* no content script on this tab */ });
+    });
+  }
+} catch (_e) { /* the pill is presentation-only */ }
 
 // --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
