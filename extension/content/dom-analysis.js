@@ -4810,7 +4810,9 @@
   // current document, deterministically and in code, or explains why it could
   // not. It never acts. Candidates are the visible elements whose role fits
   // the tool (enabled ones only, except for reads), in the light DOM and open
-  // shadow roots. Names are compared after normalising case, whitespace,
+  // shadow roots; for click, double click, right click and hover that includes
+  // an element whose computed cursor is pointer, the usual mark of one made
+  // clickable by script. Names are compared after normalising case, whitespace,
   // punctuation and a trailing count such as "Cart (2)". Ranks, best first:
   //   exact   - the normalised name equals the target;
   //   match   - every target word is in the name, label, placeholder,
@@ -4861,6 +4863,10 @@
   // These read or scroll and change nothing on the page, so a match on a
   // control that can commit needs no confirmation for them.
   const BIND_READ_TOOLS = new Set(['getText', 'getAttribute', 'scrollToElement']);
+  // Pointer verbs also take an element made clickable only by script: one
+  // with no role, handler attribute or tab stop whose computed cursor is
+  // pointer counts as weakly interactive for them.
+  const BIND_POINTER_TOOLS = new Set(['click', 'doubleClick', 'rightClick', 'hover']);
   const BIND_FAMILY_NOUNS = Object.freeze({
     interactive: 'interactive element',
     field: 'text field',
@@ -5042,6 +5048,20 @@
     return jevIsSensitiveField(el) || jevIsVaultFilled(el);
   }
 
+  // An element that may be clickable only by script: it carries a name of
+  // its own (text, aria-label or title). Its cursor is read later, and only
+  // when its name already matches the target.
+  function bindMayBePointerTarget(el) {
+    const tag = jevTag(el);
+    if (tag === 'OPTION' || jevSafeTextSkipTags.has(tag)) return false;
+    return bindHasOwnText(el) || jevAttr(el, 'aria-label') !== null || jevAttr(el, 'title') !== null;
+  }
+
+  function bindHasPointerCursor(el) {
+    const style = jevComputedStyle(el);
+    return !!style && style.cursor === 'pointer';
+  }
+
   // The visible name: the accessible label for controls; for other elements
   // the aria-label, else their text, else their title.
   function bindNameOf(el, strength) {
@@ -5219,7 +5239,8 @@
   // Every visible (and, except for reads, enabled) bindable element of the
   // family that shares at least one word with the target, in document order.
   // excludedExact: a field that is never bound by name carries the exact name.
-  function bindCollect(family, nTarget, targetTokens) {
+  // pointer: elements with a pointer cursor count as weakly interactive.
+  function bindCollect(family, nTarget, targetTokens, pointer) {
     const entries = [];
     let order = 0;
     let excludedExact = false;
@@ -5231,21 +5252,26 @@
         if (!excludedExact && fits && bindNormalize(bindNameOf(el, bindStrength(el))) === nTarget) excludedExact = true;
         return;
       }
-      if (!bindFits(el, family)) return;
+      let needsPointer = false;
+      if (!bindFits(el, family)) {
+        if (pointer !== true || !bindMayBePointerTarget(el)) return;
+        needsPointer = true;
+      }
       if (family === 'interactive' && jevTag(el) === 'LABEL') {
         const control = bindLabelControl(el);
         if (control && bindIsVisible(control)) return;
       }
-      const strength = bindStrength(el);
-      const name = bindNameOf(el, strength);
+      const strength = needsPointer ? 1 : bindStrength(el);
+      const name = bindNameOf(el, needsPointer ? 0 : strength);
       const nName = bindNormalize(name);
       const nameTokens = new Set(bindTokens(nName));
       const extraTokens = new Set(bindTokens(bindNormalize(bindExtraText(el, name))));
       if (!targetTokens.some((token) => nameTokens.has(token) || extraTokens.has(token))) return;
-      entries.push({ el, index, strength, name, nName, nameTokens, extraTokens, ctx: null, inViewport: false, role: '', ref: null });
+      entries.push({ el, index, strength, name, nName, nameTokens, extraTokens, needsPointer, ctx: null, inViewport: false, role: '', ref: null });
     }, BIND_LIMITS.POOL_VISIT_MAX);
     const usable = [];
     for (const entry of entries) {
+      if (entry.needsPointer && !bindHasPointerCursor(entry.el)) continue;
       if (!bindIsVisibleFor(entry.el)) continue;
       if (family !== 'named' && !bindIsEnabled(entry.el)) continue;
       entry.inViewport = jevCentreInViewport(entry.el);
@@ -5360,10 +5386,15 @@
   // Exact matches across the whole document, open shadow roots included,
   // hidden and disabled elements included; an element nested in another
   // with the same name is one target. Infinity when the page is too large.
-  function bindExactCount(nTarget, family) {
+  // pointer: pointer-cursor elements count too (cursor read only on a name match).
+  function bindExactCount(nTarget, family, pointer) {
     const matches = [];
     const walk = bindWalk((el) => {
-      if (!bindFits(el, family)) return;
+      if (!bindFits(el, family)) {
+        if (pointer === true && bindMayBePointerTarget(el) && bindNormalize(bindNameOf(el, 0)) === nTarget
+            && bindHasPointerCursor(el)) matches.push(el);
+        return;
+      }
       if (jevTag(el) === 'LABEL' && bindLabelControl(el)) return;
       if (bindNormalize(bindNameOf(el, bindStrength(el))) === nTarget) matches.push(el);
     }, BIND_LIMITS.COUNT_VISIT_MAX);
@@ -5412,7 +5443,8 @@
         `text=${shown} has no letters or digits to match, so nothing was executed. Use a CSS selector or a ref from get_page_snapshot.`, 0);
     }
     const targetTokens = bindTokens(nTarget);
-    const pool = bindCollect(family, nTarget, targetTokens);
+    const pointer = BIND_POINTER_TOOLS.has(tool);
+    const pool = bindCollect(family, nTarget, targetTokens, pointer);
     const full = bindRank(pool.entries, nTarget, exactOnly);
     // The name belongs to a password, payment, one-time-code or vault-filled
     // field: no other element is bound in its place by looser rules.
@@ -5496,7 +5528,7 @@
         } else if (!pool.complete) {
           why = 'the page is too large to prove that name unique';
         } else {
-          const count = bindExactCount(nTarget, family);
+          const count = bindExactCount(nTarget, family, pointer);
           if (count === Infinity) why = 'the page is too large to prove that name unique';
           else if (count !== 1) why = `${count} elements in the page carry that exact name, hidden ones included`;
         }

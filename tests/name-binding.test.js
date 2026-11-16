@@ -324,7 +324,12 @@ function loadContentScripts() {
     URL,
     Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
     WeakRef,
-    getComputedStyle: (el) => ({ display: el.style.display || 'block', visibility: el.style.visibility || 'visible', opacity: el.style.opacity || '1' }),
+    getComputedStyle: (el) => ({
+      display: el.style.display || 'block',
+      visibility: el.style.visibility || 'visible',
+      opacity: el.style.opacity || '1',
+      cursor: el.style.cursor || 'auto',
+    }),
   };
   win.getComputedStyle = sandbox.getComputedStyle;
   vm.createContext(sandbox);
@@ -679,6 +684,95 @@ test('an ordinal picks by position only within one repeated list', () => {
   assert.equal(mixed.result, null);
   assert.equal(mixed.refused[0].errorCode, 'BIND_AMBIGUOUS');
   assert.match(mixed.refused[0].error, /are not one repeated list/);
+});
+
+// A div made clickable by script alone: no role, handler attribute, tab stop
+// or href, only a pointer cursor.
+function scriptClickable(ctx, text, attrs = {}) {
+  const node = ctx.el('div', attrs, [text]);
+  node.style.cursor = 'pointer';
+  return node;
+}
+
+test('a script-clickable div with a pointer cursor binds for the click verbs', () => {
+  const ctx = loadContentScripts();
+  const follow = scriptClickable(ctx, 'Follow', { class: 'css-1x2y3z' });
+  const replies = scriptClickable(ctx, 'Show 3 replies');
+  ctx.mount(ctx.el('div', {}, [ctx.el('span', {}, ['Ada Lovelace']), follow]), replies);
+
+  // "Follow" can commit, so it binds only as an exact name unique in the page.
+  const bySelector = ctx.execute('click', { selector: 'text=Follow' });
+  assert.equal(bySelector.refused, null, bySelector.refused && bySelector.refused[0].error);
+  assert.equal(bySelector.result.target, follow);
+  assert.equal(bySelector.bound.by, 'exact');
+  assert.equal(follow.clicks, 1);
+
+  const byText = ctx.execute('click', { text: 'follow' });
+  assert.equal(byText.refused, null, byText.refused && byText.refused[0].error);
+  assert.equal(byText.result.target, follow);
+  assert.equal(follow.clicks, 2);
+
+  // A non-commit pointer target also binds by its words.
+  const words = ctx.execute('click', { text: 'show replies' });
+  assert.equal(words.result.target, replies);
+  assert.equal(words.bound.by, 'match');
+
+  // A pointer element nested in another pointer match collapses to the inner one.
+  const ctx2 = loadContentScripts();
+  const label = ctx2.el('span', {}, ['Follow']);
+  label.style.cursor = 'pointer';
+  const outer = ctx2.el('div', {}, [label]);
+  outer.style.cursor = 'pointer';
+  outer.setAttribute('aria-label', 'Follow');
+  ctx2.mount(outer);
+  const nested = ctx2.execute('click', { text: 'Follow' });
+  assert.equal(nested.refused, null, nested.refused && nested.refused[0].error);
+  assert.equal(nested.result.target, label);
+});
+
+test('without a pointer cursor, or for type_text, the same div is not bound', () => {
+  const ctx = loadContentScripts();
+  const plain = ctx.el('div', {}, ['Follow']);
+  ctx.mount(plain);
+  const notClickable = ctx.execute('click', { text: 'Follow' });
+  assert.equal(notClickable.result, null);
+  assert.equal(notClickable.refused[0].errorCode, 'BIND_NOT_FOUND');
+  assert.equal(plain.clicks, 0);
+
+  const ctx2 = loadContentScripts();
+  ctx2.mount(scriptClickable(ctx2, 'Follow'));
+  const typed = ctx2.execute('type', { selector: 'text=Follow', text: 'x' });
+  assert.equal(typed.result, null);
+  assert.equal(typed.refused[0].errorCode, 'BIND_NOT_FOUND');
+  assert.match(typed.refused[0].error, /^No visible, enabled text field is named/);
+  const boxed = ctx2.execute('toggleCheckbox', { selector: 'text=Follow' });
+  assert.equal(boxed.refused[0].errorCode, 'BIND_NOT_FOUND');
+  assert.deepEqual(ctx2.toolCalls, []);
+});
+
+test('a commit-class pointer div needs confirmation unless its name is exact and unique', () => {
+  const ctx = loadContentScripts();
+  const del = scriptClickable(ctx, 'Delete comment');
+  ctx.mount(del);
+  assert.notEqual(ctx.FSB.classifyJevRisk(del, {}), null, 'fixture: the div can commit');
+  const byWords = ctx.execute('click', { text: 'delete' });
+  assert.equal(byWords.result, null);
+  assert.equal(byWords.refused[0].errorCode, 'BIND_NEEDS_CONFIRMATION');
+  assert.match(byWords.refused[0].error, /^text="delete" matched e\d+ div "Delete comment", a control that can commit/);
+  assert.equal(del.clicks, 0);
+
+  const exact = ctx.execute('click', { selector: 'text=Delete comment' });
+  assert.equal(exact.refused, null, exact.refused && exact.refused[0].error);
+  assert.equal(exact.result.target, del);
+
+  // A hidden pointer copy with the same exact name makes it non-unique.
+  const copy = scriptClickable(ctx, 'Delete comment');
+  copy.style.display = 'none';
+  ctx.mount(copy);
+  const twice = ctx.execute('click', { selector: 'text=Delete comment' });
+  assert.equal(twice.refused[0].errorCode, 'BIND_NEEDS_CONFIRMATION');
+  assert.match(twice.refused[0].error, /2 elements in the page carry that exact name/);
+  assert.equal(del.clicks, 1);
 });
 
 test('reads bind any named element, including headings', () => {
