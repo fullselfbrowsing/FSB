@@ -497,6 +497,35 @@
    * @param {number} maxWaitMs - Maximum time to wait for stability (default 300ms)
    * @returns {Promise<Object>} { passed: boolean, reason: string|null, details: object }
    */
+  // A hidden document (any tab that is not the active one in its window) gets
+  // no animation frames and does not run smooth scrolls. Both are needed
+  // before an action on an element outside the viewport, so each has a
+  // fallback: a short timer stands in for the frame, and the scroll is instant.
+  const FRAME_FALLBACK_MS = 100;
+  const HIDDEN_FRAME_MS = 16;
+
+  function documentIsHidden() {
+    return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  }
+
+  /** 'instant' in a hidden document, where a smooth scroll never moves; otherwise 'smooth'. */
+  function scrollBehavior() {
+    return documentIsHidden() ? 'instant' : 'smooth';
+  }
+
+  /** Run callback once: on the next animation frame, or after a short timer when no frame arrives. */
+  function afterNextFrame(callback) {
+    let done = false;
+    const run = () => {
+      if (done) return;
+      done = true;
+      callback();
+    };
+    const hidden = documentIsHidden();
+    if (!hidden && typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    setTimeout(run, hidden ? HIDDEN_FRAME_MS : FRAME_FALLBACK_MS);
+  }
+
   async function checkElementStable(element, maxWaitMs = 300) {
     const startTime = Date.now();
     const TOLERANCE = 1; // 1px tolerance for position comparison
@@ -512,7 +541,7 @@
     // Check position after one frame
     const checkAfterFrame = () => {
       return new Promise(resolve => {
-        requestAnimationFrame(() => {
+        afterNextFrame(() => {
           const newPosition = getPosition();
           const delta = {
             top: Math.abs(newPosition.top - initialPosition.top),
@@ -925,8 +954,8 @@
       };
     }
 
-    // Need to scroll - use smooth scroll to center
-    element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    // Need to scroll to center: smooth when the page is visible, instant when it is hidden
+    element.scrollIntoView({ behavior: scrollBehavior(), block: 'center', inline: 'center' });
 
     // Wait for scroll animation (300ms)
     await new Promise(r => setTimeout(r, 300));
@@ -1393,6 +1422,7 @@
   FSB.checkElementVisibility = checkElementVisibility;
   FSB.checkElementEnabled = checkElementEnabled;
   FSB.checkElementStable = checkElementStable;
+  FSB.scrollBehavior = scrollBehavior;
   FSB.detectCodeEditor = detectCodeEditor;
   FSB.checkElementReceivesEvents = checkElementReceivesEvents;
   FSB.checkElementEditable = checkElementEditable;

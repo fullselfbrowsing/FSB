@@ -123,7 +123,7 @@ async function ensureCoordinatesVisible(docX, docY, width, height) {
     window.scrollTo({
       left: Math.max(0, docX - window.innerWidth / 2 + width / 2),
       top: Math.max(0, docY - window.innerHeight / 2 + height / 2),
-      behavior: 'smooth'
+      behavior: typeof FSB.scrollBehavior === 'function' ? FSB.scrollBehavior() : 'smooth'
     });
 
     // Wait for scroll animation to complete
@@ -2268,7 +2268,10 @@ const tools = {
     const element = FSB.querySelectorWithShadow(selector);
     if (!element) return { success: false, error: `Element not found: ${selector}` };
     const position = params.position || 'center';
-    element.scrollIntoView({ behavior: 'smooth', block: position === 'center' ? 'center' : 'start' });
+    element.scrollIntoView({
+      behavior: typeof FSB.scrollBehavior === 'function' ? FSB.scrollBehavior() : 'smooth',
+      block: position === 'center' ? 'center' : 'start'
+    });
     await waitForStability('scroll');
     const rect = element.getBoundingClientRect();
     const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight;
