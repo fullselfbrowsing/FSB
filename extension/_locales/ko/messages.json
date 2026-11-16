@@ -2231,7 +2231,7 @@
     "message": "LM Studio 서버 URL"
   },
   "entry_cue_begin": {
-    "message": "스크롤하여 시작"
+    "message": "시작"
   },
   "entry_nudge_path": {
     "message": "계속하려면 경로를 선택하세요"
@@ -2243,13 +2243,21 @@
     "message": "LM Studio를 실행하거나 MCP로 건너뛰세요"
   },
   "entry_stage_aria": {
-    "message": "FSB 시작 설정. 스크롤, 스와이프 또는 화살표 키로 단계 사이를 이동하세요."
+    "message": "FSB 시작 설정. 스와이프 또는 화살표 키로 단계 사이를 이동하세요."
   },
   "entry_rail_aria": {
     "message": "시작 설정 단계"
   },
   "entry_rail_back": {
     "message": "$STEP$(으)로 돌아가기",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "$STEP$(으)로 이동",
     "placeholders": {
       "step": {
         "content": "$1"

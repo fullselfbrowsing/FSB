@@ -2231,7 +2231,7 @@
     "message": "LM Studio server URL"
   },
   "entry_cue_begin": {
-    "message": "Scroll to begin"
+    "message": "Begin"
   },
   "entry_nudge_path": {
     "message": "Pick a path to continue"
@@ -2243,13 +2243,21 @@
     "message": "Start LM Studio, or skip to MCP"
   },
   "entry_stage_aria": {
-    "message": "FSB onboarding. Scroll, swipe or use the arrow keys to move between steps."
+    "message": "FSB onboarding. Swipe or use the arrow keys to move between steps."
   },
   "entry_rail_aria": {
     "message": "Onboarding steps"
   },
   "entry_rail_back": {
     "message": "Back to $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "Go to $STEP$",
     "placeholders": {
       "step": {
         "content": "$1"

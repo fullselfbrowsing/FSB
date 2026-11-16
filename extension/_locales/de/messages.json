@@ -2231,7 +2231,7 @@
     "message": "Server-URL von LM Studio"
   },
   "entry_cue_begin": {
-    "message": "Scrolle, um zu beginnen"
+    "message": "Beginnen"
   },
   "entry_nudge_path": {
     "message": "Wähle einen Weg, um fortzufahren"
@@ -2243,13 +2243,21 @@
     "message": "Starte LM Studio oder spring zu MCP"
   },
   "entry_stage_aria": {
-    "message": "FSB-Ersteinrichtung. Scrolle, wische oder nutze die Pfeiltasten, um zwischen den Schritten zu wechseln."
+    "message": "FSB-Ersteinrichtung. Wische oder nutze die Pfeiltasten, um zwischen den Schritten zu wechseln."
   },
   "entry_rail_aria": {
     "message": "Schritte der Ersteinrichtung"
   },
   "entry_rail_back": {
     "message": "Zurück zu $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "Weiter zu $STEP$",
     "placeholders": {
       "step": {
         "content": "$1"

@@ -301,15 +301,32 @@
     }
   }
 
-  // Whether a scroll, swipe or arrow key may move on from this step.
+  // A step that cannot be left going forward until it is answered.
+  function stepNeedsAnswer(step) {
+    if (step === 'path') return !state.path;
+    if (step === 'apikey') return state.keyStatus !== 'valid';
+    return false;
+  }
+
+  // Whether a swipe, an arrow key or Next may move on from this step.
   function canStep(dir) {
     const r = route();
     const index = r.indexOf(state.screen);
     if (dir < 0) return stepBefore(r, index) !== null;
     if (index < 0 || index >= r.length - 1) return false;
-    if (state.screen === 'path') return !!state.path;
-    if (state.screen === 'apikey') return state.keyStatus === 'valid';
-    return true;
+    return !stepNeedsAnswer(state.screen);
+  }
+
+  // The later steps a rail press may jump to: on along the route, up to the first
+  // step that still needs an answer, as Next and the arrow keys would go.
+  function reachableAhead(r, index) {
+    const ahead = new Set();
+    if (index < 0) return ahead;
+    for (let i = index; i < r.length - 1; i++) {
+      if (stepNeedsAnswer(r[i])) break;
+      if (STEPS.includes(r[i + 1])) ahead.add(r[i + 1]);
+    }
+    return ahead;
   }
 
   function stepBy(dir) {
@@ -401,19 +418,24 @@
     if (els.cue) els.cue.classList.toggle('is-nudge', !!state.nudge);
     if (els.cueText) {
       els.cueText.textContent = state.nudge
-        || (state.screen === 'welcome' ? ob('entry_cue_begin', 'Scroll to begin') : stepLabel(state.screen));
+        || (state.screen === 'welcome' ? ob('entry_cue_begin', 'Begin') : stepLabel(state.screen));
     }
+    const ahead = reachableAhead(r, r.indexOf(state.screen));
     const html = r.map((step, index) => {
       const done = index < currentIndex;
       const current = index === currentIndex;
-      const reachable = done && STEPS.includes(step);
+      const back = done && STEPS.includes(step);
+      const forward = !done && !current && ahead.has(step);
+      const reachable = back || forward;
       const label = stepLabel(step);
       const cls = done ? ' is-done' : current ? ' is-active' : '';
-      const aria = reachable
+      const aria = back
         ? ob('entry_rail_back', 'Back to $STEP$', { step: label })
-        : current
-          ? ob('entry_rail_current', '$STEP$, current step', { step: label })
-          : done ? label : ob('entry_rail_ahead', '$STEP$, not reached yet', { step: label });
+        : forward
+          ? ob('entry_rail_go', 'Go to $STEP$', { step: label })
+          : current
+            ? ob('entry_rail_current', '$STEP$, current step', { step: label })
+            : done ? label : ob('entry_rail_ahead', '$STEP$, not reached yet', { step: label });
       return `<button class="fsb-depth-go${cls}" type="button" data-step="${escapeAttr(step)}" aria-label="${escapeAttr(aria)}"${current ? ' aria-current="step"' : ''}${reachable ? '' : ' disabled'}><span class="fsb-depth-lbl">${escapeHtml(label)}</span><span class="fsb-depth-tick" aria-hidden="true"></span></button>`;
     }).join('');
     if (html !== railHtml) {
@@ -1067,6 +1089,10 @@
     if (!STEPS.includes(step) || step === state.screen) return;
     state.screen = step;
     state.nudge = '';
+    // A rail jump to the end finishes onboarding exactly as Next does.
+    if (step === 'done') {
+      finishOnboarding({ skipped: false, path: state.path }, { renderDone: false });
+    }
     render();
   }
 
