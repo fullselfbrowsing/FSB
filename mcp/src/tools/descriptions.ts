@@ -36,7 +36,7 @@ export const MCP_COMMON_PARAM_DESCRIPTIONS: TextTable = Object.freeze({
 // registry entry has _emitChangeReport === true. The extension leaves out a
 // change_report that records nothing, so its absence means nothing changed.
 export const MCP_CHANGE_REPORT_SENTENCE =
-  'Returns change_report (what changed) unless nothing changed; if the outcome is unknown, inspect the page before retrying.';
+  'Returns change_report (what changed) unless nothing changed, plus view (page refs) on a URL change or dialog; if the outcome is unknown, inspect the page before retrying.';
 
 // The description of the optional `expect` parameter (published by plan 69-06).
 export const MCP_EXPECT_DESCRIPTION =
@@ -46,8 +46,8 @@ export const MCP_EXPECT_DESCRIPTION =
 export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   // --- registry action tools (registerManualTools, Phase 69 plan 02) ---
   execute_js: 'Execute JavaScript in the page as a function body; use return to send a value back (stringified; a returned Promise is awaited for up to 10 s). Try it first for DOM reads, clicks and scrolls: it avoids overlay, viewport and CDP timeout issues. Verify a JS click with read_page. Fall back to native tools when a JS click changes nothing (click), for typing into controlled inputs (type_text), for real drags (drag_drop or drag), and for submits that need validated input (click the submit button).',
-  navigate: 'Navigate the tab to a URL; returns the final URL after redirects.',
-  search: 'Search the current site with its own search box, found automatically; falls back to Google when the site has none. Read results with read_page.',
+  navigate: 'Navigate the tab to a URL; returns the final URL after redirects and a compact view of the page with element refs, so you can act without reading it first (on view_pending, read it).',
+  search: 'Search the current site with its own search box, found automatically; falls back to Google when the site has none. Returns a compact view of the results page with element refs; use read_page for full text.',
   go_back: 'Go back one page in browser history; returns the new URL.',
   go_forward: 'Go forward one page in browser history; returns the new URL.',
   refresh: 'Refresh (reload) the current page; returns its URL.',
@@ -69,7 +69,7 @@ export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   scroll_to_top: 'Scroll to the top of the page.',
   scroll_to_bottom: 'Scroll to the bottom of the page, for example to load lazy content.',
   scroll_to_element: 'Scroll an element into view; returns its position.',
-  open_tab: 'Open a URL in a new tab; returns the tab ID. The tab opens in the background unless active is true.',
+  open_tab: 'Open a URL in a new tab; returns the tab ID and a compact view of the page with element refs. The tab opens in the background unless active is true.',
   switch_tab: 'Switch to a tab this agent owns, by tab ID from list_tabs. The foreground tab does not change unless active is true.',
   close_tab: 'Close a tab this agent owns without changing the foreground tab. It refuses to close the active tab unless allow_active is true; set that only when the user asks to close the active tab.',
   fill_sheet: 'Fill Google Sheets cells with CSV data, starting at a given cell. Open the sheet first; large fills can take minutes.',
