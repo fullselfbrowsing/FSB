@@ -2343,14 +2343,23 @@ check('armed: an element outside the menu reports handle null with resolved true
   assert.equal(message.resolved, true);
 });
 
-check('armed: a text-based click (no selector) and a selector that resolves nothing report resolved false', () => {
-  captureFixture();
+check('armed: a text-based click is observed through the ref its name bound to; a selector that resolves nothing reports resolved false', () => {
+  const f = captureFixture();
   let events = [];
   let sent = runtimeSpy(events);
-  runThroughGuard({ action: 'executeAction', tool: 'click', params: { text: 'Next' } }, messagingHarness(), events);
+  // The name binder turns click text into a ref before the tool runs.
+  const resolveBound = (ref) => {
+    const entry = F.refMap.resolve(ref);
+    return entry && entry.stale === false ? entry.element : null;
+  };
+  F.querySelectorWithShadow = (selector) => (/^e\d+$/.test(selector) ? resolveBound(selector) : null);
+  const params = { text: 'Next' };
+  runThroughGuard({ action: 'executeAction', tool: 'click', params }, messagingHarness({ fsb: { resolveRef: resolveBound } }), events);
+  assert.equal(params.text, undefined, 'the text target was bound before the tool');
+  assert.match(params.selector, /^e\d+$/);
   let message = observation(sent);
-  assert.equal(message.handle, null);
-  assert.equal(message.resolved, false);
+  assert.equal(message.handle, entryOf(f.menu, 'Next').handle);
+  assert.equal(message.resolved, true);
   captureFixture();
   events = [];
   sent = runtimeSpy(events);

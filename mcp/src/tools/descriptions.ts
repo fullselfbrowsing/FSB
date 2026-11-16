@@ -51,8 +51,8 @@ export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   go_back: 'Go back one page in browser history; returns the new URL.',
   go_forward: 'Go forward one page in browser history; returns the new URL.',
   refresh: 'Refresh (reload) the current page; returns its URL.',
-  click: 'Click an element by CSS selector, element ref (e5) from get_dom_snapshot, or visible text. Custom (non-native) dropdowns take two clicks: open the control, then click the option; select_option is for native <select> only. For canvas or overlay targets, use click_at.',
-  type_text: 'Type text into an editable field by selector or ref. Replaces existing text by default (clear_first false appends); in Google Docs it inserts at the cursor unless clear_first is true. Returns the rendered text.',
+  click: 'Click an element by CSS selector, element ref (e5) from get_dom_snapshot, or visible name (selector text=Save, no snapshot needed). Custom (non-native) dropdowns take two clicks: open the control, then click the option; select_option is for native <select> only. For canvas or overlay targets, use click_at.',
+  type_text: 'Type text into an editable field by selector, ref or text=<field label>. Replaces existing text by default (clear_first false appends); in Google Docs it inserts at the cursor unless clear_first is true. Returns the rendered text.',
   press_enter: 'Press Enter to submit a form or confirm input; falls back to clicking the submit button if Enter has no effect.',
   press_key: 'Press a keyboard key, optionally with ctrl, shift or alt, for shortcuts and special keys such as Escape, Tab or ArrowDown.',
   select_option: 'Select an option in a native <select> dropdown by value or visible text. Native <select> only: for custom (div-based) dropdowns use two clicks, first on the control and then on the option. If no error is returned but the value does not change, it is a custom dropdown.',
@@ -143,21 +143,36 @@ export const MCP_PARAM_DESCRIPTIONS: Readonly<Record<string, TextTable>> = Objec
     code: 'JavaScript function body; use return to send a value back.',
   }),
   click: Object.freeze({
-    selector: 'CSS selector or element ref (e5) from get_dom_snapshot.',
-    text: 'Visible text to click instead of a selector; first visible case-insensitive match.',
+    selector: 'CSS selector, element ref (e5) from get_dom_snapshot, or text=<visible name>.',
+    text: 'Visible name to click instead of a selector, as selector text=<name>. Several matches return candidate refs and click nothing.',
   }),
   type_text: Object.freeze({
-    selector: 'CSS selector or element ref of the field.',
+    selector: 'CSS selector, element ref, or text=<field label> of the field.',
     clear_first: 'Replace existing text; default true, but false in Google Docs (inserts at the cursor). False appends.',
   }),
   select_option: Object.freeze({
-    selector: 'CSS selector or element ref of the <select>.',
+    selector: 'CSS selector, element ref, or text=<label> of the <select>.',
     value: 'Option value or visible text.',
   }),
   select_text_range: Object.freeze({
-    selector: 'CSS selector or element ref of the container.',
+    selector: 'CSS selector, element ref, or text=<visible name> of the container.',
     startOffset: "Start offset in the element's text (0-based).",
     endOffset: 'End offset (exclusive).',
+  }),
+  press_enter: Object.freeze({
+    selector: 'Optional CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  check_box: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name> of the checkbox.',
+  }),
+  hover: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  right_click: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  double_click: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
   }),
   drag_drop: Object.freeze({
     sourceSelector: 'Selector or ref of the element to drag.',
@@ -169,6 +184,18 @@ export const MCP_PARAM_DESCRIPTIONS: Readonly<Record<string, TextTable>> = Objec
     selector: 'CSS selector of the dropzone.',
     fileName: 'File name, such as photo.jpg.',
     mimeType: 'MIME type, such as text/plain or image/png.',
+  }),
+  focus: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  clear_input: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<field label>.',
+  }),
+  scroll_to_element: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  set_attribute: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
   }),
   open_tab: Object.freeze({
     active: 'True foregrounds the new tab (steals focus); default false opens it in the background.',
@@ -207,10 +234,10 @@ export const MCP_PARAM_DESCRIPTIONS: Readonly<Record<string, TextTable>> = Objec
 
   // --- registry read-only tools ---
   get_text: Object.freeze({
-    selector: 'CSS selector or element ref (e3) from get_dom_snapshot.',
+    selector: 'CSS selector, element ref (e3) from get_dom_snapshot, or text=<visible name>.',
   }),
   get_attribute: Object.freeze({
-    selector: 'CSS selector or element ref (e7) from get_dom_snapshot.',
+    selector: 'CSS selector, element ref (e7) from get_dom_snapshot, or text=<visible name>.',
     attribute: 'Attribute name, such as href, src or value.',
   }),
   complete_task: Object.freeze({

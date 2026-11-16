@@ -57,6 +57,9 @@ const LAYER_LABELS = {
   visualSession: 'Visual session contract',
   sessionLookup: 'Session lookup',
   settings: 'Settings',
+  nameAmbiguous: 'Target name matched more than one element',
+  nameNotFound: 'Target name matched no element',
+  nameNeedsConfirmation: 'Target name matched a control that can commit',
 } as const;
 
 // Phase 66.1: the extension writes every SETTING_ sentence, Allowed clause and
@@ -89,6 +92,11 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'PAGE_UNRESPONSIVE',
   'ACTION_RESPONSE_TIMEOUT',
   'TAB_NOT_FOREGROUND',
+  // A selector text=<name> (or click text) that did not bind to one element.
+  // The extension writes the candidate refs into the error text.
+  'BIND_AMBIGUOUS',
+  'BIND_NOT_FOUND',
+  'BIND_NEEDS_CONFIRMATION',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -336,6 +344,24 @@ function buildLayeredDetail(
         detected: LAYER_LABELS.pageResponsiveness,
         why: 'The current page did not respond before the page-read deadline.',
         nextAction: 'Use navigate or close_tab to recover the tab. Inspect page state before repeating any mutation.',
+      };
+    case 'BIND_AMBIGUOUS':
+      return {
+        detected: LAYER_LABELS.nameAmbiguous,
+        why: errorMsg || 'The text= name matched more than one element, so nothing was executed.',
+        nextAction: 'Nothing was executed. Retry with one of the listed refs as the selector, or with a more specific text= name.',
+      };
+    case 'BIND_NOT_FOUND':
+      return {
+        detected: LAYER_LABELS.nameNotFound,
+        why: errorMsg || 'No visible element fitting this tool has that name, so nothing was executed.',
+        nextAction: 'Nothing was executed. Retry with one of the listed refs if one fits; otherwise take get_page_snapshot to find the element (scroll first if it may be off screen).',
+      };
+    case 'BIND_NEEDS_CONFIRMATION':
+      return {
+        detected: LAYER_LABELS.nameNeedsConfirmation,
+        why: errorMsg || 'The name matched a control that can commit without an exact name unique on the page, so nothing was executed.',
+        nextAction: 'Nothing was executed. If the listed element is the one you mean, retry with its ref as the selector.',
       };
     case 'TAB_NOT_FOREGROUND':
       return {

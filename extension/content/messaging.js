@@ -1062,6 +1062,51 @@
             FSB.elementCache.set(params.selector, jevVerdict.element);
           }
 
+          // NAME BINDING
+          // A selector "text=<visible name>", or click's text parameter (which
+          // keeps its precedence over a selector), names the target. It binds
+          // in code to exactly one element and then runs exactly as if that
+          // element's ref had been passed. When it cannot bind, the reply lists
+          // candidate refs and nothing runs.
+          let nameBinding = null;
+          if (params && params.jevHandle === undefined && typeof FSB.bindTargetByName === 'function') {
+            const selectorName = typeof FSB.parseNameSelector === 'function' ? FSB.parseNameSelector(params.selector) : null;
+            const nameTarget = selectorName !== null
+              ? selectorName
+              : (tool === 'click' && typeof params.text === 'string' && params.text.trim() ? params.text : null);
+            if (nameTarget !== null) {
+              let bindVerdict;
+              try {
+                bindVerdict = FSB.bindTargetByName(nameTarget, tool);
+              } catch (bindError) {
+                bindVerdict = { ok: false, errorCode: 'BIND_NOT_FOUND', candidateCount: 0,
+                  error: `The name target could not be bound (${bindError && bindError.message ? bindError.message : 'error'}), so nothing was executed.` };
+              }
+              if (bindVerdict && bindVerdict.ok === true) {
+                delete params.selector;
+                delete params.selectors;
+                if (tool === 'click') delete params.text;
+                params.ref = bindVerdict.ref;
+                nameBinding = bindVerdict.bound;
+              } else if (bindVerdict) {
+                logger.warn('Name target not bound', { sessionId: FSB.sessionId, tool, errorCode: bindVerdict.errorCode });
+                if (isManualMCP) {
+                  try { FSB.viewportGlow.destroy(); } catch (e) { /* non-blocking */ }
+                }
+                sendResponse({
+                  success: false,
+                  errorCode: bindVerdict.errorCode,
+                  error: bindVerdict.error,
+                  tool,
+                  outcome: 'failed',
+                  mayHaveExecuted: false,
+                  candidateCount: bindVerdict.candidateCount
+                });
+                return;
+              }
+            }
+          }
+
           // Snapshot refs ("e12") reach here as `selector`: tool-calling models
           // and MCP clients only have a selector parameter. No page element is
           // named e12, so querying it as CSS can only fail; resolve it as a ref.
@@ -1163,6 +1208,8 @@
                 try { FSB.progressOverlay.noteAction(false); } catch (e) { /* non-blocking */ }
               }
               logger.logTiming(FSB.sessionId, 'ACTION', tool, Date.now() - execStart, { success: result?.success });
+              // A name target reports the element it was bound to.
+              if (nameBinding && result && typeof result === 'object') result = { ...result, bound: nameBinding };
 
               // Invalidate cached element indexes
               FSB.invalidateElementIndexes();

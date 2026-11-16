@@ -2297,75 +2297,25 @@ const tools = {
     let element = null;
     let selectorUsed = null;
 
-    // TEXT-BASED TARGETING (D-03, D-04, D-05)
-    // When params.text is provided, find element by visible text content.
-    // This handles dynamic apps (LinkedIn/Ember, Facebook/React) where IDs
-    // regenerate and CSS classes are shared across list items.
+    // TEXT-BASED TARGETING
+    // A text target goes through the same name binder as selector text=:
+    // exactly one element, addressed by its ref from here on, or a refusal
+    // that lists candidate refs with nothing clicked. executeAction binds the
+    // text before this tool runs; this covers direct calls.
     if (params.text && typeof params.text === 'string') {
-      const searchText = params.text.toLowerCase();
-      const candidates = [];
-
-      // Use TreeWalker for efficient traversal of all elements
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_ELEMENT,
-        {
-          acceptNode: (node) => {
-            // Skip invisible containers early
-            const style = window.getComputedStyle(node);
-            if (style.display === 'none' || style.visibility === 'hidden') {
-              return NodeFilter.FILTER_REJECT; // Skip node and its children
-            }
-            // Check if this element's own text content matches
-            // Use innerText (rendered text only) for accuracy
-            const nodeText = (node.innerText || node.textContent || '').toLowerCase();
-            if (nodeText.includes(searchText)) {
-              return NodeFilter.FILTER_ACCEPT;
-            }
-            return NodeFilter.FILTER_SKIP; // Skip node but check children
-          }
-        }
-      );
-
-      let node;
-      while ((node = walker.nextNode())) {
-        candidates.push(node);
+      let verdict = null;
+      try {
+        verdict = typeof FSB.bindTargetByName === 'function' ? FSB.bindTargetByName(params.text, 'click') : null;
+      } catch (_bindError) {
+        verdict = null;
       }
-
-      // Find the most specific match: prefer the deepest (most nested) element
-      // whose text matches, as it is closest to the actual text content.
-      // Filter for visibility: non-zero dimensions.
-      let textMatchElement = null;
-      for (let i = candidates.length - 1; i >= 0; i--) {
-        const el = candidates[i];
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          textMatchElement = el;
-          break;
-        }
-      }
-
-      // D-05: If no "deepest visible" found, fall back to first visible match
-      if (!textMatchElement) {
-        for (const el of candidates) {
-          const rect = el.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            textMatchElement = el;
-            break;
-          }
-        }
-      }
-
-      if (textMatchElement) {
-        // Found element by text -- skip the selector cascade and proceed
-        // directly to the readiness/click logic below.
-        element = textMatchElement;
-        selectorUsed = `[text-match: "${params.text}"]`;
-        // Cache element for potential re-use
-        const textSelector = `[text-match-${Date.now()}]`;
-        FSB.elementCache?.set(textSelector, element);
+      if (verdict && verdict.ok === true) {
+        element = verdict.element;
+        selectorUsed = verdict.ref;
       } else {
-        // No visible element matches the text
+        const error = verdict && verdict.error
+          ? verdict.error
+          : `text="${params.text}" could not be bound to one element, so nothing was executed.`;
         actionRecorder.record(null, 'click', params, {
           selectorTried: `text:"${params.text}"`,
           selectorUsed: null,
@@ -2374,15 +2324,17 @@ const tools = {
           coordinatesUsed: null,
           coordinateSource: null,
           success: false,
-          error: `No visible element found containing text "${params.text}"`,
+          error,
           duration: Date.now() - startTime
         });
         return {
           success: false,
-          error: `No visible element found containing text "${params.text}". ${candidates.length} hidden/zero-dimension elements matched. Try scrolling the page or using a CSS selector instead.`,
+          errorCode: (verdict && verdict.errorCode) || 'BIND_NOT_FOUND',
+          error,
           tool: 'click',
-          textSearched: params.text,
-          hiddenMatches: candidates.length
+          outcome: 'failed',
+          mayHaveExecuted: false,
+          textSearched: params.text
         };
       }
     }
@@ -2469,8 +2421,7 @@ const tools = {
             if (!element.isConnected) {
               return buildFailureReport('click', selectorUsed, null, 'Element no longer in DOM');
             }
-            if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
-                FSB.querySelectorWithShadow(selectorUsed) !== element) {
+            if (selectorUsed && FSB.querySelectorWithShadow(selectorUsed) !== element) {
               return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
             }
             // The service worker may skip its own settle wait only for a control the
@@ -2532,12 +2483,8 @@ const tools = {
       if (!element.isConnected) {
         return buildFailureReport('click', params.selector, null, 'Element no longer in DOM');
       }
-      if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
-          FSB.querySelectorWithShadow(selectorUsed) !== element) {
+      if (selectorUsed && FSB.querySelectorWithShadow(selectorUsed) !== element) {
         return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
-      }
-      if (params.text && !(element.innerText || element.textContent || '').toLowerCase().includes(params.text.toLowerCase())) {
-        return buildFailureReport('click', params.text, null, 'Text target changed before click');
       }
 
       // FIX: Handle target="_blank" links that would open in a new tab
