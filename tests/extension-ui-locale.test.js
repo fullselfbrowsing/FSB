@@ -2692,6 +2692,47 @@ async function asyncChecks() {
   hostPage.fsbUiLocale.refresh();
   check(hostPage.document.documentElement.getAttribute('lang') === 'fr', 'content scripts leave the host page <html lang> alone');
 
+  // Safari serves extension pages from safari-web-extension:, not from
+  // chrome-extension:. They are extension pages all the same. Taken for a
+  // content script, a page kept its own markup in the old language after the
+  // picker changed it, never set <html lang>, and loaded three catalogs
+  // instead of all of them.
+  for (const protocol of ['safari-web-extension:', 'moz-extension:']) {
+    const message = (folder) => JSON.parse(fs.readFileSync(
+      path.join(root, 'extension/_locales', folder, 'messages.json'), 'utf8')).lang_follow_browser.message;
+    const label = fakeNode({ 'data-i18n': 'lang_follow_browser' }, message('en'));
+    const requested = [];
+    const document = Object.assign(fakeDoc([label]), { documentElement: fakeNode({ lang: 'en' }, '') });
+    const page = freshLocale({
+      location: { protocol },
+      document,
+      chrome: {
+        i18n: { getUILanguage: () => 'en-US', getMessage: () => '' },
+        storage: {
+          local: { get: (_key, cb) => cb({}), set: (_payload, cb) => cb(), remove: (_key, cb) => cb() },
+          onChanged: { addListener() {} }
+        },
+        runtime: { getURL: (file) => file }
+      },
+      fetch: (url) => {
+        requested.push(url);
+        return Promise.resolve({ json: () => JSON.parse(fs.readFileSync(path.join(root, 'extension', url), 'utf8')) });
+      }
+    });
+    await page.fsbUiLocale.boot();
+    check(requested.length === page.fsbUiLocale.PUBLIC_LOCALES.length,
+      `a ${protocol} page loads every catalog, like a chrome-extension: page`);
+    await page.fsbUiLocale.saveOverride('de');
+    check(message('de') !== message('en') && label.textContent === message('de'),
+      `picking a language re-translates the markup of a ${protocol} page`);
+    check(document.documentElement.getAttribute('lang') === 'de', `and sets <html lang> on a ${protocol} page`);
+    await page.fsbUiLocale.saveOverride('ja');
+    check(label.textContent === message('ja'), `and again from a language other than English on a ${protocol} page`);
+    await page.fsbUiLocale.saveOverride('');
+    check(label.textContent === message('en') && document.documentElement.getAttribute('lang') === 'en',
+      `and back to the browser's language on a ${protocol} page`);
+  }
+
   // The login prompt, payment prompt and history rows are built as HTML strings.
   // spHtml() and spAttr() keep a key on each piece of FSB copy, so a language
   // change rewrites what is on screen instead of leaving the old language.
