@@ -19844,6 +19844,39 @@ function fsbDisabledTargetProbe(x, y) {
 }
 
 /**
+ * Page-side probe for cdpScrollAt: where the page and the scroll container
+ * under (x, y) currently sit, plus the URL, where map apps keep their zoom
+ * level. Stuck detection compares one scroll_at call's position with the
+ * next, so a wheel tick that moved something reads as a new action and a tick
+ * that moved nothing reads as a repeat. Serialized via toString() and run
+ * with Runtime.evaluate, so it must stay self-contained (no closures).
+ * @returns {{url: string, scrollX: number, scrollY: number, containerTop: number|null, containerLeft: number|null}}
+ */
+function fsbWheelPositionProbe(x, y) {
+  var el = document.elementFromPoint(x, y);
+  while (el && el.shadowRoot && typeof el.shadowRoot.elementFromPoint === 'function') {
+    var inner = el.shadowRoot.elementFromPoint(x, y);
+    if (!inner || inner === el) break;
+    el = inner;
+  }
+  var container = null;
+  for (var node = el; node && !container; node = node.parentNode || node.host || null) {
+    // The window's own scroll position covers <html> and <body>.
+    if (node.nodeType !== 1 || node === document.documentElement || node === document.body) continue;
+    if (node.scrollHeight <= node.clientHeight && node.scrollWidth <= node.clientWidth) continue;
+    var style = getComputedStyle(node);
+    if (/auto|scroll|overlay/.test(style.overflowY + ' ' + style.overflowX)) container = node;
+  }
+  return {
+    url: location.href,
+    scrollX: Math.round(window.scrollX),
+    scrollY: Math.round(window.scrollY),
+    containerTop: container ? Math.round(container.scrollTop) : null,
+    containerLeft: container ? Math.round(container.scrollLeft) : null
+  };
+}
+
+/**
  * Direct CDP tool dispatcher for tool-executor.js CDP routing.
  *
  * Called from agent-loop.js via the cdpHandler wrapper:
@@ -20147,11 +20180,31 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           type: 'mouseWheel', x, y, deltaX, deltaY
         });
 
+        // The scroll_at tool asks where the tick left the view, so stuck
+        // detection can tell a tick that moved something from one that did
+        // not. Read right away: the scroll may still be animating, but each
+        // call sees at least the previous tick's result, and that call-to-call
+        // change is all the comparison needs. Remote control does not ask, so
+        // its wheel events stay one round trip. A failed probe only drops the
+        // position.
+        let position = null;
+        if (params && params.reportPosition === true) {
+          try {
+            const positionEval = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+              expression: '(' + fsbWheelPositionProbe.toString() + ')(' + JSON.stringify(x) + ',' + JSON.stringify(y) + ')',
+              returnByValue: true
+            });
+            position = positionEval && positionEval.result ? (positionEval.result.value || null) : null;
+          } catch (_positionErr) { position = null; }
+        }
+
         await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpScrollAt', 'complete', { success: true, tabId, x, y, deltaX, deltaY });
-        return { success: true, method: 'cdp_direct', x, y, deltaX, deltaY };
+        const scrollResult = { success: true, method: 'cdp_direct', x, y, deltaX, deltaY };
+        if (position) scrollResult.position = position;
+        return scrollResult;
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpScrollAt', 'complete', { success: false, tabId, error: error.message });
         return cdpFailureResult(error);

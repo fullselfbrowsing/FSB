@@ -211,3 +211,49 @@ test('#156 execute_js leaves page code it runs indirectly unchecked', { skip: !c
   assert.equal(accepted.blocked, undefined, JSON.stringify(accepted));
   assert.equal(accepted.result, 'false', 'the custom element enabled Continue');
 });
+
+// Brace-matched source of a top-level function, so the probe runs exactly as
+// cdpScrollAt serializes it.
+function sliceFunction(source, signature) {
+  const start = source.indexOf(signature);
+  assert.ok(start >= 0, 'missing ' + signature);
+  let depth = 0;
+  for (let i = source.indexOf('{', start); i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+  }
+  throw new Error('unterminated ' + signature);
+}
+
+test('#157 the scroll_at position probe reads the scroll container under the pointer', { skip: !chrome }, async () => {
+  const background = readFileSync(new URL('../extension/background.js', import.meta.url), 'utf8');
+  const probe = sliceFunction(background, 'function fsbWheelPositionProbe(');
+  const probeAt = (x, y) => evaluate(`(${probe})(${x}, ${y})`);
+
+  await evaluate(`(() => {
+    const fixed = 'position:fixed;z-index:2147483647;width:200px;height:100px;';
+    const list = document.createElement('div');
+    list.id = 'probe-list';
+    list.style.cssText = fixed + 'left:0;top:0;overflow:auto';
+    list.innerHTML = '<div style="height:1000px">rows</div>';
+    const host = document.createElement('div');
+    host.id = 'probe-host';
+    host.style.cssText = fixed + 'left:0;top:120px';
+    host.attachShadow({ mode: 'open' }).innerHTML =
+      '<div id="inner" style="width:200px;height:100px;overflow-y:scroll"><p style="height:800px;margin:0">rows</p></div>';
+    const plain = document.createElement('div');
+    plain.style.cssText = fixed + 'left:0;top:240px';
+    document.body.append(list, host, plain);
+  })()`);
+
+  const before = await probeAt(100, 50);
+  assert.equal(before.containerTop, 0);
+  assert.equal(before.url, await evaluate('location.href'));
+  await evaluate(`document.querySelector('#probe-list').scrollTop = 250`);
+  assert.equal((await probeAt(100, 50)).containerTop, 250, 'a moved list reads as a new position');
+
+  await evaluate(`document.querySelector('#probe-host').shadowRoot.querySelector('#inner').scrollTop = 90`);
+  assert.equal((await probeAt(100, 170)).containerTop, 90, 'the probe reaches a list inside a shadow root');
+
+  assert.equal((await probeAt(100, 290)).containerTop, null, 'no scroll container under a plain element');
+});

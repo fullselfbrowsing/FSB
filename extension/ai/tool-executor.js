@@ -461,7 +461,12 @@ async function executeCdpTool(tool, params, tabId, cdpHandler) {
   }
 
   try {
-    const response = await cdpHandler(tool._cdpVerb, params, tabId);
+    // scroll_at asks where the wheel tick left the view; stuck detection uses
+    // it to tell a tick that moved something from one that did not.
+    const cdpParams = tool._cdpVerb === 'cdpScrollAt'
+      ? Object.assign({}, params, { reportPosition: true })
+      : params;
+    const response = await cdpHandler(tool._cdpVerb, cdpParams, tabId);
     const success = response && response.success !== false;
     // Mirror executeContentTool: read-only CDP tools must not claim hadEffect.
     const hadEffect = success && tool._readOnly !== true;

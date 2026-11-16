@@ -212,20 +212,58 @@ function _extractMetaTargetKey(call) {
   return null;
 }
 
-// Arguments that tell two calls of the same tool apart, for detectStuck's
-// repetition check. Only these count: every action tool also takes free-text
-// fields such as visual_reason, which differ on each call and would hide a
-// real loop.
-var _STUCK_FINGERPRINT_ARGS = [
-  'url', 'query', 'text', 'value', 'key', 'direction', 'amount',
-  'x', 'y', 'deltaX', 'deltaY', 'startX', 'startY', 'endX', 'endY',
-  'sourceSelector', 'targetSelector', 'attribute', 'tabId'
-];
+// Arguments that describe a call rather than the action it performs. Every
+// action tool takes the overlay fields (visual_reason, client, is_final), and
+// their text differs on each call, which would hide a real loop. tab_id only
+// routes the call to a tab.
+var _STUCK_IGNORED_ARGS = { visual_reason: true, client: true, is_final: true, tab_id: true };
+// Arguments that already name the element, reported as the target itself.
+var _STUCK_TARGET_ARGS = { selector: true, elementId: true, element_id: true, code: true };
+// Tool name -> sorted names of the arguments that tell two of its calls apart.
+var _stuckArgNamesByTool = null;
+
+function _stuckIsIdentifyingArg(name) {
+  return !_STUCK_IGNORED_ARGS[name] && !_STUCK_TARGET_ARGS[name];
+}
+
+/**
+ * The arguments that tell two calls of one tool apart, taken from the tool's
+ * own input schema so every argument it declares counts (a fill_sheet start
+ * cell, an upload's file path, a key's modifiers) without a list to keep in
+ * step with the tools.
+ *
+ * @param {string} toolName
+ * @param {Object} args - The call's arguments, used when the tool is unknown
+ * @returns {string[]}
+ */
+function _stuckIdentifyingArgs(toolName, args) {
+  if (!_stuckArgNamesByTool) {
+    _stuckArgNamesByTool = {};
+    for (var i = 0; i < _al_TOOL_REGISTRY.length; i++) {
+      var def = _al_TOOL_REGISTRY[i];
+      var props = def && def.inputSchema && def.inputSchema.properties;
+      if (!def || !def.name || !props) continue;
+      _stuckArgNamesByTool[def.name] = Object.keys(props).filter(_stuckIsIdentifyingArg).sort();
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(_stuckArgNamesByTool, toolName)) {
+    return _stuckArgNamesByTool[toolName];
+  }
+  // A tool outside the registry: count every argument it was given. Missing a
+  // loop here still leaves goal progress and the iteration cap to stop it;
+  // stopping a session that is making progress cannot be undone.
+  return Object.keys(args).filter(_stuckIsIdentifyingArg).sort();
+}
 
 // Short values verbatim; long ones keep a readable prefix plus a hash of the
 // whole value, so two values that differ late still differ.
 function _stuckFingerprintValue(value) {
-  var str = String(value);
+  var str;
+  if (value !== null && typeof value === 'object') {
+    try { str = JSON.stringify(value); } catch (_e) { str = String(value); }
+  } else {
+    str = String(value);
+  }
   if (str.length <= 40) return str;
   var hash = 5381;
   for (var i = 0; i < str.length; i++) hash = ((hash * 33) ^ str.charCodeAt(i)) >>> 0;
@@ -237,25 +275,31 @@ function _stuckFingerprintValue(value) {
  * same action only when tool, element, and identifying values all match, so
  * visiting five pages or typing five different queries is not a repeat. A
  * scroll also records where it left the page: scrolling down a long page
- * moves on each time, while scrolling at its end repeats.
+ * moves on each time, while scrolling at its end repeats. scroll_at reports
+ * the same through `position` (window, the scroll container under the
+ * pointer, and the URL, where map apps keep their zoom).
  *
  * @param {{name: string, args?: Object, result?: Object}} tr - One tool result
  * @returns {string} Element, then `key=value` details; the element alone
  *   when the call has no identifying values
  */
 function _stuckActionTarget(tr) {
-  var args = tr.args || {};
+  var args = (tr.args && typeof tr.args === 'object') ? tr.args : {};
   var target = args.selector || args.elementId || args.element_id || '';
   if (!target && args.code) target = _stuckFingerprintValue(args.code);
   var details = [];
-  for (var i = 0; i < _STUCK_FINGERPRINT_ARGS.length; i++) {
-    var value = args[_STUCK_FINGERPRINT_ARGS[i]];
+  var names = _stuckIdentifyingArgs(tr.name, args);
+  for (var i = 0; i < names.length; i++) {
+    var value = args[names[i]];
     if (value === undefined || value === null || value === '') continue;
-    details.push(_STUCK_FINGERPRINT_ARGS[i] + '=' + _stuckFingerprintValue(value));
+    details.push(names[i] + '=' + _stuckFingerprintValue(value));
   }
   var page = tr.result && tr.result.result;
   if (String(tr.name).indexOf('scroll') === 0 && page && typeof page.scrollY === 'number') {
     details.push('scrollY=' + Math.round(page.scrollY));
+  }
+  if (page && page.position && typeof page.position === 'object') {
+    details.push('position=' + _stuckFingerprintValue(page.position));
   }
   return details.length > 0 ? target + ' ' + details.join(' ') : target;
 }
@@ -464,6 +508,11 @@ function detectStuck(session, toolResults) {
       var success = !!(trV.result && trV.result.success);
       var hadEffect = !!(trV.result && trV.result.hadEffect);
       gpOutcomeKey = trV.name + ':' + (success ? 'ok' : 'err') + ':' + (hadEffect ? 'fx' : 'nf');
+      // A successful action that changed something counts as progress when it
+      // is a new action: the next stretch of a long page, a new query, the
+      // next chunk of a sheet. Repeats and back-and-forth cycles add nothing
+      // new, so they are still caught. Failures keep the coarse key.
+      if (success && hadEffect) gpOutcomeKey += ':' + _stuckActionTarget(trV);
       break;
     }
     var iterForTracker = state.iterationCount || session.iterationCount || (state.actionFingerprints ? state.actionFingerprints.length : 0);

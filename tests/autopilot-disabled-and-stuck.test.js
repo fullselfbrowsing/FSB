@@ -193,23 +193,102 @@ async function iterationThatStops(makeResults, iterations) {
   return null;
 }
 
+// 14 iterations runs past the goal-progress window (8), so these also cover
+// the no-goal-progress check, not only the repetition check.
 test('#157 visiting several pages or scrolling a long page is not mistaken for a stuck loop', async () => {
   const visits = await iterationThatStops(i => [
     { callId: 'n' + i, name: 'navigate', args: { url: 'https://shop.example/item/' + i, visual_reason: 'open item ' + i }, result: { success: true, hadEffect: true, result: { navigatingTo: 'https://shop.example/item/' + i } } },
     { callId: 'r' + i, name: 'read_page', args: {}, result: { success: true, hadEffect: false } }
-  ], 6);
+  ], 14);
   assert.equal(visits, null, 'stopped while visiting pages, at iteration ' + visits);
 
   const scrolls = await iterationThatStops(i => [
     { callId: 's' + i, name: 'scroll', args: { direction: 'down' }, result: { success: true, hadEffect: true, result: { scrollY: 700 * i, atBottom: false } } }
-  ], 6);
+  ], 14);
   assert.equal(scrolls, null, 'stopped while scrolling a long page, at iteration ' + scrolls);
 
   // Same 40-character prefix, different row each time.
   const scripts = await iterationThatStops(i => [
     { callId: 'j' + i, name: 'execute_js', args: { code: "const rows = document.querySelectorAll('.result-row'); rows[" + i + '].click()' }, result: { success: true, hadEffect: true } }
-  ], 6);
+  ], 14);
   assert.equal(scripts, null, 'stopped while running different scripts, at iteration ' + scripts);
+
+  const queries = await iterationThatStops(i => [
+    { callId: 'q' + i, name: 'type_text', args: { selector: '#search', text: 'query ' + i }, result: { success: true, hadEffect: true } }
+  ], 14);
+  assert.equal(queries, null, 'stopped while typing different queries into one field, at iteration ' + queries);
+});
+
+test('#157 every argument a tool declares tells its calls apart', async () => {
+  const chunks = await iterationThatStops(i => [
+    { callId: 'f' + i, name: 'fill_sheet', args: { startCell: 'A' + (1 + 50 * (i - 1)), csvData: 'row ' + i + ',ok\n', visual_reason: 'chunk ' + i }, result: { success: true, hadEffect: true } }
+  ], 14);
+  assert.equal(chunks, null, 'stopped while writing a sheet in chunks, at iteration ' + chunks);
+
+  const uploads = await iterationThatStops(i => [
+    { callId: 'u' + i, name: 'upload_file', args: { selector: '#attachment', file_path: '/Users/me/Documents/report-' + i + '.pdf' }, result: { success: true, hadEffect: true } }
+  ], 14);
+  assert.equal(uploads, null, 'stopped while uploading different files, at iteration ' + uploads);
+
+  const sameChunk = await iterationThatStops(i => [
+    { callId: 'f' + i, name: 'fill_sheet', args: { startCell: 'A1', csvData: 'row,ok\n', visual_reason: 'attempt ' + i }, result: { success: true, hadEffect: true } }
+  ], 10);
+  assert.equal(sameChunk, 5, 'writing the same chunk to the same cell again stops at iteration 5');
+});
+
+test('#157 scroll_at ticks that move the view are new actions, ticks that do not are repeats', async () => {
+  const tick = position => ({ success: true, method: 'cdp_direct', x: 400, y: 500, deltaX: 0, deltaY: 120, position });
+  const view = (url, containerTop) => ({ url, scrollX: 0, scrollY: 0, containerTop, containerLeft: containerTop === null ? null : 0 });
+
+  const zooming = await iterationThatStops(i => [
+    { callId: 'z' + i, name: 'scroll_at', args: { x: 400, y: 500, deltaY: -120, visual_reason: 'zoom in' }, result: { success: true, hadEffect: true, result: tick(view('https://maps.example/@40.7,-74.0,' + (8 + i) + 'z', null)) } }
+  ], 14);
+  assert.equal(zooming, null, 'stopped while zooming a map, at iteration ' + zooming);
+
+  const paging = await iterationThatStops(i => [
+    { callId: 'p' + i, name: 'scroll_at', args: { x: 400, y: 500, deltaY: 120 }, result: { success: true, hadEffect: true, result: tick(view('https://chat.example/c/1', 360 * i)) } }
+  ], 14);
+  assert.equal(paging, null, 'stopped while paging through an inner list, at iteration ' + paging);
+
+  const atEnd = await iterationThatStops(() => [
+    { callId: 'e', name: 'scroll_at', args: { x: 400, y: 500, deltaY: 120 }, result: { success: true, hadEffect: true, result: tick(view('https://chat.example/c/1', 5040)) } }
+  ], 10);
+  assert.equal(atEnd, 5, 'wheel ticks at the end of the list stop at iteration 5');
+});
+
+test('#157 the scroll_at tool asks cdpScrollAt for the position; other CDP tools do not', async () => {
+  const { executeTool } = require('../extension/ai/tool-executor.js');
+  const calls = [];
+  const position = { url: 'https://maps.example/@40.7,-74.0,12z', scrollX: 0, scrollY: 0, containerTop: null, containerLeft: null };
+  const cdpHandler = async (verb, params) => {
+    calls.push({ verb, params });
+    return verb === 'cdpScrollAt' ? { success: true, method: 'cdp_direct', position } : { success: true, method: 'cdp_direct' };
+  };
+
+  const scrolled = await executeTool('scroll_at', { x: 10, y: 20, deltaY: 120 }, 7, { cdpHandler });
+  assert.equal(calls[0].verb, 'cdpScrollAt');
+  assert.equal(calls[0].params.reportPosition, true);
+  assert.equal(calls[0].params.deltaY, 120);
+  assert.deepEqual(scrolled.result.position, position, 'the position reaches the tool result');
+
+  await executeTool('click_at', { x: 10, y: 20 }, 7, { cdpHandler });
+  assert.equal(calls[1].verb, 'cdpClickAt');
+  assert.equal(calls[1].params.reportPosition, undefined);
+});
+
+test('#157 cdpScrollAt reads the position after the tick, only when asked', () => {
+  const start = background.indexOf("case 'cdpScrollAt': {");
+  const block = background.slice(start, background.indexOf("case '", start + 1));
+  const wheelAt = block.indexOf("type: 'mouseWheel'");
+  const gateAt = block.indexOf('params.reportPosition === true');
+  const probeAt = block.indexOf('fsbWheelPositionProbe');
+  const detachAt = block.indexOf('.detach({ tabId })', probeAt);
+  assert(wheelAt > 0 && gateAt > wheelAt && probeAt > gateAt && detachAt > probeAt, 'wheel -> gate -> probe -> detach order');
+
+  // Remote control drives cdpScrollAt directly and must not pay for the probe.
+  const wsClient = fs.readFileSync(path.join(__dirname, '../extension/ws/ws-client.js'), 'utf8');
+  const remote = wsClient.slice(wsClient.indexOf("tool: 'cdpScrollAt'"), wsClient.indexOf("tool: 'cdpScrollAt'") + 200);
+  assert.doesNotMatch(remote, /reportPosition/);
 });
 
 test('#157 repeats are still caught when only the free-text reason changes or the page stops moving', async () => {
