@@ -105,6 +105,18 @@ async function run() {
     await getDOM.call(client, { agentId: 'agent_a' });
     const { message } = client.sent[0];
     check(message.options && message.options.maxElements === 50, 'options.maxElements defaults to 50');
+  }
+  {
+    const client = stubClient();
+    await getDOM.call(client, { agentId: 'agent_a', maxElements: 2000 });
+    const { message } = client.sent[0];
+    check(message.options && message.options.maxElements === 200, 'options.maxElements is capped at 200');
+  }
+  {
+    const client = stubClient();
+    await getDOM.call(client, { agentId: 'agent_a', maxElements: 0 });
+    const { message } = client.sent[0];
+    check(message.options && message.options.maxElements === 50, 'a non-positive maxElements falls back to 50');
     check(contentDomMaxElements(message) === 50, 'the content snapshot options see the default 50');
   }
 

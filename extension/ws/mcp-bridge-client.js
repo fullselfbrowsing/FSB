@@ -1721,10 +1721,13 @@ class MCPBridgeClient {
     if (resolved.success === false) {
       return resolved;
     }
-    // The content script builds the snapshot from request.options.
+    // The content script builds the snapshot from request.options. Each
+    // element costs about half a kilobyte, so a request is capped at 200.
+    const requested = Number(payload.maxElements);
+    const maxElements = Number.isFinite(requested) && requested >= 1 ? Math.min(Math.floor(requested), 200) : 50;
     const response = await this._sendToContentScript(resolved.tabId, {
       action: 'getDOM',
-      options: { maxElements: payload.maxElements || 50 },
+      options: { maxElements },
     });
     return response;
   }
