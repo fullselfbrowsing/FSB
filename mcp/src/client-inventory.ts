@@ -174,10 +174,19 @@ export function detectMcpClientInventory(): Promise<McpClientInventory> {
 export async function pushMcpClientInventory(bridge: WebSocketBridge): Promise<void> {
   try {
     const platforms = await detectMcpClientInventory();
-    await bridge.sendAndWait(
-      { type: 'system:client-inventory', payload: { platforms } },
+    // Each attached browser keeps its own copy. A browser that attaches later
+    // receives it with this session's first agent:register there.
+    const roster = (bridge as { browserRoster?: unknown }).browserRoster;
+    const browsers: Array<string | null> = Array.isArray(roster) && roster.length > 0
+      ? roster.map((entry) => String((entry as { key: unknown }).key))
+      : [null];
+    const pushes = await Promise.allSettled(browsers.map((browser) => bridge.sendAndWait(
+      browser
+        ? { type: 'system:client-inventory', payload: { platforms }, browser }
+        : { type: 'system:client-inventory', payload: { platforms } },
       { timeout: 3000 },
-    );
+    )));
+    if (pushes.every((push) => push.status === 'rejected')) throw new Error('no browser took the inventory');
   } catch {
     console.error('[FSB MCP] Client inventory push skipped (extension offline or incompatible)');
   }

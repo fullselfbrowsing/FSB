@@ -11,6 +11,11 @@
 
 const MCP_BRIDGE_URL = 'ws://localhost:7225';
 const MCP_BRIDGE_STATE_KEY = 'mcpBridgeState';
+// When a window of this browser last had focus. One MCP hub can hold several
+// browsers (Chrome and Safari), and a call that names none goes to the one
+// used last. Kept in session storage so a worker restart reports the true
+// last focus, not the moment it restarted.
+const MCP_BROWSER_FOCUS_KEY = 'mcpBrowserFocusedAt';
 const MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
 const FSB_EXT_PROTOCOL = 'fsb-ext-v1';
 const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
@@ -204,6 +209,8 @@ class MCPBridgeClient {
     this._extRequestCounter = 0;
     this._replacementSockets = new Set();
     this._socketWaiters = new Set();
+    this._focusedAt = null;
+    this._focusHydrating = this._hydrateFocus();
 
     // Fire-and-forget so _policyHydrating is already set by the time
     // background.js arms the bridge at service-worker evaluation time.
@@ -1558,10 +1565,43 @@ class MCPBridgeClient {
     }
   }
 
+  async _hydrateFocus() {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage?.session || typeof chrome.storage.session.get !== 'function') return;
+      const stored = await chrome.storage.session.get(MCP_BROWSER_FOCUS_KEY);
+      const value = stored ? stored[MCP_BROWSER_FOCUS_KEY] : null;
+      if (Number.isSafeInteger(value) && value > 0 && (this._focusedAt === null || value > this._focusedAt)) {
+        this._focusedAt = value;
+      }
+    } catch (_error) { /* no session storage: focus starts unknown */ }
+  }
+
+  /**
+   * When a window of this browser last had focus, or null if never seen.
+   * Sampled when the state frame is sent (on connect and on every keepalive),
+   * not from a focus listener: a listener would wake the service worker on
+   * every window switch, and Safari does not deliver one reliably.
+   */
+  async _readFocusedAt() {
+    try { await this._focusHydrating; } catch (_error) { /* starts unknown */ }
+    try {
+      if (typeof chrome !== 'undefined' && chrome.windows && typeof chrome.windows.getLastFocused === 'function') {
+        const lastFocused = await chrome.windows.getLastFocused();
+        if (lastFocused && lastFocused.focused === true) {
+          this._focusedAt = Date.now();
+          if (chrome.storage?.session && typeof chrome.storage.session.set === 'function') {
+            Promise.resolve(chrome.storage.session.set({ [MCP_BROWSER_FOCUS_KEY]: this._focusedAt })).catch(() => {});
+          }
+        }
+      }
+    } catch (_error) { /* no window to ask: the last known time stands */ }
+    return this._focusedAt;
+  }
+
   async _sendExtensionState() {
     if (typeof getMcpAttachmentMetadata !== 'function') return;
-    const attachment = await getMcpAttachmentMetadata();
-    this._send({ type: 'mcp:extension-state', ...attachment, connectedAt: this._lastConnectedAt || null });
+    const [attachment, focusedAt] = await Promise.all([getMcpAttachmentMetadata(), this._readFocusedAt()]);
+    this._send({ type: 'mcp:extension-state', ...attachment, connectedAt: this._lastConnectedAt || null, focusedAt });
   }
 
   _sendResult(id, payload) {

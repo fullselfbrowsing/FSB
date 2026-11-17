@@ -8,6 +8,9 @@ import type {
   BridgeCapability,
   BridgeOptions,
   BridgeTopologyState,
+  BrowserKind,
+  BrowserRefusal,
+  BrowserRosterEntry,
   ExtensionAttachmentState,
   ExtEvent,
   ExtRequest,
@@ -28,11 +31,59 @@ import {
 } from './bridge-auth.js';
 import { logBridgeEvent } from './bridge-events.js';
 import { makeExtError, parseExtFrame } from './ext-protocol.js';
+import { FSB_MCP_VERSION } from './version.js';
+import { BROWSER_KEY_PATTERN, pickDefaultBrowser } from './browser-routing.js';
 
 interface PendingRequest {
   resolve: (value: MCPResponse) => void;
   reject: (reason: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+  // Hub mode: the browser this request went to. Only that browser may answer
+  // it, and only that browser going away fails it. Null in relay mode.
+  browser: string | null;
+}
+
+/**
+ * One attached browser. The hub keeps a slot per browser kind, and everything
+ * that describes "the extension" lives here, so one browser's heartbeat, reaper
+ * or disconnect can never touch another's.
+ */
+interface ExtensionSlot {
+  key: string;
+  kind: BrowserKind;
+  socket: WsWebSocket;
+  livenessTimer: ReturnType<typeof setInterval> | null;
+  lastHeartbeatAt: number | null;
+  heartbeatCount: number;
+  closeCause: string | null;
+  attachment: ExtensionAttachmentState | null;
+  focusedAt: number | null;
+  lastBrowserStateAt: number;
+  connectedAt: number;
+}
+
+/** Where a forwarded request came from, and which browser holds it. */
+interface MessageRoute {
+  origin: string; // a relay's instanceId, or 'local'
+  browser: string;
+}
+
+export interface BrowserNotConnectedError extends Error {
+  code: 'BROWSER_NOT_CONNECTED';
+  browser: string | null;
+  connectedBrowsers: string[];
+}
+
+// A relay that names no browser predates the roster. It keeps the browser the
+// hub first gave it for this long after that browser goes away, so a worker
+// restart cannot move an old client to another browser in the middle of a task.
+const LEGACY_RELAY_BINDING_GRACE_MS = 60_000;
+const BROWSER_STATE_MIN_INTERVAL_MS = 100;
+const MAX_REFUSAL_REASON_LENGTH = 64;
+const SAFARI_EXTENSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*(?: \([A-Za-z0-9]+\))?$/;
+
+function browserKindOf(origin: string): BrowserKind {
+  return origin.startsWith('safari-web-extension://') ? 'safari' : 'chrome';
 }
 
 interface AcceptedSocketMetadata {
@@ -102,6 +153,65 @@ export function bridgeDisconnectReason(err: unknown): string | null {
     : null;
 }
 
+const MAX_ROSTER_ENTRIES = 8;
+
+function isBrowserKind(value: unknown): value is BrowserKind {
+  return value === 'chrome' || value === 'safari';
+}
+
+function boundedString(value: unknown, max: number): string | null {
+  return typeof value === 'string' && value.length > 0 && value.length <= max ? value : null;
+}
+
+function nonNegativeInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/** A hub's roster as a relay may trust it: null unless it is a list, bad entries dropped. */
+function parseRoster(value: unknown): BrowserRosterEntry[] | null {
+  if (!Array.isArray(value)) return null;
+  const roster: BrowserRosterEntry[] = [];
+  for (const raw of value.slice(0, MAX_ROSTER_ENTRIES)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const entry = raw as Record<string, unknown>;
+    const connectedAt = nonNegativeInteger(entry.connectedAt);
+    if (
+      typeof entry.key !== 'string' || !BROWSER_KEY_PATTERN.test(entry.key)
+      || !isBrowserKind(entry.kind)
+      || connectedAt === null
+      || roster.some((known) => known.key === entry.key)
+    ) continue;
+    roster.push({
+      key: entry.key,
+      kind: entry.kind,
+      extensionVersion: boundedString(entry.extensionVersion, 64),
+      installInstanceId: boundedString(entry.installInstanceId, 128),
+      authorized: entry.authorized === true,
+      focusedAt: nonNegativeInteger(entry.focusedAt),
+      connectedAt,
+    });
+  }
+  return roster;
+}
+
+function parseRefusals(value: unknown): BrowserRefusal[] {
+  if (!Array.isArray(value)) return [];
+  const refusals: BrowserRefusal[] = [];
+  for (const raw of value.slice(0, MAX_ROSTER_ENTRIES)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const entry = raw as Record<string, unknown>;
+    const at = nonNegativeInteger(entry.at);
+    if (
+      !isBrowserKind(entry.kind)
+      || typeof entry.reason !== 'string'
+      || !BRIDGE_DISCONNECT_REASON_PATTERN.test(entry.reason)
+      || at === null
+    ) continue;
+    refusals.push({ kind: entry.kind, reason: entry.reason, at });
+  }
+  return refusals;
+}
+
 export class WebSocketBridge {
   // Identity
   private instanceId: string;
@@ -114,6 +224,7 @@ export class WebSocketBridge {
   private extensionHeartbeatTimeoutMs: number;
   private promotionJitterMs: number;
   private maxReconnectDelayMs: number;
+  private legacyRelayBindingGraceMs: number;
   private allowedBrowserOrigins: string[];
   private capabilities: Set<BridgeCapability>;
   private handleExtRequest: ExtRequestHandler | null;
@@ -121,14 +232,17 @@ export class WebSocketBridge {
   // Hub mode state
   private wss: WebSocketServer | null = null;
   private httpServer: Server | null = null;
-  private extensionClient: WsWebSocket | null = null;
+  private slots = new Map<string, ExtensionSlot>(); // browser key -> its slot
   private relayClients = new Map<string, WsWebSocket>();
   private relayCapabilities = new Map<string, Set<BridgeCapability>>();
   private activeExtRequests = new Map<string, ActiveExtRequest>();
-  private messageOrigin = new Map<string, string>(); // msgId -> instanceId | "local"
+  private messageOrigin = new Map<string, MessageRoute>(); // msgId -> who asked, and which browser holds it
   private handshakeTimers = new Map<WsWebSocket, ReturnType<typeof setTimeout>>();
   private acceptedSocketMetadata = new WeakMap<WsWebSocket, AcceptedSocketMetadata>();
-  private extensionLivenessTimer: ReturnType<typeof setInterval> | null = null;
+  private legacyRelayBrowsers = new Map<string, string>(); // relay instanceId -> the browser it was given
+  private slotGoneAt = new Map<string, number>(); // browser key -> when its slot last closed
+  private browserRefusals = new Map<BrowserKind, BrowserRefusal>();
+  private lastFocusedAt = new Map<string, number>(); // browser key -> last reported focus, kept across a reconnect
 
   // Relay mode state
   private hubConnection: WebSocket | null = null;
@@ -147,11 +261,14 @@ export class WebSocketBridge {
   private activeHubInstanceId: string | null = null;
   private relayExtensionConnected = false;
   private relayCount = 0;
-  private lastExtensionHeartbeatAt: number | null = null;
-  private extensionHeartbeatCount = 0;
-  private extensionCloseCause: string | null = null;
   private lastDisconnectReason: string | null = null;
-  private extensionAttachment: ExtensionAttachmentState | null = null;
+  // Relay mode: what the hub last reported. The roster is null until a hub
+  // sends one, and stays null against a hub that predates it.
+  private relayLastExtensionHeartbeatAt: number | null = null;
+  private relayExtensionAttachment: ExtensionAttachmentState | null = null;
+  private relayBrowsers: BrowserRosterEntry[] | null = null;
+  private relayRefusedBrowsers: BrowserRefusal[] = [];
+  private relayHubVersion: string | null = null;
 
   constructor(options: BridgeOptions = {}) {
     this.port = options.port ?? 7225;
@@ -171,6 +288,7 @@ export class WebSocketBridge {
     this.extensionHeartbeatTimeoutMs = options.extensionHeartbeatTimeoutMs ?? 90_000;
     this.promotionJitterMs = options.promotionJitterMs ?? 500;
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
+    this.legacyRelayBindingGraceMs = options.legacyRelayBindingGraceMs ?? LEGACY_RELAY_BINDING_GRACE_MS;
     // Safari Web Extensions send Origin: safari-web-extension://<UUID>, both
     // from a direct WebSocket and from the container app's native socket.
     this.allowedBrowserOrigins = options.allowedBrowserOrigins ??
@@ -256,10 +374,7 @@ export class WebSocketBridge {
     this.activeHubInstanceId = null;
     this.relayExtensionConnected = false;
     this.relayCount = 0;
-    this.lastExtensionHeartbeatAt = null;
-    this.extensionAttachment = null;
-    this.extensionHeartbeatCount = 0;
-    this.extensionCloseCause = null;
+    this._clearBrowserState();
     this.mode = 'disconnected';
     console.error(`[FSB Bridge ${this.instanceId}] Disconnected`);
   }
@@ -277,8 +392,20 @@ export class WebSocketBridge {
       throw new Error(FSB_ERROR_MESSAGES['extension_not_connected']);
     }
 
+    // `browser` is routing for the hub, never part of what an extension reads.
+    const { browser: requestedBrowser, ...body } = msg;
+    const browser = typeof requestedBrowser === 'string' && requestedBrowser ? requestedBrowser : null;
+
+    // Chosen before anything is registered: a browser that is not attached must
+    // fail the call here, not after a pending entry and its timer exist.
+    let slot: ExtensionSlot | null = null;
+    if (this.mode === 'hub') {
+      slot = browser ? this.slots.get(browser) ?? null : this._defaultSlot();
+      if (!slot) throw this._browserNotConnectedError(browser);
+    }
+
     const id = this.generateId();
-    const fullMsg: MCPMessage = { id, ...msg };
+    const fullMsg: MCPMessage = { id, ...body };
     const timeoutMs = options?.timeout ?? 30_000;
 
     console.error(`[FSB Bridge ${this.instanceId}] >> Sending: ${msg.type} (id=${id}, mode=${this.mode}, timeout=${timeoutMs}ms)`);
@@ -301,26 +428,46 @@ export class WebSocketBridge {
         },
         reject,
         timeout: timer,
+        browser: slot ? slot.key : null,
       });
 
       if (options?.onProgress) {
         this.progressListeners.set(id, options.onProgress);
       }
 
-      if (this.mode === 'hub') {
-        // Send directly to extension
-        this.messageOrigin.set(id, 'local');
-        this.extensionClient!.send(JSON.stringify(fullMsg));
+      if (slot) {
+        // Send directly to the chosen browser
+        this.messageOrigin.set(id, { origin: 'local', browser: slot.key });
+        slot.socket.send(JSON.stringify(fullMsg));
       } else if (this.mode === 'relay') {
-        // Send to hub for forwarding
-        this.hubConnection!.send(JSON.stringify(fullMsg));
+        // Send to hub for forwarding. The hub routes on `browser`.
+        this.hubConnection!.send(JSON.stringify(browser ? { ...fullMsg, browser } : fullMsg));
       }
     });
   }
 
-  /** Whether this bridge can reach the extension (directly or via relay). */
+  /** Whether this bridge can reach an extension (directly or via relay). */
   get isConnected(): boolean {
     return this.topology.extensionConnected;
+  }
+
+  /** Whether one named browser is attached. False against a hub with no roster. */
+  isConnectedTo(browser: string): boolean {
+    return (this.browserRoster ?? []).some((entry) => entry.key === browser);
+  }
+
+  /**
+   * The attached browsers. Null when this process relays through a hub that
+   * predates the roster: that hub serves one browser and takes no `browser`.
+   */
+  get browserRoster(): BrowserRosterEntry[] | null {
+    if (this.mode === 'hub') return this._hubRoster();
+    return this.mode === 'relay' ? this.relayBrowsers : null;
+  }
+
+  /** Browsers that tried to attach and were turned away, with the reason. */
+  get refusedBrowsers(): BrowserRefusal[] {
+    return this.mode === 'hub' ? [...this.browserRefusals.values()] : this.relayRefusedBrowsers;
   }
 
   /** Current operating mode. */
@@ -341,7 +488,96 @@ export class WebSocketBridge {
       lastExtensionHeartbeatAt: this.lastExtensionHeartbeatAt,
       lastDisconnectReason: this.lastDisconnectReason,
       extensionAttachment: this.extensionAttachment,
+      browsers: this.browserRoster,
+      refusedBrowsers: this.refusedBrowsers,
+      hubVersion: this.mode === 'hub' ? FSB_MCP_VERSION : this.relayHubVersion,
     };
+  }
+
+  // --------------------------------------------------------------------------
+  // Browser slots
+  // --------------------------------------------------------------------------
+
+  // The single-browser names below are kept as views of the default slot. With
+  // one browser attached they mean exactly what the fields they replace meant.
+
+  private get extensionClient(): WsWebSocket | null {
+    return this._defaultSlot()?.socket ?? null;
+  }
+
+  private get extensionHeartbeatCount(): number {
+    return this._defaultSlot()?.heartbeatCount ?? 0;
+  }
+
+  private get lastExtensionHeartbeatAt(): number | null {
+    return this.mode === 'hub'
+      ? this._defaultSlot()?.lastHeartbeatAt ?? null
+      : this.relayLastExtensionHeartbeatAt;
+  }
+
+  private get extensionAttachment(): ExtensionAttachmentState | null {
+    return this.mode === 'hub'
+      ? this._defaultSlot()?.attachment ?? null
+      : this.relayExtensionAttachment;
+  }
+
+  /**
+   * The browser a call lands in when it names none. The rule is the sessions'
+   * own (pickDefaultBrowser): most recently focused, then Chrome, then
+   * whichever attached first.
+   */
+  private _defaultSlot(): ExtensionSlot | null {
+    if (this.slots.size === 0) return null;
+    const key = pickDefaultBrowser(this._hubRoster());
+    return key ? this.slots.get(key) ?? null : null;
+  }
+
+  private _slotOf(ws: WsWebSocket): ExtensionSlot | null {
+    for (const slot of this.slots.values()) {
+      if (slot.socket === ws) return slot;
+    }
+    return null;
+  }
+
+  private _hubRoster(): BrowserRosterEntry[] {
+    return [...this.slots.values()].map((slot) => ({
+      key: slot.key,
+      kind: slot.kind,
+      extensionVersion: slot.attachment?.extensionVersion ?? null,
+      installInstanceId: slot.attachment?.installInstanceId ?? null,
+      authorized: this.acceptedSocketMetadata.get(slot.socket)?.extAuthorized === true,
+      focusedAt: slot.focusedAt,
+      connectedAt: slot.connectedAt,
+    }));
+  }
+
+  private _browserNotConnectedError(browser: string | null): BrowserNotConnectedError {
+    const error = new Error('browser_not_connected') as BrowserNotConnectedError;
+    error.code = 'BROWSER_NOT_CONNECTED';
+    error.browser = browser;
+    error.connectedBrowsers = [...this.slots.keys()];
+    return error;
+  }
+
+  private _noteBrowserRefusal(kind: BrowserKind, reason: string): void {
+    this.browserRefusals.set(kind, {
+      kind,
+      reason: reason.slice(0, MAX_REFUSAL_REASON_LENGTH),
+      at: Date.now(),
+    });
+  }
+
+  /** Forget everything known about attached browsers, in either mode. */
+  private _clearBrowserState(): void {
+    this.relayLastExtensionHeartbeatAt = null;
+    this.relayExtensionAttachment = null;
+    this.relayBrowsers = null;
+    this.relayRefusedBrowsers = [];
+    this.relayHubVersion = null;
+    this.legacyRelayBrowsers.clear();
+    this.slotGoneAt.clear();
+    this.browserRefusals.clear();
+    this.lastFocusedAt.clear();
   }
 
   /** Generate a unique message ID with instance prefix. */
@@ -495,12 +731,14 @@ export class WebSocketBridge {
       this.relayClients.delete(id);
       this.relayCapabilities.delete(id);
     }
-    this._stopExtensionLiveness();
-    // Cleared before close() so the socket's own close handler sees a stale
-    // client and leaves the bridge state to the caller.
-    const extensionClient = this.extensionClient;
-    this.extensionClient = null;
-    extensionClient?.close();
+    // Cleared before close() so each socket's own close handler sees a stale
+    // slot and leaves the bridge state to the caller.
+    const slots = [...this.slots.values()];
+    this.slots.clear();
+    for (const slot of slots) {
+      this._stopSlotLiveness(slot);
+      slot.socket.close();
+    }
     this._closeHubServers();
     for (const [, timer] of this.handshakeTimers) {
       clearTimeout(timer);
@@ -535,10 +773,7 @@ export class WebSocketBridge {
     this.connected = false;
     this.hubConnected = false;
     this.activeHubInstanceId = null;
-    this.lastExtensionHeartbeatAt = null;
-    this.extensionAttachment = null;
-    this.extensionHeartbeatCount = 0;
-    this.extensionCloseCause = null;
+    this._clearBrowserState();
     this.mode = 'disconnected';
     this.lastDisconnectReason = reason;
   }
@@ -643,6 +878,9 @@ export class WebSocketBridge {
           + 'Cure: npx -y fsb-mcp-server@latest pair --reset',
         );
       }
+      // A refused upgrade is a bare 403 and carries no reason to the browser,
+      // so the reason is kept here for status, doctor and tool errors.
+      this._noteBrowserRefusal(browserKindOf(browserOrigin), 'extension_origin_pin_mismatch');
       this.lastDisconnectReason = 'extension_origin_pin_mismatch';
       this._broadcastRelayState();
       return null;
@@ -738,7 +976,10 @@ export class WebSocketBridge {
     }
 
     if (metadata.browserOrigin) {
-      if (this.extensionClient && !this._isCurrentExtAuthority(ws)) {
+      // One slot per browser kind. A browser of another kind takes its own
+      // slot: only a second socket of the same kind contests this one.
+      const incumbent = this.slots.get(browserKindOf(metadata.browserOrigin));
+      if (incumbent && !this._isCurrentExtAuthority(ws)) {
         // Coalesced: an extension that keeps retrying lands here once per
         // attempt, which is how a single lockout produced tens of thousands of
         // identical lines in the field.
@@ -795,31 +1036,50 @@ export class WebSocketBridge {
   }
 
   private _registerExtensionClient(ws: WsWebSocket): void {
-    this._stopExtensionLiveness();
+    const metadata = this.acceptedSocketMetadata.get(ws);
+    const kind = browserKindOf(metadata?.browserOrigin ?? '');
+    const key: string = kind;
+    const previous = this.slots.get(key);
 
-    if (this.extensionClient) {
+    if (previous) {
+      this._stopSlotLiveness(previous);
       console.error(`[FSB Bridge ${this.instanceId}] New extension connected, closing previous`);
       this.lastDisconnectReason = 'extension_replaced';
-      this.extensionCloseCause = 'extension_replaced';
+      previous.closeCause = 'extension_replaced';
       logBridgeEvent({
         event: 'extension_replaced',
         instanceId: this.instanceId,
-        origin: this.acceptedSocketMetadata.get(this.extensionClient)?.browserOrigin ?? null,
+        origin: this.acceptedSocketMetadata.get(previous.socket)?.browserOrigin ?? null,
       });
-      this._abortRoutesForOrigin(this.extensionClient);
-      this.extensionClient.close();
+      this._abortRoutesForOrigin(previous.socket);
+      previous.socket.close();
     }
 
-    this.extensionClient = ws;
+    const now = Date.now();
+    const slot: ExtensionSlot = {
+      key,
+      kind,
+      socket: ws,
+      livenessTimer: null,
+      lastHeartbeatAt: now,
+      heartbeatCount: 0,
+      closeCause: null,
+      attachment: null,
+      // A worker restart is the same browser: its last focus still stands
+      // until the extension reports again.
+      focusedAt: this.lastFocusedAt.get(key) ?? null,
+      lastBrowserStateAt: 0,
+      connectedAt: now,
+    };
+    this.slots.set(key, slot);
+    this.slotGoneAt.delete(key);
+    this.browserRefusals.delete(kind);
     this.connected = true;
-    this.lastExtensionHeartbeatAt = Date.now();
-    this.extensionHeartbeatCount = 0;
     this.lastDisconnectReason = null;
-    this.extensionAttachment = null;
-    this.extensionCloseCause = null;
-    console.error(`[FSB Bridge ${this.instanceId}] Extension connected`);
+    console.error(`[FSB Bridge ${this.instanceId}] Extension connected (${key})`);
+    if (metadata?.extAuthorized) this._closeSlotsOutsidePin(slot);
     this._broadcastRelayState();
-    this._startExtensionLiveness(ws);
+    this._startExtensionLiveness(slot);
 
     // Replace the temporary message handler with the real one
     ws.removeAllListeners('message');
@@ -828,8 +1088,8 @@ export class WebSocketBridge {
     });
 
     ws.on('close', (code: number) => {
-      if (this.extensionClient !== ws) return;
-      this._stopExtensionLiveness();
+      if (this.slots.get(key) !== slot) return;
+      this._stopSlotLiveness(slot);
 
       // The rejection message below stays literal so the sw_evicted recovery
       // keeps arming -- that recovery (reconnect, then fetch the persisted
@@ -837,11 +1097,11 @@ export class WebSocketBridge {
       // really was interrupted. The specific cause rides on a property of the
       // Error instead, so callers can report what actually happened without
       // any recovery branch changing.
-      const cause = this.extensionCloseCause
+      const cause = slot.closeCause
         ?? (code === 1008 ? 'extension_policy_closed' : 'extension_disconnected');
-      this.extensionCloseCause = null;
+      slot.closeCause = null;
 
-      console.error(`[FSB Bridge ${this.instanceId}] Extension disconnected (${cause}, code=${code})`);
+      console.error(`[FSB Bridge ${this.instanceId}] Extension disconnected (${key}: ${cause}, code=${code})`);
       logBridgeEvent({
         event: 'extension_closed',
         instanceId: this.instanceId,
@@ -849,32 +1109,28 @@ export class WebSocketBridge {
         closeCode: code,
         reason: cause,
       });
-      this.extensionClient = null;
-      this.connected = false;
+      this.slots.delete(key);
+      this.slotGoneAt.set(key, Date.now());
+      this.connected = this.slots.size > 0;
       this.lastDisconnectReason = cause;
-      this.lastExtensionHeartbeatAt = null;
-      this.extensionAttachment = null;
-      this.extensionHeartbeatCount = 0;
 
-      // Reject all pending local requests
+      // Fail only what this browser was holding. Calls in another browser go on.
       for (const [id, pending] of this.pendingRequests) {
+        if (pending.browser !== key) continue;
         clearTimeout(pending.timeout);
         const error = new Error('Extension disconnected') as BridgeDisconnectError;
         error.bridgeDisconnectReason = cause;
         pending.reject(error);
         this.pendingRequests.delete(id);
+        this.progressListeners.delete(id);
       }
-      this.progressListeners.clear();
 
       this._abortRoutesForOrigin(ws);
 
-      // Notify relay clients about pending requests that can't be fulfilled
-      // (they'll get errors when they timeout)
-      // Clean up messageOrigin entries for non-local origins
-      for (const [msgId, origin] of this.messageOrigin) {
-        if (origin !== 'local') {
-          this.messageOrigin.delete(msgId);
-        }
+      // Relay clients learn of the requests this browser can no longer answer
+      // when those time out. Their routes are dropped here.
+      for (const [msgId, route] of this.messageOrigin) {
+        if (route.browser === key) this.messageOrigin.delete(msgId);
       }
       this._broadcastRelayState();
     });
@@ -882,6 +1138,32 @@ export class WebSocketBridge {
     ws.on('error', (err: Error) => {
       console.error(`[FSB Bridge ${this.instanceId}] Extension error:`, err.message);
     });
+  }
+
+  /**
+   * A paired browser owns the bridge: once its origin is pinned, the upgrade
+   * gate refuses every other origin. A browser that attached before the pin
+   * was bound is closed here, so the outcome is the same whoever came first.
+   */
+  private _closeSlotsOutsidePin(paired: ExtensionSlot): void {
+    const pinnedOrigin = this.acceptedSocketMetadata.get(paired.socket)?.browserOrigin ?? null;
+    for (const other of [...this.slots.values()]) {
+      if (other === paired) continue;
+      const origin = this.acceptedSocketMetadata.get(other.socket)?.browserOrigin ?? null;
+      if (origin === pinnedOrigin) continue;
+      other.closeCause = 'extension_origin_pin_mismatch';
+      this._noteBrowserRefusal(other.kind, 'extension_origin_pin_mismatch');
+      logBridgeEvent({
+        event: 'extension_slot_refused',
+        instanceId: this.instanceId,
+        origin,
+        reason: 'extension_origin_pin_mismatch',
+      });
+      console.error(
+        `[FSB Bridge ${this.instanceId}] Closing ${other.key}: bridge pairing is now bound to another browser`,
+      );
+      other.socket.close(1008, 'Bridge pairing is bound to another browser');
+    }
   }
 
   /**
@@ -899,7 +1181,8 @@ export class WebSocketBridge {
    *     so an older extension build that never sends one is governed by Tier A
    *     alone and is never terminated merely for staying quiet.
    */
-  private _startExtensionLiveness(ws: WsWebSocket): void {
+  private _startExtensionLiveness(slot: ExtensionSlot): void {
+    const ws = slot.socket;
     let awaitingPong = false;
     let sawAppHeartbeat = false;
 
@@ -908,8 +1191,8 @@ export class WebSocketBridge {
     });
 
     const timer = setInterval(() => {
-      if (this.extensionClient !== ws) {
-        this._stopExtensionLiveness();
+      if (this.slots.get(slot.key) !== slot) {
+        this._stopSlotLiveness(slot);
         return;
       }
       if (ws.readyState !== WebSocket.OPEN) {
@@ -917,11 +1200,11 @@ export class WebSocketBridge {
         return;
       }
 
-      const heartbeatAt = this.lastExtensionHeartbeatAt;
+      const heartbeatAt = slot.lastHeartbeatAt;
       // Counted rather than inferred from timestamps: registration and a fast
       // first ping can land in the same millisecond, and a comparison would
       // then never arm this tier at all.
-      if (this.extensionHeartbeatCount > 0) sawAppHeartbeat = true;
+      if (slot.heartbeatCount > 0) sawAppHeartbeat = true;
 
       if (awaitingPong) {
         this._reapExtensionClient(ws, 'pong_timeout');
@@ -947,13 +1230,14 @@ export class WebSocketBridge {
     }, this.extensionPingIntervalMs);
 
     timer.unref?.();
-    this.extensionLivenessTimer = timer;
+    slot.livenessTimer = timer;
   }
 
-  private _stopExtensionLiveness(): void {
-    if (!this.extensionLivenessTimer) return;
-    clearInterval(this.extensionLivenessTimer);
-    this.extensionLivenessTimer = null;
+  /** Each browser has its own timer: stopping one must never stop another's. */
+  private _stopSlotLiveness(slot: ExtensionSlot): void {
+    if (!slot.livenessTimer) return;
+    clearInterval(slot.livenessTimer);
+    slot.livenessTimer = null;
   }
 
   /**
@@ -962,16 +1246,17 @@ export class WebSocketBridge {
    * own 'close' handler, which is the one place that frees the slot.
    */
   private _reapExtensionClient(ws: WsWebSocket, reason: string): void {
-    this._stopExtensionLiveness();
-    if (this.extensionClient !== ws) return;
-    console.error(`[FSB Bridge ${this.instanceId}] Extension liveness lost (${reason}), terminating socket`);
+    const slot = this._slotOf(ws);
+    if (!slot) return;
+    this._stopSlotLiveness(slot);
+    console.error(`[FSB Bridge ${this.instanceId}] Extension liveness lost (${slot.key}: ${reason}), terminating socket`);
     logBridgeEvent({
       event: 'extension_reaped',
       instanceId: this.instanceId,
       origin: this.acceptedSocketMetadata.get(ws)?.browserOrigin ?? null,
       reason,
     });
-    this.extensionCloseCause = `extension_reaped_${reason}`;
+    slot.closeCause = `extension_reaped_${reason}`;
     ws.terminate();
   }
 
@@ -995,14 +1280,9 @@ export class WebSocketBridge {
 
     // Send welcome
     const welcome: RelayWelcome = {
+      ...this._relayView(clientId),
       type: 'relay:welcome',
       instanceId: clientId,
-      hubInstanceId: this.instanceId,
-      extensionConnected: this.connected,
-      relayCount: this.relayClients.size,
-      lastExtensionHeartbeatAt: this.lastExtensionHeartbeatAt,
-      lastDisconnectReason: this.lastDisconnectReason,
-      extensionAttachment: this.extensionAttachment,
     };
     ws.send(JSON.stringify(welcome));
     this._broadcastRelayState();
@@ -1018,12 +1298,13 @@ export class WebSocketBridge {
       if (this.relayClients.get(clientId) === ws) {
         this.relayClients.delete(clientId);
         this.relayCapabilities.delete(clientId);
+        this.legacyRelayBrowsers.delete(clientId);
         this._settleRoutesForRelay(clientId);
       }
 
       // Clean up messageOrigin entries for this client
-      for (const [msgId, origin] of this.messageOrigin) {
-        if (origin === clientId) {
+      for (const [msgId, route] of this.messageOrigin) {
+        if (route.origin === clientId) {
           this.messageOrigin.delete(msgId);
         }
       }
@@ -1035,25 +1316,55 @@ export class WebSocketBridge {
     });
   }
 
-  private _buildRelayState(): RelayState {
+  /**
+   * What one relay is told. The single-extension fields describe one browser:
+   * the one a relay was given if it names none (a client from before the
+   * roster, which must go on seeing the one-browser bridge it expects), and
+   * otherwise the default. `browsers` lists all of them for clients that can
+   * choose.
+   */
+  private _relayView(relayId: string | null): Omit<RelayState, 'type'> {
+    const boundKey = relayId ? this.legacyRelayBrowsers.get(relayId) : undefined;
+    const slot = boundKey ? this.slots.get(boundKey) ?? null : this._defaultSlot();
     return {
-      type: 'relay:state',
       hubInstanceId: this.instanceId,
-      extensionConnected: this.connected,
+      extensionConnected: slot !== null,
       relayCount: this.relayClients.size,
-      lastExtensionHeartbeatAt: this.lastExtensionHeartbeatAt,
+      lastExtensionHeartbeatAt: slot?.lastHeartbeatAt ?? null,
       lastDisconnectReason: this.lastDisconnectReason,
-      extensionAttachment: this.extensionAttachment,
+      extensionAttachment: slot?.attachment ?? null,
+      browsers: this._hubRoster(),
+      refusedBrowsers: [...this.browserRefusals.values()],
+      hubVersion: FSB_MCP_VERSION,
     };
   }
 
+  private _buildRelayState(relayId: string | null = null): RelayState {
+    return { type: 'relay:state', ...this._relayView(relayId) };
+  }
+
   private _broadcastRelayState(): void {
-    const raw = JSON.stringify(this._buildRelayState());
-    for (const [, ws] of this.relayClients) {
+    for (const [relayId, ws] of this.relayClients) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(raw);
+        ws.send(JSON.stringify(this._buildRelayState(relayId)));
       }
     }
+  }
+
+  private _kindOfSocket(ws: WsWebSocket): BrowserKind | null {
+    const origin = this.acceptedSocketMetadata.get(ws)?.browserOrigin;
+    return origin ? browserKindOf(origin) : null;
+  }
+
+  /** Record a focus report. True when it moved the browser's last focus forward. */
+  private _applyFocus(slot: ExtensionSlot, value: unknown): boolean {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return false;
+    // Never later than now: a browser cannot claim the default from the future.
+    const at = Math.min(value, Date.now());
+    if (slot.focusedAt !== null && at <= slot.focusedAt) return false;
+    slot.focusedAt = at;
+    this.lastFocusedAt.set(slot.key, at);
+    return true;
   }
 
   /**
@@ -1070,10 +1381,12 @@ export class WebSocketBridge {
         const heartbeatAt = Date.now();
         // A socket just replaced can still deliver a ping already in flight. It
         // is answered, but must not arm or refresh its successor's liveness.
-        const current = this.extensionClient === ws;
-        if (current) {
-          this.lastExtensionHeartbeatAt = heartbeatAt;
-          this.extensionHeartbeatCount += 1;
+        // Nor may one browser's ping refresh another browser's slot.
+        const pinged = this._slotOf(ws);
+        const current = pinged !== null;
+        if (pinged) {
+          pinged.lastHeartbeatAt = heartbeatAt;
+          pinged.heartbeatCount += 1;
         }
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify(heartbeat.nonce === undefined
@@ -1083,20 +1396,37 @@ export class WebSocketBridge {
         if (current) this._broadcastRelayState();
         return;
       }
-      if (parsed.type === 'mcp:extension-state' && this.extensionClient === ws) {
+      const stateSlot = parsed.type === 'mcp:extension-state' || parsed.type === 'mcp:browser-state'
+        ? this._slotOf(ws)
+        : null;
+      if (parsed.type === 'mcp:extension-state' && stateSlot) {
         const { extensionId, extensionVersion, installInstanceId, normalWindowCount, connectedAt } = parsed;
-        if (typeof extensionId === 'string' && /^[a-p]{32}$/.test(extensionId)
+        // Chrome's id is 32 letters. Safari's is its bundle id, followed by the
+        // signing team in parentheses.
+        const idPattern = stateSlot.kind === 'safari' ? SAFARI_EXTENSION_ID_PATTERN : /^[a-p]{32}$/;
+        if (typeof extensionId === 'string' && extensionId.length <= 128 && idPattern.test(extensionId)
           && typeof extensionVersion === 'string' && extensionVersion.length <= 64
           && typeof installInstanceId === 'string' && installInstanceId.length <= 128
           && Number.isInteger(normalWindowCount) && (normalWindowCount as number) >= 0
           && (normalWindowCount as number) <= 1000
           && (connectedAt === null || (typeof connectedAt === 'string' && connectedAt.length <= 64))) {
-          this.extensionAttachment = { extensionId, extensionVersion, installInstanceId,
+          stateSlot.attachment = { extensionId, extensionVersion, installInstanceId,
             normalWindowCount: normalWindowCount as number, connectedAt: connectedAt as string | null };
+          this._applyFocus(stateSlot, parsed.focusedAt);
           this._broadcastRelayState();
         }
         return;
       }
+      if (parsed.type === 'mcp:browser-state' && stateSlot) {
+        // Focus reports decide the default browser, so they are rate limited
+        // and taken only from a socket that holds a slot.
+        const now = Date.now();
+        if (now - stateSlot.lastBrowserStateAt < BROWSER_STATE_MIN_INTERVAL_MS) return;
+        stateSlot.lastBrowserStateAt = now;
+        if (this._applyFocus(stateSlot, parsed.focusedAt)) this._broadcastRelayState();
+        return;
+      }
+      if (parsed.type === 'mcp:extension-state' || parsed.type === 'mcp:browser-state') return;
     } catch {
       console.error(`[FSB Bridge ${this.instanceId}] Failed to parse extension message`);
       return;
@@ -1127,7 +1457,15 @@ export class WebSocketBridge {
 
     const resp = parsed as unknown as MCPResponse;
 
-    const origin = this.messageOrigin.get(resp.id);
+    const route = this.messageOrigin.get(resp.id);
+    // An answer counts only from the browser the request went to. Another
+    // browser that happens to use the same id must not settle it.
+    const asked = route?.browser ?? this.pendingRequests.get(resp.id)?.browser ?? null;
+    if (asked !== null && asked !== this._kindOfSocket(ws)) {
+      console.error(`[FSB Bridge ${this.instanceId}] Dropped a response from a browser that was not asked`);
+      return;
+    }
+    const origin = route?.origin;
 
     // Progress notifications
     if (resp.type === 'mcp:progress') {
@@ -1206,7 +1544,8 @@ export class WebSocketBridge {
     const metadata = this.acceptedSocketMetadata.get(ws);
     if (!metadata) return;
     metadata.extAuthorized = false;
-    if (this.extensionClient === ws) this.extensionCloseCause = 'extension_auth_revoked';
+    const revoked = this._slotOf(ws);
+    if (revoked) revoked.closeCause = 'extension_auth_revoked';
     logBridgeEvent({
       event: 'ext_authority_revoked',
       instanceId: this.instanceId,
@@ -1420,12 +1759,13 @@ export class WebSocketBridge {
 
     const msg = parsed as unknown as MCPMessage;
 
-    if (!this.extensionClient) {
+    const target = this._slotForRelayFrame(clientId, parsed.browser);
+    if (!target.slot) {
       // Can't forward -- send error back to relay client
       const errorResp: MCPResponse = {
         id: msg.id,
         type: 'mcp:error',
-        payload: { success: false, error: 'extension_not_connected' },
+        payload: target.error,
       };
       const relayWs = this.relayClients.get(clientId);
       if (relayWs) relayWs.send(JSON.stringify(errorResp));
@@ -1433,10 +1773,65 @@ export class WebSocketBridge {
     }
 
     // Track origin so we can route the response back
-    this.messageOrigin.set(msg.id, clientId);
+    this.messageOrigin.set(msg.id, { origin: clientId, browser: target.slot.key });
 
-    // Forward to extension
-    this.extensionClient.send(raw);
+    // Forward to the browser. `browser` is this hub's own routing: an
+    // extension is sent the frame without it.
+    if (Object.prototype.hasOwnProperty.call(parsed, 'browser')) {
+      const { browser: _routing, ...frame } = parsed;
+      target.slot.socket.send(JSON.stringify(frame));
+    } else {
+      target.slot.socket.send(raw);
+    }
+  }
+
+  /**
+   * Choose the browser for one relayed request.
+   *
+   * A frame that names a browser goes there or fails: it never falls back to
+   * another one. A frame that names none comes from a client that predates the
+   * roster. That relay is given the default browser on its first frame and
+   * keeps it, through a worker restart too, until the browser has been gone
+   * for the binding grace (a minute by default).
+   */
+  private _slotForRelayFrame(
+    relayId: string,
+    requested: unknown,
+  ): { slot: ExtensionSlot; error?: undefined } | { slot: null; error: Record<string, unknown> } {
+    if (typeof requested === 'string' && requested) {
+      const slot = BROWSER_KEY_PATTERN.test(requested) ? this.slots.get(requested) ?? null : null;
+      if (slot) return { slot };
+      return {
+        slot: null,
+        error: {
+          success: false,
+          error: 'browser_not_connected',
+          code: 'BROWSER_NOT_CONNECTED',
+          browser: requested.slice(0, 32),
+          connectedBrowsers: [...this.slots.keys()],
+        },
+      };
+    }
+
+    let key = this.legacyRelayBrowsers.get(relayId);
+    if (key && !this.slots.has(key)) {
+      const goneAt = this.slotGoneAt.get(key);
+      if (goneAt === undefined || Date.now() - goneAt > this.legacyRelayBindingGraceMs) key = undefined;
+    }
+    if (!key) {
+      const fallback = this._defaultSlot();
+      if (fallback) {
+        key = fallback.key;
+        this.legacyRelayBrowsers.set(relayId, key);
+        // From here on this relay hears about its own browser.
+        const relayWs = this.relayClients.get(relayId);
+        if (relayWs?.readyState === WebSocket.OPEN) {
+          relayWs.send(JSON.stringify(this._buildRelayState(relayId)));
+        }
+      }
+    }
+    const slot = key ? this.slots.get(key) ?? null : null;
+    return slot ? { slot } : { slot: null, error: { success: false, error: 'extension_not_connected' } };
   }
 
   // --------------------------------------------------------------------------
@@ -1446,15 +1841,24 @@ export class WebSocketBridge {
   private _applyRelayState(state: RelayWelcome | RelayState): void {
     this.hubConnected = true;
     this.activeHubInstanceId = state.hubInstanceId;
-    this.relayExtensionConnected = state.extensionConnected === true;
+    // Replaced whole on every state: a roster is never merged with an older
+    // one, and a hub that sends none leaves it null.
+    this.relayBrowsers = parseRoster(state.browsers);
+    this.relayRefusedBrowsers = parseRefusals(state.refusedBrowsers);
+    this.relayHubVersion = typeof state.hubVersion === 'string' && state.hubVersion.length <= 32
+      ? state.hubVersion
+      : null;
+    this.relayExtensionConnected = this.relayBrowsers
+      ? this.relayBrowsers.length > 0
+      : state.extensionConnected === true;
     this.relayCount = Number.isFinite(state.relayCount) ? state.relayCount : 0;
-    this.lastExtensionHeartbeatAt = typeof state.lastExtensionHeartbeatAt === 'number'
+    this.relayLastExtensionHeartbeatAt = typeof state.lastExtensionHeartbeatAt === 'number'
       ? state.lastExtensionHeartbeatAt
       : null;
     this.lastDisconnectReason = typeof state.lastDisconnectReason === 'string'
       ? state.lastDisconnectReason
       : null;
-    this.extensionAttachment = state.extensionAttachment ?? null;
+    this.relayExtensionAttachment = state.extensionAttachment ?? null;
     this.connected = this.relayExtensionConnected;
   }
 
@@ -1568,6 +1972,11 @@ export class WebSocketBridge {
         this.relayExtensionConnected = false;
         this.relayCount = 0;
         this.connected = false;
+        // The roster described a hub that is gone. Whoever is hub next, this
+        // process included, starts from none.
+        this.relayBrowsers = null;
+        this.relayRefusedBrowsers = [];
+        this.relayHubVersion = null;
         this.lastDisconnectReason = 'hub_disconnected';
         console.error(`[FSB Bridge ${this.instanceId}] Relay mode: disconnected from hub`);
 

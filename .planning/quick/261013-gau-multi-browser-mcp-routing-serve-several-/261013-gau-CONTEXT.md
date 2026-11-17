@@ -97,6 +97,57 @@ extension's `safari-web-extension://<UUID>` on every browser launch.
 
 </specifics>
 
+<update date="2026-11-16">
+## What was built, and what changed from the above
+
+Built on `safari-extension-port` for Chrome and Safari. Chrome profiles and
+other Chromium browsers are left for later, and Safari pairing is a separate
+change.
+
+- **Browser identity comes from the Origin scheme**, not from a frame the
+  extension sends after connecting. The slot key is the browser kind
+  (`chrome`, `safari`), so there is no pending-identity state and the Chrome
+  extension that is already installed works unchanged. Chrome, Brave and Edge
+  therefore still share one slot. The roster carries each install id, which is
+  the key for profiles later.
+- **The `browser` argument is on three tools only**: `open_tab`, `list_tabs`
+  and `run_task`. Every other tool follows its tab or the session's current
+  browser. This replaces "tab-taking tools accept an optional `browser`
+  argument": about 55 tool descriptions would have grown in every client's
+  context. It is added in the MCP layer, so the registry and its pin are
+  untouched.
+- **A session's current browser is the one its last call used**, and it is kept
+  on the `AgentScope`, because one HTTP process serves many sessions. Added
+  ahead of "most recently focused": `FSB_BROWSER` from the client's config.
+- **"Most recently focused" applies only when every attached browser reports
+  focus.** Until then the default is Chrome. Found on a device: with Safari
+  reporting and the installed Chrome extension not, a client on the published
+  server was given Safari. Agents that have always driven Chrome must not move
+  the day Safari attaches.
+- **A decided browser that is away is an error**, never a fallback. The browser
+  is chosen once per call and reused for the registration, the send and the
+  `AGENT_NOT_REGISTERED` retry.
+- **Tabs are matched from what the session has seen**, not from a hub-wide list
+  of tab ids, so the extension reports no tab ids. The ambiguous case has its
+  own code, `AMBIGUOUS_TAB_BROWSER`: `AMBIGUOUS_TAB` already means something
+  else.
+- **Focus is sampled, not listened for.** The extension reads
+  `windows.getLastFocused()` when it sends its state frame (on connect and on
+  every keepalive). A focus listener would wake the service worker on every
+  window switch, and Safari does not deliver one reliably (WebKit 263170).
+- **`bridge-auth.json` is untouched and there is no sidecar yet.** With no pin,
+  each browser attaches unpaired. With a pin, only the pinned browser attaches,
+  and binding a pin closes any other attached browser.
+- **Safari pairing: not the folder grant.** The research found that a
+  security-scoped bookmark made by the app cannot be resolved by the extension
+  process. Planned instead: a short code the server prints and the user types
+  into FSB in Safari.
+
+Tests: `tests/mcp-bridge-topology.test.js` (nine multi-browser cases),
+`tests/browser-routing.test.js`, `tests/mcp-bridge-client-lifecycle.test.js`
+(focus report).
+</update>
+
 <canonical_refs>
 ## Canonical References
 

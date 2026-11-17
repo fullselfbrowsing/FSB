@@ -352,6 +352,8 @@ npx -y fsb-mcp-server@latest doctor
 npx -y fsb-mcp-server@latest status --watch
 ```
 
+With several browsers attached, `doctor` and `status` list each one, and `--browser <name>` chooses which one the detailed lines describe.
+
 `doctor` reports the primary failing layer: package, bridge, authorization, extension, active tab, content script, or configuration. Only restart or reinstall the client when the reported layer points there.
 
 `doctor` and `status` show the extension ID, extension version, persistent install instance ID, connection time, and normal-window count. The tab count comes from the diagnostic route. `NO_BROWSER_WINDOW` means the attached profile has no normal browser window; open one there. `ORIGIN_PIN_MISMATCH` means the bridge is pinned to a different extension ID; run `npx -y fsb-mcp-server@latest pair --reset` and pair again. The bridge serves one attached extension profile at a time and does not switch profiles automatically. MCP server and extension versions are released independently; compare their reported versions with each component's requirements.
@@ -462,6 +464,55 @@ Restricted pages such as `chrome://` surfaces cannot be watched by content scrip
 The extension enforces trigger concurrency with `fsbTriggerCap`, configurable in the control panel. Default is `8`, range is `1..64`. Active usage includes armed watches plus attention states such as `needs_attention` and `blocked`; terminal states such as `fired`, `timed_out`, and `stopped` do not count as active cap usage.
 
 ---
+
+## Several Browsers On One Server
+
+One bridge on port 7225 can hold Chrome and Safari at the same time. The hub keeps one slot per browser and tells them apart by the scheme of the `Origin` each extension connects with (`chrome-extension://` or `safari-web-extension://`), so the extension needs no update for this. Two Chromium browsers still share the one `chrome` slot.
+
+### How a call's browser is chosen
+
+Each MCP session decides the browser for every call before it registers or sends anything. The first rule that applies decides:
+
+1. The browser the call names. `open_tab`, `list_tabs` and `run_task` take an optional `browser` argument: `"chrome"` or `"safari"`.
+2. The browser the call's tab lives in, as far as the session has seen that tab.
+3. The browser the session's last call used. Naming a browser once is therefore the switch.
+4. `FSB_BROWSER` from the client's MCP config, which sets where a new session starts.
+5. Chrome, until every attached browser reports when it last had focus. From then on, the most recently focused one. An extension from before this feature reports none, so clients that have always driven Chrome are not moved when Safari attaches.
+
+A decided browser that is not connected is an error. A call is never sent to a different browser than the one it belongs to.
+
+To keep one agent in Safari while another works in Chrome, set the variable in each client's config:
+
+```json
+{
+  "mcpServers": {
+    "fsb": {
+      "command": "npx",
+      "args": ["-y", "fsb-mcp-server@latest"],
+      "env": { "FSB_BROWSER": "safari" }
+    }
+  }
+}
+```
+
+### What an agent sees
+
+- With one browser connected nothing changes.
+- With more than one, every result carries `browser`, and `list_tabs` adds `browsers`: each connected browser, which one the listing came from, and which was focused last.
+- A session keeps a separate agent identity, and separate tab ownership, in each browser it uses. Tab IDs are numbers that belong to one browser.
+- `stop_task` and `get_task_status` go to the browser running the session's task, and `stop_trigger` and `get_trigger_status` to the browser the trigger was armed in, without moving the session there.
+
+| Error | Meaning | What to do |
+|-------|---------|------------|
+| `BROWSER_NOT_CONNECTED` | The call belongs to a browser that is not attached. It was not sent anywhere else. | Retry when the browser is back, or name a connected browser on `open_tab` or `list_tabs`. |
+| `AMBIGUOUS_TAB_BROWSER` | The tab ID was seen in more than one browser and the session is in neither. | Call `list_tabs` with `browser` set, then retry. |
+| `BROWSER_CHOICE_UNAVAILABLE` | The bridge on this machine is run by an `fsb-mcp-server` from before this feature. It serves one Chromium browser. | Restart the MCP clients on the current version so a current server runs the bridge. |
+
+### Pairing and versions
+
+- With no pairing, each browser attaches unpaired. With a pairing, only the paired browser attaches, and pairing one browser closes any other that was attached. `status` and `doctor` show a browser that was turned away and why. Safari cannot be paired yet.
+- Whichever server binds port 7225 first is the hub, and the hub decides what is possible. A client from before this feature that connects to a current hub is given one browser and keeps it.
+- `status` and `doctor` list every attached browser. `--browser <name>` chooses which one their detailed lines describe.
 
 ## Multi-Agent Contract (v0.8.0)
 

@@ -108,6 +108,12 @@ function readNumberFlag(flags: Record<string, FlagValue>, name: string, fallback
   return fallback;
 }
 
+/** The browser `status` or `doctor` should ask, when one is named. */
+function readBrowserFlag(flags: Record<string, FlagValue>): string | null {
+  const name = readStringFlag(flags, 'browser', '').trim().toLowerCase();
+  return name ? name : null;
+}
+
 function isJson(flags: Record<string, FlagValue>): boolean {
   return flags.json === true;
 }
@@ -137,6 +143,9 @@ Options:
   --watch             Continuously refresh \`status\`
   --interval <ms>     Poll interval for \`status --watch\` (default: 1000)
   --json              Emit machine-readable JSON for status or doctor
+  --browser <name>    With several browsers attached, the one \`status\` or
+                      \`doctor\` asks: chrome or safari (default: the one
+                      used last)
 `);
 }
 
@@ -243,6 +252,27 @@ function formatExtensionAttachment(diagnostics: DiagnosticsSnapshot): string[] {
   ];
 }
 
+const BROWSER_REFUSAL_TEXT: Record<string, string> = {
+  extension_origin_pin_mismatch:
+    'bridge pairing is bound to another browser. Cure: npx -y fsb-mcp-server@latest pair --reset',
+};
+
+/** Every attached browser, and any that tried to attach and was turned away. */
+function formatBrowsers(diagnostics: DiagnosticsSnapshot): string[] {
+  const topology = diagnostics.bridgeTopology;
+  const lines: string[] = [];
+  const browsers = Array.isArray(topology?.browsers) ? topology.browsers : [];
+  if (browsers.length > 0) {
+    lines.push(`Browsers: ${browsers.map((browser) => (
+      `${browser.key}${browser.extensionVersion ? ` ${browser.extensionVersion}` : ''} (${browser.authorized ? 'paired' : 'unpaired'})`
+    )).join(', ')}`);
+  }
+  for (const refusal of Array.isArray(topology?.refusedBrowsers) ? topology.refusedBrowsers : []) {
+    lines.push(`Browser not attached: ${refusal.kind} (${BROWSER_REFUSAL_TEXT[refusal.reason] ?? refusal.reason})`);
+  }
+  return lines;
+}
+
 function formatFieldLines(fields: Array<[string, string]>): string[] {
   return fields.map(([label, value]) => `${label}: ${value}`);
 }
@@ -268,6 +298,7 @@ export function formatStatus(diagnostics: DiagnosticsSnapshot): string {
   }
 
   lines.push(...formatExtensionAttachment(diagnostics));
+  lines.push(...formatBrowsers(diagnostics));
 
   if (diagnostics.tabsSummary) {
     lines.push(`Open tabs: ${diagnostics.tabsSummary.totalTabs}`);
@@ -298,6 +329,7 @@ export function formatWatchSnapshot(diagnostics: DiagnosticsSnapshot): string {
   }
 
   lines.push(...formatExtensionAttachment(diagnostics));
+  lines.push(...formatBrowsers(diagnostics));
 
   if (diagnostics.probeNotes && diagnostics.probeNotes.length > 0) {
     lines.push(`Note: ${diagnostics.probeNotes[0].message}`);
@@ -314,6 +346,7 @@ export function formatDoctor(diagnostics: DiagnosticsSnapshot): string {
     `Next action: ${diagnostics.nextAction}`,
     ...formatFieldLines(buildCompactStatusFields(diagnostics)),
     ...formatExtensionAttachment(diagnostics),
+    ...formatBrowsers(diagnostics),
   ];
 
   if (diagnostics.activeTab.url) {
@@ -487,6 +520,7 @@ async function runStatus(flags: Record<string, FlagValue>): Promise<void> {
       waitForExtensionMs,
       includeConfig: true,
       includeTabs: true,
+      browser: readBrowserFlag(flags),
       onUpdate: (diagnostics) => {
         if (isJson(flags)) {
           process.stdout.write(`${JSON.stringify(diagnostics)}\n`);
@@ -505,6 +539,7 @@ async function runStatus(flags: Record<string, FlagValue>): Promise<void> {
     waitForExtensionMs,
     includeConfig: true,
     includeTabs: true,
+    browser: readBrowserFlag(flags),
   }, productionNativeHostDiagnostics);
 
   if (isJson(flags)) {
@@ -520,6 +555,7 @@ async function runDoctor(flags: Record<string, FlagValue>): Promise<void> {
     waitForExtensionMs: readNumberFlag(flags, 'timeout', 2500),
     includeConfig: true,
     includeTabs: true,
+    browser: readBrowserFlag(flags),
   }, productionNativeHostDiagnostics);
 
   if (isJson(flags)) {

@@ -3,9 +3,15 @@ import type { WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import type { MCPMessageType } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
-import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
+import { connectedBrowserSummary, sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
-import { TOOL_REGISTRY, jsonSchemaToZod } from './schema-bridge.js';
+import {
+  BROWSER_ARGUMENT_TOOLS,
+  TOOL_REGISTRY,
+  jsonSchemaToZod,
+  splitBrowserArgument,
+  withBrowserArgument,
+} from './schema-bridge.js';
 
 // ---------------------------------------------------------------------------
 // Bridge message type mapping
@@ -126,11 +132,15 @@ export function registerReadOnlyTools(
     server.tool(
       tool.name,
       tool.description,
-      zodShape,
-      async (params: Record<string, unknown>) => {
+      withBrowserArgument(tool.name, zodShape),
+      async (rawParams: Record<string, unknown>) => {
         if (!bridge.isConnected) {
           return mapFSBError({ success: false, error: 'extension_not_connected' });
         }
+        // The browser argument is this server's routing, not part of the call.
+        const { browser, params } = BROWSER_ARGUMENT_TOOLS.has(tool.name)
+          ? splitBrowserArgument(rawParams)
+          : { browser: undefined, params: rawParams };
         return queue.enqueue(tool.name, async () => {
           const targetTabId = typeof params.tab_id === 'number' ? params.tab_id : null;
           const built = messageBuilder(params);
@@ -139,8 +149,18 @@ export function registerReadOnlyTools(
             agentScope,
             built.type,
             built.payload as Record<string, unknown>,
-            { timeout, targetTabId },
+            { timeout, targetTabId, browser },
           );
+          // A tab listing shows one browser's tabs. With several attached it
+          // also says which ones there are, so an agent can ask for another
+          // without any call being sent to all of them.
+          if (tool.name === 'list_tabs' && result && result.success !== false) {
+            const browsers = connectedBrowserSummary(
+              bridge,
+              typeof result.browser === 'string' ? result.browser : null,
+            );
+            if (browsers) result.browsers = browsers;
+          }
           // fail_task reports the task's outcome with success:false even when
           // the dispatcher successfully recorded it. Treat only that canonical
           // lifecycle envelope as an acknowledgement; genuine tool failures

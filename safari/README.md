@@ -7,7 +7,7 @@ payload is generated into `build/safari/` by `npm run build:safari`.
 ```
 npm run build:safari      # esbuild -> build/safari/ -> Version.xcconfig
 npm run validate:safari   # manifest + JS syntax + Safari negative invariants
-npm run test:safari       # 716 assertions across 16 suites (one needs macOS + swiftc)
+npm run test:safari       # 1007 assertions across 17 suites (one needs macOS + swiftc)
 ```
 
 ## Why there is no fork
@@ -83,15 +83,45 @@ Both transports present the extension's own `Origin`. `URLSessionWebSocketTask`
 sends none by default, so `MCPSocketSession` sets it from the `open` frame: the
 server treats an Origin-less socket as an MCP relay that must say
 `relay:hello`, never as the extension. The `safari-web-extension://` allowlist
-entry exists only on this branch. Published `fsb-mcp-server` (0.11.1 at the
+entry exists only on this branch. Published `fsb-mcp-server` (0.11.5 at the
 time of writing) refuses that origin on both transports, so Safari needs an MCP
 release cut from here.
 
-**One browser at a time, and Safari stays unpaired.** The server holds one
-extension socket and pins one extension origin in `~/.fsb/bridge-auth.json`.
-While Chrome is paired, every other browser origin is refused at the upgrade,
-paired or not; `fsb-mcp-server pair --reset` clears the pin. Safari cannot pair
-yet either:
+**Safari and Chrome at the same time.** The hub keeps one slot per browser, told
+apart by the scheme of the `Origin` each extension connects with. So Safari no
+longer competes with Chrome for the one extension socket, and Chrome needs no
+update for this: its installed extension is recognised by its Origin.
+
+An agent chooses its browser with an optional `browser` argument (`"chrome"` or
+`"safari"`) on `open_tab`, `list_tabs` and `run_task`. Every other call follows
+the tab it names, or the browser the agent used last, so naming a browser once
+is the switch. A client can be started in one browser with `FSB_BROWSER=safari`
+in its MCP config, which is how one agent is kept in Safari while another works
+in Chrome. A call with nothing to tie it to a browser goes to Chrome, until
+every attached browser reports when it last had focus: from then on it goes to
+the one focused most recently. An extension from before this change reports
+no focus, so agents that have always driven Chrome are not moved to Safari the
+day Safari attaches. `list_tabs` lists the connected browsers. `mcp/README.md`
+("Several browsers on one server") has the full rule.
+
+Three things hold whatever the order of events:
+
+- A call that belongs to one browser is never sent to another. If Safari is
+  away, a call for a Safari tab fails with `BROWSER_NOT_CONNECTED`.
+- One browser going away fails only its own calls. A reply is accepted only
+  from the browser the request went to.
+- Whichever server binds port 7225 first is the hub. A hub from a published
+  package before this change serves one Chromium browser. A current client that
+  is asked for Safari there says so (`BROWSER_CHOICE_UNAVAILABLE`).
+
+**Safari stays unpaired.** Pairing is unchanged in effect: with no pin, each
+browser attaches unpaired, and with a pin only the pinned browser attaches.
+What is new is that pairing Chrome while Safari is attached closes Safari's
+slot, so the outcome is the same whichever came first. A refused upgrade is a
+bare 403 that carries no reason to the browser, so the reason is shown by
+`fsb-mcp-server status`, by `doctor`, and in the error an agent gets when it
+names Safari. `fsb-mcp-server pair --reset` clears the pin. Safari cannot pair
+yet:
 
 - Chrome gets its pairing code from the Node native host, which reads `~/.fsb`.
   Safari's native messages go to the sandboxed app, which cannot.
@@ -100,8 +130,10 @@ yet either:
   so an exact-origin pin would not survive a relaunch.
 
 Unpaired, the MCP tools work. Delegated agent runs, which need pairing and the
-Node native host, do not. Pairing per browser and routing MCP calls to a chosen
-browser are planned as a separate change.
+Node native host, do not. Safari pairing is planned as a separate change: a
+short code the server prints and the user types into FSB in Safari, in place of
+a folder grant, because a security-scoped bookmark made by the app cannot be
+resolved by the extension process.
 
 **Socket lifetime is slaved to port lifetime, deliberately.** If the app kept
 :7225 open across a service-worker eviction, the hub would never see a close,
@@ -420,6 +452,8 @@ of its results by design, and the app already lists the roots in its own UI.
 | V10 | Does `resolveTargetTab` return the last content tab, and does `tabs.query` report the workspace window's `safari-web-extension://` URL? | the adapter rules out the workspace's tab by its window id as well as its URL, and a tab with no URL is never streamed |
 | V11 | Does Safari apply `left` / `top` / `width` / `height` from `windows.create` for a popup-type window and from `windows.update` for a normal one, and report them back from `windows.get`? | the adapter reads the bounds back and leaves the workspace floating, as before |
 | V12 | Does `ui/sidepanel.html` run inside a web page as the in-page panel, with its tab and window lookups routed through the worker? | the workspace window |
+| V13 | With Chrome and Safari both running, do both attach to one hub, and do two MCP clients (`FSB_BROWSER=safari` and `FSB_BROWSER=chrome`) work at once without touching each other's tabs? | none: this is the feature |
+| V14 | Does `windows.getLastFocused()` report `focused: true` only while Safari is the frontmost app, so the extension's focus time can pick the default browser? | the default stays Chrome; naming a browser and `FSB_BROWSER` do not depend on it |
 
 ### Results (Safari 26.5, macOS 26.6, ad-hoc signed Debug build)
 
@@ -440,3 +474,5 @@ hub on :7225.
 | V10 | Not verified: needs the workspace window. |
 | V11 | Not verified yet: needs a toolbar click on a device, in a window that is not full screen. |
 | V12 | Yes for the page itself: `ui/sidepanel.html` loads in a frame the content script adds, on a plain page, under `frame-src 'none'` and under Trusted Types, and its own non-web-accessible scripts load. The panel rendered and reported READY inside a full-screen window, with the host page intact. The toolbar toggle and the put-back after navigation are covered by tests and still need a click on a device. |
+| V13 | Yes, against Chrome with its installed 0.9.95 extension, unchanged. Both browsers attached to one hub. Two MCP clients, one started with `FSB_BROWSER=safari` and one with `FSB_BROWSER=chrome`, each opened a tab and ran a script at the same time, and `navigator.userAgent` confirmed each ran in its own browser. One client then moved by naming a browser, and calls that named a tab kept going to that tab's browser. A client on the published `fsb-mcp-server` 0.11.5, connected as a relay, worked and stayed in one browser. Not run on a device: a browser quitting in the middle of a call (covered by `tests/mcp-bridge-topology.test.js`). |
+| V14 | Mostly. With Safari in front the focus time advanced on every keepalive (20 s apart), and it stopped advancing once another app was in front. It also read as focused once at connect while another app was in front, straight after tab operations the extension itself had made in Safari, so automation can set it as well as the user. The installed Chrome extension reports no focus time, so on this machine the default stays Chrome until Chrome's extension is updated. |

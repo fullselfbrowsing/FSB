@@ -12,6 +12,7 @@
 
 import type { WebSocketBridge } from './bridge.js';
 import type { McpClientInventory } from './client-inventory.js';
+import { BROWSER_KEY_PATTERN, normalizeBrowserName } from './browser-routing.js';
 import { randomUUID } from 'node:crypto';
 
 const SCOPE_LOG_PREFIX = '[FSB AgentScope]';
@@ -31,6 +32,19 @@ export type AgentScopeEnvironment = Readonly<Record<string, string | undefined>>
 export type AgentScopeOptions = {
   environment?: AgentScopeEnvironment;
 };
+
+/** What a session knows about where it is, for choosing a call's browser. */
+export type BrowserSession = {
+  /** The browser this session's last call used. */
+  current: string | null;
+  /** The browser this client was configured to start in (FSB_BROWSER). */
+  configured: string | null;
+  /** The browsers this session has seen a tab id in. */
+  seenIn: (tabId: number) => string[];
+};
+
+// A session forgets the oldest tabs it has seen past this many.
+const MAX_SEEN_TABS = 5000;
 
 export class AgentScope {
   private agentId: string | null = null;
@@ -71,11 +85,24 @@ export class AgentScope {
   private recordingRunInFlight: Map<string, number> = new Map();
   private readonly environment: AgentScopeEnvironment;
 
-  constructor(options: AgentScopeOptions = {}) {
+  // Several browsers on one hub. An agent identity, its ownership tokens and
+  // its connection id all belong to one browser's registry, so a session keeps
+  // one child scope per browser it has used. The scope a session is created
+  // with is the root: it holds what the session knows about where it is, and
+  // it is itself the identity against a hub that serves a single browser.
+  private readonly parent: AgentScope | null;
+  private readonly browserKey: string | null;
+  private readonly children: Map<string, AgentScope> = new Map();
+  private currentBrowser: string | null = null;
+  private readonly seenTabs: Map<number, Set<string>> = new Map();
+
+  constructor(options: AgentScopeOptions = {}, parent: AgentScope | null = null, browserKey: string | null = null) {
     // Capture the process environment once. A delegated child receives the
     // daemon-minted id at spawn time; later ambient mutations must not change
     // the identity carried by this process's one registration handshake.
     this.environment = { ...(options.environment ?? process.env) };
+    this.parent = parent;
+    this.browserKey = browserKey;
   }
 
   setClientInfoSupplier(supplier: ClientInfoSupplier): void {
@@ -84,6 +111,70 @@ export class AgentScope {
 
   setClientInventorySupplier(supplier: ClientInventorySupplier): void {
     this.clientInventorySupplier = supplier;
+  }
+
+  /**
+   * This session's identity in one browser. Created on first use, and kept for
+   * the session: the same key always returns the same scope.
+   */
+  forBrowser(browser: string): AgentScope {
+    const root = this.parent ?? this;
+    let child = root.children.get(browser);
+    if (!child) {
+      child = new AgentScope({ environment: root.environment }, root, browser);
+      root.children.set(browser, child);
+    }
+    return child;
+  }
+
+  /** The browser this scope's identity lives in. Null for the root. */
+  browser(): string | null {
+    return this.browserKey;
+  }
+
+  /** What this session knows about where it is. */
+  browserSession(): BrowserSession {
+    const root = this.parent ?? this;
+    const configured = normalizeBrowserName(root.environment.FSB_BROWSER);
+    return {
+      current: root.currentBrowser,
+      // A name that could never be a browser is still reported, so the call
+      // fails naming it instead of quietly going somewhere else.
+      configured: configured && !BROWSER_KEY_PATTERN.test(configured) ? configured.slice(0, 32) : configured,
+      seenIn: (tabId: number) => [...(root.seenTabs.get(tabId) ?? [])],
+    };
+  }
+
+  /**
+   * Record that a call went to a browser, and which tabs its result showed
+   * there. The browser becomes the session's current one, and a later call
+   * that names one of those tabs follows it.
+   *
+   * `moveSession: false` is for a call the server sent back to a browser on
+   * its own account (stopping a trigger armed there, asking after a task
+   * running there). The agent did not choose to work there, so the session
+   * stays where it is.
+   */
+  noteBrowserUse(
+    browser: string,
+    tabIds: Iterable<number> = [],
+    options: { moveSession?: boolean } = {},
+  ): void {
+    const root = this.parent ?? this;
+    if (options.moveSession !== false) root.currentBrowser = browser;
+    for (const tabId of tabIds) {
+      if (!Number.isSafeInteger(tabId) || tabId < 0) continue;
+      const seen = root.seenTabs.get(tabId);
+      if (seen) {
+        seen.add(browser);
+        continue;
+      }
+      if (root.seenTabs.size >= MAX_SEEN_TABS) {
+        const oldest = root.seenTabs.keys().next().value;
+        if (oldest !== undefined) root.seenTabs.delete(oldest);
+      }
+      root.seenTabs.set(tabId, new Set([browser]));
+    }
   }
 
   /**
@@ -114,7 +205,10 @@ export class AgentScope {
           // stored as agent identity and never participates in MCP tool args.
           payload.delegationId = delegationId;
         }
-        const suppliedClientInfo = this.clientInfoSupplier?.();
+        // A per-browser scope describes the same client as its session.
+        const clientInfoSupplier = this.clientInfoSupplier ?? this.parent?.clientInfoSupplier ?? null;
+        const clientInventorySupplier = this.clientInventorySupplier ?? this.parent?.clientInventorySupplier ?? null;
+        const suppliedClientInfo = clientInfoSupplier?.();
         if (suppliedClientInfo) {
           const clientInfo: ClientInfo = {};
           if (typeof suppliedClientInfo.name === 'string') {
@@ -128,7 +222,7 @@ export class AgentScope {
           }
         }
 
-        const suppliedPlatforms = await this.clientInventorySupplier?.();
+        const suppliedPlatforms = await clientInventorySupplier?.();
         if (
           suppliedPlatforms &&
           typeof suppliedPlatforms === 'object' &&
@@ -138,8 +232,12 @@ export class AgentScope {
           payload.platforms = { ...suppliedPlatforms };
         }
 
+        // The registration goes to this scope's own browser. The root names
+        // none: it is the identity where there is only one browser to have.
         const result = await bridge.sendAndWait(
-          { type: 'agent:register', payload },
+          this.browserKey
+            ? { type: 'agent:register', payload, browser: this.browserKey }
+            : { type: 'agent:register', payload },
           { timeout: 10_000 },
         );
         if (!result || result.success !== true || typeof result.agentId !== 'string') {
@@ -330,5 +428,13 @@ export class AgentScope {
     // alongside the rest so a follow-up ensure() captures a fresh one.
     this.connectionId = null;
     this.rotateRecordingRun();
+    // Resetting one browser's identity leaves the others alone. Resetting the
+    // session resets all of them, and forgets where the session was.
+    if (!this.parent) {
+      for (const child of this.children.values()) child.reset();
+      this.children.clear();
+      this.currentBrowser = null;
+      this.seenTabs.clear();
+    }
   }
 }

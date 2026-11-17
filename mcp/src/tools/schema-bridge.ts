@@ -70,6 +70,43 @@ export const getToolsByRoute: (route: string) => ToolDefinition[] = toolDefs.get
 // ---------------------------------------------------------------------------
 
 /**
+ * The calls on which an agent chooses its browser. With several browsers on
+ * one hub (Chrome and Safari), every other tool follows the tab it names, or
+ * the browser the session is already in, so naming a browser once is the
+ * switch.
+ *
+ * The argument is added here, in the MCP layer, and never reaches the
+ * extension. The shared registry and its SHA-256 pin are untouched, and the
+ * extension's own autopilot, which runs inside one browser, never sees it.
+ */
+export const BROWSER_ARGUMENT_TOOLS: ReadonlySet<string> = new Set(['open_tab', 'list_tabs', 'run_task']);
+
+export const BROWSER_ARGUMENT_DESCRIPTION =
+  'Which connected browser to use: "chrome" or "safari". Omit it to stay in the browser you are already using. '
+  + 'Naming one makes it your browser for the calls that follow. list_tabs reports which browsers are connected.';
+
+export function browserArgument(): z.ZodTypeAny {
+  return z.string().optional().describe(BROWSER_ARGUMENT_DESCRIPTION);
+}
+
+/** A tool's Zod shape, with the browser argument if it is one of the tools that take it. */
+export function withBrowserArgument(
+  toolName: string,
+  shape: Record<string, z.ZodTypeAny>,
+): Record<string, z.ZodTypeAny> {
+  return BROWSER_ARGUMENT_TOOLS.has(toolName) ? { ...shape, browser: browserArgument() } : shape;
+}
+
+/** Take the browser argument out of a call's params: it is routing, not input. */
+export function splitBrowserArgument(
+  params: Record<string, unknown>,
+): { browser: unknown; params: Record<string, unknown> } {
+  if (!Object.prototype.hasOwnProperty.call(params, 'browser')) return { browser: undefined, params };
+  const { browser, ...rest } = params;
+  return { browser, params: rest };
+}
+
+/**
  * Convert a JSON Schema inputSchema object into the Zod shape record
  * that McpServer.tool() expects as its third argument.
  *
