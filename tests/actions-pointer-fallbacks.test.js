@@ -77,7 +77,7 @@ function makeEl(tag, opts = {}) {
   return el;
 }
 
-function buildEnv({ hit, scroller, active, execOk = true, pageScroller, tabbables = [] }) {
+function buildEnv({ hit, scroller, active, execOk = true, pageScroller, tabbables = [], overflow }) {
   const calls = { exec: [], stability: [] };
   class Ev {
     constructor(type, init) {
@@ -92,10 +92,14 @@ function buildEnv({ hit, scroller, active, execOk = true, pageScroller, tabbable
   const win = {
     innerWidth: 1000, innerHeight: 800, screenX: 0, screenY: 0,
     PointerEvent: Ev, MouseEvent: Ev, WheelEvent: Ev, DragEvent: Ev, KeyboardEvent: Ev,
-    getComputedStyle: (n) => ({
-      overflowY: n === scroller ? 'auto' : 'visible',
-      overflowX: n === scroller ? 'auto' : 'visible'
-    })
+    // `overflow` (a Map of element -> { x, y }) gives boxes their own axes;
+    // otherwise `scroller` scrolls both ways and nothing else scrolls.
+    getComputedStyle: (n) => (overflow && overflow.has(n)
+      ? { overflowY: overflow.get(n).y || 'visible', overflowX: overflow.get(n).x || 'visible' }
+      : {
+        overflowY: n === scroller ? 'auto' : 'visible',
+        overflowX: n === scroller ? 'auto' : 'visible'
+      })
   };
   const body = makeEl('body');
   const html = makeEl('html');
@@ -127,7 +131,7 @@ function buildEnv({ hit, scroller, active, execOk = true, pageScroller, tabbable
     sandbox.tools, sandbox.window, sandbox.document, Ev, Ev, Ev, Ev, Ev,
     sandbox.DataTransfer, sandbox.FSB, sandbox.waitForStability
   );
-  return { tools, calls, doc };
+  return { tools, calls, doc, win };
 }
 
 // Element with the focus-related surface the click and key paths read, whose
@@ -234,6 +238,26 @@ const DEGRADED_NOTE = /chrome\.debugger unavailable/;
     passAssert(el.events.includes('pointermove'), 'still fires pointermove');
   }
   {
+    // Sortable lists: the press lands on the label inside the draggable card.
+    const card = makeEl('li', { draggable: true });
+    const label = makeEl('span', { parentElement: card });
+    const { tools } = buildEnv({ hit: label });
+    const r = await tools.pointerDrag({ startX: 0, startY: 0, endX: 0, endY: 0, steps: 2 });
+    passAssertEqual(r.html5Drag, true, 'a press inside a draggable element starts an HTML5 drag');
+    passAssert(card.events.includes('dragstart') && card.events.includes('drag') && card.events.includes('dragend'),
+      'dragstart, drag and dragend fire on the draggable ancestor');
+    passAssert(!label.events.includes('dragstart'), 'not on the label that was hit');
+    passAssert(label.events.includes('pointerdown') && label.events.includes('mousedown'),
+      'pointer and mouse events still go to the element under the pointer');
+  }
+  {
+    const page = makeEl('div', { draggable: false });
+    const label = makeEl('span', { parentElement: page });
+    const { tools } = buildEnv({ hit: label });
+    const r = await tools.pointerDrag({ startX: 0, startY: 0, endX: 5, endY: 5, steps: 2 });
+    passAssertEqual(r.html5Drag, false, 'no draggable ancestor means no HTML5 drag');
+  }
+  {
     const el = makeEl('div');
     const { tools } = buildEnv({ hit: el });
     const r = await tools.pointerDrag({ startX: 0, startY: 0, endX: 10 });
@@ -315,6 +339,37 @@ const DEGRADED_NOTE = /chrome\.debugger unavailable/;
     passAssertEqual(host.scrollCalls, 0, 'not the host it is slotted into');
   }
 
+  console.log('\n=== 6c. wheelScrollAt scrolls a box that can move on the wheel\'s axis ===');
+  {
+    // A code block or wide table: overflows sideways only, inside a vertical feed.
+    const feed = makeEl('div', { id: 'feed', scrollHeight: 5000, clientHeight: 500 });
+    const pre = makeEl('pre', { id: 'code', parentElement: feed, scrollWidth: 3000, clientWidth: 600, scrollHeight: 200, clientHeight: 200 });
+    const line = makeEl('span', { parentElement: pre });
+    const overflow = new Map([[feed, { y: 'auto' }], [pre, { x: 'auto' }]]);
+    const { tools } = buildEnv({ hit: line, overflow, pageScroller: makeEl('html') });
+    const r = await tools.wheelScrollAt({ x: 5, y: 5, deltaY: 240 });
+    passAssertEqual(feed.scrollTop, 240, 'a vertical wheel over a horizontal strip scrolls the feed around it');
+    passAssertEqual(pre.scrollCalls, 0, 'not the strip, which cannot move vertically');
+    passAssertEqual(r.scroller, '<div#feed>', 'and reports the feed as the scroller');
+    const side = await tools.wheelScrollAt({ x: 5, y: 5, deltaX: 300, deltaY: 0 });
+    passAssertEqual(pre.scrollLeft, 300, 'a horizontal wheel over the same strip scrolls the strip');
+    passAssertEqual(side.scroller, '<pre#code>', 'and reports it');
+  }
+  {
+    // A nested list already at its bottom hands a downward wheel to its parent.
+    const outer = makeEl('div', { id: 'outer', scrollHeight: 5000, clientHeight: 500 });
+    const list = makeEl('ul', { id: 'list', parentElement: outer, scrollHeight: 1000, clientHeight: 400 });
+    list.scrollTop = 600;
+    const item = makeEl('li', { parentElement: list });
+    const overflow = new Map([[outer, { y: 'auto' }], [list, { y: 'auto' }]]);
+    const { tools } = buildEnv({ hit: item, overflow, pageScroller: makeEl('html') });
+    await tools.wheelScrollAt({ x: 5, y: 5, deltaY: 240 });
+    passAssertEqual(outer.scrollTop, 240, 'a list at its bottom passes a downward wheel on');
+    passAssertEqual(list.scrollCalls, 0, 'instead of scrolling a list that cannot move');
+    await tools.wheelScrollAt({ x: 5, y: 5, deltaY: -240 });
+    passAssertEqual(list.scrollTop, 360, 'an upward wheel still scrolls the list itself');
+  }
+
   console.log('\n=== 7. domInsertTextAt ===');
   {
     const el = makeEl('input', { value: 'old' });
@@ -338,6 +393,73 @@ const DEGRADED_NOTE = /chrome\.debugger unavailable/;
     const r = await tools.domInsertTextAt({ text: 'hello', selector: '#x', clearFirst: true });
     passAssert(r.success === true && r.clearFirst === true, 'explicit clearFirst is honoured');
     passAssertEqual(el.value, '', 'explicit clearFirst empties the field');
+  }
+  // insert_text's schema sends `position`, which cdpInsertText honours. These
+  // fields can take a selection, so the insert below lands on it.
+  function selectableInput(value) {
+    const el = makeEl('input', { value });
+    el.ranges = [];
+    el.setSelectionRange = (a, b) => { el.ranges.push([a, b]); };
+    return el;
+  }
+  {
+    const el = selectableInput('Old title');
+    const { tools, calls } = buildEnv({ hit: el, active: el });
+    const r = await tools.domInsertTextAt({ text: 'New title', selector: '#t', position: 'replace_all' });
+    passAssert(r.success === true && r.position === 'replace_all', 'position replace_all is honoured');
+    passAssertEqual(JSON.stringify(el.ranges), '[[0,9]]', 'replace_all selects the whole value');
+    passAssert(calls.exec.some((c) => c[0] === 'insertText' && c[1] === 'New title'),
+      'and inserts over that selection in one edit');
+  }
+  {
+    const el = selectableInput('Hello');
+    const { tools } = buildEnv({ hit: el, active: el });
+    const r = await tools.domInsertTextAt({ text: '!', selector: '#t', position: 'end' });
+    passAssert(r.success === true && r.position === 'end', 'position end is honoured');
+    passAssertEqual(JSON.stringify(el.ranges), '[[5,5]]', 'end collapses the selection after the last character');
+  }
+  {
+    const el = selectableInput('Hello');
+    const { tools } = buildEnv({ hit: el, active: el });
+    await tools.domInsertTextAt({ text: 'x', selector: '#t' });
+    passAssertEqual(el.ranges.length, 0, 'the default caret position leaves the selection alone');
+  }
+  {
+    const el = selectableInput('Old title');
+    const { tools } = buildEnv({ hit: el, active: el, execOk: false });
+    await tools.domInsertTextAt({ text: 'New title', selector: '#t', position: 'replace_all' });
+    passAssertEqual(el.value, 'New title', 'replace_all still replaces when insertText is refused');
+  }
+  {
+    // Email and number inputs throw on setSelectionRange.
+    const el = makeEl('input', { value: 'a@b.c' });
+    el.setSelectionRange = () => { const e = new Error('no selection'); e.name = 'InvalidStateError'; throw e; };
+    const { tools, calls } = buildEnv({ hit: el, active: el });
+    const r = await tools.domInsertTextAt({ text: '.uk', selector: '#t', position: 'end' });
+    passAssert(r.success === true, 'end on a field that rejects selection still succeeds');
+    passAssertEqual(el.value, 'a@b.c.uk', 'by appending to the value');
+    passAssert(!calls.exec.some((c) => c[0] === 'insertText'),
+      'without an insertText at a caret that could be anywhere');
+  }
+  {
+    const el = makeEl('div');
+    const { tools, doc, win } = buildEnv({ hit: el, active: el });
+    const log = [];
+    doc.createRange = () => ({
+      selectNodeContents: (n) => log.push(['contents', n === el]),
+      collapse: (toStart) => log.push(['collapse', toStart])
+    });
+    win.getSelection = () => ({ removeAllRanges: () => log.push(['clear']), addRange: () => log.push(['add']) });
+    await tools.domInsertTextAt({ text: 'x', selector: '#e', position: 'end' });
+    passAssertEqual(JSON.stringify(log), '[["contents",true],["collapse",false],["clear"],["add"]]',
+      'a contenteditable end selects its contents and collapses to the end');
+  }
+  {
+    const el = makeEl('input', { value: 'v' });
+    const { tools } = buildEnv({ hit: el, active: el });
+    const r = await tools.domInsertTextAt({ text: 'x', selector: '#t', position: 'middle' });
+    passAssert(r.success === false && /Invalid insertion position/.test(r.error), 'an unknown position is refused');
+    passAssertEqual(el.value, 'v', 'and the field is untouched');
   }
   {
     const el = makeEl('div');
@@ -498,6 +620,52 @@ const DEGRADED_NOTE = /chrome\.debugger unavailable/;
       'arrow keys reach page listeners but are not emulated');
     const missing = await env.tools.domKeyPress({});
     passAssert(missing.success === false && /key required/.test(missing.error), 'a missing key is rejected');
+  }
+  // Pages that test e.keyCode === 13 or e.which === 27 ignore a synthetic key
+  // that carries 0, so each press brings its legacy code.
+  function keyRecorder(env) {
+    const el = focusableEl(env, 'div');
+    el.seen = [];
+    const realDispatch = el.dispatchEvent;
+    el.dispatchEvent = function (e) { el.seen.push(e); return realDispatch.call(el, e); };
+    return el;
+  }
+  {
+    const env = {};
+    const el = keyRecorder(env);
+    Object.assign(env, buildEnv({ hit: el, active: el }));
+    const codes = {};
+    for (const key of ['Enter', 'Escape', 'Tab', 'Backspace', 'ArrowDown', 'a', '7', 'F5', 'Dead']) {
+      el.seen.length = 0;
+      env.doc.activeElement = el;
+      await env.tools.domKeyPress({ key });
+      codes[key] = el.seen.map((e) => e.keyCode + '/' + e.which).join(' ');
+    }
+    passAssertEqual(codes.Enter, '13/13 13/13', 'Enter keydown and keyup carry keyCode and which 13');
+    passAssertEqual(codes.Escape, '27/27 27/27', 'Escape carries 27');
+    passAssertEqual(codes.Tab.split(' ')[0], '9/9', 'Tab carries 9');
+    passAssertEqual(codes.Backspace, '8/8 8/8', 'Backspace carries 8');
+    passAssertEqual(codes.ArrowDown, '40/40 40/40', 'ArrowDown carries 40');
+    passAssertEqual(codes.a, '65/65 65/65', 'a letter carries its uppercase code');
+    passAssertEqual(codes['7'], '55/55 55/55', 'a digit carries its code');
+    passAssertEqual(codes.F5, '116/116 116/116', 'a function key carries its code');
+    passAssertEqual(codes.Dead, '0/0 0/0', 'a key with no legacy code carries 0');
+  }
+  {
+    // An engine whose constructor ignores the legacy init members.
+    const env = {};
+    const el = keyRecorder(env);
+    Object.assign(env, buildEnv({ hit: el, active: el }));
+    class StrictKeyboardEvent {
+      constructor(type, init) { this.type = type; this.key = init.key; this.defaultPrevented = false; }
+      get keyCode() { return 0; }
+      get which() { return 0; }
+      preventDefault() {}
+    }
+    env.win.KeyboardEvent = StrictKeyboardEvent;
+    await env.tools.domKeyPress({ key: 'Enter' });
+    passAssertEqual(el.seen.map((e) => e.keyCode + '/' + e.which).join(' '), '13/13 13/13',
+      'the code is pinned on the event when the constructor drops it');
   }
 
   console.log('\n=== 8. every fallback reports untrusted ===');

@@ -6044,12 +6044,39 @@ const tools = {
     return parent && parent.nodeType === 11 && parent.host ? parent.host : null;
   }
 
-  function _fsbScrollableAncestor(el) {
+  function _fsbDraggableAncestor(el) {
+    for (let node = el; node; node = _fsbComposedParent(node)) {
+      if (node === document.body || node === document.documentElement) return null;
+      if (node.draggable === true
+          || (typeof node.getAttribute === 'function' && node.getAttribute('draggable') === 'true')) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  // Whether a box can still scroll by `delta` on one axis: it scrolls on that
+  // axis, overflows on it, and is not already at the edge the delta points to.
+  function _fsbCanScrollAxis(overflow, position, viewSize, contentSize, delta) {
+    if (overflow !== 'auto' && overflow !== 'scroll') return false;
+    if (!(contentSize > viewSize)) return false;
+    return delta > 0 ? position + viewSize < contentSize - 1 : position > 0;
+  }
+
+  // The box a real wheel at this point would scroll: the nearest ancestor that
+  // can still move on an axis the wheel moves on. A horizontal strip under a
+  // vertical wheel, or a list already at its end, hands the scroll on to the
+  // box around it, as the browser's own scroll chaining does.
+  function _fsbScrollableAncestor(el, deltaX, deltaY) {
+    const dx = Number(deltaX) || 0;
+    const dy = Number(deltaY) || 0;
     let node = el;
     while (node && node !== document.body && node !== document.documentElement) {
       const style = window.getComputedStyle(node);
-      const canY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight;
-      const canX = (style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth;
+      const canY = dy !== 0
+        && _fsbCanScrollAxis(style.overflowY, node.scrollTop, node.clientHeight, node.scrollHeight, dy);
+      const canX = dx !== 0
+        && _fsbCanScrollAxis(style.overflowX, node.scrollLeft, node.clientWidth, node.scrollWidth, dx);
       if (canY || canX) return node;
       node = _fsbComposedParent(node);
     }
@@ -6185,7 +6212,11 @@ const tools = {
     if (!source) return { success: false, error: `No element at (${startX}, ${startY})` };
 
     const mods = _fsbMods(params);
-    const isDraggable = source.draggable === true || source.getAttribute('draggable') === 'true';
+    // A browser starts an HTML5 drag from the nearest draggable ancestor of
+    // the pressed point, and the hit test usually lands on a label or icon
+    // inside the draggable card rather than on the card itself.
+    const dragSource = _fsbDraggableAncestor(source);
+    const isDraggable = dragSource !== null;
     let dt = null;
     if (isDraggable && typeof DataTransfer === 'function') {
       try { dt = new DataTransfer(); } catch (_e) { dt = null; }
@@ -6200,7 +6231,7 @@ const tools = {
     }
 
     _fsbDispatchSeq(source, ['pointerover', 'pointermove', 'pointerdown', 'mousedown'], startX, startY, mods);
-    fireDrag(source, 'dragstart', startX, startY);
+    fireDrag(dragSource, 'dragstart', startX, startY);
 
     let last = source;
     for (let i = 1; i <= steps; i += 1) {
@@ -6209,7 +6240,7 @@ const tools = {
       const py = startY + (endY - startY) * t;
       const over = _fsbHitTest(px, py) || last;
       _fsbDispatchSeq(over, ['pointermove', 'mousemove'], px, py, mods);
-      fireDrag(source, 'drag', px, py);
+      fireDrag(dragSource, 'drag', px, py);
       if (over !== last) fireDrag(over, 'dragenter', px, py);
       fireDrag(over, 'dragover', px, py);
       last = over;
@@ -6219,7 +6250,7 @@ const tools = {
     const target = _fsbHitTest(endX, endY) || last;
     fireDrag(target, 'drop', endX, endY);
     _fsbDispatchSeq(target, ['pointerup', 'mouseup'], endX, endY, mods);
-    fireDrag(source, 'dragend', endX, endY);
+    fireDrag(dragSource, 'dragend', endX, endY);
     await waitForStability('click');
 
     return _fsbDegraded({
@@ -6261,7 +6292,7 @@ const tools = {
       }))) !== false;
     } catch (_e) { /* WheelEvent unsupported; the scrollBy below still applies */ }
 
-    const scroller = _fsbScrollableAncestor(el);
+    const scroller = _fsbScrollableAncestor(el, deltaX, deltaY);
     const beforeTop = scroller.scrollTop;
     const beforeLeft = scroller.scrollLeft;
     if (shouldScroll) {
@@ -6279,14 +6310,42 @@ const tools = {
     });
   };
 
+  // Put the selection where an insert at `position` belongs, as
+  // prepareCdpTextTarget does for the CDP path: all of the field for
+  // replace_all, its end for end. False when it cannot be placed: email and
+  // number inputs throw on setSelectionRange.
+  function _fsbPlaceSelection(el, position, isFormField) {
+    try {
+      if (isFormField) {
+        if (typeof el.setSelectionRange !== 'function') return false;
+        const length = (el.value || '').length;
+        el.setSelectionRange(position === 'end' ? length : 0, length);
+        return true;
+      }
+      const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
+      if (!selection || typeof document.createRange !== 'function') return false;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      if (position === 'end') range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
   tools.domInsertTextAt = async (params) => {
     const text = typeof params.text === 'string' ? params.text : '';
-    // Opt-IN, matching cdpInsertText's `if (clearFirst)`. The insert_text tool
-    // schema does not expose this parameter at all, so defaulting it to true
-    // would make every Safari insert_text wipe the field the model meant to
-    // insert INTO -- exactly backwards for the canvas/rich-editor cases the
-    // tool exists for.
-    const clearFirst = params.clearFirst === true;
+    // insert_text's `position` (caret | end | replace_all), defaulting to the
+    // caret the way cdpInsertText does. clearFirst is the older spelling of
+    // replace_all; it stays opt-in, so an insert never wipes a field unasked.
+    const position = params.position != null
+      ? params.position
+      : (params.clearFirst === true ? 'replace_all' : 'caret');
+    if (!['caret', 'end', 'replace_all'].includes(position)) {
+      return { success: false, error: 'Invalid insertion position' };
+    }
     let el = null;
 
     if (params.selector) {
@@ -6302,7 +6361,10 @@ const tools = {
     try { el.focus(); } catch (_e) { /* already focused or not focusable */ }
 
     const isFormField = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
-    if (clearFirst) {
+    // With the selection over the whole field, insertText below replaces it in
+    // one edit; collapsed at the end, it appends.
+    const placed = position === 'caret' || _fsbPlaceSelection(el, position, isFormField);
+    if (!placed && position === 'replace_all') {
       if (isFormField) {
         el.value = '';
         el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -6317,15 +6379,19 @@ const tools = {
     // execCommand('insertText') is what makes rich editors (Slack, Notion,
     // Google Docs) see a real edit rather than a value assignment. It is
     // deprecated but still the only in-page path that fires the right
-    // composition/input events. Fall back to direct assignment.
+    // composition/input events. Fall back to direct assignment. An end the
+    // selection could not reach goes straight to the assignment, since the
+    // caret could be anywhere in the field.
     let inserted = false;
-    try {
-      inserted = document.execCommand('insertText', false, text);
-    } catch (_e) {
-      inserted = false;
+    if (placed || position !== 'end') {
+      try {
+        inserted = document.execCommand('insertText', false, text);
+      } catch (_e) {
+        inserted = false;
+      }
     }
     if (!inserted && isFormField) {
-      el.value = (el.value || '') + text;
+      el.value = position === 'replace_all' ? text : (el.value || '') + text;
       inserted = true;
     }
     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -6339,7 +6405,8 @@ const tools = {
       success: true,
       method: 'domInsertText',
       textLength: text.length,
-      clearFirst,
+      position,
+      clearFirst: position === 'replace_all',
       target: _fsbDescribe(el)
     });
   };
@@ -6402,21 +6469,53 @@ const tools = {
   // One key press on whatever holds focus, as keydown then keyup. Printable
   // text goes through domInsertTextAt instead; this is for editing keys,
   // Escape, and shortcuts that pages handle in their own keydown listeners.
+  // Legacy keyCode/which values. A synthetic KeyboardEvent carries 0 unless it
+  // is given one, and pages still test e.keyCode === 13 or e.which === 27.
+  const FSB_LEGACY_KEY_CODES = {
+    Backspace: 8, Tab: 9, Enter: 13, Shift: 16, Control: 17, Alt: 18, Pause: 19,
+    CapsLock: 20, Escape: 27, Esc: 27, ' ': 32, Spacebar: 32, PageUp: 33, PageDown: 34,
+    End: 35, Home: 36, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
+    Insert: 45, Delete: 46, Meta: 91, ContextMenu: 93
+  };
+
+  function _fsbLegacyKeyCode(key) {
+    if (Object.prototype.hasOwnProperty.call(FSB_LEGACY_KEY_CODES, key)) return FSB_LEGACY_KEY_CODES[key];
+    const fn = /^F([1-9]|1[0-2])$/.exec(key);
+    if (fn) return 111 + Number(fn[1]);
+    if (key.length === 1 && /[a-z0-9]/i.test(key)) return key.toUpperCase().charCodeAt(0);
+    return 0;
+  }
+
   tools.domKeyPress = async (params) => {
     const key = typeof params.key === 'string' ? params.key : '';
     if (!key) return { success: false, error: 'key required' };
     const mods = _fsbMods(params);
     const KeyEvent = window.KeyboardEvent;
+    const keyCode = _fsbLegacyKeyCode(key);
     const init = Object.assign({
       key,
       code: typeof params.code === 'string' && params.code ? params.code : key,
+      keyCode,
+      which: keyCode,
       bubbles: true,
       cancelable: true,
       composed: true
     }, mods);
+    // An engine that ignores the legacy members of the init dictionary still
+    // reports 0, so the value is pinned on the event itself.
+    const keyEvent = (type) => {
+      const event = new KeyEvent(type, init);
+      if (keyCode && event.keyCode !== keyCode) {
+        try {
+          Object.defineProperty(event, 'keyCode', { get: () => keyCode });
+          Object.defineProperty(event, 'which', { get: () => keyCode });
+        } catch (_e) { /* the event keeps its own values */ }
+      }
+      return event;
+    };
 
     const target = document.activeElement || document.body;
-    const down = new KeyEvent('keydown', init);
+    const down = keyEvent('keydown');
     target.dispatchEvent(down);
 
     let defaultAction = null;
@@ -6428,7 +6527,7 @@ const tools = {
       }
     }
     // After Tab the keyup belongs to the newly focused element, as with a real press.
-    (document.activeElement || document.body).dispatchEvent(new KeyEvent('keyup', init));
+    (document.activeElement || document.body).dispatchEvent(keyEvent('keyup'));
     await waitForStability('type_keystroke');
 
     return _fsbDegraded({
