@@ -148,6 +148,8 @@ final class BridgeCoordinator {
                 return
             }
 
+            // A fresh dial starts from nothing the previous connection left.
+            //
             // A socket that never reached .open must not survive the new port.
             // Its callbacks are still attached, so it could answer the NEW
             // port's pendingOpenReply with a socket this coordinator no longer
@@ -155,12 +157,16 @@ final class BridgeCoordinator {
             // -- after which every handleFrame silently drops on
             // `self.socket?.send`. Reachable whenever a dial outlives the
             // extension's 8s NATIVE_OPEN_TIMEOUT_MS and it reconnects.
-            if self.socket != nil { self.discardSocket(reason: "superseded_by_new_port") }
+            //
             // A server-side close nils the socket without passing through
-            // discardSocket(), so half-built messages from that connection can
-            // still be here. Left in place, the new socket's watchdog would
-            // expire them and tear down a connection that did nothing wrong.
-            self.reassembly.removeAll()
+            // discardSocket(), and so leaves that connection's buffers behind:
+            // half-built messages the new socket's watchdog would expire, server
+            // frames meant for a connection that is gone, and the `closed` (or
+            // `error`) queued for a poll that never came. That stale `closed`
+            // would be the new port's first poll reply, and the extension would
+            // hang up on a connection that had just opened. discardSocket() is
+            // safe with no socket, and armWatchdog() below re-arms the watchdog.
+            self.discardSocket(reason: "superseded_by_new_port")
 
             let session = MCPSocketSession(url: parsed, origin: origin)
             self.socket = session

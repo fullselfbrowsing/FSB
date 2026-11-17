@@ -42,6 +42,7 @@ function passAssert(cond, msg) {
   else { failed++; console.error('  FAIL:', msg); }
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function passAssertEqual(a, b, msg) { passAssert(a === b, msg + ' (got ' + JSON.stringify(a) + ')'); }
 
 // Asynchronous on purpose: the echo servers live in this process, and
 // spawnSync would freeze the event loop that answers their handshakes.
@@ -57,13 +58,22 @@ function runHarness(binary, args) {
   });
 }
 
+// Echoes every message back, prefixed, except `close-me`, which the server
+// answers by closing the socket. byConnection[i] is what connection i+1 sent.
 function echoServer(prefix) {
-  const seen = { connections: 0, origins: [], closes: 0 };
+  const seen = { connections: 0, origins: [], closes: 0, byConnection: [] };
   const wss = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   wss.on('connection', (ws, req) => {
     seen.connections += 1;
     seen.origins.push(req.headers.origin || null);
-    ws.on('message', (data) => ws.send(prefix + data.toString()));
+    const received = [];
+    seen.byConnection.push(received);
+    ws.on('message', (data) => {
+      const text = data.toString();
+      received.push(text);
+      if (text === 'close-me') ws.close(1000, 'server_closed');
+      else ws.send(prefix + text);
+    });
     ws.on('close', () => { seen.closes += 1; });
   });
   return new Promise((resolve) => wss.on('listening', () => resolve({ wss, seen, url: `ws://127.0.0.1:${wss.address().port}` })));
@@ -117,12 +127,22 @@ function echoServer(prefix) {
 
   console.log('\n=== 4. closing relay leaves mcp open ===');
   passAssert(same(report.mcpAfterRelayClose, ['mcp:after-relay-close']), 'mcp still round-trips after relay closed');
-  passAssert(mcp.seen.connections === 1, 'mcp never redialled');
+  passAssert(mcp.seen.byConnection[0] && mcp.seen.byConnection[0].includes('after-relay-close'),
+    'on its first connection: closing relay did not make mcp redial');
 
   console.log('\n=== 5. relay reopens fresh ===');
   passAssert(report.relayReopen === 'opened' && report.relayReopenAdopted === false, 'relay dials a new socket');
   passAssert(relay.seen.connections === 2, 'the relay server saw a second connection');
   passAssert(same(report.relayAfterReopen, ['relay:ping-c']), 'and it round-trips');
+
+  console.log('\n=== 6. a server close with no poll parked does not end the next connection ===');
+  passAssert(report.mcpReopen === 'opened' && report.mcpReopenAdopted === false, 'mcp dials a new socket after the server closed it');
+  passAssert(mcp.seen.connections === 2, 'the mcp server saw a second connection');
+  passAssertEqual(report.mcpFirstPollAfterReopen, 'pollempty',
+    'the new port\'s first poll is not the old connection\'s queued `closed`');
+  passAssert(same(report.mcpAfterReopen, ['mcp:after-reopen']), 'and the new connection round-trips');
+  passAssert(mcp.seen.byConnection[1] && same(mcp.seen.byConnection[1], ['after-reopen']),
+    'on the second connection');
 
   console.log('\n---');
   console.log('passed:', passed, 'failed:', failed);

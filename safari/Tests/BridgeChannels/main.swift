@@ -76,6 +76,20 @@ report["relayReopenAdopted"] = relayReopen?["adopted"] as? Bool ?? false
 relay.handleFrame(["v": NativeFraming.protocolVersion, "t": "frame", "seq": 2, "data": "ping-c"])
 report["relayAfterReopen"] = poll(relay)
 
+// The server closes the mcp socket while no poll is parked, so the `closed`
+// is queued for a poll that never comes (the worker was evicted). A fresh
+// `open` must not hand that stale `closed` to the new port as its first poll
+// reply: the extension would hang up on a connection that had just opened.
+mcp.handleFrame(["v": NativeFraming.protocolVersion, "t": "frame", "seq": 3, "data": "close-me"])
+Thread.sleep(forTimeInterval: 1.0)
+let mcpReopen = waitFor { done in mcp.handleOpen(url: mcpURL, origin: origin) { done($0) } }
+report["mcpReopen"] = mcpReopen?["t"] as? String ?? "timeout"
+report["mcpReopenAdopted"] = mcpReopen?["adopted"] as? Bool ?? false
+let firstPoll = waitFor { done in mcp.handlePoll(waitMs: 500) { done($0) } }
+report["mcpFirstPollAfterReopen"] = firstPoll?["t"] as? String ?? "timeout"
+mcp.handleFrame(["v": NativeFraming.protocolVersion, "t": "frame", "seq": 4, "data": "after-reopen"])
+report["mcpAfterReopen"] = poll(mcp)
+
 mcp.handleClose(code: 1000, reason: "harness_done")
 relay.handleClose(code: 1000, reason: "harness_done")
 

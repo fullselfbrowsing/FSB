@@ -23,32 +23,87 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
 
     enum State { case idle, dialing, open, closing, closed }
 
-    private(set) var state: State = .idle
     let url: URL
     let origin: String?
     let socketId = UUID().uuidString
 
-    var onOpen: ((String) -> Void)?
-    var onText: ((String) -> Void)?
-    var onClosed: ((Int, String) -> Void)?
+    // Threading: every mutable member below is read and written on `queue`
+    // alone. The owner calls in from its own queue, URLSession calls back on
+    // its delegate queue, and the ping timer fires on a third; left alone,
+    // those raced on `task`, `session` and `pingTimer` -- a close cancelling
+    // the task while the failed receive tore the same fields down from
+    // URLSession's queue -- and concurrent stores to a strong reference can
+    // over-release it and crash the extension process. So the public entry
+    // points hop onto `queue`, and URLSession is handed an OperationQueue that
+    // runs on `queue`, which brings its delegate callbacks and every task
+    // completion handler there too.
+    //
+    // The hops are async and `queue` is serial, so calls keep the order they
+    // were made in: callbacks set before open() are in place when the dial
+    // starts, and callbacks cleared before close() are gone when it runs.
+    private let queue = DispatchQueue(label: "com.fullselfbrowsing.fsb.socket")
+    private static let queueKey = DispatchSpecificKey<ObjectIdentifier>()
 
+    private var _state: State = .idle
+    private var _onOpen: ((String) -> Void)?
+    private var _onText: ((String) -> Void)?
+    private var _onClosed: ((Int, String) -> Void)?
     private var session: URLSession?
     private var task: URLSessionWebSocketTask?
     private var pingTimer: DispatchSourceTimer?
-    private let queue = DispatchQueue(label: "com.fullselfbrowsing.fsb.socket")
+
+    /// Read from any queue. The owner reads it on its own queue, and nothing on
+    /// `queue` ever waits on the owner's, so the sync cannot deadlock.
+    var state: State { onQueue { _state } }
+
+    var onOpen: ((String) -> Void)? {
+        get { onQueue { _onOpen } }
+        set { queue.async { self._onOpen = newValue } }
+    }
+    var onText: ((String) -> Void)? {
+        get { onQueue { _onText } }
+        set { queue.async { self._onText = newValue } }
+    }
+    var onClosed: ((Int, String) -> Void)? {
+        get { onQueue { _onClosed } }
+        set { queue.async { self._onClosed = newValue } }
+    }
 
     init(url: URL, origin: String?) {
         self.url = url
         self.origin = origin
         super.init()
+        queue.setSpecific(key: Self.queueKey, value: ObjectIdentifier(self))
+    }
+
+    private func onQueue<T>(_ body: () -> T) -> T {
+        if DispatchQueue.getSpecific(key: Self.queueKey) == ObjectIdentifier(self) { return body() }
+        return queue.sync(execute: body)
     }
 
     func open() {
-        guard state == .idle else { return }
-        state = .dialing
+        queue.async { self.openOnQueue() }
+    }
+
+    func send(_ text: String) {
+        queue.async { self.sendOnQueue(text) }
+    }
+
+    func close(code: URLSessionWebSocketTask.CloseCode = .normalClosure, reason: String = "intentional") {
+        queue.async { self.closeOnQueue(code: code, reason: reason) }
+    }
+
+    // MARK: - On `queue`
+
+    private func openOnQueue() {
+        guard _state == .idle else { return }
+        _state = .dialing
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = false
-        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        let delegateQueue = OperationQueue()
+        delegateQueue.underlyingQueue = queue
+        delegateQueue.maxConcurrentOperationCount = 1
+        let session = URLSession(configuration: config, delegate: self, delegateQueue: delegateQueue)
         self.session = session
         var request = URLRequest(url: url)
         if let origin { request.setValue(origin, forHTTPHeaderField: "Origin") }
@@ -58,24 +113,24 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
         pump()
     }
 
-    func send(_ text: String) {
-        guard let task = task, state == .open else { return }
+    private func sendOnQueue(_ text: String) {
+        guard let task = task, _state == .open else { return }
         task.send(.string(text)) { [weak self] error in
             guard let self, let error else { return }
             self.fail(code: 1006, reason: "send_failed:\(error.localizedDescription)")
         }
     }
 
-    func close(code: URLSessionWebSocketTask.CloseCode = .normalClosure, reason: String = "intentional") {
-        guard state == .open || state == .dialing else { return }
-        state = .closing
+    private func closeOnQueue(code: URLSessionWebSocketTask.CloseCode, reason: String) {
+        guard _state == .open || _state == .dialing else { return }
+        _state = .closing
         stopPing()
         task?.cancel(with: code, reason: reason.data(using: .utf8))
         task = nil
         session?.invalidateAndCancel()
         session = nil
-        state = .closed
-        onClosed?(Int(code.rawValue), reason)
+        _state = .closed
+        _onClosed?(Int(code.rawValue), reason)
     }
 
     // MARK: - Receive loop
@@ -93,10 +148,10 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
             case .success(let message):
                 switch message {
                 case .string(let text):
-                    self.onText?(text)
+                    self._onText?(text)
                 case .data(let data):
                     // The `ws` npm server sends text, but never assume it.
-                    if let text = String(data: data, encoding: .utf8) { self.onText?(text) }
+                    if let text = String(data: data, encoding: .utf8) { self._onText?(text) }
                 @unknown default:
                     break
                 }
@@ -106,13 +161,13 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
     }
 
     private func fail(code: Int, reason: String) {
-        guard state != .closed else { return }
-        state = .closed
+        guard _state != .closed else { return }
+        _state = .closed
         stopPing()
         task = nil
         session?.invalidateAndCancel()
         session = nil
-        onClosed?(code, reason)
+        _onClosed?(code, reason)
     }
 
     // MARK: - Ping
@@ -137,14 +192,17 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
         pingTimer = nil
     }
 
-    // MARK: - URLSessionWebSocketDelegate
+    // MARK: - URLSessionWebSocketDelegate (delivered on `queue`)
 
     func urlSession(_ session: URLSession,
                     webSocketTask: URLSessionWebSocketTask,
                     didOpenWithProtocol protocol: String?) {
-        state = .open
+        // A close that ran while the handshake was finishing already settled
+        // this session; it must not come back to life as open.
+        guard _state == .dialing else { return }
+        _state = .open
         startPing()
-        onOpen?(socketId)
+        _onOpen?(socketId)
     }
 
     func urlSession(_ session: URLSession,

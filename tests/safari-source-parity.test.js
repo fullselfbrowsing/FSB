@@ -322,11 +322,15 @@ function extensionResourcePaths(pbx) {
         'every ingest failure goes through failReassembly');
 
       // A server-side close nils the socket without discardSocket(); a new
-      // socket must not inherit, then expire, the old connection's buffers.
-      const clearAt = openCode.indexOf('self.reassembly.removeAll()');
+      // socket must not inherit the old connection's buffers: half-built
+      // messages its watchdog would expire, or the queued `closed` that would
+      // be the new port's first poll reply.
+      const openDiscardAt = openCode.indexOf('self.discardSocket(');
       const dialAt = openCode.indexOf('MCPSocketSession(url:');
-      passAssert(clearAt >= 0 && dialAt > clearAt,
-        'handleOpen clears leftover reassembly before dialing a new socket');
+      passAssert(openDiscardAt >= 0 && dialAt > openDiscardAt,
+        'handleOpen discards the previous connection\'s state before dialing a new socket');
+      passAssert(!/if self\.socket != nil \{ self\.discardSocket/.test(openCode),
+        'and does so whether or not a socket is still attached');
 
       const framing = fs.readFileSync(
         path.join(ROOT, 'safari', 'FSB', 'Shared', 'NativeFraming.swift'), 'utf8'
