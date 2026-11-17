@@ -1139,11 +1139,44 @@ function shorten(text, max = 30) {
  */
 async function endSessionOverlays(session, reason) {
   const tabId = session.tabId || session.originalTabId;
+  const previousTabId = session.previousTabId;
   await sendSessionStatus(tabId, { phase: 'ended', reason });
 
   if (session.previousTabId && session.previousTabId !== tabId) {
     await sendSessionStatus(session.previousTabId, { phase: 'ended', reason: 'tab_switch' });
     session.previousTabId = null;
+  }
+
+  // The loop records a non-final visual tick on every tool dispatch, and the
+  // sends above only reach the page. Left in storage, that tick is replayed as
+  // a running overlay when the tab next finishes loading, for up to its 60s
+  // deadline. The 'ended' status just went out, so the clear sends nothing.
+  await clearSessionVisualTicks(session, [tabId, previousTabId], reason);
+}
+
+async function clearSessionVisualTicks(session, tabIds, reason) {
+  const agentId = session && typeof session.agentId === 'string' ? session.agentId : null;
+  if (!agentId
+      || typeof MCPVisualSessionLifecycleUtils === 'undefined'
+      || typeof MCPVisualSessionLifecycleUtils.clearVisualSession !== 'function') {
+    return;
+  }
+  const seen = new Set();
+  for (const id of tabIds) {
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    try {
+      await MCPVisualSessionLifecycleUtils.clearVisualSession(id, {
+        reason: 'session_' + (reason || 'ended'),
+        skipBroadcast: true,
+        agentId
+      });
+    } catch (error) {
+      automationLogger.debug('Clearing the visual tick on session end failed', {
+        tabId: id,
+        error: error?.message || String(error),
+      });
+    }
   }
 }
 

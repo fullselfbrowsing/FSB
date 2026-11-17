@@ -701,6 +701,68 @@ async function caseO() {
     .includes('contentScriptAbsentTabs.delete(tabId);'), 'O.12 closing the tab clears the mark');
 }
 
+// ------------------------------------------------------------------
+// Case P -- an ended autopilot run clears its own tick. The loop records a
+// non-final tick on every tool dispatch; endSessionOverlays only told the page.
+// The entry stayed in storage, and the tab-load replay above brought the
+// running overlay back on the next navigation for up to 60 s.
+// ------------------------------------------------------------------
+
+function loadEndSessionOverlays(lc) {
+  const fs = require('fs');
+  const vm = require('vm');
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const start = bg.indexOf('async function endSessionOverlays(session, reason) {');
+  const end = bg.indexOf('\n/**\n * Send session status to content script', start);
+  const sent = [];
+  const context = {
+    MCPVisualSessionLifecycleUtils: lc,
+    automationLogger: { debug() {} },
+    sendSessionStatus: async (tabId, statusData) => { sent.push({ tabId, phase: statusData.phase }); },
+    Number, Set, String
+  };
+  const source = start >= 0 && end > start ? bg.slice(start, end) : 'async function endSessionOverlays() {}';
+  return { end: vm.runInNewContext(source + '\nendSessionOverlays', context), sent };
+}
+
+async function caseP() {
+  console.log('\n--- Case P: an ended session clears the visual tick it left behind ---');
+  const { chromeMock, lc, capturedStatusBroadcasts } = setupHarness();
+  const read = async (tabId) => (await chromeMock.storage.session.get(['mcpVisualSession:' + tabId]))['mcpVisualSession:' + tabId];
+
+  await lc.recordVisualSessionTick(601, 'agent_owner', { visualReason: 'Step', client: 'Claude' });
+  const other = await lc.clearVisualSession(601, { reason: 'session_complete', agentId: 'agent_other' });
+  check(other && other.ok === true && other.action === 'noop', 'P.1 a clear scoped to another agent is a no-op');
+  check(!!(await read(601)), 'P.2 and the owner\'s entry stays');
+  const own = await lc.clearVisualSession(601, { reason: 'session_complete', agentId: 'agent_owner' });
+  check(own && own.action === 'cleared' && (await read(601)) === undefined, 'P.3 a clear scoped to the owner removes it');
+
+  await lc.recordVisualSessionTick(602, 'legacy:sidepanel', {
+    visualReason: 'autopilot-tool-dispatch:click', client: 'Autopilot', driver: 'autopilot', isFinal: false
+  });
+  await lc.recordVisualSessionTick(603, 'legacy:sidepanel', {
+    visualReason: 'autopilot-tool-dispatch:click', client: 'Autopilot', driver: 'autopilot', isFinal: false
+  });
+  await lc.recordVisualSessionTick(604, 'agent_someone_else', { visualReason: 'Step', client: 'Claude' });
+  const { end, sent } = loadEndSessionOverlays(lc);
+  const session = { tabId: 602, previousTabId: 603, agentId: 'legacy:sidepanel' };
+  capturedStatusBroadcasts.length = 0;
+  await end(session, 'complete');
+  check(sent.length === 2 && sent.every((s) => s.phase === 'ended'), 'P.4 both tabs are still told the session ended');
+  check((await read(602)) === undefined, 'P.5 the current tab\'s tick is cleared');
+  check((await read(603)) === undefined, 'P.6 the previous tab\'s tick is cleared too');
+  check(!!(await read(604)), 'P.7 another agent\'s tick is untouched');
+  check(capturedStatusBroadcasts.length === 0, 'P.8 the clear sends no second ended status');
+  const replay = await lc.replayVisualSessionLifecycleForTab(602);
+  check(replay && replay.action === 'noop' && capturedStatusBroadcasts.length === 0,
+    'P.9 the next page load on that tab replays nothing');
+
+  const { end: endNoAgent } = loadEndSessionOverlays(lc);
+  await lc.recordVisualSessionTick(605, 'agent_owner', { visualReason: 'Step', client: 'Claude' });
+  await endNoAgent({ tabId: 605 }, 'stopped');
+  check(!!(await read(605)), 'P.10 a session with no agent id clears nothing');
+}
+
 (async () => {
   await caseA();
   await caseB();
@@ -717,6 +779,7 @@ async function caseO() {
   await caseM();
   await caseN();
   await caseO();
+  await caseP();
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
   process.exit(failed > 0 ? 1 : 0);

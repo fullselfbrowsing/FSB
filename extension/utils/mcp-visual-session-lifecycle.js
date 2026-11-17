@@ -418,9 +418,12 @@
    *   - Broadcasts the v0.9.36-compatible clear-status payload to the tab's
    *     content script (unless options.skipBroadcast is true).
    *   - Missing entry is a no-op (still clears the alarm for safety).
+   *   - options.agentId, when given, limits the clear to an entry that agent
+   *     owns. Another agent's entry is left alone (no-op), so a session ending
+   *     on a tab cannot take down an overlay a different agent is driving.
    *
    * @param {number} tabId
-   * @param {object} options { reason?: string, skipBroadcast?: boolean }
+   * @param {object} options { reason?: string, skipBroadcast?: boolean, agentId?: string }
    * @returns {Promise<object>} { ok: true, action: 'cleared'|'noop', entry?: object } on success;
    *                            { ok: false, reason: string } on validation errors.
    */
@@ -434,12 +437,17 @@
     var opts = options || {};
     var reason = (typeof opts.reason === 'string' && opts.reason.trim().length > 0) ? opts.reason.trim() : 'timeout';
     var skipBroadcast = opts.skipBroadcast === true;
+    var ownerAgentId = (typeof opts.agentId === 'string' && opts.agentId.trim().length > 0) ? opts.agentId.trim() : null;
 
     var entry = await readStorageEntry(storageKey);
     if (!entry) {
       // Safety: clear alarm anyway in case storage was wiped externally.
       await clearAlarm(alarmName);
       return { ok: true, action: 'noop' };
+    }
+
+    if (ownerAgentId && entry.agentId !== ownerAgentId) {
+      return { ok: true, action: 'noop', entry: entry };
     }
 
     if (!skipBroadcast) {
