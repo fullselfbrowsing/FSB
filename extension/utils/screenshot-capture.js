@@ -562,6 +562,16 @@
         fail('SCREENSHOT_REGION_OUT_OF_BOUNDS', 'Only what is on screen can be captured here. Scroll the target into view, then retry.');
       }
 
+      // captureVisibleTab takes whatever tab is in front of the window right
+      // now, and the settle wait above can last seconds. If another agent or
+      // the user switched tabs meanwhile, this would return their page under
+      // this tab's URL.
+      const current = await bounded(tabs.get(targetTabId));
+      if (!current || current.active !== true || current.windowId !== tab.windowId) {
+        fail('SCREENSHOT_CAPTURE_FAILED',
+          'The tab left the screen before it could be captured. Use switch_tab with active:true, then retry.', { retryable: true });
+      }
+
       const screenBase64 = pngDataUrlBase64(await bounded(limited(
         Promise.resolve(tabs.captureVisibleTab(tab.windowId, { format: 'png' })), captureMs,
         () => new ScreenshotError('SCREENSHOT_CAPTURE_FAILED',

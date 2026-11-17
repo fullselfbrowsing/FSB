@@ -54,7 +54,14 @@ function harness(opts = {}) {
   const calls = { scripts: [], captures: [], crops: [] };
   const chrome = {
     tabs: {
-      get: async (id) => ({ id, windowId: 31, active: opts.active !== false, url: 'https://example.com/page' }),
+      // opts.activeSeq answers successive tabs.get calls, for a tab that
+      // leaves the screen partway through the capture.
+      get: async (id) => {
+        calls.gets = (calls.gets || 0) + 1;
+        const seq = opts.activeSeq;
+        const active = seq ? seq[Math.min(calls.gets, seq.length) - 1] : opts.active !== false;
+        return { id, windowId: 31, active, url: 'https://example.com/page' };
+      },
       captureVisibleTab: (windowId, options) => {
         calls.captures.push({ windowId, options });
         if (opts.hang === 'capture') return new Promise(() => {});
@@ -166,6 +173,14 @@ function harness(opts = {}) {
     passAssertEqual(bg.retryable, true, 'retryable: switch_tab then retry');
     passAssert(/switch_tab/.test(bg.error), 'and the message says how');
     passAssertEqual(hidden.calls.scripts.length, 0, 'no script ran in the background tab');
+
+    // Another agent or the user switches tabs during the settle wait.
+    const switched = harness({ activeSeq: [true, false] });
+    const moved = await engine.capture({}, 7, switched.options);
+    passAssertEqual(moved.code, 'SCREENSHOT_CAPTURE_FAILED', 'a tab that left the screen during the capture fails');
+    passAssertEqual(moved.retryable, true, 'retryably');
+    passAssertEqual(switched.calls.captures.length, 0, 'without capturing the tab that took its place');
+    passAssert(switched.names().includes('overlayRemoveScript'), 'and the hidden overlays are restored');
   }
 
   console.log('\n=== 5. a platform with CDP keeps the debugger path ===');
