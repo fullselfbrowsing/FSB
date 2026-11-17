@@ -734,6 +734,32 @@ function safariLikeScope(overrides) {
     passAssert(world.pages.get(11).shown === false && !world.store.fsbSafariPanel.windows[1], 'closing it asks the worker, which hides the panel and forgets the window');
   }
   {
+    // The close is what woke an evicted worker, so it lands before the saved
+    // panel record is read back. Answering it from the empty in-memory record
+    // saved {windows: {}} and erased the other window's panel.
+    const world = panelWorld().tab({ id: 11, windowId: 1 }).tab({ id: 21, windowId: 2 });
+    world.store.fsbSafariPanel = { windows: { 1: true, 2: true } };
+    let openGate;
+    const gate = new Promise((r) => { openGate = r; });
+    const scope = safariLikeScope((s) => {
+      world.chromeFor(null)(s);
+      s.chrome.storage.session.get = () => {
+        const snapshot = JSON.parse(JSON.stringify(world.store));
+        return gate.then(() => snapshot);
+      };
+    });
+    const plat = loadAdapter(scope);
+    plat.install();
+    const page = await world.panelPage(HOST);
+    page.plat.closeSurface();
+    await settle();
+    openGate();
+    await settle();
+    passAssertEqual(json(world.store.fsbSafariPanel), json({ windows: { 2: true } }),
+      'a close that wakes the worker forgets only its own window');
+    passAssertEqual(json(plat._panelState()), json({ windows: { 2: true } }), 'and the worker\'s own record agrees');
+  }
+  {
     const world = panelWorld().tab({ id: 11, windowId: 1 });
     await world.worker();
     const stranger = await world.panelPage({ tab: { id: 11, windowId: 1 }, frameId: 0, url: 'https://example.com/' });

@@ -730,7 +730,14 @@
     var host = sender.tab;
     if (ns === 'fsbPanel') {
       if (method === 'hostTab') return invoke(c.tabs.get, c.tabs, [host.id]);
-      if (method === 'close') { await hidePanelIn(c, host.windowId); return true; }
+      if (method === 'close') {
+        // The close may be what woke the worker. Until the saved panel state
+        // is back, _panel.windows is empty and saving it would erase every
+        // other window's panel.
+        if (_hydrating) { try { await _hydrating; } catch (_e) { /* best effort */ } }
+        await hidePanelIn(c, host.windowId);
+        return true;
+      }
       if (method === 'openOptions') { await invoke(c.runtime.openOptionsPage, c.runtime, []); return true; }
       throw new Error('Unknown panel call: ' + method);
     }
