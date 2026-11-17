@@ -759,6 +759,66 @@ describe('createDepthEngine', () => {
       expect(seen).not.toContain(2);
     }, 10000);
 
+    // A gentle swipe: a short push, then a long slow tail that covers less than half
+    // a plane of travel by the time the check below runs.
+    const gentle = (): number[] => {
+      const steps = [3, 6, 10, 14, 16];
+      for (let d = 15; d >= 1; d *= 0.95) steps.push(Math.round(d));
+      return steps;
+    };
+
+    it('sets off for the next plane while a gentle swipe is still going', async () => {
+      build([120, 120, 120]);
+      const run = burst(gentle());
+      await pause(300);
+      expect(activeIndex()).toBe(1);
+      await run;
+      await pause(300);
+      expect(seen).toEqual([0, 1]);
+    }, 10000);
+
+    it('leans on a nudge, then comes back to the plane it was on', async () => {
+      build([120, 120, 120]);
+      await burst([2, 4, 6, 5, 3, 2, 1]);
+      await pause(900);
+      expect(seen).toEqual([0]);
+      const h = layers()[0].querySelector<HTMLElement>('h2')!;
+      expect(h.style.translate).toBe('');
+      expect(h.style.filter).toBe('');
+    }, 10000);
+
+    // A real tail wobbles by a pixel or two as it falls, so it climbs for a step or two
+    // now and then.
+    it('keeps a momentum tail that wobbles to one plane', async () => {
+      build([120, 120, 120]);
+      const steps = [4, 10, 18, 26, 30];
+      for (let k = 0; k < 60; k++) steps.push(Math.max(1, Math.round(28 * Math.pow(0.95, k)) + [2, -1, 0][k % 3]));
+      await burst(steps);
+      await pause(400);
+      expect(seen).toEqual([0, 1]);
+    }, 10000);
+
+    it('takes no jump from the still event a trackpad sends as the fingers lift', async () => {
+      build([120, 120, 120]);
+      const steps = swipe(30);
+      steps.splice(6, 0, 0);
+      await burst(steps);
+      await pause(400);
+      expect(seen).toEqual([0, 1]);
+    }, 10000);
+
+    it('holds at the end of a plane that scrolls while the swipe that got there runs out', async () => {
+      build([120, window.innerHeight * 3, 120]);
+      engine!.go(1);
+      await settle(1);
+      const L = layers()[1];
+      L.scrollTop = L.scrollHeight - L.clientHeight - 60;
+      await burst(swipe(30));
+      await pause(400);
+      expect(activeIndex()).toBe(1);
+      expect(seen).not.toContain(2);
+    }, 10000);
+
     it('still eats the momentum of the swipe that changed planes', async () => {
       build([120, 120, 120]);
       wheel(120);
