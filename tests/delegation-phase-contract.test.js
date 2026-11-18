@@ -224,6 +224,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/change-report-settle-shortcuts.test.js',
   'node tests/name-binding.test.js',
   'node tests/hidden-tab-readiness.test.js',
+  'node tests/select-option-matching.test.js',
   'node tests/mcp-page-view.test.js',
 ]);
 

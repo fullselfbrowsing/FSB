@@ -1551,6 +1551,148 @@ function checkBinaryState(element, intent) {
 }
 
 // ============================================================================
+// SELECT OPTION RESOLUTION
+// A caller names an option by its value, its visible text or its position.
+// The option is found before the select is touched, so a request that names
+// no single option changes nothing, and its reply lists what the select offers.
+// ============================================================================
+
+// Most options a refusal lists by name; the rest are only counted.
+const SELECT_OPTION_LIST_LIMIT = 12;
+// Longest option text or value quoted in a refusal.
+const SELECT_OPTION_QUOTE_LIMIT = 80;
+
+/**
+ * Reduces option text to the form it is compared in: every run of whitespace
+ * (non-breaking spaces included) becomes one space and the ends are trimmed.
+ * @param {*} value - Text to normalize
+ * @returns {string} Normalized text
+ */
+function normalizeOptionText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Describes each option of a select by position, value, text and label.
+ * `shown` is the text a reply quotes: the option's text, or its label
+ * attribute when the option has no text of its own.
+ * @param {HTMLSelectElement} select - The select to read
+ * @returns {Array<Object>} One entry per option, in document order
+ */
+function describeSelectOptions(select) {
+  return Array.from(select.options || [], (option, index) => {
+    const text = normalizeOptionText(option.text);
+    const label = normalizeOptionText(option.label);
+    return { option, index, value: String(option.value ?? ''), text, label, shown: text || label };
+  });
+}
+
+/**
+ * Quotes options for a refusal, capped in count and in length.
+ * @param {Array<Object>} entries - Entries from describeSelectOptions
+ * @param {boolean} [withValues=false] - Also quote each option's value
+ * @returns {string} For example: "Red", "Green", and 3 more
+ */
+function quoteSelectOptions(entries, withValues = false) {
+  const clip = (value) => (value.length > SELECT_OPTION_QUOTE_LIMIT ? `${value.slice(0, SELECT_OPTION_QUOTE_LIMIT)}...` : value);
+  const quoted = entries.slice(0, SELECT_OPTION_LIST_LIMIT)
+    .map(entry => (withValues ? `"${clip(entry.shown)}" (value "${clip(entry.value)}")` : `"${clip(entry.shown)}"`));
+  const more = entries.length - quoted.length;
+  if (more > 0) quoted.push(`and ${more} more`);
+  return quoted.join(', ');
+}
+
+/**
+ * Finds the option a select_option request names, without changing the select.
+ *
+ * A value is tried as an option value, then as the option's visible text,
+ * then as text or label with letter case ignored. That last, loosest step
+ * counts only when exactly one option matches. A text request skips the value
+ * step, and an index must be the position of an existing option.
+ *
+ * @param {HTMLSelectElement} select - The select to search
+ * @param {Object} params - Tool parameters; value, index or text names the option
+ * @returns {Object} { choice, requestedBy, matchedBy } when one option is named,
+ *   otherwise { errorCode, error } with nothing chosen
+ */
+function resolveSelectOption(select, params) {
+  const entries = describeSelectOptions(select);
+  const offered = entries.length > 0
+    ? `Available options (${entries.length}): ${quoteSelectOptions(entries)}.`
+    : 'This select has no options.';
+  const refusal = (errorCode, error) => ({ errorCode, error });
+
+  const requestedBy = ['value', 'index', 'text'].find(key => params[key] !== undefined && params[key] !== null);
+  if (!requestedBy) {
+    return refusal('OPTION_NOT_FOUND', `No option was named, so nothing was changed. Pass an option's value or visible text as value. ${offered}`);
+  }
+
+  if (requestedBy === 'index') {
+    const raw = params.index;
+    const position = typeof raw === 'string' && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : raw;
+    if (!Number.isInteger(position) || position < 0 || position >= entries.length) {
+      const range = entries.length > 0 ? ` (positions 0 to ${entries.length - 1})` : '';
+      return refusal('OPTION_NOT_FOUND',
+        `Option index ${String(raw)} does not exist: this select has ${entries.length} option${entries.length === 1 ? '' : 's'}${range}. Nothing was changed. ${offered}`);
+    }
+    return { choice: entries[position], requestedBy, matchedBy: 'index' };
+  }
+
+  const requested = String(params[requestedBy]);
+  const wanted = normalizeOptionText(requested);
+
+  if (requestedBy === 'value') {
+    const byValue = entries.find(entry => entry.value === requested);
+    if (byValue) return { choice: byValue, requestedBy, matchedBy: 'value' };
+  }
+
+  const byText = entries.find(entry => entry.text === wanted);
+  if (byText) return { choice: byText, requestedBy, matchedBy: 'text' };
+
+  const folded = wanted.toLowerCase();
+  const loose = folded
+    ? entries.filter(entry => entry.text.toLowerCase() === folded || entry.label.toLowerCase() === folded)
+    : [];
+  if (loose.length === 1) return { choice: loose[0], requestedBy, matchedBy: 'text-ignoring-case' };
+  if (loose.length > 1) {
+    return refusal('OPTION_AMBIGUOUS',
+      `"${requested}" matches ${loose.length} options when letter case is ignored: ${quoteSelectOptions(loose, true)}. Nothing was changed. Retry with the exact text or the value of the option you want.`);
+  }
+  return refusal('OPTION_NOT_FOUND', `No option matches "${requested}". Nothing was changed. ${offered} Retry with one of these texts.`);
+}
+
+/**
+ * Lists the positions of the selected options, to tell whether a selection
+ * changed.
+ * @param {HTMLSelectElement} select - The select to read
+ * @returns {string} Comma-separated positions
+ */
+function readSelectedPositions(select) {
+  return Array.from(select.options || [], (option, index) => (option.selected ? index : -1))
+    .filter(index => index >= 0).join(',');
+}
+
+/**
+ * Tells whether a select currently holds the chosen option. A single select
+ * holds it when selectedIndex points at an option with the chosen value and
+ * text; a multiple select holds it when such an option is among those
+ * selected. Comparing value and text keeps the answer right when the page
+ * rebuilt its option elements in the meantime.
+ * @param {HTMLSelectElement} select - The select to read
+ * @param {Object} choice - Entry returned by resolveSelectOption
+ * @returns {boolean} True when the chosen option is selected
+ */
+function selectHoldsOption(select, choice) {
+  const options = select.options || [];
+  const selected = select.multiple
+    ? Array.from(options).filter(option => option.selected)
+    : [options[select.selectedIndex]];
+  return selected.some(option => option
+    && String(option.value ?? '') === choice.value
+    && normalizeOptionText(option.text) === choice.text);
+}
+
+// ============================================================================
 // STABILITY PROFILES -- observation-based waits replacing hardcoded setTimeout
 // Each profile tunes maxWait, stableTime, and networkQuietTime for its use case.
 // ============================================================================
@@ -4921,12 +5063,17 @@ const tools = {
     return { success: true, hovering: params.selector, scrolled: readiness.scrolled };
   },
 
-  // Select dropdown option with verification
+  // Select an option of a native select by value, visible text or position
   selectOption: async (params) => {
     const startTime = Date.now();
     const selectors = params.selectors || [params.selector];
     let lastAttemptError = null;
-    let lastVerification = null;
+    const record = (outcome) => actionRecorder.record(null, 'selectOption', params, { selectorTried: selectors[0], ...outcome, duration: Date.now() - startTime });
+    // Ends the call with a failure about the select that was found.
+    const fail = (selector, element, details) => {
+      record({ selectorUsed: selector, elementFound: true, elementDetails: captureElementDetails(element), success: false, error: details.error });
+      return { success: false, action: 'selectOption', selector, ...details };
+    };
 
     for (let selectorIndex = 0; selectorIndex < selectors.length; selectorIndex++) {
       const currentSelector = selectors[selectorIndex];
@@ -4934,30 +5081,74 @@ const tools = {
         let element = FSB.querySelectorWithShadow(currentSelector);
         if (!element || element.tagName !== 'SELECT') { lastAttemptError = `Select element not found with selector: ${currentSelector}`; continue; }
 
+        // A request that names no single option is refused before the page is
+        // scrolled or the select is touched.
+        let resolution = resolveSelectOption(element, params);
+        if (!resolution.choice) {
+          return fail(currentSelector, element, { errorCode: resolution.errorCode, error: resolution.error, outcome: 'failed', mayHaveExecuted: false });
+        }
+
         const readiness = await FSB.smartEnsureReady(element, 'selectOption');
         if (!readiness.ready) { lastAttemptError = `Element not ready: ${readiness.failureReason}`; continue; }
-        if (readiness.scrolled) { element = FSB.querySelectorWithShadow(currentSelector); if (!element) { lastAttemptError = 'Element became stale after scrolling'; continue; } }
+        if (readiness.scrolled) {
+          element = FSB.querySelectorWithShadow(currentSelector);
+          if (!element || element.tagName !== 'SELECT') { lastAttemptError = 'Element became stale after scrolling'; continue; }
+        }
+
+        // The page may have rebuilt the options during the wait, so the option
+        // is looked up again at the moment it is applied.
+        resolution = resolveSelectOption(element, params);
+        if (!resolution.choice) {
+          return fail(currentSelector, element, { errorCode: resolution.errorCode, error: resolution.error, outcome: 'failed', mayHaveExecuted: false });
+        }
+        const choice = resolution.choice;
 
         const preState = captureActionState(element, 'selectOption');
+        const positionsBefore = readSelectedPositions(element);
 
-        if (params.value !== undefined) { element.value = params.value; }
-        else if (params.index !== undefined) { element.selectedIndex = params.index; }
-        else if (params.text !== undefined) { const option = Array.from(element.options).find(opt => opt.text === params.text); if (option) { option.selected = true; } }
+        // Value and index requests replace the selection. A text request
+        // selects its option, which on a multiple select adds to the selection.
+        if (resolution.requestedBy === 'text') { choice.option.selected = true; }
+        else { element.selectedIndex = choice.index; }
 
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-        await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+        // No change event is sent when the option was already the selection.
+        const changed = readSelectedPositions(element) !== positionsBefore;
+        if (changed) {
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+        }
 
-        const postState = captureActionState(element, 'selectOption');
-        const verification = verifyActionEffect(preState, postState, 'selectOption');
-        lastVerification = verification;
-        if (!verification.verified) { lastAttemptError = `Selection had no verified effect: ${verification.reason}`; continue; }
+        // Success is decided on the select the page shows once it has settled,
+        // which is another element when the page replaced the select.
+        const live = element.isConnected ? element : FSB.querySelectorWithShadow(currentSelector);
+        if (!live || live.tagName !== 'SELECT' || !live.isConnected) {
+          return fail(currentSelector, element, {
+            error: `Option "${choice.shown}" was selected, but the select then left the page, so the selection could not be confirmed.`,
+            outcome: 'unknown', mayHaveExecuted: true
+          });
+        }
+        if (!selectHoldsOption(live, choice)) {
+          const current = describeSelectOptions(live)[live.selectedIndex];
+          return fail(currentSelector, live, {
+            errorCode: 'OPTION_NOT_KEPT',
+            error: `Option "${choice.shown}" was selected, but the select did not keep it. It now shows ${current ? `"${current.shown}"` : 'no option'}.`
+          });
+        }
 
-        actionRecorder.record(null, 'selectOption', params, { selectorTried: selectors[0], selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(element), success: true, hadEffect: true, verification: verification, duration: Date.now() - startTime });
-        return { success: true, selected: params.value || params.text || params.index, selector: currentSelector, selectorIndex, usedFallback: selectorIndex > 0, hadEffect: true, verification: { verified: verification.verified, reason: verification.reason, changes: verification.changes } };
+        const selection = { selected: choice.shown, selectedValue: choice.value, matchedBy: resolution.matchedBy, selector: currentSelector, selectorIndex, usedFallback: selectorIndex > 0 };
+        if (!changed) {
+          record({ selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(live), success: true, hadEffect: false });
+          return { success: true, action: 'selectOption', alreadyInState: true, message: `Option "${choice.shown}" was already selected`, ...selection };
+        }
+
+        const effect = verifyActionEffect(preState, captureActionState(live, 'selectOption'), 'selectOption');
+        const verification = { verified: true, reason: effect.verified ? effect.reason : 'The select holds the chosen option', changes: effect.changes };
+        record({ selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(live), success: true, hadEffect: true, verification });
+        return { success: true, ...selection, hadEffect: true, verification };
       } catch (error) { lastAttemptError = error.message; }
     }
 
-    actionRecorder.record(null, 'selectOption', params, { selectorTried: selectors[0], selectorUsed: null, elementFound: false, success: false, error: lastAttemptError || 'Selection had no effect with any available selector', diagnostic: generateDiagnostic('noEffect', { selector: selectors[0] }), duration: Date.now() - startTime });
+    record({ selectorUsed: null, elementFound: false, success: false, error: lastAttemptError || 'Selection had no effect with any available selector', diagnostic: generateDiagnostic('noEffect', { selector: selectors[0] }) });
     return buildFailureReport('selectOption', selectors[0], null, lastAttemptError || 'Selection had no effect with any available selector');
   },
 
