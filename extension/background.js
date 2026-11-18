@@ -17927,6 +17927,7 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3, options = {}
       // Only "no receiving end" or a tab Chrome cannot find proves non-delivery.
       if (message.action === 'executeAction' && messageDispatched
         && !/receiving end does not exist|no tab with id/i.test(error.message || '')) {
+        options.onDeliveryState?.('closed');
         return {
           success: false,
           outcome: 'unknown',

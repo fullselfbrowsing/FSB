@@ -63,6 +63,9 @@ const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close
 // In-process-only call timing stamp (D-04). JSON and structuredClone drop
 // Symbol keys, so the stamp never reaches a response or storage.
 const MCP_BRIDGE_CALL_TIMING = Symbol.for('fsb.mcp.call-timing');
+// Marks an action payload that arrived as a live mcp:execute-action call.
+// Replays call _handleExecuteAction without it.
+const MCP_BRIDGE_LIVE_ACTION = Symbol.for('fsb.mcp.live-action');
 // Toolbar icon classes keyed by message type. Read-only tools never reach
 // mcp:execute-action -- they have their own routes and carry no tool name, so
 // the route itself is what identifies them as reading.
@@ -1326,8 +1329,15 @@ class MCPBridgeClient {
   // predict, runActionWithPageView (mcp-tool-dispatcher.js) adds a compact
   // view of the page to the result: after _handleExecuteAction has handed the
   // result to the session recorder, before the wire copy is taken. Replays
-  // call _handleExecuteAction directly and never wait for a view.
+  // call _handleExecuteAction directly and never wait for a view. The payload
+  // is marked as a live call, which answering an action with the navigation
+  // it started requires.
   async _handleExecuteActionWithView(payload) {
+    if (payload && typeof payload === 'object') {
+      try {
+        Object.defineProperty(payload, MCP_BRIDGE_LIVE_ACTION, { value: true, enumerable: false, configurable: true });
+      } catch (_error) { /* an unmarked call keeps the unknown outcome */ }
+    }
     const execute = () => this._handleExecuteAction(payload);
     if (typeof runActionWithPageView !== 'function') return execute();
     const params = (payload && payload.params && typeof payload.params === 'object') ? payload.params : {};
@@ -1371,6 +1381,25 @@ class MCPBridgeClient {
 
   _sendProgress(id, progressData) {
     this._send({ id, type: 'mcp:progress', payload: progressData });
+  }
+
+  /**
+   * Sends one content-script action of an MCP call. On a live call, an action
+   * whose connection closed because the page navigated is answered with that
+   * navigation instead of an unknown outcome (runActionAcrossNavigation in
+   * mcp-tool-dispatcher.js holds every condition). Replays keep the unknown
+   * outcome. `delivery` is the object _sendToContentScript reports on.
+   */
+  _sendAcrossNavigation(payload, tabId, send, delivery) {
+    if (!payload || payload[MCP_BRIDGE_LIVE_ACTION] !== true || typeof runActionAcrossNavigation !== 'function') {
+      return send();
+    }
+    return runActionAcrossNavigation({
+      toolName: payload.tool,
+      tabId,
+      execute: send,
+      connectionClosed: () => delivery.connectionClosed === true
+    });
   }
 
   async _handleMessage(raw) {
@@ -1652,9 +1681,11 @@ class MCPBridgeClient {
   /**
    * Send message to content script using background.js's sendMessageWithRetry.
    * This ensures content scripts are injected before sending, handling the
-   * MV3 content script lifecycle properly.
+   * MV3 content script lifecycle properly. A caller that passes `delivery`
+   * finds connectionClosed set on it when the message was sent and its
+   * connection closed before an answer came.
    */
-  async _sendToContentScript(tabId, message) {
+  async _sendToContentScript(tabId, message, delivery) {
     const deliveryDeadline = Date.now() + 12000;
     if (message.action === 'executeAction') message._fsbDeadlineAt = deliveryDeadline;
     const isAction = message.action === 'executeAction';
@@ -1688,6 +1719,12 @@ class MCPBridgeClient {
     };
     const onDeliveryState = (state) => {
       if (settled) return;
+      // The connection closed after the message was sent. The result stays
+      // the unknown outcome; what the closing means is the caller's to judge.
+      if (state === 'closed') {
+        if (delivery) delivery.connectionClosed = true;
+        return;
+      }
       dispatched = state === 'dispatching';
       // An undelivered attempt may retry only within the original delivery
       // window. A sheet that was dispatched gets its own execution budget.
@@ -2263,13 +2300,19 @@ class MCPBridgeClient {
         }
         return executeCDPToolDirect({ tool: toolDef._cdpVerb, params }, tabId);
       }
-      // Default: send to content script (content-routed or unknown tools)
-      return this._sendToContentScript(tabId, {
+      // Default: send to content script (content-routed or unknown tools).
+      // The send may be answered by the navigation it started
+      // (_sendAcrossNavigation).
+      const delivery = { connectionClosed: false };
+      const send = () => this._sendToContentScript(tabId, {
         action: 'executeAction',
         tool: payload.tool,
         params,
         source: 'mcp-manual',
-      });
+      }, delivery);
+      return typeof this._sendAcrossNavigation === 'function'
+        ? this._sendAcrossNavigation(payload, tabId, send, delivery)
+        : send();
     };
     const executeFn = async () => {
       const provenance = (typeof globalThis !== 'undefined')

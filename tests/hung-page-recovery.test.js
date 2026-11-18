@@ -11,7 +11,7 @@ const dispatcher = fs.readFileSync(path.join(__dirname, '../extension/ws/mcp-too
 const background = fs.readFileSync(path.join(__dirname, '../extension/background.js'), 'utf8');
 
 test('a hung page read returns a typed bounded error', async () => {
-  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message, delivery) {');
   const end = bridge.indexOf('\n  async _handleGetTabs(', start);
   const method = bridge.slice(start, end).replace('12000);', '20);');
   const context = {
@@ -25,7 +25,7 @@ test('a hung page read returns a typed bounded error', async () => {
 });
 
 test('a hung mutation reports uncertain execution', async () => {
-  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message, delivery) {');
   const end = bridge.indexOf('\n  async _handleGetTabs(', start);
   const method = bridge.slice(start, end).replace('12000);', '20);');
   const context = { sendMessageWithRetry: (_tabId, _message, _retries, options) => {
@@ -297,7 +297,7 @@ test('an injection that never settles does not pin the tab past its timeout', as
 });
 
 test('an undelivered mutation is reported as not executed', async () => {
-  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message, delivery) {');
   const end = bridge.indexOf('\n  async _handleGetTabs(', start);
   const context = {
     sendMessageWithRetry: async () => {
@@ -313,7 +313,7 @@ test('an undelivered mutation is reported as not executed', async () => {
 });
 
 test('a direct send that loses its port after dispatch stays uncertain', async () => {
-  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message, delivery) {');
   const end = bridge.indexOf('\n  async _handleGetTabs(', start);
   const chrome = { runtime: {}, tabs: {
     sendMessage(_tabId, _message, _options, callback) {
@@ -330,7 +330,7 @@ test('a direct send that loses its port after dispatch stays uncertain', async (
 });
 
 test('a direct send to a closed tab is reported as not delivered', async () => {
-  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message, delivery) {');
   const end = bridge.indexOf('\n  async _handleGetTabs(', start);
   const chrome = { runtime: {}, tabs: {
     sendMessage(_tabId, _message, _options, callback) {
@@ -421,7 +421,7 @@ function sheetDeliveryFixture() {
       return new Promise(resolve => { finish = resolve; });
     }
   };
-  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message, delivery) {');
   const end = bridge.indexOf('\n  async _handleGetTabs(', start);
   const send = vm.runInNewContext(`({${bridge.slice(start, end)}})._sendToContentScript`, context);
   return {

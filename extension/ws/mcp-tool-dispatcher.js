@@ -5444,12 +5444,13 @@ async function wrapWithChangeReport(ctx) {
 //
 // After a navigation the host's next call is almost always a page read. The
 // results of navigate, open_tab, go_back, go_forward, refresh, search and
-// switch_tab, and of any action whose change_report shows a URL change or an
-// opened dialog, therefore carry `view`: a compact text list of the page's
-// headings and interactive elements with refs the next call can use (built by
-// FSB.buildPageView in content/dom-analysis.js). Other results carry no view:
-// the host can predict the page they leave, and a view on every action would
-// cost more text than it saves.
+// switch_tab, of any action whose change_report shows a URL change or an
+// opened dialog, and of an action answered by the navigation it started
+// (runActionAcrossNavigation), therefore carry `view`: a compact text list of
+// the page's headings and interactive elements with refs the next call can use
+// (built by FSB.buildPageView in content/dom-analysis.js). Other results carry
+// no view: the host can predict the page they leave, and a view on every
+// action would cost more text than it saves.
 //
 // The view is read from the document the action left in the tab. A tool whose
 // result can arrive before that document commits waits for the commit; the
@@ -5468,6 +5469,10 @@ const _PAGE_VIEW_EXCLUDED_TOOLS = Object.freeze(['close_tab']);
 // How often the readiness probe repeats while it waits for DOMContentLoaded.
 const _PAGE_VIEW_PROBE_INTERVAL_MS = 250;
 const _PAGE_VIEW_TIMED_OUT = Symbol('fsb-page-view-timed-out');
+// Marks a result that runActionAcrossNavigation built from a navigation, so
+// its view is read whatever its change_report says. A Symbol key never
+// reaches the wire or storage.
+const _ACTION_NAVIGATED = Symbol('fsb-action-navigated');
 
 function _pageViewToolName(toolNameOrVerb) {
   try {
@@ -5481,6 +5486,7 @@ function _pageViewWanted(toolName, response) {
   if (!response || typeof response !== 'object' || response.success !== true) return false;
   if (_PAGE_VIEW_EXCLUDED_TOOLS.indexOf(toolName) !== -1) return false;
   if (_PAGE_VIEW_TOOLS.indexOf(toolName) !== -1) return true;
+  if (response[_ACTION_NAVIGATED] === true) return true;
   const report = response.change_report;
   if (!report || typeof report !== 'object') return false;
   if (report.url && typeof report.url === 'object' && report.url.changed === true) return true;
@@ -5490,8 +5496,9 @@ function _pageViewWanted(toolName, response) {
 // Records main-frame commits from before the action runs, so a commit that
 // lands before the result arrives is not missed. With a null tabId the last
 // few commits of every tab are kept until bindTab picks one (open_tab, and
-// navigate when it creates the tab).
-function _watchPageViewCommits(tabId) {
+// navigate when it creates the tab). With newDocumentsOnly, updates within
+// the same document (fragment and history-state changes) are not recorded.
+function _watchPageViewCommits(tabId, newDocumentsOnly) {
   const events = (typeof chrome !== 'undefined' && chrome.webNavigation) ? chrome.webNavigation : null;
   if (!events || !events.onCommitted || typeof events.onCommitted.addListener !== 'function') return null;
   let boundTab = Number.isFinite(tabId) ? tabId : null;
@@ -5513,8 +5520,10 @@ function _watchPageViewCommits(tabId) {
     try { event.addListener(listener); listeners.push([event, listener]); } catch (_) { /* best-effort */ }
   };
   listen(events.onCommitted, (details) => record(details, true));
-  listen(events.onReferenceFragmentUpdated, (details) => record(details, false));
-  listen(events.onHistoryStateUpdated, (details) => record(details, false));
+  if (newDocumentsOnly !== true) {
+    listen(events.onReferenceFragmentUpdated, (details) => record(details, false));
+    listen(events.onHistoryStateUpdated, (details) => record(details, false));
+  }
   const find = (accept, afterSeq) => {
     const list = boundTab === null ? null : byTab.get(boundTab);
     if (!list) return null;
@@ -5754,10 +5763,142 @@ async function runActionWithPageView(ctx) {
       const view = await _collectPageView(state, response, tabId, deadline);
       if (view === _PAGE_VIEW_TIMED_OUT) response.view_pending = true;
       else if (typeof view === 'string' && view) response.view = view;
+      if (response[_ACTION_NAVIGATED] === true) await _refreshNavigatedActionResult(response, tabId);
     } catch (_) { /* a view never changes the action's result */ }
     return response;
   } finally {
     if (state.watcher) state.watcher.dispose();
+  }
+}
+
+// =============================================================================
+// Actions answered by the navigation they started
+// =============================================================================
+//
+// A click or an Enter that starts a navigation often loses its content script
+// before the script can answer: the document is replaced and the connection
+// closes. On its own a closed connection is an unknown outcome. When the tab
+// also navigated after the action was sent (its URL changed, or its main frame
+// committed a new document), the action is reported as a success that
+// navigated, with the tab's new URL and title, and runActionWithPageView adds
+// the view of the new page.
+//
+// Nothing waits unless the connection closed, and then only while a commit is
+// due: a navigation is pending, or the main frame already holds a new document
+// whose commit has not been reported yet. That wait ends with the commit or
+// after ACTION_NAVIGATION_WAIT_MS. The unknown outcome is returned unchanged
+// when the tab shows no navigation, when none commits in that time, and when
+// the tab was already navigating as the action was sent, since that navigation
+// is not the action's. Reads and sheet fills are never rewritten: their answer
+// is their product, which a navigation cannot stand in for.
+
+const ACTION_NAVIGATION_WAIT_MS = 1000;
+
+function _actionAnswersWithNavigation(toolNameOrVerb) {
+  let def = null;
+  try {
+    def = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolNameOrVerb) : null;
+  } catch (_) { def = null; }
+  return !!def && def._route === 'content' && def._readOnly !== true && def.name !== 'fill_sheet';
+}
+
+// The tab with the id of the document in its main frame, or null when the
+// tab is gone. documentId is null where the browser does not report one.
+async function _readTabDocument(tabId) {
+  const events = (typeof chrome !== 'undefined' && chrome.webNavigation) ? chrome.webNavigation : null;
+  let frameRead = null;
+  if (events && typeof events.getFrame === 'function') {
+    try { frameRead = Promise.resolve(events.getFrame({ tabId, frameId: 0 })).then((frame) => frame, () => null); }
+    catch (_) { frameRead = null; }
+  }
+  const [tab, frame] = await Promise.all([_safeGetTab(tabId), frameRead]);
+  if (!tab) return null;
+  return {
+    tab,
+    url: typeof tab.url === 'string' ? tab.url : '',
+    pending: typeof tab.pendingUrl === 'string' && tab.pendingUrl.length > 0,
+    documentId: (frame && typeof frame.documentId === 'string' && frame.documentId) ? frame.documentId : null
+  };
+}
+
+// The tab once the navigation that followed an action has committed, or null
+// when it shows none by the deadline. `before` is the tab as it was when the
+// action was sent, with the number of new documents `watcher` had recorded in
+// its main frame by then.
+async function _awaitActionNavigation(tabId, before, watcher, deadline) {
+  if (!before || before.pending) return null;
+  for (;;) {
+    const seen = watcher ? watcher.lastSeq() : 0;
+    const now = await _readTabDocument(tabId);
+    if (!now) return null;
+    const navigated = seen > before.commits || (before.url !== '' && now.url !== '' && now.url !== before.url);
+    if (navigated && !now.pending) return now.tab;
+    // A changed document id alone is not taken as a navigation: it only says
+    // that a commit is about to be reported.
+    const commitDue = now.pending
+      || (before.documentId !== null && now.documentId !== null && now.documentId !== before.documentId);
+    if (!commitDue || !watcher || Date.now() >= deadline) return navigated ? now.tab : null;
+    const commit = await watcher.waitFor(() => true, deadline, seen);
+    if (!commit) return navigated ? now.tab : null;
+  }
+}
+
+// The page view waited for the new document to parse, so the tab now has the
+// title the document gave itself and the URL any redirect left it on.
+async function _refreshNavigatedActionResult(response, tabId) {
+  const tab = await _safeGetTab(tabId);
+  if (!tab || typeof tab.url !== 'string' || !tab.url) return;
+  response.url = tab.url;
+  response.domain = getDomainFromUrl(tab.url);
+  response.title = tab.title || '';
+}
+
+/**
+ * Run one content-script action of a live MCP call. When its connection
+ * closes and the tab navigated after the action was sent, the navigation is
+ * the answer (see the section comment); every other response is returned as
+ * execute() gave it.
+ *
+ * @param {Object} ctx
+ * @param {string} ctx.toolName - MCP tool name or wire verb
+ * @param {number} ctx.tabId - the tab the action runs in
+ * @param {Function} ctx.execute - async () => response
+ * @param {Function} ctx.connectionClosed - () => true once the action was sent
+ *   and its connection closed before an answer
+ * @returns {Promise<Object>} the response, or a success that names the navigation
+ */
+async function runActionAcrossNavigation(ctx) {
+  const execute = ctx && ctx.execute;
+  if (typeof execute !== 'function') {
+    return { success: false, error: 'runActionAcrossNavigation requires execute callback' };
+  }
+  const tabId = Number.isFinite(ctx.tabId) ? ctx.tabId : null;
+  if (tabId === null || typeof ctx.connectionClosed !== 'function' || !_actionAnswersWithNavigation(ctx.toolName)) {
+    return execute();
+  }
+  const watcher = _watchPageViewCommits(tabId, true);
+  try {
+    // Read while the action is on its way; awaited only if the connection closes.
+    const sentFrom = _readTabDocument(tabId).then(
+      (doc) => (doc ? { ...doc, commits: watcher ? watcher.lastSeq() : 0 } : null),
+      () => null
+    );
+    const response = await execute();
+    if (ctx.connectionClosed() !== true) return response;
+    if (!response || typeof response !== 'object' || response.success === true || response.mayHaveExecuted !== true) {
+      return response;
+    }
+    try {
+      const tab = await _awaitActionNavigation(tabId, await sentFrom, watcher, Date.now() + ACTION_NAVIGATION_WAIT_MS);
+      if (!tab) return response;
+      const navigated = sanitizeSingleTab(_pageViewToolName(ctx.toolName), tab, { hadEffect: true, navigationTriggered: true });
+      Object.defineProperty(navigated, _ACTION_NAVIGATED, { value: true });
+      return navigated;
+    } catch (_) {
+      return response;
+    }
+  } finally {
+    if (watcher) watcher.dispose();
   }
 }
 
@@ -5782,6 +5923,9 @@ const _mcp_dispatcher_exports = {
   // Page views on action results.
   runActionWithPageView,
   PAGE_VIEW_WAIT_MS,
+  // Actions answered by the navigation they started.
+  runActionAcrossNavigation,
+  ACTION_NAVIGATION_WAIT_MS,
   _getChangeReportsEnabled,
   _setChangeReportsEnabledForTest,
   // Phase 69 same-call expect helpers (test-only accessors).
@@ -5830,6 +5974,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.wrapWithChangeReport = wrapWithChangeReport;
   // The bridge client runs each MCP action call through this to attach page views.
   globalThis.runActionWithPageView = runActionWithPageView;
+  // The bridge client sends each content-script action of a live call through this.
+  globalThis.runActionAcrossNavigation = runActionAcrossNavigation;
   // Surface the connection-scoped client-label cache reset so the bridge
   // client can clear it on every fresh _ws.onopen (different MCP client
   // attaching on the same port must not inherit the prior client's label).
