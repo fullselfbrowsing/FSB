@@ -5878,8 +5878,10 @@ async function runActionAcrossNavigation(ctx) {
   }
   const watcher = _watchPageViewCommits(tabId, true);
   try {
-    // Read while the action is on its way; awaited only if the connection closes.
-    const sentFrom = _readTabDocument(tabId).then(
+    // Read before the action is sent. A click can start, and even commit, its
+    // navigation within a few milliseconds, so a read made alongside the send
+    // would already show the new page and hide the navigation.
+    const sentFrom = await _readTabDocument(tabId).then(
       (doc) => (doc ? { ...doc, commits: watcher ? watcher.lastSeq() : 0 } : null),
       () => null
     );
@@ -5889,7 +5891,7 @@ async function runActionAcrossNavigation(ctx) {
       return response;
     }
     try {
-      const tab = await _awaitActionNavigation(tabId, await sentFrom, watcher, Date.now() + ACTION_NAVIGATION_WAIT_MS);
+      const tab = await _awaitActionNavigation(tabId, sentFrom, watcher, Date.now() + ACTION_NAVIGATION_WAIT_MS);
       if (!tab) return response;
       const navigated = sanitizeSingleTab(_pageViewToolName(ctx.toolName), tab, { hadEffect: true, navigationTriggered: true });
       Object.defineProperty(navigated, _ACTION_NAVIGATED, { value: true });
