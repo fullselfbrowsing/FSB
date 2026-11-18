@@ -882,6 +882,25 @@ describe('createDepthEngine', () => {
       expect(seen).not.toContain(2);
     }, 10000);
 
+    // The camera has just set off for a plane that scrolls, and lands at its top. A swipe
+    // up asks for the plane above before the lock is over, and waits; a swipe down then
+    // scrolls the plane instead, so the plane above is no longer wanted.
+    it('drops a plane still waiting once the next swipe scrolls the plane it is on', async () => {
+      build([120, window.innerHeight * 3, 120]);
+      await pause(300);
+      wheel(120);
+      await pause(170);
+      wheel(-120);
+      await pause(170);
+      wheel(120);
+      await pause(800);
+      expect(seen).toEqual([0, 1]);
+      expect(layers()[1].scrollTop).toBeGreaterThan(0);
+      const h = layers()[1].querySelector<HTMLElement>('h2')!;
+      expect(h.style.translate).toBe('');
+      expect(h.style.filter).toBe('');
+    }, 10000);
+
     it('still eats the momentum of the swipe that changed planes', async () => {
       build([120, 120, 120]);
       wheel(120);

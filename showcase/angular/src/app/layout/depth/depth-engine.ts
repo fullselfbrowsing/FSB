@@ -1005,7 +1005,14 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     swipe = s;
     const L = layers[Math.round(target)];
     if (flows(L) && canScroll(L, dy)) {
+      // Scrolling the plane it is on: a plane still waiting to be chosen stays put, and
+      // the camera stops leaning toward it.
       s.mode = 'inner';
+      unwait();
+      if (gesturing) {
+        gesturing = false;
+        go(anchor);
+      }
       scrollBy(L, dy);
     } else leanBy(s, dy);
   }
