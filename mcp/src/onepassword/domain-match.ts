@@ -8,6 +8,9 @@
  *   - ExactDomain        -> hostname (and an explicit port) must be identical.
  *   - AnywhereOnWebsite  -> the host must sit on the same registrable domain.
  * IP addresses and single-label hosts (localhost) always match exactly.
+ * A website saved with https:// is never released to an http:// page, so a
+ * login is not typed into a page without TLS. A website saved without a
+ * scheme, or with http://, matches either.
  */
 
 // Suffixes under which unrelated parties each register their own name, so the
@@ -44,6 +47,8 @@ export type MatchStrength = 'exact' | 'site';
 export interface HostTarget {
   hostname: string;
   port: string;
+  /** The scheme the input named, or null for a bare host such as "example.com". */
+  protocol: 'http:' | 'https:' | null;
 }
 
 export interface WebsiteLike {
@@ -59,17 +64,17 @@ export function parseHostTarget(input: unknown): HostTarget | null {
   if (typeof input !== 'string') return null;
   const trimmed = input.trim();
   if (!trimmed || trimmed.length > 2048) return null;
-  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
   let url: URL;
   try {
-    url = new URL(withScheme);
+    url = new URL(hasScheme ? trimmed : `https://${trimmed}`);
   } catch {
     return null;
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
   const hostname = normalizeHostname(url.hostname);
   if (!hostname) return null;
-  return { hostname, port: url.port || '' };
+  return { hostname, port: url.port || '', protocol: hasScheme ? url.protocol : null };
 }
 
 export function normalizeHostname(value: string): string | null {
@@ -84,6 +89,16 @@ export function normalizeHostname(value: string): string | null {
 export function isIpHost(hostname: string): boolean {
   if (hostname.startsWith('[')) return true;
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
+}
+
+/**
+ * Scheme to record for a host whose scheme is unknown (FSB's old vault kept
+ * hostnames only). Routers, intranet names, and localhost are usually served
+ * over http, so they get http:// and keep matching; public sites get https://
+ * and are protected from plain-http pages.
+ */
+export function defaultSchemeForHost(hostname: string): 'http:' | 'https:' {
+  return isIpHost(hostname) || !hostname.includes('.') ? 'http:' : 'https:';
 }
 
 /**
@@ -109,6 +124,8 @@ export function websiteMatch(website: WebsiteLike, target: HostTarget): MatchStr
   if (behavior === 'Never') return null;
   const site = parseHostTarget(website.url);
   if (!site) return null;
+  // An https login never goes to a page an on-path attacker could rewrite.
+  if (site.protocol === 'https:' && target.protocol === 'http:') return null;
 
   const sameHost = site.hostname === target.hostname;
   const portOk = !site.port || site.port === target.port;

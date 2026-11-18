@@ -14869,10 +14869,14 @@ async function fsbImportLegacyVault(pin) {
     if (read.cards[index]) importedKeys.push(read.cards[index].storageKey);
   }
   await secureConfig.purgeLegacyVault(importedKeys);
+  // 1Password can end the import partway (rate limit, expired session). The
+  // entries it never reached stay in the old vault for the next attempt.
+  const notAttempted = result.stopped && result.stopped.notAttempted ? result.stopped.notAttempted : {};
   return {
     success: true,
     imported: { logins: result.logins?.imported || 0, cards: result.cards?.imported || 0 },
     failed: { logins: result.logins?.failed || 0, cards: result.cards?.failed || 0 },
+    notAttempted: { logins: Number(notAttempted.logins) || 0, cards: Number(notAttempted.cards) || 0 },
     unreadable: read.unreadable,
     legacy: await fsbLegacyVaultSummary()
   };

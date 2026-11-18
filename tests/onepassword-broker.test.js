@@ -62,8 +62,10 @@ function cardItem(vaultId, id) {
 }
 
 function makeSdk(items, options = {}) {
-  const calls = { createClient: [], list: 0, get: [], create: [] };
+  const calls = { createClient: [], list: 0, get: [], create: [], created: [] };
   let expireNext = options.expireOnce === true;
+  // { at: n, error: 'expire' | 'rate' }: the nth create call fails once.
+  let interruptCreate = options.interruptCreate ? { ...options.interruptCreate } : null;
   const sdk = {
     DesktopAuth: class { constructor(accountName) { this.accountName = accountName; } },
     async createClient(config) {
@@ -104,7 +106,13 @@ function makeSdk(items, options = {}) {
           },
           async create(params) {
             calls.create.push(params);
+            if (interruptCreate && calls.create.length === interruptCreate.at) {
+              const kind = interruptCreate.error;
+              interruptCreate = null;
+              throw kind === 'rate' ? new RateLimitExceededError('slow down') : new DesktopSessionExpiredError('session expired');
+            }
             if (options.failCreateTitle && params.title === options.failCreateTitle) throw new Error('create failed');
+            calls.created.push(params.title);
             return { ...params, id: `new${calls.create.length}` };
           },
         },
@@ -171,6 +179,25 @@ async function run() {
   });
   await check('IP addresses only match exactly', () => {
     assert.equal(match.websiteMatch({ url: 'http://10.0.0.5' }, at('http://10.0.0.6')), null);
+  });
+  await check('an https login is never released to an http page', () => {
+    assert.equal(match.websiteMatch({ url: 'https://bank.com', autofillBehavior: 'ExactDomain' }, at('http://bank.com/login')), null);
+    assert.equal(match.websiteMatch({ url: 'https://bank.com' }, at('http://login.bank.com')), null);
+    assert.equal(match.bestWebsiteMatch([{ url: 'https://bank.com' }], at('http://bank.com')), null);
+    assert.equal(match.websiteMatch({ url: 'https://bank.com' }, at('https://bank.com')), 'exact');
+  });
+  await check('http and scheme-less websites match either scheme', () => {
+    assert.equal(match.websiteMatch({ url: 'http://intranet.test' }, at('https://intranet.test')), 'exact');
+    assert.equal(match.websiteMatch({ url: 'http://intranet.test' }, at('http://intranet.test')), 'exact');
+    assert.equal(match.websiteMatch({ url: '192.168.1.1' }, at('http://192.168.1.1')), 'exact');
+    assert.equal(match.websiteMatch({ url: 'example.com' }, at('http://example.com')), 'exact');
+  });
+  await check('hosts with an unknown scheme get http only when usually served that way', () => {
+    assert.equal(at('example.com').protocol, null);
+    assert.equal(at('http://example.com').protocol, 'http:');
+    assert.equal(match.defaultSchemeForHost('example.com'), 'https:');
+    assert.equal(match.defaultSchemeForHost('192.168.1.1'), 'http:');
+    assert.equal(match.defaultSchemeForHost('localhost'), 'http:');
   });
   await check('non-web schemes are rejected', () => {
     assert.equal(at('chrome://settings'), null);
@@ -265,6 +292,14 @@ async function run() {
     await rejects(broker.resolveLogin({ url: 'https://bank.test', itemId: 'vaultB:loginPrivate' }), 'invalid_request');
     await rejects(broker.resolveLogin({ url: 'https://bank.test' }), 'credential_not_found');
   });
+  await check('an https login is withheld from the http version of its site, and the error says why', async () => {
+    const error = await rejects(broker.resolveLogin({ url: 'http://example.com/login' }), 'credential_not_found');
+    assert.match(error.message, /never filled on http:\/\/ pages/);
+    const pinned = await rejects(broker.resolveLogin({ url: 'http://example.com', itemId: 'vaultA:loginA' }), 'credential_domain_mismatch');
+    assert.match(pinned.message, /https:\/\//);
+    const plain = await rejects(broker.resolveLogin({ url: 'https://nothing-saved.test' }), 'credential_not_found');
+    assert.doesNotMatch(plain.message, /http:\/\//, 'https pages keep the plain message');
+  });
   await check('ExactDomain logins are not released on subdomains', async () => {
     await rejects(broker.resolveLogin({ url: 'https://www2.shop.test' }), 'credential_not_found');
   });
@@ -330,6 +365,64 @@ async function run() {
     assert.equal(card.fields.find((field) => field.id === 'expiry').value, '12/2031');
     assert.ok(card.notes.includes('Chicago'), 'billing address is kept in the card notes');
     assert.ok(!JSON.stringify(result).includes('pw'), 'import result echoes no secrets');
+    assert.equal(result.stopped, null);
+  });
+  await check('logins saved from an http page keep their scheme', async () => {
+    const httpFake = makeSdk([]);
+    const httpBroker = new OnePasswordBroker({ loadSdk: async () => httpFake.sdk, configPath, env: {} });
+    await httpBroker.saveLogin({ url: 'http://router.test:8080', username: 'admin', password: 'p' });
+    assert.equal(httpFake.calls.create[0].websites[0].url, 'http://router.test:8080');
+  });
+  await check('imported hostnames get https, except IPs and single-label hosts', async () => {
+    const schemeFake = makeSdk([]);
+    const schemeBroker = new OnePasswordBroker({ loadSdk: async () => schemeFake.sdk, configPath, env: {} });
+    await schemeBroker.importLegacy({
+      logins: [
+        { domain: 'example.com', username: 'a', password: 'p' },
+        { domain: '192.168.1.1', username: 'b', password: 'p' },
+        { domain: 'localhost', username: 'c', password: 'p' },
+      ],
+    });
+    assert.deepEqual(schemeFake.calls.create.map((params) => params.websites[0].url),
+      ['https://example.com', 'http://192.168.1.1', 'http://localhost']);
+  });
+  const legacyLogins = ['a.test', 'b.test', 'c.test', 'd.test'].map((domain) => ({ domain, username: 'u', password: 'p' }));
+  const legacyCard = { cardholderName: 'A', cardNumber: '4111111111111111', expiryMonth: '12', expiryYear: '2031', cvv: '737' };
+  await check('a session that expires mid-import stops without duplicating anything', async () => {
+    const expiring = makeSdk([], { interruptCreate: { at: 3, error: 'expire' } });
+    const importBroker = new OnePasswordBroker({ loadSdk: async () => expiring.sdk, configPath, env: {} });
+    const result = await importBroker.importLegacy({ logins: legacyLogins, cards: [legacyCard] });
+    assert.deepEqual(expiring.calls.created, ['a.test', 'b.test'], 'each item is created at most once');
+    assert.deepEqual(result.importedLoginDomains, ['a.test', 'b.test']);
+    assert.deepEqual(result.logins, { imported: 2, failed: 0 });
+    assert.deepEqual(result.cards, { imported: 0, failed: 0 });
+    assert.deepEqual(result.stopped, { code: 'onepassword_auth_failed', notAttempted: { logins: 2, cards: 1 } });
+    await importBroker.listVaults();
+    assert.equal(expiring.calls.createClient.length, 2, 'the next request signs in again');
+  });
+  await check('a session that expires before anything is saved is retried once', async () => {
+    const expiring = makeSdk([], { interruptCreate: { at: 1, error: 'expire' } });
+    const importBroker = new OnePasswordBroker({ loadSdk: async () => expiring.sdk, configPath, env: {} });
+    const result = await importBroker.importLegacy({ logins: legacyLogins, cards: [] });
+    assert.deepEqual(expiring.calls.created, ['a.test', 'b.test', 'c.test', 'd.test']);
+    assert.equal(expiring.calls.createClient.length, 2);
+    assert.equal(result.stopped, null);
+  });
+  await check('a rate limit mid-import keeps what was saved and reports the rest', async () => {
+    const limited = makeSdk([], { interruptCreate: { at: 5, error: 'rate' } });
+    const importBroker = new OnePasswordBroker({ loadSdk: async () => limited.sdk, configPath, env: {} });
+    const result = await importBroker.importLegacy({ logins: legacyLogins, cards: [legacyCard, legacyCard] });
+    assert.deepEqual(result.logins, { imported: 4, failed: 0 });
+    assert.deepEqual(result.cards, { imported: 0, failed: 0 });
+    assert.deepEqual(result.importedCardIndexes, []);
+    assert.deepEqual(result.stopped, { code: 'onepassword_rate_limited', notAttempted: { logins: 0, cards: 2 } });
+    assert.equal(importBroker.status().lastError.code, 'onepassword_rate_limited');
+  });
+  await check('a rate limit before anything is saved is still an error', async () => {
+    const limited = makeSdk([], { interruptCreate: { at: 1, error: 'rate' } });
+    const importBroker = new OnePasswordBroker({ loadSdk: async () => limited.sdk, configPath, env: {} });
+    await rejects(importBroker.importLegacy({ logins: legacyLogins, cards: [] }), 'onepassword_rate_limited');
+    assert.deepEqual(limited.calls.created, []);
   });
 
   console.log('\n--- sessions, limits, and error hygiene ---');
@@ -388,6 +481,39 @@ async function run() {
     assert.equal(response.ok, false);
     assert.equal(response.errorCode, 'multiple_credentials');
     assert.equal(response.candidates.length, 2);
+  });
+
+  console.log('\n--- MCP tool results ---');
+  const { multipleCredentialsResult } = await import(pathToFileURL(path.join(__dirname, '..', 'mcp', 'build', 'tools', 'vault.js')).href);
+  await check('several matching logins reach the agent as candidates', () => {
+    const mapped = multipleCredentialsResult({
+      success: false,
+      errorCode: 'multiple_credentials',
+      error: 'Several 1Password logins match example.com. Pass credential_id to choose one.',
+      candidates: [
+        { id: 'vaultA:loginA', title: 'Example', username: 'alice', password: 'pw-a' },
+        { id: 'vaultA:loginA2', title: 'Example work', username: 'alice@work' },
+      ],
+    });
+    assert.equal(mapped.isError, true);
+    const text = mapped.content[0].text;
+    assert.match(text, /^Detected: Several 1Password logins match this site/);
+    assert.match(text, /credential_id/);
+    const payload = JSON.parse(text.slice(text.indexOf('{')));
+    assert.deepEqual(payload.candidates, [
+      { id: 'vaultA:loginA', title: 'Example', username: 'alice' },
+      { id: 'vaultA:loginA2', title: 'Example work', username: 'alice@work' },
+    ]);
+    assert.ok(!text.includes('pw-a'), 'only id, title, and username are kept');
+  });
+  await check('other results keep the generic error mapping', () => {
+    assert.equal(multipleCredentialsResult({ success: false, errorCode: 'credential_not_found', error: 'x' }), null);
+    assert.equal(multipleCredentialsResult({ success: true, filled: ['password'] }), null);
+    assert.equal(multipleCredentialsResult(null), null);
+  });
+  await check('a choice without candidates points at list_credentials', () => {
+    const mapped = multipleCredentialsResult({ success: false, errorCode: 'multiple_credentials', error: 'Several match.' });
+    assert.match(mapped.content[0].text, /Call list_credentials/);
   });
 
   console.log('\n--- bridge hub routing ---');

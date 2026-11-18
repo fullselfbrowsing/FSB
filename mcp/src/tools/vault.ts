@@ -13,6 +13,42 @@ const FILL_TIMEOUT_MS = 90_000;
 // Card metadata lookup + the extension's 120_000ms confirmation gate + the
 // post-approval card read, with headroom.
 const PAYMENT_CONFIRMATION_TIMEOUT_MS = 250_000;
+const MAX_CANDIDATES = 20;
+
+/**
+ * Several 1Password logins match the tab's site. mapFSBError renders only the
+ * error text, which would drop the candidates and file this under page
+ * navigation, so the choice is answered here. Each candidate is rebuilt from
+ * id, title, and username only, so no other field can reach the tool result.
+ * Returns null for any other result.
+ */
+export function multipleCredentialsResult(
+  result: Record<string, unknown> | null | undefined,
+): { content: Array<{ type: 'text'; text: string }>; isError: true } | null {
+  if (!result || result.success === true || result.errorCode !== 'multiple_credentials') return null;
+  const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+  const candidates = (Array.isArray(result.candidates) ? result.candidates : [])
+    .map((entry) => {
+      const record = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
+      return { id: text(record.id), title: text(record.title), username: text(record.username) };
+    })
+    .filter((candidate) => candidate.id)
+    .slice(0, MAX_CANDIDATES);
+  const lines = [
+    'Detected: Several 1Password logins match this site',
+    `Why: ${text(result.error) || 'More than one saved login matches the tab\'s site.'}`,
+    candidates.length > 0
+      ? 'Next action: Call fill_credential again with credential_id set to the id of the login to use.'
+      : 'Next action: Call list_credentials, then call fill_credential again with credential_id set to the id of the login to use.',
+  ];
+  return {
+    isError: true,
+    content: [{
+      type: 'text',
+      text: `${lines.join('\n')}\n\n${JSON.stringify({ errorCode: 'multiple_credentials', candidates }, null, 2)}`,
+    }],
+  };
+}
 
 /**
  * Register the credential tools: list_credentials, fill_credential,
@@ -76,7 +112,7 @@ export function registerVaultTools(
           payload,
           { timeout: FILL_TIMEOUT_MS, targetTabId },
         );
-        return mapFSBError(result);
+        return multipleCredentialsResult(result) ?? mapFSBError(result);
       });
     },
   );

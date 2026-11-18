@@ -1,6 +1,7 @@
 import { FSB_MCP_VERSION } from '../version.js';
 import {
   bestWebsiteMatch,
+  defaultSchemeForHost,
   parseHostTarget,
   websiteHosts,
   type HostTarget,
@@ -192,6 +193,21 @@ export interface LegacyCardRecord {
   stateRegion?: string;
   postalCode?: string;
   country?: string;
+}
+
+export interface LegacyImportResult {
+  logins: { imported: number; failed: number };
+  cards: { imported: number; failed: number };
+  importedLoginDomains: string[];
+  importedCardIndexes: number[];
+  /**
+   * Set when 1Password ended the import partway (rate limit or expired
+   * session). Entries not reached were never sent and stay in the old vault.
+   */
+  stopped: {
+    code: 'onepassword_rate_limited' | 'onepassword_auth_failed';
+    notAttempted: { logins: number; cards: number };
+  } | null;
 }
 
 export interface OnePasswordBrokerOptions {
@@ -690,10 +706,14 @@ export class OnePasswordBroker {
       }
 
       if (candidates.length === 0) {
+        // On a plain-http page, say why an https login that exists was withheld.
+        const httpNote = target.protocol === 'http:'
+          ? ' on this http:// page. Logins saved for https:// websites are never filled on http:// pages'
+          : '';
         if (requested) {
-          throw new BrokerError('credential_domain_mismatch', `That 1Password item is not saved for ${target.hostname}`);
+          throw new BrokerError('credential_domain_mismatch', `That 1Password item is not saved for ${target.hostname}${httpNote}`);
         }
-        throw new BrokerError('credential_not_found', `No 1Password login is saved for ${target.hostname}`);
+        throw new BrokerError('credential_not_found', `No 1Password login is saved for ${target.hostname}${httpNote}`);
       }
 
       candidates.sort((a, b) => {
@@ -821,6 +841,9 @@ export class OnePasswordBroker {
     return this.withClient(async (client, config) => {
       const vaultId = this.requireSaveVault(config);
       const created = await client.items.create(this.loginCreateParams(vaultId, {
+        // Record the page's own scheme: an http page saved as https:// would
+        // never be offered this login again.
+        scheme: target.protocol ?? defaultSchemeForHost(target.hostname),
         domain: target.port ? `${target.hostname}:${target.port}` : target.hostname,
         username,
         password,
@@ -831,24 +854,41 @@ export class OnePasswordBroker {
     });
   }
 
-  async importLegacy(input: { logins?: unknown; cards?: unknown }): Promise<{
-    logins: { imported: number; failed: number };
-    cards: { imported: number; failed: number };
-    importedLoginDomains: string[];
-    importedCardIndexes: number[];
-  }> {
+  async importLegacy(input: { logins?: unknown; cards?: unknown }): Promise<LegacyImportResult> {
     const logins = Array.isArray(input.logins) ? input.logins.slice(0, MAX_IMPORT_ENTRIES) : [];
     const cards = Array.isArray(input.cards) ? input.cards.slice(0, MAX_IMPORT_ENTRIES) : [];
     return this.withClient(async (client, config) => {
       const vaultId = this.requireSaveVault(config);
-      const result = {
+      const result: LegacyImportResult = {
         logins: { imported: 0, failed: 0 },
         cards: { imported: 0, failed: 0 },
-        importedLoginDomains: [] as string[],
-        importedCardIndexes: [] as number[],
+        importedLoginDomains: [],
+        importedCardIndexes: [],
+        stopped: null,
       };
-      for (const raw of logins) {
-        const record = raw as LegacyLoginRecord;
+      // withClient runs this callback again after a session expiry, which is
+      // safe only while nothing has been written. After the first save, an
+      // expired session or a rate limit ends the import here and reports what
+      // was saved, so neither the retry nor the user's next attempt creates
+      // a duplicate.
+      const stopImport = (error: unknown, loginsLeft: number, cardsLeft: number): boolean => {
+        if (!isSessionExpiry(error) && !isRateLimit(error)) return false;
+        if (result.logins.imported + result.cards.imported === 0) throw error;
+        if (isRateLimit(error)) {
+          this.noteError('onepassword_rate_limited', 'Rate limited by 1Password');
+        } else {
+          // The next request signs in again.
+          this.resetClient();
+        }
+        result.stopped = {
+          code: isRateLimit(error) ? 'onepassword_rate_limited' : 'onepassword_auth_failed',
+          notAttempted: { logins: loginsLeft, cards: cardsLeft },
+        };
+        return true;
+      };
+
+      for (let index = 0; index < logins.length; index += 1) {
+        const record = logins[index] as LegacyLoginRecord;
         const target = parseHostTarget(record?.domain);
         if (!target || (!record.username && !record.password)) {
           result.logins.failed += 1;
@@ -856,6 +896,8 @@ export class OnePasswordBroker {
         }
         try {
           await client.items.create(this.loginCreateParams(vaultId, {
+            // The old vault kept hostnames only, without a scheme.
+            scheme: target.protocol ?? defaultSchemeForHost(target.hostname),
             domain: target.port ? `${target.hostname}:${target.port}` : target.hostname,
             username: clip(record.username, 320),
             password: clip(record.password),
@@ -865,11 +907,11 @@ export class OnePasswordBroker {
           result.logins.imported += 1;
           result.importedLoginDomains.push(String(record.domain));
         } catch (error) {
-          if (isSessionExpiry(error) || isRateLimit(error)) throw error;
+          if (stopImport(error, logins.length - index, cards.length)) break;
           result.logins.failed += 1;
         }
       }
-      for (let index = 0; index < cards.length; index += 1) {
+      for (let index = 0; !result.stopped && index < cards.length; index += 1) {
         const record = cards[index] as LegacyCardRecord;
         const digits = clip(record?.cardNumber, 32).replace(/\D/g, '');
         if (!digits) {
@@ -881,7 +923,7 @@ export class OnePasswordBroker {
           result.cards.imported += 1;
           result.importedCardIndexes.push(index);
         } catch (error) {
-          if (isSessionExpiry(error) || isRateLimit(error)) throw error;
+          if (stopImport(error, 0, cards.length - index)) break;
           result.cards.failed += 1;
         }
       }
@@ -899,6 +941,7 @@ export class OnePasswordBroker {
   }
 
   private loginCreateParams(vaultId: string, entry: {
+    scheme: 'http:' | 'https:';
     domain: string;
     username: string;
     password: string;
@@ -916,7 +959,7 @@ export class OnePasswordBroker {
       notes: entry.notes || '',
       tags: ['FSB'],
       websites: [{
-        url: `https://${entry.domain}`,
+        url: `${entry.scheme}//${entry.domain}`,
         label: 'website',
         autofillBehavior: entry.allowSubdomains ? 'AnywhereOnWebsite' : 'ExactDomain',
       }],

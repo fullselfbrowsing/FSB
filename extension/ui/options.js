@@ -5291,7 +5291,9 @@ async function importLegacyVault() {
       logins: String(response.imported?.logins || 0),
       cards: String(response.imported?.cards || 0)
     }), 'success');
-    const kept = (response.failed?.logins || 0) + (response.failed?.cards || 0) + (response.unreadable || 0);
+    const kept = (response.failed?.logins || 0) + (response.failed?.cards || 0)
+      + (response.notAttempted?.logins || 0) + (response.notAttempted?.cards || 0)
+      + (response.unreadable || 0);
     if (kept > 0) showToast(fsbUiLine('Not moved and kept in FSB: $COUNT$', { count: String(kept) }), 'warning');
     _legacyVaultPin = null;
   } catch (error) {

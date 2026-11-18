@@ -254,7 +254,7 @@ npx fsb-mcp-server onepassword --save-vault <vaultId>   # optional: where "Save 
 npx fsb-mcp-server onepassword                     # show the current setup
 ```
 
-Settings live in `~/.fsb/onepassword.json` (owner-only). `--desktop <account>` configures the desktop app from the CLI, and `--reset` forgets everything. Logins are released only for a site one of their saved websites matches, following the item's 1Password autofill setting. Cards are read only after the user approves the fill.
+Settings live in `~/.fsb/onepassword.json` (owner-only). `--desktop <account>` configures the desktop app from the CLI, and `--reset` forgets everything. Logins are released only for a site one of their saved websites matches, following the item's 1Password autofill setting, and a website saved as `https://` is never matched by a plain-`http://` page. Cards are read only after the user approves the fill.
 
 ### Grok Build as the extension's AI provider
 
