@@ -83,10 +83,15 @@ interface Swipe {
   acc: number;
   /** How far it has gone at a steady pace since it last moved the camera, signed. */
   travel: number;
-  /** The shape of its deltas: the highest, the lowest since then, and the run of rises. */
+  /** The shape of its deltas, each as big as it would be in one frame (FRAME_MS): the
+      highest, the lowest since then, and the run of rises. */
   peak: number;
   low: number;
   run: number;
+  /** When an event of it last came late, held back by a busy page. */
+  heldAt: number;
+  /** The farthest it has gone in STEADY_MS. */
+  best: number;
   /** Its recent deltas and when they came, for its pace (steadyNow()). */
   log: { t: number; d: number }[];
 }
@@ -139,6 +144,20 @@ const STEADY_MS = 300;
 const STEADY = 0.75;
 const STEADY_PX = 60;
 const PLANE = 0.75;
+/* A wheel event happened when its time stamp says, which a busy page does not delay.
+   A trackpad reports its travel a few times a frame, and the browser hands over once a
+   frame all that came during it, so a long frame brings a big delta and a short one a
+   small delta. Once the events come within QUICK_MS of each other, as a trackpad's do,
+   each is sized as it would be in one FRAME_MS frame, taking the time since the last as
+   no less than SAMPLE_MS, about how often a trackpad reports. One that comes HELD_MS
+   or more after the last was held back by a busy page, and brings several frames. */
+const FRAME_MS = 1000 / 60;
+const QUICK_MS = 25;
+const SAMPLE_MS = 8;
+const HELD_MS = 50;
+/* A pause in the wheel counts only if the page drew at least DREW frames through it.
+   If it drew fewer it was busy, and the swipe was still coming. */
+const DREW = 3;
 
 /* A finger that slides only a few pixels along the rail can still count as a tap,
    and the browser then clicks the entry it came down on. A click on the rail this
@@ -208,16 +227,24 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   // How tall each piece of on-demand content was at the last pass, to tell which
   // one is opening.
   const grownTo = new WeakMap<HTMLElement, number>();
-  // The wheel: the swipe it is in, when its last event came and how big it was, and
-  // until when no plane is chosen. A plane chosen before then waits (`waitDir`, to
-  // go from `waitFrom`) on a timer.
+  // The wheel: the swipe it is in; when its last event came, by its time stamp and by
+  // the clock as it was handled; how big that event was in one frame; how many frames
+  // had been drawn by then; and how many events in a row have come quickly. Then until
+  // when no plane is chosen. A plane chosen before then waits (`waitDir`, to go from
+  // `waitFrom`) on a timer.
   let swipe: Swipe | null = null;
   let wheelAt = -1e9;
-  let wheelAd = 0;
+  let wheelNow = -1e9;
+  let wheelD = 0;
+  let wheelF = 0;
+  let quick = 0;
   let lockEnd = 0;
   let waitDir = 0;
   let waitFrom = 0;
   let waitT = 0;
+  // The frames the page has drawn while the wheel is in use (count()).
+  let frames = 0;
+  let ticker = 0;
   const ambients: Ambient[] = Array.from(stage.querySelectorAll<HTMLElement>('[data-depth-ambient]')).map((el) => {
     const r = (el.getAttribute('data-depth-ambient') || '0,0').split(',');
     return { el, a: parseFloat(r[0]), b: parseFloat(r[1]), o: -1 };
@@ -960,11 +987,21 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const t = e.target as Element | null;
     return !!(t && t.closest && t.closest('[data-depth-own]'));
   };
-  // A new swipe: it scrolls the plane it is on while that can go its way, and
-  // otherwise leans toward the next plane.
-  function begin(dy: number, now: number): void {
-    const ad = Math.abs(dy);
-    const s: Swipe = { mode: 'lean', acc: 0, travel: 0, peak: ad, low: ad, run: 0, log: [{ t: now, d: ad }] };
+  // When the input behind a wheel event happened: its time stamp, unless that is on
+  // some other clock.
+  function stampOf(e: Event, now: number): number {
+    const t = e.timeStamp;
+    return t > now - 60000 && t <= now + 1 ? t : now;
+  }
+  // Counts the frames the page draws, until a second after the last wheel event.
+  function count(): void {
+    frames++;
+    ticker = win.performance.now() - wheelNow < 1000 ? win.requestAnimationFrame(count) : 0;
+  }
+  // A new swipe, whose first event came at `t` and was `d` in one frame: it scrolls the
+  // plane it is on while that can go its way, and otherwise leans toward the next plane.
+  function begin(dy: number, d: number, t: number): void {
+    const s: Swipe = { mode: 'lean', acc: 0, travel: 0, peak: d, low: d, run: 0, heldAt: -1e9, best: 0, log: [{ t, d: Math.abs(dy) }] };
     swipe = s;
     const L = layers[Math.round(target)];
     if (flows(L) && canScroll(L, dy)) {
@@ -1016,19 +1053,28 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       swipe.travel = 0;
     }
   }
-  // Whether the swipe keeps its pace, as momentum never does.
-  function steadyNow(s: Swipe, now: number): boolean {
+  // Whether the swipe keeps its pace, as momentum never does: momentum only slows, so it
+  // soon falls short of the swipe's best. Just after a held event the pace cannot be
+  // told, since all that event's travel lands at one moment.
+  function steadyNow(s: Swipe, t: number): boolean {
     let recent = 0;
     let before = 0;
     for (const x of s.log) {
-      if (now - x.t < STEADY_MS) recent += x.d;
+      if (t - x.t < STEADY_MS) recent += x.d;
       else before += x.d;
     }
-    return before > 0 && recent >= STEADY_PX && recent >= before * STEADY;
+    s.best = Math.max(s.best, recent);
+    if (t - s.heldAt < 2 * STEADY_MS) return false;
+    return before > 0 && recent >= STEADY_PX && recent >= before * STEADY && recent >= s.best * STEADY;
   }
   function onIdle(): void {
     const s = swipe;
     if (!s) return;
+    // The page has drawn next to nothing since the last event: it was busy, not idle.
+    if (frames - wheelF < DREW && win.performance.now() - wheelNow < 1000) {
+      idle = win.setTimeout(onIdle, IDLE_MS);
+      return;
+    }
     if (s.mode === 'lean' && !waitDir) {
       // Stopped short of the next plane: back to this one.
       swipe = null;
@@ -1046,34 +1092,48 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     // only make the next one look like a jump.
     if (!ad) return;
     const now = win.performance.now();
-    const gap = now - wheelAt;
-    const prev = wheelAd;
-    wheelAt = now;
-    wheelAd = ad;
+    const t = stampOf(e, now);
+    const gap = t - wheelAt;
+    const drew = frames - wheelF;
+    const prev = wheelD;
+    wheelAt = t;
+    wheelNow = now;
+    wheelF = frames;
+    if (!ticker) ticker = win.requestAnimationFrame(count);
     win.clearTimeout(idle);
     idle = win.setTimeout(onIdle, IDLE_MS);
     let s = swipe;
-    // A pause ends the swipe, unless what comes after it is that swipe's momentum,
-    // arriving late.
-    if (s && gap >= IDLE_MS && !(s.mode === 'eat' && gap < RESUME_MS && ad < prev)) s = swipe = null;
+    // The page drew next to nothing since the last event: it was busy, and this one was
+    // held back.
+    const stalled = gap < 1000 && drew < DREW;
+    // How big the event would be in one frame, once the events come as a trackpad's
+    // do. A mouse wheel's notches come further apart, and count as they are.
+    if (gap < QUICK_MS) quick++;
+    else if (!stalled) quick = 0;
+    const d = quick >= 2 ? (ad * FRAME_MS) / Math.max(gap, SAMPLE_MS) : ad;
+    if (s && quick >= 2 && gap >= HELD_MS) s.heldAt = t;
+    wheelD = d;
+    // A pause ends the swipe, unless the page was busy through it, or what comes after
+    // it is that swipe's momentum, arriving late and slower.
+    if (s && gap >= IDLE_MS && !stalled && !(s.mode === 'eat' && gap < RESUME_MS && d < prev)) s = swipe = null;
     if (!s) {
-      begin(dy, now);
+      begin(dy, d, t);
       return;
     }
-    s.log.push({ t: now, d: ad });
-    while (now - s.log[0].t >= 2 * STEADY_MS) s.log.shift();
+    s.log.push({ t, d: ad });
+    while (t - s.log[0].t >= 2 * STEADY_MS) s.log.shift();
     // One physical swipe is a push and then its momentum: the deltas climb, then only
     // ebb. A new push on that momentum climbs out of the ebb well past where it was.
-    s.run = ad > prev ? s.run + 1 : 0;
-    const fresh = s.run >= 2 && s.low < s.peak * 0.7 && ad >= s.low * RISE + RISE_PX;
-    if (ad > s.peak) s.peak = s.low = ad;
-    else if (ad < s.low) s.low = ad;
+    s.run = d > prev ? s.run + 1 : 0;
+    const fresh = s.run >= 2 && s.low < s.peak * 0.7 && d >= s.low * RISE + RISE_PX;
+    if (d > s.peak) s.peak = s.low = d;
+    else if (d < s.low) s.low = d;
     if (s.mode === 'lean') {
       leanBy(s, dy);
       return;
     }
     if (fresh) {
-      begin(dy, now);
+      begin(dy, d, t);
       return;
     }
     const L = layers[Math.round(target)];
@@ -1089,7 +1149,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     }
     // Eaten, unless it keeps its pace once the camera is there: then it scrolls the
     // plane, or moves on a plane for each plane of travel.
-    if (now < lockEnd || !steadyNow(s, now)) return;
+    const steady = steadyNow(s, t);
+    if (now < lockEnd || !steady) return;
     if (flows(L) && canScroll(L, dy)) {
       s.mode = 'inner';
       scrollBy(L, dy);
@@ -1364,6 +1425,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       win.clearTimeout(idle);
       win.clearTimeout(waitT);
       win.cancelAnimationFrame(raf);
+      win.cancelAnimationFrame(ticker);
       mo?.disconnect();
       win.removeEventListener('load', rescan);
       cueEl?.style.removeProperty('--cue');

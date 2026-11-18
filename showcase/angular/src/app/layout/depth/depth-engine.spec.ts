@@ -692,15 +692,78 @@ describe('createDepthEngine', () => {
 
   describe('wheel', () => {
     // A wheel notch or trackpad step, dispatched on the stage and bubbling to the document.
-    function wheel(deltaY: number): void {
-      root.querySelector('[data-depth-stage]')!.dispatchEvent(new WheelEvent('wheel', { deltaY, cancelable: true, bubbles: true }));
+    // `stamp` is when the input happened, as the browser stamps it (event.timeStamp).
+    function wheel(deltaY: number, stamp?: number): void {
+      const e = new WheelEvent('wheel', { deltaY, cancelable: true, bubbles: true });
+      if (stamp !== undefined) Object.defineProperty(e, 'timeStamp', { value: stamp });
+      root.querySelector('[data-depth-stage]')!.dispatchEvent(e);
     }
     const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
     const activeIndex = (): number => layers().findIndex((l) => !l.hasAttribute('inert'));
+    // Steps a frame apart, as a trackpad stamps them, however late the test's timers run.
     async function burst(deltas: readonly number[]): Promise<void> {
+      let stamp = performance.now();
       for (const d of deltas) {
-        wheel(d);
+        wheel(d, stamp);
         await pause(16);
+        stamp = Math.min(stamp + 1000 / 60, performance.now());
+      }
+    }
+    // Holds the page up, as a heavy frame can: nothing else runs and nothing is drawn.
+    const busy = (ms: number): void => {
+      const end = performance.now() + ms;
+      while (performance.now() < end) {
+        // The page is frozen.
+      }
+    };
+    // A flick as a trackpad reports it. The pad samples the fingers' travel every 8.33ms,
+    // and the browser hands over once a frame all the samples that came during it,
+    // stamped with the last one. `frames` are the frame lengths in ms, repeated; the
+    // flick climbs to `speed` px/ms over 100ms, then its momentum ebbs.
+    interface Step {
+      d: number;
+      at: number;
+      stamp: number;
+    }
+    function sampled(speed: number, frames: readonly number[]): Step[] {
+      const v = (t: number): number => (t < 100 ? speed * Math.sin((Math.PI / 2) * (t / 100)) ** 2 : speed * Math.exp(-0.002 * (t - 100)));
+      const steps: Step[] = [];
+      let carry = 0;
+      for (let t = 0, s = 8.33, i = 0; t < 100 || v(t) > 0.01; i++) {
+        t += frames[i % frames.length];
+        let d = 0;
+        let stamp = -1;
+        for (; s <= t; s += 8.33) {
+          d += v(s) * 8.33;
+          stamp = s;
+        }
+        if (stamp < 0) continue;
+        const r = Math.round(d + carry);
+        carry += d - r;
+        if (r) steps.push({ d: r, at: t, stamp });
+      }
+      return steps;
+    }
+    // Plays the steps at their times. With `freeze`, the page is held up for `ms` from the
+    // step at `at`, and what came in meanwhile arrives in one event as it lets go.
+    async function play(steps: readonly Step[], freeze?: { at: number; ms: number }): Promise<void> {
+      const t0 = performance.now();
+      let held = 0;
+      let heldStamp = 0;
+      for (const x of steps) {
+        if (freeze && x.at > freeze.at && x.at <= freeze.at + freeze.ms) {
+          if (!held) busy(t0 + freeze.at + freeze.ms - performance.now());
+          held += x.d;
+          heldStamp = x.stamp;
+          continue;
+        }
+        if (held) {
+          wheel(held, Math.min(t0 + heldStamp, performance.now()));
+          held = 0;
+        }
+        const wait = t0 + x.at - performance.now();
+        if (wait > 0) await pause(wait);
+        wheel(x.d, Math.min(t0 + x.stamp, performance.now()));
       }
     }
 
@@ -859,6 +922,35 @@ describe('createDepthEngine', () => {
       await pause(400);
       expect(activeIndex()).toBe(2);
       expect(seen).not.toContain(3);
+    }, 10000);
+
+    // Frames are rarely even. Every 200ms here one comes short and the next long, so the
+    // deltas dip and then climb twice in a row, as a fresh push would.
+    it('moves one plane for a swipe whose frames come unevenly', async () => {
+      build([120, 120, 120, 120]);
+      await play(sampled(2, [16, 16, 16, 16, 9, 16, 24, 16, 16, 16, 16, 16]));
+      await pause(500);
+      expect(seen).toEqual([0, 1]);
+    }, 10000);
+
+    // The camera has set off and the page stalls while it draws the planes: the momentum
+    // that came in meanwhile arrives after a long gap, all at once.
+    it('eats the momentum that comes in one lump after the page was busy', async () => {
+      build([120, 120, 120, 120]);
+      const steps = sampled(2, [1000 / 60]);
+      await play(steps, { at: steps.find((x) => x.at >= 200)!.at, ms: 250 });
+      await pause(500);
+      expect(seen).toEqual([0, 1]);
+    }, 10000);
+
+    // The stall comes as the swipe changes planes, while the fingers are still speeding
+    // up, so the lump is faster than what came before it.
+    it('keeps a swipe the page stalls in while it is still speeding up to one plane', async () => {
+      build([120, 120, 120, 120]);
+      const steps = sampled(3, [1000 / 60]);
+      await play(steps, { at: steps.find((x) => x.at >= 66)!.at, ms: 200 });
+      await pause(500);
+      expect(seen).toEqual([0, 1]);
     }, 10000);
   });
 
