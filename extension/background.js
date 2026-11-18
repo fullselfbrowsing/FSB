@@ -14926,12 +14926,14 @@ async function fsbHandleOnePasswordUiAction(request) {
 }
 
 // Fill a login resolved from 1Password into the page's detected login form.
-async function fillCredentialsOnPage(tabId, login, domData) {
+// expectedOrigin is the origin the login was looked up for.
+async function fillCredentialsOnPage(tabId, login, domData, expectedOrigin) {
   if (!login || (!login.username && !login.password)) return { success: false, error: 'No credentials found' };
 
   const fields = extractLoginFields(domData);
 
   return await fillCredentialsOnPageDirect(tabId, {
+    expectedOrigin,
     usernameSelector: fields.usernameSelector,
     passwordSelector: fields.passwordSelector,
     submitSelector: fields.submitSelector,
@@ -14943,11 +14945,28 @@ async function fillCredentialsOnPage(tabId, login, domData) {
 // Fill credentials on page directly via chrome.scripting.executeScript
 // This avoids sending credentials over message passing where they could be intercepted
 // Uses React-compatible native setter to work with frameworks that intercept value changes
-async function fillCredentialsOnPageDirect(tabId, { usernameSelector, passwordSelector, submitSelector, username, password }) {
+//
+// Credentials belong to the origin they were looked up or typed for
+// (expectedOrigin). The 1Password lookup or the user's answer can take long
+// enough for the tab to navigate, so the tab is re-read here and the origin is
+// checked again inside the page before either value is used.
+async function fillCredentialsOnPageDirect(tabId, { expectedOrigin, usernameSelector, passwordSelector, submitSelector, username, password }) {
+  const originChanged = { success: false, originChanged: true, error: 'The page changed before the credential fill' };
+  if (!expectedOrigin) return { success: false, error: 'Credentials can only be filled on http(s) pages' };
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (fsbReplayOrigin(tab && tab.url) !== expectedOrigin) return originChanged;
+  } catch (_error) {
+    return { success: false, error: 'Credential fill failed' };
+  }
   try {
     const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (uSel, pSel, sSel, u, p) => {
+      target: { tabId, frameIds: [0] },
+      func: (origin, uSel, pSel, sSel, u, p) => {
+        // First, before u or p reach any page API: is this still the page the
+        // credentials were meant for?
+        if (location.origin !== origin) return { success: false, originChanged: true };
+
         // React-compatible value setter: uses the native HTMLInputElement prototype setter
         // which triggers React's synthetic event system, unlike direct .value assignment
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
@@ -15000,10 +15019,11 @@ async function fillCredentialsOnPageDirect(tabId, { usernameSelector, passwordSe
           passwordVerified: pVerified
         };
       },
-      args: [usernameSelector, passwordSelector, submitSelector, username, password],
+      args: [expectedOrigin, usernameSelector, passwordSelector, submitSelector, username, password],
       world: 'MAIN'
     });
     const result = results[0]?.result || { success: false, error: 'No result from script injection' };
+    if (result.originChanged) return originChanged;
     automationLogger.debug('fillCredentialsOnPageDirect result', result);
     return result;
   } catch (error) {
@@ -17031,6 +17051,18 @@ async function startAutomationLoop(sessionId) {
 
     if (enableLogin && hasPasswordField && !session._loginHandledForUrl?.includes(currentUrl)) {
       const loginDomain = secureConfig.normalizeDomain(currentUrl);
+      // Credentials are only filled into this origin, even if the tab moves
+      // while 1Password or the user is answering.
+      const loginOrigin = fsbReplayOrigin(currentUrl);
+      // A refused fill means this DOM snapshot is stale: read the new page
+      // instead of handing the old one to the AI.
+      const restartOnNewPage = () => {
+        automationLogger.info('Page changed before the login fill, nothing was filled', { sessionId, domain: loginDomain });
+        loopResolve?.();
+        if (!isSessionTerminating(sessionId) && activeSessions.has(sessionId)) {
+          setTimeout(() => startAutomationLoop(sessionId), 500);
+        }
+      };
       automationLogger.debug('Login page detected', { sessionId, domain: loginDomain, url: currentUrl });
 
       // Track that we've handled login for this URL to avoid repeated prompts
@@ -17071,9 +17103,14 @@ async function startAutomationLoop(sessionId) {
         });
 
         const loginFields = extractLoginFields(domResponse.structuredDOM);
-        const fillResult = await fillCredentialsOnPage(session.tabId, savedCred, domResponse.structuredDOM);
+        const fillResult = await fillCredentialsOnPage(session.tabId, savedCred, domResponse.structuredDOM, loginOrigin);
 
         automationLogger.debug('Auto-fill result', { sessionId, success: fillResult?.success, filledUsername: fillResult?.filledUsername, filledPassword: fillResult?.filledPassword ? '***' : false, usernameVerified: fillResult?.usernameVerified, passwordVerified: fillResult?.passwordVerified });
+
+        if (fillResult?.originChanged) {
+          restartOnNewPage();
+          return;
+        }
 
         if (fillResult?.success) {
           session._loginHandledForUrl.push(currentUrl);
@@ -17147,12 +17184,18 @@ async function startAutomationLoop(sessionId) {
 
           // Fill the form on page
           const directFillResult = await fillCredentialsOnPageDirect(session.tabId, {
+            expectedOrigin: loginOrigin,
             usernameSelector: loginFields.usernameSelector,
             passwordSelector: loginFields.passwordSelector,
             submitSelector: loginFields.submitSelector,
             username: userResponse.credentials.username,
             password: userResponse.credentials.password
           });
+
+          if (directFillResult?.originChanged) {
+            restartOnNewPage();
+            return;
+          }
 
           if (directFillResult?.success) {
             session._loginHandledForUrl.push(currentUrl);

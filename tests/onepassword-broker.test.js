@@ -155,6 +155,16 @@ async function run() {
     assert.equal(match.websiteMatch({ url: 'alpha.co.uk' }, at('https://beta.co.uk')), null);
     assert.equal(match.websiteMatch({ url: 'shop.alpha.co.uk' }, at('https://login.alpha.co.uk')), 'site');
   });
+  await check('shared hosting suffixes keep customers apart', () => {
+    for (const suffix of ['github.io', 'vercel.app', 'netlify.app', 'pages.dev', 'up.railway.app']) {
+      assert.equal(match.websiteMatch({ url: `app.${suffix}` }, at(`https://other.${suffix}`)), null, suffix);
+      assert.equal(match.websiteMatch({ url: `app.${suffix}` }, at(`https://docs.app.${suffix}`)), 'site', suffix);
+      assert.equal(match.websiteMatch({ url: suffix }, at(`https://app.${suffix}`)), null, `bare ${suffix}`);
+    }
+    assert.equal(match.registrableDomain('a.b.up.railway.app'), 'b.up.railway.app', 'longest suffix wins');
+    assert.equal(match.registrableDomain('accounts.github.com'), 'github.com', 'other domains are unchanged');
+    assert.equal(match.websiteMatch({ url: 'app.github.io', autofillBehavior: 'ExactDomain' }, at('https://app.github.io/login')), 'exact');
+  });
   await check('explicit ports must agree', () => {
     assert.equal(match.websiteMatch({ url: 'http://localhost:3000' }, at('http://localhost:3000/login')), 'exact');
     assert.equal(match.websiteMatch({ url: 'http://localhost:3000' }, at('http://localhost:4000')), null);

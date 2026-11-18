@@ -1,9 +1,10 @@
 'use strict';
 
 // extension/utils/onepassword-client.js: the service-worker side of 1Password.
-// Checks that only the page origin is sent, fill results carry no secrets,
-// cards are read only after a trusted approval for the same merchant, and
-// transport failures map to actionable codes.
+// Checks that only the page origin is sent, fills land only on that origin
+// (scheme, host, and port), fill results carry no secrets, cards are read only
+// after a trusted approval for the same merchant, the autopilot refuses to
+// guess between logins, and transport failures map to actionable codes.
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -110,7 +111,9 @@ async function run() {
     }]);
     assert.equal(sent[0].tabId, 7);
     assert.equal(sent[0].message.tool, 'fillCredentialFields');
-    assert.deepEqual(JSON.parse(JSON.stringify(sent[0].message.params)), { username: 'alice', password: 'hunter2', oneTimeCode: '123456' });
+    assert.deepEqual(JSON.parse(JSON.stringify(sent[0].message.params)), {
+      username: 'alice', password: 'hunter2', oneTimeCode: '123456', expectedOrigin: 'https://example.com',
+    }, 'the content script is told which origin the login is for');
     assert.equal(result.success, true);
     assert.equal(result.site, 'example.com');
     const serialized = JSON.stringify(result);
@@ -134,6 +137,32 @@ async function run() {
     const result = await env.api.fillLoginInTab(7, { requireUnique: true }, async () => assert.fail('must not fill'));
     assert.equal(result.errorCode, 'multiple_credentials');
     assert.deepEqual(JSON.parse(JSON.stringify(result.candidates)), [{ id: 'v:a', title: 'A', username: 'a' }]);
+  });
+  for (const [label, moved] of [
+    ['another site', 'https://evil.test/login'],
+    ['http on the same host', 'http://example.com/login'],
+    ['another port on the same host', 'https://example.com:8443/login'],
+  ]) {
+    await check(`a tab that moves to ${label} while 1Password answers is not filled`, async () => {
+      const env = makeEnv({
+        tabUrls: ['https://example.com/login', moved],
+        responses: { 'onepassword.resolve-login': { ok: true, login } },
+      });
+      const result = await env.api.fillLoginInTab(7, {}, async () => assert.fail('must not fill'));
+      assert.equal(result.success, false);
+      assert.equal(result.errorCode, 'page_changed');
+      assert.ok(!JSON.stringify(result).includes('hunter2'));
+    });
+  }
+  await check('a path change on the same origin still fills', async () => {
+    const env = makeEnv({
+      tabUrls: ['https://example.com/login', 'https://example.com/login?step=2'],
+      responses: { 'onepassword.resolve-login': { ok: true, login } },
+    });
+    let fills = 0;
+    const result = await env.api.fillLoginInTab(7, {}, async () => { fills += 1; return { success: true, filled: ['password'] }; });
+    assert.equal(result.success, true);
+    assert.equal(fills, 1);
   });
 
   console.log('\n--- cards ---');
@@ -166,6 +195,7 @@ async function run() {
     assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card', 'onepassword.resolve-card']);
     assert.equal(fills[0].tool, 'fillPaymentFields');
     assert.equal(fills[0].params.cardNumber, '4111111111111111');
+    assert.equal(fills[0].params.expectedOrigin, 'https://shop.test');
     assert.deepEqual(JSON.parse(JSON.stringify(fills[0].params.billingAddress)), {
       line1: '1 Main St', line2: '', city: 'Chicago', region: 'IL', postalCode: '60601', country: 'US',
     }, 'billing goes in the shape fillPaymentFields reads');
@@ -188,9 +218,135 @@ async function run() {
     await waitFor(() => env.runtimeSent.length === 1);
     env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, trusted);
     const result = await pending;
+    assert.equal(result.success, false);
     assert.equal(result.errorCode, 'merchant_changed');
     assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card']);
   });
+  for (const [label, moved] of [
+    ['http on the same host', 'http://shop.test/checkout'],
+    ['another port on the same host', 'https://shop.test:8443/checkout'],
+  ]) {
+    await check(`a tab that moves to ${label} after approval is refused`, async () => {
+      const env = cardEnv(['https://shop.test/checkout', moved]);
+      const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
+      await waitFor(() => env.runtimeSent.length === 1);
+      env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, trusted);
+      const result = await pending;
+      assert.equal(result.errorCode, 'merchant_changed');
+      assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card']);
+    });
+  }
+  await check('a tab that moves while the card is read is not filled', async () => {
+    const env = cardEnv(['https://shop.test/checkout', 'https://shop.test/checkout', 'https://evil.test/pay']);
+    const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
+    await waitFor(() => env.runtimeSent.length === 1);
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, trusted);
+    const result = await pending;
+    assert.equal(result.errorCode, 'merchant_changed');
+    assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card', 'onepassword.resolve-card']);
+    assert.ok(!JSON.stringify(result).includes('4111111111111111'));
+  });
+  for (const [url, shown] of [
+    ['https://shop.test:8443/checkout', 'shop.test:8443'],
+    ['http://shop.test/checkout', 'http://shop.test'],
+  ]) {
+    await check(`the approval prompt names ${shown}`, async () => {
+      const env = cardEnv([url]);
+      const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
+      await waitFor(() => env.runtimeSent.length === 1);
+      assert.equal(env.runtimeSent[0].merchantDomain, shown);
+      env.deliver({ action: 'paymentFillDenied', paymentMethodId: 'v:c' }, trusted);
+      await pending;
+    });
+  }
+
+  console.log('\n--- content-script fills check the receiving document ---');
+  {
+    const actions = fs.readFileSync(path.join(__dirname, '..', 'extension', 'content', 'actions.js'), 'utf8');
+    const start = actions.indexOf('  const OTP_FIELD_PATTERN');
+    const end = actions.indexOf('  FSB.clickAtCoordinates = clickAtCoordinates;');
+    assert.ok(start > 0 && end > start, 'fill tools found in content/actions.js');
+    const loadFillTools = (origin) => {
+      const domReads = { count: 0 };
+      const context = {
+        tools: {},
+        window: { location: { origin } },
+        document: { querySelectorAll: () => { domReads.count += 1; return []; } },
+        FSB: { inferElementPurpose: () => null },
+      };
+      vm.runInNewContext(actions.slice(start, end), context);
+      return { tools: context.tools, domReads };
+    };
+    await check('a login meant for another origin is refused before the page is read', async () => {
+      const { tools, domReads } = loadFillTools('https://evil.test');
+      const result = await tools.fillCredentialFields({ username: 'alice', password: 'hunter2', expectedOrigin: 'https://example.com' });
+      assert.equal(result.errorCode, 'page_changed');
+      assert.equal(domReads.count, 0);
+    });
+    await check('a card meant for another origin is refused before the page is read', async () => {
+      const { tools, domReads } = loadFillTools('https://shop.test:8443');
+      const result = await tools.fillPaymentFields({ cardNumber: '4111111111111111', expectedOrigin: 'https://shop.test' });
+      assert.equal(result.errorCode, 'merchant_changed');
+      assert.equal(domReads.count, 0);
+    });
+    await check('a fill without an origin is refused', async () => {
+      const { tools, domReads } = loadFillTools('https://example.com');
+      assert.equal((await tools.fillCredentialFields({ password: 'hunter2' })).errorCode, 'page_changed');
+      assert.equal((await tools.fillPaymentFields({ cardNumber: '4111111111111111' })).errorCode, 'merchant_changed');
+      assert.equal(domReads.count, 0);
+    });
+    await check('the matching origin reaches the field search', async () => {
+      const { tools, domReads } = loadFillTools('https://example.com');
+      const login = await tools.fillCredentialFields({ password: 'hunter2', expectedOrigin: 'https://example.com' });
+      const pay = await tools.fillPaymentFields({ cardNumber: '4111111111111111', expectedOrigin: 'https://example.com' });
+      assert.match(login.error, /No login fields/);
+      assert.match(pay.error, /No payment fields/);
+      assert.equal(domReads.count, 2);
+    });
+  }
+
+  console.log('\n--- autopilot fill_credential ---');
+  {
+    const executor = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ai', 'tool-executor.js'), 'utf8');
+    const makeResultSrc = executor.slice(executor.indexOf('function makeResult('), executor.indexOf('function buildAutopilotTriggerParams('));
+    const caseStart = executor.indexOf("      case 'fill_credential': {");
+    const caseEnd = executor.indexOf("      case 'fill_payment_method': {");
+    assert.ok(caseStart > 0 && caseEnd > caseStart, 'fill_credential case found in tool-executor.js');
+    const runCase = (fillResult) => {
+      const calls = [];
+      const context = {
+        chrome: { tabs: { sendMessage: async () => ({}) } },
+        fsbOnePassword: {
+          async fillLoginInTab(tabId, options) {
+            calls.push({ tabId, options: { ...options } });
+            return fillResult;
+          },
+        },
+      };
+      context.globalThis = context;
+      const run = vm.runInNewContext(
+        `${makeResultSrc}\n(async function (tool, params, tabId) { switch (tool.name) {\n${executor.slice(caseStart, caseEnd)}\n} })`,
+        context,
+      );
+      return { calls, run: (params) => run({ name: 'fill_credential' }, params, 5) };
+    };
+    await check('several matching logins fail with candidates instead of picking one', async () => {
+      const candidates = [{ id: 'v:a', title: 'Personal', username: 'me' }, { id: 'v:b', title: 'Work', username: 'me@work' }];
+      const env = runCase({ success: false, errorCode: 'multiple_credentials', error: 'pick one', candidates });
+      const result = await env.run({});
+      assert.equal(env.calls[0].options.requireUnique, true);
+      assert.equal(result.success, false);
+      assert.equal(result.result.errorCode, 'multiple_credentials');
+      assert.deepEqual(JSON.parse(JSON.stringify(result.result.candidates)), candidates);
+    });
+    await check('credential_id is passed through to pick one', async () => {
+      const env = runCase({ success: true, credentialId: 'v:b', site: 'example.com', filled: ['password'] });
+      const result = await env.run({ credential_id: 'v:b' });
+      assert.equal(env.calls[0].options.itemId, 'v:b');
+      assert.equal(result.success, true);
+      assert.equal(result.result.candidates, undefined);
+    });
+  }
 
   console.log('\n--- transport ---');
   await check('no local server reports how to install it', async () => {

@@ -175,10 +175,26 @@
       if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
         return { error: failure('unsupported_page', 'Credentials can only be filled on http(s) pages') };
       }
-      return { url: tab.url, hostname: parsed.hostname };
+      return {
+        url: tab.url,
+        origin: parsed.origin,
+        hostname: parsed.hostname,
+        // What the user is shown: host plus any non-default port, and the
+        // scheme too when the page is not https.
+        label: parsed.protocol === 'https:' ? parsed.host : parsed.origin
+      };
     } catch (_e) {
       return { error: failure('unsupported_page', 'Cannot determine the site from the tab URL') };
     }
+  }
+
+  // Secrets are resolved for one origin (scheme, host, and port). 1Password
+  // reads can wait on a desktop approval, so the tab is re-read right before
+  // a fill and the content script checks the origin again in the document
+  // that receives the values.
+  async function sameOrigin(tabId, origin) {
+    var now = await tabSite(tabId);
+    return !now.error && now.origin === origin;
   }
 
   function toFillFailure(result, fallback) {
@@ -210,6 +226,12 @@
       return toFillFailure(resolved, 'No 1Password login for ' + site.hostname);
     }
     var login = resolved.login;
+    if (!(await sameOrigin(tabId, site.origin))) {
+      return toFillFailure(
+        failure('page_changed', 'The page changed while 1Password was answering; the login was not filled'),
+        'Page changed'
+      );
+    }
     var reply;
     try {
       reply = await send(tabId, {
@@ -218,7 +240,8 @@
         params: {
           username: login.username || '',
           password: login.password || '',
-          oneTimeCode: login.oneTimeCode || ''
+          oneTimeCode: login.oneTimeCode || '',
+          expectedOrigin: site.origin
         }
       });
     } catch (error) {
@@ -290,7 +313,7 @@
       paymentMethodId: String(itemId),
       cardBrand: described.card.cardBrand,
       last4: described.card.last4,
-      merchantDomain: site.hostname
+      merchantDomain: site.label
     });
     if (!confirm.approved) {
       var reason = confirm.reason || 'user_declined';
@@ -305,16 +328,19 @@
       };
     }
 
-    // The approval was for this merchant: refuse if the tab moved meanwhile.
-    var after = await tabSite(tabId);
-    if (after.error || after.hostname !== site.hostname) {
-      return failure('merchant_changed', 'The page changed after approval; the card was not filled');
-    }
+    // The approval was for this origin. Check before reading the card, and
+    // again after, since that read can wait on 1Password as well.
+    var merchantChanged = toFillFailure(
+      failure('merchant_changed', 'The page changed after approval; the card was not filled'),
+      'Page changed'
+    );
+    if (!(await sameOrigin(tabId, site.origin))) return merchantChanged;
 
     var resolved = await api.resolveCard(itemId);
     if (!resolved || !resolved.ok || !resolved.card) {
       return toFillFailure(resolved, 'Could not read the card from 1Password');
     }
+    if (!(await sameOrigin(tabId, site.origin))) return merchantChanged;
     var card = resolved.card;
     var reply;
     try {
@@ -322,6 +348,7 @@
         action: 'executeAction',
         tool: 'fillPaymentFields',
         params: {
+          expectedOrigin: site.origin,
           cardNumber: card.cardNumber || '',
           expiryMonth: card.expiryMonth || '',
           expiryYear: card.expiryYear || '',
@@ -347,7 +374,7 @@
       paymentMethodId: String(itemId),
       cardBrand: described.card.cardBrand,
       last4: described.card.last4,
-      merchantDomain: site.hostname,
+      merchantDomain: site.label,
       filled: Array.isArray(reply && reply.filled) ? reply.filled : [],
       totalFieldsDetected: (reply && reply.totalFieldsDetected) || 0
     };

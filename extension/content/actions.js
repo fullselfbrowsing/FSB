@@ -5956,6 +5956,15 @@ const tools = {
   const OTP_FIELD_PATTERN = /(^|[^a-z])(otp|totp|one.?time|2fa|mfa|two.?factor|verification.?code|verify.?code|auth(entication|enticator)?.?code|security.?code|passcode|login.?code|sign.?in.?code)([^a-z]|$)/i;
   const OTP_EXCLUDE_PATTERN = /cvv|cvc|csc|card|cc-|zip|postal|phone|promo|coupon|gift/i;
 
+  // The background resolved these values from 1Password for one origin. If the
+  // tab navigated before this message landed, this is another document: refuse
+  // before any value touches the page. A missing origin is refused too.
+  function fillOriginRefusal(params, errorCode) {
+    const expected = params && typeof params.expectedOrigin === 'string' ? params.expectedOrigin : '';
+    if (expected && expected === window.location.origin) return null;
+    return { success: false, errorCode, error: 'The page changed before the fill; nothing was filled' };
+  }
+
   function credentialSetValue(element, value) {
     element.focus();
     const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -5995,6 +6004,8 @@ const tools = {
   }
 
   tools.fillCredentialFields = async (params) => {
+    const refusal = fillOriginRefusal(params, 'page_changed');
+    if (refusal) return refusal;
     const username = params && params.username ? String(params.username) : '';
     const password = params && params.password ? String(params.password) : '';
     const oneTimeCode = params && /^\d{4,10}$/.test(String(params.oneTimeCode || '')) ? String(params.oneTimeCode) : '';
@@ -6074,6 +6085,8 @@ const tools = {
   // Returns: { success, filled, totalFieldsDetected } or { success: false, error }.
   // =========================================================================
   tools.fillPaymentFields = async (params) => {
+    const refusal = fillOriginRefusal(params, 'merchant_changed');
+    if (refusal) return refusal;
     const { cardNumber, cvv, expiryMonth, expiryYear, cardholderName, billingAddress } = params;
 
     const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select'));

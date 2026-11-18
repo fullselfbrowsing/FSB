@@ -10,9 +10,12 @@
  * IP addresses and single-label hosts (localhost) always match exactly.
  */
 
-// Multi-level public suffixes where the registrable domain keeps three labels.
-// Mirrors the list the extension used for its own vault so behavior carries over.
-const MULTI_LEVEL_SUFFIXES = new Set([
+// Suffixes under which unrelated parties each register their own name, so the
+// registrable domain is the suffix plus one more label (alpha.co.uk,
+// app.github.io). Anything not listed falls back to the last two labels.
+// Adding an entry only makes matching stricter, never looser.
+const PUBLIC_SUFFIXES = new Set([
+  // Multi-level country suffixes (the list the extension's own vault used).
   'co.uk', 'co.jp', 'co.kr', 'co.in', 'co.nz', 'co.za', 'co.il',
   'com.br', 'com.au', 'com.mx', 'com.cn', 'com.tw', 'com.hk', 'com.sg',
   'com.ar', 'com.tr', 'com.eg', 'com.pk', 'com.ng', 'com.co',
@@ -21,6 +24,17 @@ const MULTI_LEVEL_SUFFIXES = new Set([
   'net.au', 'net.br',
   'ac.uk', 'ac.jp',
   'edu.au', 'edu.cn',
+  // Shared hosting where every customer gets a subdomain (Public Suffix List,
+  // private section).
+  'github.io', 'githubusercontent.com', 'gitlab.io', 'bitbucket.io', 'codeberg.page',
+  'vercel.app', 'now.sh', 'netlify.app', 'pages.dev', 'workers.dev', 'r2.dev',
+  'web.app', 'firebaseapp.com', 'appspot.com', 'blogspot.com',
+  'herokuapp.com', 'onrender.com', 'fly.dev', 'up.railway.app', 'deno.dev',
+  'azurewebsites.net', 'azurestaticapps.net', 'cloudfront.net', 'amplifyapp.com',
+  's3.amazonaws.com', 'elasticbeanstalk.com',
+  'glitch.me', 'surge.sh', 'repl.co', 'readthedocs.io', 'webflow.io',
+  'myshopify.com', 'wixsite.com',
+  'ngrok.io', 'ngrok.app', 'ngrok-free.app',
 ]);
 
 const HOST_PATTERN = /^[a-z0-9.-]+$/;
@@ -72,16 +86,22 @@ export function isIpHost(hostname: string): boolean {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
 }
 
-/** Approximate eTLD+1 ("accounts.google.com" -> "google.com"). */
+/**
+ * Approximate eTLD+1 ("accounts.google.com" -> "google.com",
+ * "docs.app.github.io" -> "app.github.io"). A host that is itself a listed
+ * suffix ("github.io") is returned as is, so it matches none of the sites
+ * under it.
+ */
 export function registrableDomain(hostname: string): string {
   if (isIpHost(hostname)) return hostname;
   const labels = hostname.split('.');
-  if (labels.length <= 2) return hostname;
-  const lastTwo = labels.slice(-2).join('.');
-  if (MULTI_LEVEL_SUFFIXES.has(lastTwo)) {
-    return labels.length > 3 ? labels.slice(-3).join('.') : hostname;
+  // Longest listed suffix first, so up.railway.app wins over a shorter entry.
+  for (let start = 0; start < labels.length; start += 1) {
+    if (PUBLIC_SUFFIXES.has(labels.slice(start).join('.'))) {
+      return start === 0 ? hostname : labels.slice(start - 1).join('.');
+    }
   }
-  return lastTwo;
+  return labels.length <= 2 ? hostname : labels.slice(-2).join('.');
 }
 
 export function websiteMatch(website: WebsiteLike, target: HostTarget): MatchStrength | null {

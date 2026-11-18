@@ -455,9 +455,11 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
         }
         const itemId = typeof params?.credential_id === 'string' ? params.credential_id
           : (typeof params?.credentialId === 'string' ? params.credentialId : undefined);
+        // Same contract as the MCP tool: several matching logins (personal and
+        // work, say) fail with candidates instead of typing the newest one.
         const fill = await onePassword.fillLoginInTab(
           tabId,
-          { itemId, requireUnique: false },
+          { itemId, requireUnique: true },
           (targetTabId, message) => chrome.tabs.sendMessage(targetTabId, message)
         );
         return makeResult({
@@ -469,7 +471,9 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
             credentialId: fill.credentialId || null,
             filled: fill.filled || [],
             fieldsFound: fill.fieldsFound || {},
-            errorCode: fill.success ? undefined : fill.errorCode
+            errorCode: fill.success ? undefined : fill.errorCode,
+            // id, title, username only: pass one id back as credential_id.
+            candidates: !fill.success && Array.isArray(fill.candidates) ? fill.candidates : undefined
           }
         });
       }
