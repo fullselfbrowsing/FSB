@@ -4666,5 +4666,161 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB meldet sich mit Anmeldedaten aus deinem 1Password an. FSB selbst speichert keine Passwörter."
+  },
+  "panel_8b70975df7": {
+    "message": "Wenn aktiviert, erkennt FSB Anmeldeseiten und meldet sich mit den passenden Anmeldedaten aus 1Password an."
+  },
+  "panel_818962bda5": {
+    "message": "1Password-Verbindung wird geprüft..."
+  },
+  "panel_b84510154a": {
+    "message": "1Password-Konto"
+  },
+  "panel_a6f394d865": {
+    "message": "Der Kontoname oben in der Seitenleiste von 1Password. Aktiviere in der 1Password-App Settings > Developer > Integrate with other apps."
+  },
+  "panel_5dec08e310": {
+    "message": "1Password verbinden"
+  },
+  "panel_e175b45390": {
+    "message": "Lieber ein Dienstkonto verwenden? Führe dies in einem Terminal aus und lade diese Seite dann neu:"
+  },
+  "panel_5c0a336c67": {
+    "message": "Wähle die Tresore, die FSB lesen darf. Am sichersten ist ein Tresor, den nur FSB nutzt."
+  },
+  "panel_161c79f605": {
+    "message": "Neue Anmeldedaten speichern in"
+  },
+  "panel_cc6d7a8340": {
+    "message": "Nicht speichern"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "Tresorzugriff speichern"
+  },
+  "panel_5ab21b8830": {
+    "message": "Alten FSB-Tresor nach 1Password verschieben"
+  },
+  "panel_911c744cd5": {
+    "message": "Gib die PIN deines alten FSB-Tresors ein. Nach 1Password verschobene Einträge werden aus FSB gelöscht."
+  },
+  "panel_3f6118f701": {
+    "message": "Nach 1Password verschieben"
+  },
+  "panel_0f5320398c": {
+    "message": "Alten Tresor löschen"
+  },
+  "panel_00f3328a04": {
+    "message": "In den Tresoren, die FSB nutzen darf, gibt es keine Anmeldedaten. Füge sie in 1Password hinzu oder bearbeite sie dort."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB füllt Bezahlformulare mit Kreditkarten aus deinem 1Password aus, nachdem du jedes Ausfüllen bestätigt hast."
+  },
+  "panel_4875f94fbf": {
+    "message": "Verbinde 1Password unter Passwörter, um deine Karten zu nutzen."
+  },
+  "panel_b9675cca57": {
+    "message": "In den Tresoren, die FSB nutzen darf, gibt es keine Kreditkarten. Füge Karten in 1Password hinzu oder bearbeite sie dort."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password ist über die Desktop-App verbunden ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password ist mit einem Dienstkonto verbunden."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password ist nicht verbunden."
+  },
+  "panel_5848961ce6": {
+    "message": "Wähle die Tresore, die FSB nutzen darf, um die Einrichtung abzuschließen."
+  },
+  "panel_216dcfd214": {
+    "message": "Gib den Namen deines 1Password-Kontos ein"
+  },
+  "panel_a94d6f85db": {
+    "message": "Verbindung wird hergestellt... Bestätige FSB in der 1Password-App, falls du gefragt wirst."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password verbunden"
+  },
+  "panel_e520e3cf11": {
+    "message": "Wähle mindestens einen Tresor"
+  },
+  "panel_cc541e4c1e": {
+    "message": "Tresorzugriff gespeichert"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password getrennt"
+  },
+  "panel_e95f94cbda": {
+    "message": "Der alte FSB-Tresor enthält noch Einträge, die FSB nicht mehr nutzt. Anmeldedaten: $LOGINS$. Karten: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "Nach 1Password verschoben. Anmeldedaten: $LOGINS$. Karten: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "Nicht verschoben und in FSB behalten: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "Alten FSB-Tresor löschen? Alles, was nicht nach 1Password verschoben wurde, geht verloren."
+  },
+  "panel_ed17465290": {
+    "message": "Alter Tresor gelöscht"
+  },
+  "panel_3d763a56b2": {
+    "message": "Einträge: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "Wird verschoben..."
+  },
+  "panel_498fd066bf": {
+    "message": "1Password ist nicht erreichbar: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "Gib deine Anmeldedaten ein, um dich anzumelden. FSB kann sie für das nächste Mal in 1Password speichern."
+  },
+  "copy_751ac3de88": {
+    "message": "Gib deine Anmeldedaten ein, um dich anzumelden. FSB verwendet sie einmal und speichert sie nicht."
+  },
+  "copy_264681c742": {
+    "message": "In 1Password speichern"
   }
 }

@@ -308,15 +308,15 @@ for (const [file, exactMap, texts] of [
   ['extension/ui/options.js', controlPanelMap, [
     'Model Required', 'Models Required', 'API Key Required', 'Connection Failed', 'Connection Error', 'Test failed',
     'Provide an API key before saving this provider', 'Load an available model from this provider before saving',
-    'Changes discarded', 'Logs cleared', 'Session deleted', 'Vault unlocked', 'Incorrect PIN', 'Credential saved',
-    'Credential updated', 'Credential deleted', 'Access granted', 'Request denied', 'Memory deleted', 'Memories exported',
+    'Changes discarded', 'Logs cleared', 'Session deleted', '1Password connected', 'Vault access saved',
+    '1Password disconnected', 'Old vault deleted', 'Choose at least one vault', 'Access granted', 'Request denied', 'Memory deleted', 'Memories exported',
     '$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.',
     '$NAME$ connection', 'FSB uses $NAME$\'s existing local sign-in. Test Connection sends one small no-tools validation request.',
     'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.',
     '$ACTIVE$ of $CAP$ active', 'Step $CURRENT$ of $TOTAL$', 'Load next 500 events',
     'Not connected', 'Sign-in failed', 'Sign-in cancelled', 'Connected with browser OAuth',
-    'Sign-in status unavailable', 'Opening Grok sign-in...', 'Waiting for browser sign-in...', 'Edit Credential',
-    'Add Credential', 'Edit Payment Method', 'Add Payment Method', 'No models match search', 'No models available',
+    'Sign-in status unavailable', 'Opening Grok sign-in...', 'Waiting for browser sign-in...', 'Enter your 1Password account name',
+    '1Password is not connected.', 'Choose the vaults FSB may use to finish setup.', 'No models match search', 'No models available',
     '$COUNT$ pending', '$NAME$ is not installed or is not on PATH.', '$NAME$ must be updated to a supported version.',
     '$NAME$ was found at a supported version, but its isolation or protocol profile could not be verified.',
     '$NAME$ could not start the required strict sandbox. Resolve the local sandbox environment problem and try again.',
@@ -471,7 +471,6 @@ for (const file of [
   'extension/ui/control_panel.html',
   'extension/ui/sidepanel.html',
   'extension/ui/popup.html',
-  'extension/ui/unlock.html',
   'extension/ui/microphone-permission.html',
   'extension/ui/onboarding.html'
 ]) {
@@ -1905,9 +1904,7 @@ function sidepanelMessageContext(api) {
     [name, fs.readFileSync(path.join(root, `extension/ui/${name}.js`), 'utf8')]));
   const occurrences = (source, text) => source.split(text).length - 1;
   for (const [file, text, count] of [
-    ['options', "'Failed to save: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
-    ['options', "'Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 2],
-    ['options', "'Error saving payment method: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
+    ['options', "'Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } }", 2],
     ['options', "'Failed to start explorer: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
     ['options', "'Failed to load more session events: $ERROR$', { error: { english: error.message } }", 1],
     ['options', "'Could not generate pairing code: $ERROR$', { error: { english: error.message } }", 2],
@@ -2756,8 +2753,8 @@ async function asyncChecks() {
     shipped.setOverride('es');
     ctx.showLoginPrompt('Ready', { usernameType: 'email' });
     const login = parse(appended.innerHTML);
-    const loginCopy = ['Login Required', 'Enter your credentials to sign in. They will be encrypted and saved for future use.',
-      'Email', 'Password', 'Save for future use', 'Sign In', 'Skip'];
+    const loginCopy = ['Login Required', 'Enter your credentials to sign in. FSB uses them once and does not store them.',
+      'Email', 'Password', 'Sign In', 'Skip'];
     check(loginCopy.every((english) => shows(login, 'es', english)), 'the login prompt renders each label and button in the active language');
     check(attrShows(login, 'es', 'placeholder', 'Email') && attrShows(login, 'es', 'placeholder', 'Password'),
       'the login prompt renders its placeholders in the active language');
@@ -2766,6 +2763,14 @@ async function asyncChecks() {
     check(attrShows(login, 'de', 'placeholder', 'Email') && attrShows(login, 'de', 'placeholder', 'Password'),
       'a language change rewrites the login placeholders');
     check(login.html.includes('<div class="login-prompt-domain">Ready</div>'), 'a site name stays as sent, even when it matches FSB copy');
+    check(!login.html.includes('loginPromptSave'), 'without a 1Password save vault the login prompt offers no save checkbox');
+
+    shipped.setOverride('es');
+    ctx.showLoginPrompt('Ready', { usernameType: 'email' }, true);
+    const saving = parse(appended.innerHTML);
+    check(['Enter your credentials to sign in. FSB can save them to 1Password for next time.', 'Save to 1Password']
+      .every((english) => shows(saving, 'es', english)) && saving.html.includes('id="loginPromptSave"'),
+      'with a 1Password save vault the login prompt offers Save to 1Password in the active language');
 
     shipped.setOverride('es');
     ctx.showLoginPrompt('', {});

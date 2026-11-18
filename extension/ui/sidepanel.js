@@ -6065,7 +6065,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (currentStatusMessage) {
           updateStatusMessage('Login page detected...');
         }
-        showLoginPrompt(request.domain, request.fields);
+        showLoginPrompt(request.domain, request.fields, request.canSave === true);
         sendResponse({ received: true });
       }
       return;
@@ -6137,7 +6137,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Show inline login prompt in the chat
-function showLoginPrompt(domain, fields) {
+function showLoginPrompt(domain, fields, canSave) {
   // Prevent duplicate prompts if rapid loginDetected messages arrive
   const existing = document.getElementById('login-prompt');
   if (existing) existing.remove();
@@ -6155,11 +6155,8 @@ function showLoginPrompt(domain, fields) {
 
   // Escape domain for safe HTML insertion
   const safeDomain = domain ? escapeAttr(domain) : spHtml('this site');
-  const authPrompt = null;
-  const allowSave = authPrompt?.allowSave !== false;
-  const safeSaveDisabledReason = authPrompt?.saveDisabledReason
-    ? escapeAttr(authPrompt.saveDisabledReason)
-    : spHtml('Saving is unavailable for this session.');
+  // Saving goes to 1Password, and only when FSB has a vault to save into.
+  const allowSave = canSave === true;
 
   container.innerHTML = `
     <div class="login-prompt-header">
@@ -6167,7 +6164,9 @@ function showLoginPrompt(domain, fields) {
       <span>${spHtml('Login Required')}</span>
     </div>
     <div class="login-prompt-domain">${safeDomain}</div>
-    <div class="login-prompt-subtext">${spHtml('Enter your credentials to sign in. They will be encrypted and saved for future use.')}</div>
+    <div class="login-prompt-subtext">${allowSave
+      ? spHtml('Enter your credentials to sign in. FSB can save them to 1Password for next time.')
+      : spHtml('Enter your credentials to sign in. FSB uses them once and does not store them.')}</div>
     <div class="login-prompt-form">
       <div class="login-prompt-field">
         <label>${spHtml(fieldLabel)}</label>
@@ -6182,11 +6181,10 @@ function showLoginPrompt(domain, fields) {
           </button>
         </div>
       </div>
-      <label class="login-prompt-save-label">
-        <input type="checkbox" id="loginPromptSave" ${allowSave ? 'checked' : ''} ${allowSave ? '' : 'disabled'}>
-        <span>${spHtml('Save for future use')}</span>
-      </label>
-      ${allowSave ? '' : `<div class="login-prompt-subtext">${safeSaveDisabledReason}</div>`}
+      ${allowSave ? `<label class="login-prompt-save-label">
+        <input type="checkbox" id="loginPromptSave" checked>
+        <span>${spHtml('Save to 1Password')}</span>
+      </label>` : ''}
       <div class="login-prompt-actions">
         <button class="login-prompt-btn primary" id="loginPromptSubmit">${spHtml('Sign In')}</button>
         <button class="login-prompt-btn ghost" id="loginPromptSkip">${spHtml('Skip')}</button>
@@ -6226,7 +6224,7 @@ function showLoginPrompt(domain, fields) {
     submitBtn.addEventListener('click', () => {
       const username = document.getElementById('loginPromptUsername')?.value?.trim();
       const password = document.getElementById('loginPromptPassword')?.value;
-      const save = document.getElementById('loginPromptSave')?.checked ?? true;
+      const save = allowSave && (document.getElementById('loginPromptSave')?.checked ?? false);
 
       if (!username && !password) {
         return;

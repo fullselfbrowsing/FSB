@@ -2,8 +2,12 @@
   "schema": 1,
   "packageName": "fsb-mcp-server",
   "packageVersion": "0.11.5",
-  "lockSha256": "2f78f5283a967e3c40474cacbd46701c55ebf6c46b50f0214e01554d3be1c65b",
+  "lockSha256": "bcdccf930ac990b441568022d7e8f1813e73585847a58669dfeb00afcee5e3b5",
   "directDependencies": [
+    {
+      "name": "@1password/sdk",
+      "version": "0.5.0"
+    },
     {
       "name": "@modelcontextprotocol/sdk",
       "version": "1.29.0"
@@ -30,6 +34,7 @@
     }
   ],
   "bundleDependencies": [
+    "@1password/sdk",
     "@modelcontextprotocol/sdk",
     "smol-toml",
     "strip-json-comments",
@@ -38,6 +43,18 @@
     "zod"
   ],
   "productionPackages": [
+    {
+      "path": "node_modules/@1password/sdk",
+      "name": "@1password/sdk",
+      "version": "0.5.0",
+      "integrity": "sha512-k6kov3pcA7PRg2tev9CgTfEf/3JSyAp11BPQNCEsqAD32QbqM032OXC1rfjyC8Ba0sfH+NHYZxcifUZToyGyYA=="
+    },
+    {
+      "path": "node_modules/@1password/sdk-core",
+      "name": "@1password/sdk-core",
+      "version": "0.5.0",
+      "integrity": "sha512-9g7LWOKRKdePZ85evVgE9xEom3DAg3hRIyQdOwLPvpL/F7KpDXmUHMi72rsqJxKaDbWApXmrYjDExMSPqUg7xw=="
+    },
     {
       "path": "node_modules/@hono/node-server",
       "name": "@hono/node-server",

@@ -114,7 +114,7 @@ This is the FSB v0.9.60 milestone release. The headline change is the new multi-
 - Route-aware tool dispatch and centralized parameter mapping.
 - Layered diagnostics through `doctor` and `status --watch`.
 - Persistent visual session glow across content script reinjection.
-- Secure vault tools that avoid sending raw secrets over the bridge.
+- 1Password-backed login and card tools that never return secrets to the MCP client.
 - One-command installer coverage for 21 platforms.
 
 Background-agent MCP tools were retired with the extension's background-agent sunset. The last tool left in that module, `back`, duplicated `go_back` and has been removed.
@@ -237,6 +237,24 @@ npx -y fsb-mcp-server@latest uninstall --native-host --browser edge
 Extension IDs are browser-installation-specific. Omitted `--extension-id` uses the published Chrome Web Store ID, `badgafnfchcihdfnjneklogedcdkmjfk`. For Edge, Brave, Chromium, or an unpacked build, copy the 32-character lowercase ID shown on that browser's extensions page and pass it with `--extension-id`.
 
 The browser selector controls the user-scoped native-messaging registration location. To switch browsers, uninstall the browser target reported by `doctor` first; cross-target install and uninstall requests refuse without changing either registration.
+
+### 1Password for logins and cards
+
+FSB keeps no passwords or cards of its own. `fill_credential` and `use_payment_method` read the user's 1Password, and only the vaults the user allows. This server signs in to 1Password with the [1Password JavaScript SDK](https://www.npmjs.com/package/@1password/sdk) and hands values to the extension over the paired loopback bridge; the extension fills the page.
+
+Desktop app (recommended): in the 1Password app, turn on **Settings > Developer > Integrate with other apps**, then connect from the extension's **Passwords** settings with your account name. 1Password asks you to approve FSB, and asks again after the app locks or sits idle.
+
+Service account (headless): create a 1Password service account with read access to a vault used only by FSB, then:
+
+```bash
+npx fsb-mcp-server onepassword --service-account   # token is read hidden, or from OP_SERVICE_ACCOUNT_TOKEN
+npx fsb-mcp-server onepassword --vaults            # list vault ids
+npx fsb-mcp-server onepassword --allow <vaultId>   # limit FSB to that vault
+npx fsb-mcp-server onepassword --save-vault <vaultId>   # optional: where "Save to 1Password" writes
+npx fsb-mcp-server onepassword                     # show the current setup
+```
+
+Settings live in `~/.fsb/onepassword.json` (owner-only). `--desktop <account>` configures the desktop app from the CLI, and `--reset` forgets everything. Logins are released only for a site one of their saved websites matches, following the item's 1Password autofill setting. Cards are read only after the user approves the fill.
 
 ### Grok Build as the extension's AI provider
 
@@ -613,12 +631,12 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 
 | Tool | Purpose |
 |------|---------|
-| `list_credentials` | List saved credential metadata without passwords. |
-| `fill_credential` | Fill a login form with an unlocked saved credential. |
-| `list_payment_methods` | List saved payment metadata without full card data. |
-| `use_payment_method` | Fill checkout data after user confirmation. |
+| `list_credentials` | List the 1Password logins FSB may use: id, title, site domains, username. |
+| `fill_credential` | Fill username, password, and one-time code from the 1Password login saved for the tab's site. |
+| `list_payment_methods` | List 1Password credit cards: id, title, brand, last 4, expiry. |
+| `use_payment_method` | Fill a checkout form with a 1Password card after the user approves it in the side panel. |
 
-Vault responses expose metadata only. Passwords, full card numbers, and CVV values are resolved inside the extension and are not returned to the MCP client.
+These tools read the user's 1Password (see [1Password](#1password-for-logins-and-cards)). Responses expose metadata only. Passwords, one-time codes, full card numbers, and CVV values go from 1Password to this server to the extension to the page, and are never returned to the MCP client.
 
 ### Tool Count Contract
 

@@ -302,6 +302,10 @@ function buildClientHarness(options = {}) {
   if (typeof options.fsbDispatchInternalMessage === 'function') {
     context.fsbDispatchInternalMessage = options.fsbDispatchInternalMessage;
   }
+  if (options.fsbOnePassword) context.fsbOnePassword = options.fsbOnePassword;
+  if (typeof options.resolveAgentTabOrError === 'function') {
+    context.resolveAgentTabOrError = options.resolveAgentTabOrError;
+  }
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   const footer = `
@@ -487,40 +491,83 @@ async function runRecordingLeaseDoesNotGateRoutingCase() {
 }
 
 async function runListCredentialsSecretStripCase() {
-  console.log('\n--- A5: mcp:list-credentials end-to-end strips secrets (MCP-01) ---');
+  console.log('\n--- A5: mcp:list-credentials end-to-end strips secrets (MCP-01, 1Password) ---');
 
   const dispatchCalls = [];
+  const onePasswordCalls = [];
   const harness = buildClientHarness({
     fsbDispatchInternalMessage(request) {
       dispatchCalls.push(request);
-      if (request.action === 'getCredentialVaultStatus') {
-        return Promise.resolve({ configured: true, unlocked: true });
+      return Promise.resolve({ success: false });
+    },
+    fsbOnePassword: {
+      async listLogins() {
+        onePasswordCalls.push('listLogins');
+        return {
+          ok: true,
+          logins: [
+            { id: 'v1:a', title: 'Example', domains: ['example.com'], username: 'alice', password: 'hunter2', oneTimeCode: '123456' },
+            { id: 'v1:b', title: 'Shop', domains: ['shop.test', 'pay.shop.test'], username: 'bob', password: 's3cret' }
+          ]
+        };
       }
-      return Promise.resolve({
-        success: true,
-        credentials: [
-          { domain: 'example.com', username: 'alice', password: 'hunter2' },
-          { domain: 'shop.test', username: 'bob', password: 's3cret' }
-        ]
-      });
     }
   });
   const client = harness.exports.mcpBridgeClient;
 
   const result = await client._routeMessage('mcp:list-credentials', {}, 'msg-1');
-  assertEqual(dispatchCalls.length, 2, 'list-credentials checks vault state before listing');
-  assertDeepEqual(dispatchCalls[0], { action: 'getCredentialVaultStatus' }, 'list-credentials reads vault status');
-  assertDeepEqual(dispatchCalls[1], { action: 'getAllCredentials' }, 'list-credentials sends the getAllCredentials action');
-  assertEqual(result.success, true, 'list-credentials succeeds via internal dispatch');
+  assertEqual(dispatchCalls.length, 0, 'list-credentials never asks the background for secrets');
+  assertDeepEqual(onePasswordCalls, ['listLogins'], 'list-credentials reads 1Password logins once');
+  assertEqual(result.success, true, 'list-credentials succeeds');
   assertDeepEqual(
     result.credentials,
     [
-      { domain: 'example.com', username: 'alice' },
-      { domain: 'shop.test', username: 'bob' }
+      { id: 'v1:a', title: 'Example', domain: 'example.com', domains: ['example.com'], username: 'alice' },
+      { id: 'v1:b', title: 'Shop', domain: 'shop.test', domains: ['shop.test', 'pay.shop.test'], username: 'bob' }
     ],
-    'credentials reduced to domain + username'
+    'credentials reduced to id, title, domains, and username'
   );
   assertNoSecrets(result, 'list-credentials response contains no password material');
+  assert(!JSON.stringify(result).includes('123456'), 'list-credentials response contains no one-time code');
+}
+
+async function runFillCredentialRoutesThroughOnePasswordCase() {
+  console.log('\n--- A5b: mcp:fill-credential resolves the tab, then fills from 1Password ---');
+
+  const fills = [];
+  const harness = buildClientHarness({
+    resolveAgentTabOrError: async (agentId, params) => {
+      assertEqual(agentId, 'agent-fill', 'resolver receives the calling agent');
+      return { success: true, tabId: 41 };
+    },
+    fsbOnePassword: {
+      async fillLoginInTab(tabId, options, send) {
+        fills.push({ tabId, options, sendIsFunction: typeof send === 'function' });
+        return { success: true, credentialId: 'v1:a', title: 'Example', site: 'example.com', filled: ['username', 'password'], fieldsFound: {} };
+      }
+    }
+  });
+  const client = harness.exports.mcpBridgeClient;
+
+  const result = await client._routeMessage('mcp:fill-credential', {
+    agentId: 'agent-fill',
+    credentialId: 'v1:a',
+    domain: 'attacker.example'
+  }, 'msg-fill');
+  assertEqual(fills.length, 1, 'fill-credential fills once');
+  assertEqual(fills[0].tabId, 41, 'fill targets the resolver-chosen tab');
+  assertEqual(fills[0].options.itemId, 'v1:a', 'credential_id is forwarded');
+  assertEqual(fills[0].options.requireUnique, true, 'MCP fills refuse to guess between several logins');
+  assert(fills[0].sendIsFunction, 'fill delivers through the content-script sender');
+  assert(!JSON.stringify(fills[0]).includes('attacker.example'), 'the payload domain never picks the login');
+  assertEqual(result.success, true, 'fill-credential reports success');
+
+  const rejected = buildClientHarness({
+    resolveAgentTabOrError: async () => ({ success: false, code: 'TAB_NOT_OWNED' }),
+    fsbOnePassword: { async fillLoginInTab() { throw new Error('must not fill'); } }
+  });
+  const denied = await rejected.exports.mcpBridgeClient._routeMessage('mcp:fill-credential', { agentId: 'x' }, 'msg-deny');
+  assertEqual(denied.code, 'TAB_NOT_OWNED', 'ownership rejection short-circuits before 1Password');
 }
 
 async function runAgentActionDeprecationCase() {
@@ -3619,6 +3666,7 @@ async function run() {
   await runRecordingLeaseLifecycleCase();
   await runRecordingLeaseDoesNotGateRoutingCase();
   await runListCredentialsSecretStripCase();
+  await runFillCredentialRoutesThroughOnePasswordCase();
   await runAgentActionDeprecationCase();
   await runDriftSettlementCases();
   await runTaskStatusRouteCase();

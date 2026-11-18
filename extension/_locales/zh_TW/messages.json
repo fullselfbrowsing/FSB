@@ -4666,5 +4666,161 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB 使用你 1Password 中的登入資訊登入。FSB 本身不儲存任何密碼。"
+  },
+  "panel_8b70975df7": {
+    "message": "啟用後，FSB 會偵測登入頁面，並使用相符的 1Password 登入資訊登入。"
+  },
+  "panel_818962bda5": {
+    "message": "正在檢查 1Password 連線..."
+  },
+  "panel_b84510154a": {
+    "message": "1Password 帳號"
+  },
+  "panel_a6f394d865": {
+    "message": "即 1Password 側邊欄頂端顯示的帳號名稱。請在 1Password 應用程式中開啟 Settings > Developer > Integrate with other apps。"
+  },
+  "panel_5dec08e310": {
+    "message": "連接 1Password"
+  },
+  "panel_e175b45390": {
+    "message": "想改用服務帳號？請在終端機中執行以下指令，然後重新載入此頁面："
+  },
+  "panel_5c0a336c67": {
+    "message": "選擇 FSB 可以讀取的保險庫。僅供 FSB 使用的保險庫最安全。"
+  },
+  "panel_161c79f605": {
+    "message": "新登入資訊儲存至"
+  },
+  "panel_cc6d7a8340": {
+    "message": "不儲存"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "儲存保險庫存取權限"
+  },
+  "panel_5ab21b8830": {
+    "message": "將舊的 FSB 保險庫移至 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "輸入舊 FSB 保險庫的 PIN。已移至 1Password 的項目會從 FSB 中清除。"
+  },
+  "panel_3f6118f701": {
+    "message": "移至 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "刪除舊保險庫"
+  },
+  "panel_00f3328a04": {
+    "message": "FSB 可用的保險庫中沒有登入資訊。請在 1Password 中新增或編輯登入資訊。"
+  },
+  "panel_c6e98715b7": {
+    "message": "每次填寫前經你核准後，FSB 會用你 1Password 中的信用卡填寫結帳表單。"
+  },
+  "panel_4875f94fbf": {
+    "message": "請在「密碼」中連接 1Password 以使用你的卡片。"
+  },
+  "panel_b9675cca57": {
+    "message": "FSB 可用的保險庫中沒有信用卡。請在 1Password 中新增或編輯卡片。"
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password 已透過桌面應用程式連線（$ACCOUNT$）。",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password 已透過服務帳號連線。"
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password 尚未連線。"
+  },
+  "panel_5848961ce6": {
+    "message": "請選擇 FSB 可以使用的保險庫以完成設定。"
+  },
+  "panel_216dcfd214": {
+    "message": "請輸入你的 1Password 帳號名稱"
+  },
+  "panel_a94d6f85db": {
+    "message": "正在連線... 如有提示，請在 1Password 應用程式中核准 FSB。"
+  },
+  "panel_616c3a2010": {
+    "message": "1Password 已連線"
+  },
+  "panel_e520e3cf11": {
+    "message": "請至少選擇一個保險庫"
+  },
+  "panel_cc541e4c1e": {
+    "message": "保險庫存取權限已儲存"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password 已中斷連線"
+  },
+  "panel_e95f94cbda": {
+    "message": "舊的 FSB 保險庫中仍有 FSB 不再使用的項目。登入資訊：$LOGINS$。卡片：$CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "已移至 1Password。登入資訊：$LOGINS$。卡片：$CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "未移動並保留在 FSB 中：$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "要刪除舊的 FSB 保險庫嗎？所有未移至 1Password 的內容都將遺失。"
+  },
+  "panel_ed17465290": {
+    "message": "舊保險庫已刪除"
+  },
+  "panel_3d763a56b2": {
+    "message": "項目：$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "正在移動..."
+  },
+  "panel_498fd066bf": {
+    "message": "無法連線至 1Password：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "輸入憑證以登入。FSB 可以將其儲存至 1Password 供下次使用。"
+  },
+  "copy_751ac3de88": {
+    "message": "輸入憑證以登入。FSB 只使用一次，不會儲存。"
+  },
+  "copy_264681c742": {
+    "message": "儲存至 1Password"
   }
 }

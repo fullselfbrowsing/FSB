@@ -1,0 +1,423 @@
+'use strict';
+
+// 1Password broker (mcp/src/onepassword): site matching, vault allowlist,
+// secret projection, card gating, saving, legacy import, error hygiene, and
+// the bridge rule that onepassword.* requests are answered by the hub only.
+// Runs against the compiled build (npm --prefix mcp run build) with a fake SDK
+// shaped like @1password/sdk 0.5.x.
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+const buildDir = path.join(__dirname, '..', 'mcp', 'build', 'onepassword');
+const load = (name) => import(pathToFileURL(path.join(buildDir, name)).href);
+
+let passed = 0;
+async function check(name, fn) {
+  try {
+    await fn();
+    passed += 1;
+    console.log('  PASS:', name);
+  } catch (error) {
+    console.error('  FAIL:', name);
+    throw error;
+  }
+}
+
+// --- fake SDK --------------------------------------------------------------
+
+class DesktopSessionExpiredError extends Error {}
+class RateLimitExceededError extends Error {}
+
+function loginItem(vaultId, id, { title, url, behavior = 'AnywhereOnWebsite', username, password, otp, updatedAt = '2026-01-01T00:00:00Z' }) {
+  const fields = [
+    { id: 'username', title: 'username', fieldType: 'Text', value: username },
+    { id: 'password', title: 'password', fieldType: 'Concealed', value: password },
+  ];
+  if (otp) {
+    fields.push({ id: 'TOTP_x', title: 'one-time password', fieldType: 'Totp', value: 'otpauth://totp/x?secret=SEED', details: { type: 'Otp', content: { code: otp } } });
+  }
+  return {
+    id, vaultId, title, category: 'Login', state: 'active', tags: [], notes: '',
+    websites: [{ url, label: 'website', autofillBehavior: behavior }],
+    fields, updatedAt,
+  };
+}
+
+function cardItem(vaultId, id) {
+  return {
+    id, vaultId, title: 'Work Visa', category: 'CreditCard', state: 'active', websites: [], tags: [], notes: '',
+    fields: [
+      { id: 'cardholder', title: 'cardholder name', fieldType: 'Text', value: 'Alice Example' },
+      { id: 'type', title: 'type', fieldType: 'CreditCardType', value: 'Visa' },
+      { id: 'ccnum', title: 'number', fieldType: 'CreditCardNumber', value: '4111 1111 1111 1111' },
+      { id: 'cvv', title: 'verification number', fieldType: 'Concealed', value: '737' },
+      { id: 'expiry', title: 'expiry date', fieldType: 'MonthYear', value: '12/2031' },
+      { id: 'addr', title: 'billing', fieldType: 'Address', value: '', details: { type: 'Address', content: { street: '1 Main St', city: 'Chicago', state: 'IL', zip: '60601', country: 'US' } } },
+    ],
+  };
+}
+
+function makeSdk(items, options = {}) {
+  const calls = { createClient: [], list: 0, get: [], create: [] };
+  let expireNext = options.expireOnce === true;
+  const sdk = {
+    DesktopAuth: class { constructor(accountName) { this.accountName = accountName; } },
+    async createClient(config) {
+      calls.createClient.push(config);
+      if (options.authError) throw new Error(options.authError);
+      return {
+        vaults: {
+          async list() {
+            return [
+              { id: 'vaultA', title: 'FSB', activeItemCount: 3 },
+              { id: 'vaultB', title: 'Private', activeItemCount: 1 },
+            ];
+          },
+        },
+        items: {
+          async list(vaultId) {
+            calls.list += 1;
+            if (expireNext) {
+              expireNext = false;
+              throw new DesktopSessionExpiredError('session expired');
+            }
+            if (options.rateLimited) throw new RateLimitExceededError('slow down');
+            return items.filter((item) => item.vaultId === vaultId).map(({ fields, ...overview }) => overview);
+          },
+          async get(vaultId, itemId) {
+            calls.get.push(`${vaultId}:${itemId}`);
+            const item = items.find((entry) => entry.vaultId === vaultId && entry.id === itemId);
+            if (!item) throw new Error('item not found');
+            return item;
+          },
+          async getAll(vaultId, ids) {
+            return {
+              individualResponses: ids.map((id) => {
+                const item = items.find((entry) => entry.vaultId === vaultId && entry.id === id);
+                return item ? { content: item } : { error: { type: 'itemNotFound' } };
+              }),
+            };
+          },
+          async create(params) {
+            calls.create.push(params);
+            if (options.failCreateTitle && params.title === options.failCreateTitle) throw new Error('create failed');
+            return { ...params, id: `new${calls.create.length}` };
+          },
+        },
+      };
+    },
+  };
+  return { sdk, calls };
+}
+
+function tempConfigPath() {
+  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-op-test-')), 'onepassword.json');
+}
+
+async function rejects(promise, code) {
+  try {
+    await promise;
+  } catch (error) {
+    assert.equal(error.code, code, `expected ${code}, got ${error.code}: ${error.message}`);
+    return error;
+  }
+  assert.fail(`expected rejection with ${code}`);
+}
+
+async function run() {
+  const match = await load('domain-match.js');
+  const { OnePasswordBroker, parseItemRef } = await load('broker.js');
+  const { handleOnePasswordRequest, isOnePasswordExtMethod, ONEPASSWORD_EXT_METHODS } = await load('ext-handler.js');
+
+  console.log('\n--- site matching follows 1Password autofill rules ---');
+  const at = (url) => match.parseHostTarget(url);
+  await check('exact host matches', () => {
+    assert.equal(match.websiteMatch({ url: 'https://example.com', autofillBehavior: 'ExactDomain' }, at('https://www.example.com/login')), 'exact');
+  });
+  await check('AnywhereOnWebsite covers subdomains of the registrable domain', () => {
+    assert.equal(match.websiteMatch({ url: 'example.com', autofillBehavior: 'AnywhereOnWebsite' }, at('https://accounts.example.com')), 'site');
+  });
+  await check('ExactDomain refuses subdomains', () => {
+    assert.equal(match.websiteMatch({ url: 'example.com', autofillBehavior: 'ExactDomain' }, at('https://accounts.example.com')), null);
+  });
+  await check('Never websites are ignored', () => {
+    assert.equal(match.websiteMatch({ url: 'example.com', autofillBehavior: 'Never' }, at('https://example.com')), null);
+  });
+  await check('look-alike hosts do not match', () => {
+    assert.equal(match.websiteMatch({ url: 'example.com' }, at('https://example.com.evil.test')), null);
+    assert.equal(match.websiteMatch({ url: 'example.com' }, at('https://notexample.com')), null);
+  });
+  await check('multi-level suffixes keep sites apart', () => {
+    assert.equal(match.websiteMatch({ url: 'alpha.co.uk' }, at('https://beta.co.uk')), null);
+    assert.equal(match.websiteMatch({ url: 'shop.alpha.co.uk' }, at('https://login.alpha.co.uk')), 'site');
+  });
+  await check('explicit ports must agree', () => {
+    assert.equal(match.websiteMatch({ url: 'http://localhost:3000' }, at('http://localhost:3000/login')), 'exact');
+    assert.equal(match.websiteMatch({ url: 'http://localhost:3000' }, at('http://localhost:4000')), null);
+  });
+  await check('IP addresses only match exactly', () => {
+    assert.equal(match.websiteMatch({ url: 'http://10.0.0.5' }, at('http://10.0.0.6')), null);
+  });
+  await check('non-web schemes are rejected', () => {
+    assert.equal(at('chrome://settings'), null);
+    assert.equal(at('file:///etc/passwd'), null);
+  });
+
+  console.log('\n--- configuration and allowlist ---');
+  const items = [
+    loginItem('vaultA', 'loginA', { title: 'Example', url: 'https://example.com', username: 'alice', password: 'pw-a', otp: '123456' }),
+    loginItem('vaultA', 'loginA2', { title: 'Example work', url: 'https://example.com', username: 'alice@work', password: 'pw-a2', updatedAt: '2026-06-01T00:00:00Z' }),
+    loginItem('vaultA', 'loginShop', { title: 'Shop', url: 'https://shop.test', behavior: 'ExactDomain', username: 'bob', password: 'pw-shop' }),
+    loginItem('vaultB', 'loginPrivate', { title: 'Bank', url: 'https://bank.test', username: 'carol', password: 'pw-bank' }),
+    cardItem('vaultA', 'cardA'),
+  ];
+
+  await check('unconfigured broker refuses to read', async () => {
+    const { sdk } = makeSdk(items);
+    const broker = new OnePasswordBroker({ loadSdk: async () => sdk, configPath: tempConfigPath(), env: {} });
+    assert.equal(broker.status().configured, false);
+    await rejects(broker.listLogins(), 'onepassword_not_configured');
+  });
+
+  const configPath = tempConfigPath();
+  const fake = makeSdk(items);
+  const broker = new OnePasswordBroker({ loadSdk: async () => fake.sdk, configPath, env: {} });
+
+  await check('desktop sign-in without vaults is not ready', async () => {
+    const status = broker.configure({ authKind: 'desktop', accountName: 'my.1password.com' });
+    assert.equal(status.authKind, 'desktop');
+    assert.equal(status.configured, false);
+    await rejects(broker.listLogins(), 'onepassword_no_vaults');
+    assert.equal(fake.calls.createClient[0].auth.accountName, 'my.1password.com', 'desktop auth uses the account name');
+    assert.equal(fake.calls.createClient[0].integrationName, 'FSB');
+  });
+
+  await check('config file is owner-only', () => {
+    if (process.platform === 'win32') return;
+    assert.equal(fs.statSync(configPath).mode & 0o777, 0o600);
+  });
+
+  await check('listing vaults shows every vault so the user can choose', async () => {
+    const vaults = await broker.listVaults();
+    assert.deepEqual(vaults.map((vault) => vault.id), ['vaultA', 'vaultB']);
+  });
+
+  await check('save vault must be one of the allowed vaults', () => {
+    assert.throws(() => broker.configure({ vaultIds: ['vaultA'], saveVaultId: 'vaultB' }), /allowed vaults/);
+  });
+
+  broker.configure({ vaultIds: ['vaultA'] });
+
+  await check('only allowlisted vaults are listed, without passwords', async () => {
+    const logins = await broker.listLogins();
+    assert.deepEqual(logins.map((login) => login.id).sort(), ['vaultA:loginA', 'vaultA:loginA2', 'vaultA:loginShop']);
+    const serialized = JSON.stringify(logins);
+    for (const secret of ['pw-a', 'pw-bank', '123456', 'SEED']) assert.ok(!serialized.includes(secret), `list omits ${secret}`);
+    assert.equal(logins.find((login) => login.id === 'vaultA:loginA').username, 'alice');
+  });
+
+  console.log('\n--- resolving logins for a page ---');
+  await check('the most specific, most recent match wins without requireUnique', async () => {
+    const login = await broker.resolveLogin({ url: 'https://example.com/login' });
+    assert.equal(login.id, 'vaultA:loginA2', 'newer exact match wins');
+    assert.equal(login.password, 'pw-a2');
+  });
+  await check('requireUnique returns candidates instead of guessing', async () => {
+    const error = await rejects(broker.resolveLogin({ url: 'https://example.com', requireUnique: true }), 'multiple_credentials');
+    const candidates = error.details.candidates;
+    assert.deepEqual(candidates.map((candidate) => candidate.id).sort(), ['vaultA:loginA', 'vaultA:loginA2']);
+    assert.ok(!JSON.stringify(candidates).includes('pw-'), 'candidates carry no passwords');
+  });
+  await check('one exact-host login is not ambiguous next to site-level matches', async () => {
+    const tiered = makeSdk([
+      loginItem('vaultA', 'exactOne', { title: 'Accounts', url: 'https://accounts.example.com', username: 'exact', password: 'pw-exact' }),
+      loginItem('vaultA', 'siteOne', { title: 'Example', url: 'https://example.com', username: 'site', password: 'pw-site' }),
+    ]);
+    const tieredBroker = new OnePasswordBroker({ loadSdk: async () => tiered.sdk, configPath, env: {} });
+    const login = await tieredBroker.resolveLogin({ url: 'https://accounts.example.com', requireUnique: true });
+    assert.equal(login.username, 'exact');
+  });
+  await check('a chosen item resolves with its one-time code', async () => {
+    const login = await broker.resolveLogin({ url: 'https://sub.example.com', itemId: 'vaultA:loginA', requireUnique: true });
+    assert.equal(login.username, 'alice');
+    assert.equal(login.password, 'pw-a');
+    assert.equal(login.oneTimeCode, '123456');
+    assert.equal(login.match, 'site');
+  });
+  await check('a chosen item for another site is refused', async () => {
+    await rejects(broker.resolveLogin({ url: 'https://shop.test', itemId: 'vaultA:loginA' }), 'credential_domain_mismatch');
+  });
+  await check('items outside the allowlist cannot be addressed', async () => {
+    await rejects(broker.resolveLogin({ url: 'https://bank.test', itemId: 'vaultB:loginPrivate' }), 'invalid_request');
+    await rejects(broker.resolveLogin({ url: 'https://bank.test' }), 'credential_not_found');
+  });
+  await check('ExactDomain logins are not released on subdomains', async () => {
+    await rejects(broker.resolveLogin({ url: 'https://www2.shop.test' }), 'credential_not_found');
+  });
+  await check('pages without an http(s) URL are refused', async () => {
+    await rejects(broker.resolveLogin({ url: 'javascript:alert(1)' }), 'invalid_request');
+  });
+
+  console.log('\n--- credit cards ---');
+  await check('card list and description carry no number or CVV', async () => {
+    const cards = await broker.listCards();
+    assert.equal(cards.length, 1);
+    assert.equal(cards[0].cardBrand, 'visa');
+    assert.equal(cards[0].last4, '1111');
+    assert.equal(cards[0].expiryYearLast2, '31');
+    const described = await broker.describeCard({ itemId: 'vaultA:cardA' });
+    for (const value of [JSON.stringify(cards), JSON.stringify(described)]) {
+      assert.ok(!value.includes('4111111111111111') && !value.includes('737'), 'metadata only');
+    }
+  });
+  await check('resolveCard returns the full card with billing address', async () => {
+    const card = await broker.resolveCard({ itemId: 'vaultA:cardA' });
+    assert.equal(card.cardNumber, '4111111111111111');
+    assert.equal(card.cvv, '737');
+    assert.equal(card.expiryMonth, '12');
+    assert.equal(card.expiryYear, '2031');
+    assert.equal(card.city, 'Chicago');
+  });
+  await check('a login item is not a card', async () => {
+    await rejects(broker.resolveCard({ itemId: 'vaultA:loginA' }), 'payment_method_not_found');
+  });
+
+  console.log('\n--- saving and importing ---');
+  await check('saving needs a save vault', async () => {
+    await rejects(broker.saveLogin({ url: 'https://new.test', username: 'u', password: 'p' }), 'onepassword_save_vault_missing');
+  });
+  broker.configure({ saveVaultId: 'vaultA' });
+  await check('saved logins are tagged and bound to the site', async () => {
+    const saved = await broker.saveLogin({ url: 'https://new.test/login', username: 'u', password: 'p' });
+    assert.equal(saved.id, 'vaultA:new1');
+    const params = fake.calls.create[0];
+    assert.equal(params.category, 'Login');
+    assert.equal(params.vaultId, 'vaultA');
+    assert.deepEqual(params.tags, ['FSB']);
+    assert.equal(params.websites[0].url, 'https://new.test');
+    assert.deepEqual(params.fields.map((field) => field.id), ['username', 'password']);
+  });
+  await check('legacy import reports exactly what 1Password saved', async () => {
+    const importFake = makeSdk([], { failCreateTitle: 'bad.test' });
+    const importBroker = new OnePasswordBroker({ loadSdk: async () => importFake.sdk, configPath, env: {} });
+    const result = await importBroker.importLegacy({
+      logins: [
+        { domain: 'example.com', username: 'alice', password: 'pw', allowSubdomains: true },
+        { domain: 'bad.test', username: 'x', password: 'y' },
+        { domain: 'not a domain', username: 'x', password: 'y' },
+      ],
+      cards: [{ cardholderName: 'A', cardNumber: '4111111111111111', expiryMonth: '12', expiryYear: '2031', cvv: '737', city: 'Chicago' }],
+    });
+    assert.deepEqual(result.logins, { imported: 1, failed: 2 });
+    assert.deepEqual(result.cards, { imported: 1, failed: 0 });
+    assert.deepEqual(result.importedLoginDomains, ['example.com']);
+    assert.deepEqual(result.importedCardIndexes, [0]);
+    const card = importFake.calls.create.find((params) => params.category === 'CreditCard');
+    assert.equal(card.fields.find((field) => field.id === 'expiry').value, '12/2031');
+    assert.ok(card.notes.includes('Chicago'), 'billing address is kept in the card notes');
+    assert.ok(!JSON.stringify(result).includes('pw'), 'import result echoes no secrets');
+  });
+
+  console.log('\n--- sessions, limits, and error hygiene ---');
+  await check('an expired desktop session reconnects once', async () => {
+    const expiring = makeSdk(items, { expireOnce: true });
+    const retrying = new OnePasswordBroker({ loadSdk: async () => expiring.sdk, configPath, env: {} });
+    const logins = await retrying.listLogins();
+    assert.ok(logins.length > 0);
+    assert.equal(expiring.calls.createClient.length, 2, 'client was rebuilt after expiry');
+  });
+  await check('rate limits surface as their own code', async () => {
+    const limited = new OnePasswordBroker({ loadSdk: async () => makeSdk(items, { rateLimited: true }).sdk, configPath, env: {} });
+    await rejects(limited.listLogins(), 'onepassword_rate_limited');
+  });
+  await check('sign-in errors never echo a token', async () => {
+    const token = `ops_${'A'.repeat(48)}`;
+    const failing = new OnePasswordBroker({
+      loadSdk: async () => makeSdk(items, { authError: `bad token ${token}` }).sdk,
+      configPath: tempConfigPath(),
+      env: { OP_SERVICE_ACCOUNT_TOKEN: token },
+    });
+    failing.configure({ vaultIds: ['vaultA'] });
+    const error = await rejects(failing.listLogins(), 'onepassword_auth_failed');
+    assert.ok(!error.message.includes(token));
+    const status = failing.status();
+    assert.equal(status.tokenSource, 'env');
+    assert.ok(!JSON.stringify(status).includes(token), 'status never includes the token');
+  });
+  await check('a missing desktop app gets an actionable message', async () => {
+    const missing = new OnePasswordBroker({
+      loadSdk: async () => makeSdk(items, { authError: 'Native library is not available.' }).sdk,
+      configPath,
+      env: {},
+    });
+    const error = await rejects(missing.listVaults(), 'onepassword_auth_failed');
+    assert.match(error.message, /Integrate with other apps/);
+  });
+  await check('item refs are strict', () => {
+    assert.deepEqual(parseItemRef('abc:def'), { vaultId: 'abc', itemId: 'def' });
+    assert.equal(parseItemRef('abc:def:ghi'), null);
+    assert.equal(parseItemRef('../x:y'), null);
+  });
+
+  console.log('\n--- ext request handler ---');
+  await check('only onepassword.* methods are claimed', () => {
+    assert.ok(ONEPASSWORD_EXT_METHODS.every(isOnePasswordExtMethod));
+    assert.equal(isOnePasswordExtMethod('delegate.start'), false);
+  });
+  await check('unknown methods and extra fields are refused', async () => {
+    assert.equal((await handleOnePasswordRequest(broker, { method: 'onepassword.export', payload: {} })).errorCode, 'invalid_request');
+    const tokenAttempt = await handleOnePasswordRequest(broker, { method: 'onepassword.configure', payload: { authKind: 'service-account', token: 'ops_x' } });
+    assert.equal(tokenAttempt.errorCode, 'invalid_request', 'tokens cannot be set over the bridge');
+  });
+  await check('broker errors map to codes with candidates intact', async () => {
+    const response = await handleOnePasswordRequest(broker, { method: 'onepassword.resolve-login', payload: { url: 'https://example.com', requireUnique: true } });
+    assert.equal(response.ok, false);
+    assert.equal(response.errorCode, 'multiple_credentials');
+    assert.equal(response.candidates.length, 2);
+  });
+
+  console.log('\n--- bridge hub routing ---');
+  const { WebSocketBridge } = await import(pathToFileURL(path.join(__dirname, '..', 'mcp', 'build', 'bridge.js')).href);
+  await check('onepassword.* is answered by the hub without agent-spawn and never relayed', async () => {
+    const handled = [];
+    const bridge = new WebSocketBridge({
+      instanceId: 'op-routing',
+      handleOnePasswordRequest: async (request) => {
+        handled.push(request.method);
+        return { ok: true, status: { configured: true } };
+      },
+    });
+    const relaySent = [];
+    bridge.relayClients.set('relay-1', { readyState: 1, send: (raw) => relaySent.push(raw) });
+    bridge.relayCapabilities.set('relay-1', new Set(['agent-spawn']));
+    const extensionSent = [];
+    const extensionSocket = { readyState: 1, send: (raw) => extensionSent.push(JSON.parse(raw)) };
+    bridge._handleExtRequest(extensionSocket, { id: 'op-1', type: 'ext:request', method: 'onepassword.status', payload: {} });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(handled, ['onepassword.status']);
+    assert.equal(relaySent.length, 0, 'no relay ever sees a 1Password request');
+    assert.deepEqual(extensionSent, [{ id: 'op-1', type: 'ext:response', payload: { ok: true, status: { configured: true } } }]);
+  });
+  await check('a hub with 1Password disabled refuses instead of relaying', async () => {
+    const bridge = new WebSocketBridge({ instanceId: 'op-disabled', handleOnePasswordRequest: null });
+    const relaySent = [];
+    bridge.relayClients.set('relay-1', { readyState: 1, send: (raw) => relaySent.push(raw) });
+    bridge.relayCapabilities.set('relay-1', new Set(['agent-spawn']));
+    const extensionSent = [];
+    bridge._handleExtRequest({ readyState: 1, send: (raw) => extensionSent.push(JSON.parse(raw)) },
+      { id: 'op-2', type: 'ext:request', method: 'onepassword.list-logins', payload: {} });
+    assert.equal(relaySent.length, 0);
+    assert.equal(extensionSent[0].error.code, 'invalid_ext_request');
+  });
+
+  console.log(`\nonepassword-broker: ${passed} passed, 0 failed`);
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

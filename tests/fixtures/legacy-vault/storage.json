@@ -1,0 +1,18 @@
+{
+  "pin": "482913",
+  "pinVault": {
+    "credentialVaultConfig": {
+      "version": 2,
+      "salt": "iiNTWY6DeyHvQUjS7LX+vW1ByB+EVoK2D9zundlIOwM=",
+      "verifier": "{\"encrypted\":\"H5GIEa/BTEEa7SVhfV4SxK3nLEhKb77pyQic/UQB1sVpvIHhdIFD\",\"salt\":\"ocLFoXGkt10mGnbtbJJ/KRKa+5V48KrHJSwAvBotPxJURKqXTAnwe+9yqtxpQmxRMiWb7NlQegF5Lg1z+tbgjg==\",\"iv\":\"zcx2yIFNEA4txDE6TLcEfA==\"}",
+      "pinLength": 6,
+      "createdAt": 1794883175906
+    },
+    "cred_example.com": "{\"encrypted\":\"COk1rPY3KSGdSk94aYr74OcBjFN+N7lBD84JHmv+t7OSjn6DUy2VHrAFCUA7T1ZHuIVGOJYyLto2If/pg1rwaVeBS5OxoMRWv1sUdBa9YtL+Y9ZnRY2SbMlPc1QbZQ4Eon36GCYA07lspAEKSBsGjwrAQqqBDXLI4qQZ5fGzXN25ceQSRl++DFlMZO/52cmzpbAnR9lGM5QF2ejZ17/dxEA391lZYtcuo8aVKUOKnGpfmjjALtyZUmIC2MFtlqlgGFKYXysmaQ==\",\"salt\":\"xyUk+83QUyzxHSOq+WhKCranOIqUYPGW337kPybV83pA86jCFkMh7jtdiX4KLGOJMPU3aJ3amEJfFNA+BJRlhQ==\",\"iv\":\"yQaJ9WrANGl5IJEmT5spvQ==\"}",
+    "cred_login.shop.test": "{\"encrypted\":\"EiT1qSI/auwSDSXUWvt1TmosKROsihiQgwtybtBD0cRUTs0CBTw2GhsF9+2kebHx1h9zxgJnKO9tbHLfEzLJJ3j4nJtxi7XXoOI51um1LrAgCVAKRl0Ea2K3siMD0RPth0Sy6Wgqr+OEiQ75ogN2AxvlzaZbuHANc+8C8SOLoV6qVU2a30wGCUUYfPCJCeKtzRuvtSzegEz5y19cJaNJKCI59ADsgw==\",\"salt\":\"NIH4XoKpj/s1HNwqYLNPl8tkA6v1ubHb1fK/BbTcODV9qvSMLJgXciaGyhW4mhBTsX8hRtsM7ed+8dJtiBOdrA==\",\"iv\":\"WrBVebKJgCUqm4W/2fKtpA==\"}",
+    "payment_method_c265c890-8dbe-47be-a4fe-a9859051d31b": "{\"encrypted\":\"Z2s2+g6coNSIQ5r9LU156D18O06k0gdZz+HlR7tp9Wr10Ack5iWEE9UkMI6IDk6urbycMnXOO67bkoMQwbsn6+57m36oK6Cs6kUd/LXgjuazv8jX/XIYRTY7qGGOpVyLliaJRinishw0qQpPVTBzgLwvQhEoEA6v3zQxSeeBC0/5ya52hxzMne2MfkNcwcFkamwBPoGbVI+ZAXh+NJqtc4ZtkByQpeNNFf113jqw/2bcCPiN0PkcI71bN6IPN1DMQXc6zr40P3NASVJrzQPr/GX8wGjqk1DUaQpN4BiIaNKOiTZrgM9LGduC5iCBjbyBe+gNefvgpI2taqI9SqrRRw6uYQHVTPx3ANK3A4Dki6cSeSkFNbIn2VsQqA+WrsIMGwn3ehRGsGnrEEbQVLU9+kOUDuX+Ry79DRhLY2CmWiqWq62spRIXt7RA3A9ly1vIMNnyEHa2bic5ymY5uLN0y/SUQaNxsCIa+NFo6XhzXNrp+/u0r3x1oP+mKqsEwW7zY4elEWEnlxuhSAfmVPWAg54Z+tU5pDLN+2qlNxThZiwNZA==\",\"salt\":\"9g6WD3omj5Z+MhyxO5vSFJux8fEd4H312P0EycCkhCiCm0vW4Do1Rl43rG/NALKeOzpRGT5XKhx9F7rRoe4S2A==\",\"iv\":\"c772XaSzu2c88wz4/vXjFA==\"}"
+  },
+  "preVault": {
+    "cred_old.example": "{\"encrypted\":\"Fyltuhdg4M69jU59YVqfzNCKpFDJ/toPs35eeBq31V9jH7AWis4TVXHjYtpPXWrAGQrilSNF3XL4JLlcDcCr\",\"salt\":\"rJqkXNTDFLyMkdhqpaoWEHlg8JeqINZ6fC7Q5ws8g9T/coJpsMJwd1EkGySMOQ8AO3gHJgw4EtKONH0qoUDqSg==\",\"iv\":\"lYywPj8QAmIui2drlAIpMg==\"}"
+  }
+}

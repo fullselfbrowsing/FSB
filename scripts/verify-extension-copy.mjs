@@ -27,8 +27,6 @@ const SCOPE = [
   'extension/ui/control_panel.html',
   'extension/ui/onboarding.html',
   'extension/ui/onboarding.js',
-  'extension/ui/unlock.html',
-  'extension/ui/unlock.js',
   'extension/ui/microphone-permission.html',
   'extension/ui/microphone-permission.js',
   'extension/content/visual-feedback.js'

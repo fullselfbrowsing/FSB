@@ -4666,5 +4666,161 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB는 1Password의 로그인 정보로 로그인합니다. FSB 자체는 비밀번호를 저장하지 않습니다."
+  },
+  "panel_8b70975df7": {
+    "message": "사용하면 FSB가 로그인 페이지를 감지하고 일치하는 1Password 로그인 정보로 로그인합니다."
+  },
+  "panel_818962bda5": {
+    "message": "1Password 연결을 확인하는 중..."
+  },
+  "panel_b84510154a": {
+    "message": "1Password 계정"
+  },
+  "panel_a6f394d865": {
+    "message": "1Password 사이드바 상단에 표시되는 계정 이름입니다. 1Password 앱에서 Settings > Developer > Integrate with other apps를 켜세요."
+  },
+  "panel_5dec08e310": {
+    "message": "1Password 연결"
+  },
+  "panel_e175b45390": {
+    "message": "서비스 계정을 대신 사용하시나요? 터미널에서 다음을 실행한 뒤 이 페이지를 새로 고치세요:"
+  },
+  "panel_5c0a336c67": {
+    "message": "FSB가 읽을 수 있는 보관함을 선택하세요. FSB 전용 보관함이 가장 안전합니다."
+  },
+  "panel_161c79f605": {
+    "message": "새 로그인 정보 저장 위치"
+  },
+  "panel_cc6d7a8340": {
+    "message": "저장 안 함"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "보관함 접근 저장"
+  },
+  "panel_5ab21b8830": {
+    "message": "이전 FSB 보관함을 1Password로 옮기기"
+  },
+  "panel_911c744cd5": {
+    "message": "이전 FSB 보관함의 PIN을 입력하세요. 1Password로 옮긴 항목은 FSB에서 지워집니다."
+  },
+  "panel_3f6118f701": {
+    "message": "1Password로 옮기기"
+  },
+  "panel_0f5320398c": {
+    "message": "이전 보관함 삭제"
+  },
+  "panel_00f3328a04": {
+    "message": "FSB가 사용할 수 있는 보관함에 로그인 정보가 없습니다. 로그인 정보는 1Password에서 추가하거나 편집하세요."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB는 입력할 때마다 승인을 받은 뒤 1Password의 신용카드로 결제 양식을 채웁니다."
+  },
+  "panel_4875f94fbf": {
+    "message": "카드를 사용하려면 비밀번호에서 1Password를 연결하세요."
+  },
+  "panel_b9675cca57": {
+    "message": "FSB가 사용할 수 있는 보관함에 신용카드가 없습니다. 카드는 1Password에서 추가하거나 편집하세요."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password가 데스크톱 앱으로 연결되었습니다 ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password가 서비스 계정으로 연결되었습니다."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password가 연결되지 않았습니다."
+  },
+  "panel_5848961ce6": {
+    "message": "설정을 마치려면 FSB가 사용할 수 있는 보관함을 선택하세요."
+  },
+  "panel_216dcfd214": {
+    "message": "1Password 계정 이름을 입력하세요"
+  },
+  "panel_a94d6f85db": {
+    "message": "연결하는 중... 요청이 표시되면 1Password 앱에서 FSB를 승인하세요."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password가 연결되었습니다"
+  },
+  "panel_e520e3cf11": {
+    "message": "보관함을 하나 이상 선택하세요"
+  },
+  "panel_cc541e4c1e": {
+    "message": "보관함 접근이 저장되었습니다"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password 연결이 해제되었습니다"
+  },
+  "panel_e95f94cbda": {
+    "message": "이전 FSB 보관함에 FSB가 더 이상 사용하지 않는 항목이 남아 있습니다. 로그인: $LOGINS$. 카드: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "1Password로 옮겼습니다. 로그인: $LOGINS$. 카드: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "옮기지 못해 FSB에 남긴 항목: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "이전 FSB 보관함을 삭제할까요? 1Password로 옮기지 않은 항목은 모두 사라집니다."
+  },
+  "panel_ed17465290": {
+    "message": "이전 보관함이 삭제되었습니다"
+  },
+  "panel_3d763a56b2": {
+    "message": "항목: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "옮기는 중..."
+  },
+  "panel_498fd066bf": {
+    "message": "1Password에 연결할 수 없습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "로그인하려면 자격 증명을 입력하세요. FSB가 다음을 위해 1Password에 저장할 수 있습니다."
+  },
+  "copy_751ac3de88": {
+    "message": "로그인하려면 자격 증명을 입력하세요. FSB는 한 번만 사용하고 저장하지 않습니다."
+  },
+  "copy_264681c742": {
+    "message": "1Password에 저장"
   }
 }

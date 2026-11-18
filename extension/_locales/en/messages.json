@@ -4666,5 +4666,161 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB signs in with logins from your 1Password. FSB itself stores no passwords."
+  },
+  "panel_8b70975df7": {
+    "message": "When enabled, FSB detects login pages and signs in with the matching 1Password login."
+  },
+  "panel_818962bda5": {
+    "message": "Checking 1Password connection..."
+  },
+  "panel_b84510154a": {
+    "message": "1Password account"
+  },
+  "panel_a6f394d865": {
+    "message": "The account name shown at the top of the 1Password sidebar. In the 1Password app, turn on Settings > Developer > Integrate with other apps."
+  },
+  "panel_5dec08e310": {
+    "message": "Connect 1Password"
+  },
+  "panel_e175b45390": {
+    "message": "Using a service account instead? Run this in a terminal, then reload this page:"
+  },
+  "panel_5c0a336c67": {
+    "message": "Choose the vaults FSB may read. A vault used only by FSB is safest."
+  },
+  "panel_161c79f605": {
+    "message": "Save new logins to"
+  },
+  "panel_cc6d7a8340": {
+    "message": "Do not save"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "Save vault access"
+  },
+  "panel_5ab21b8830": {
+    "message": "Move your old FSB vault to 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "Enter the PIN of your old FSB vault. Items moved to 1Password are erased from FSB."
+  },
+  "panel_3f6118f701": {
+    "message": "Move to 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "Delete old vault"
+  },
+  "panel_00f3328a04": {
+    "message": "No logins in the vaults FSB can use. Add or edit logins in 1Password."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB fills checkout forms with credit cards from your 1Password, after you approve each fill."
+  },
+  "panel_4875f94fbf": {
+    "message": "Connect 1Password in Passwords to use your cards."
+  },
+  "panel_b9675cca57": {
+    "message": "No credit cards in the vaults FSB can use. Add or edit cards in 1Password."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password is connected through the desktop app ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password is connected with a service account."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password is not connected."
+  },
+  "panel_5848961ce6": {
+    "message": "Choose the vaults FSB may use to finish setup."
+  },
+  "panel_216dcfd214": {
+    "message": "Enter your 1Password account name"
+  },
+  "panel_a94d6f85db": {
+    "message": "Connecting... Approve FSB in the 1Password app if asked."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password connected"
+  },
+  "panel_e520e3cf11": {
+    "message": "Choose at least one vault"
+  },
+  "panel_cc541e4c1e": {
+    "message": "Vault access saved"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password disconnected"
+  },
+  "panel_e95f94cbda": {
+    "message": "FSB's old vault still holds items FSB no longer uses. Logins: $LOGINS$. Cards: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "Not moved and kept in FSB: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "Delete the old FSB vault? Anything not moved to 1Password will be lost."
+  },
+  "panel_ed17465290": {
+    "message": "Old vault deleted"
+  },
+  "panel_3d763a56b2": {
+    "message": "Items: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "Moving..."
+  },
+  "panel_498fd066bf": {
+    "message": "Could not reach 1Password: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "Enter your credentials to sign in. FSB can save them to 1Password for next time."
+  },
+  "copy_751ac3de88": {
+    "message": "Enter your credentials to sign in. FSB uses them once and does not store them."
+  },
+  "copy_264681c742": {
+    "message": "Save to 1Password"
   }
 }

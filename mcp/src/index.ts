@@ -24,6 +24,7 @@ import {
 } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
 import { shutdownWhenStdinEnds } from './stdin-shutdown.js';
+import { ONEPASSWORD_HELP, runOnePasswordCommand } from './onepassword/cli.js';
 import {
   FSB_EXT_PROTOCOL,
   formatPairingCode,
@@ -129,6 +130,7 @@ Usage:
   fsb-mcp-server uninstall           Remove FSB from an MCP client config
   fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <id>] Install the selected browser native messaging host
   fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>] Remove the selected browser native messaging host
+${ONEPASSWORD_HELP}
 
 Options:
   --host <host>       HTTP listen host for \`serve\` (default: ${DEFAULT_HTTP_HOST})
@@ -589,6 +591,10 @@ async function main(): Promise<void> {
       return;
     case 'uninstall':
       await runUninstall(flags, productionNativeHostCliOperations);
+      return;
+    case 'onepassword':
+    case '1password':
+      await runOnePasswordCommand(flags);
       return;
     default:
       throw new Error(`Unknown command: ${command}`);

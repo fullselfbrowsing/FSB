@@ -6,6 +6,23 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Changed
+
+- **1Password replaces FSB's own password and card vault.** FSB no longer stores logins or cards. `fill_credential`, `use_payment_method`, their list tools, and autopilot's auto-login read the user's 1Password, limited to the vaults the user allows FSB to use (a vault used only by FSB is recommended). The `fsb-mcp-server` local server signs in with the 1Password JavaScript SDK (`@1password/sdk` 0.5.0, now a pinned production dependency) through the 1Password desktop app or a service account, and passes values to the extension over the paired loopback bridge. Passwords, one-time codes, card numbers, and CVVs are never returned to MCP clients or the model.
+- **Logins follow 1Password's own site rules.** A login is filled only on a site one of its saved websites matches, honoring the item's "Anywhere on website", "Only exact domain", and "Never" autofill setting. The site always comes from the agent's tab URL; the `domain` argument some agents still send is ignored. When several logins match, `fill_credential` fails with the candidates (id, title, username) and accepts a new optional `credential_id` to choose one.
+- **Cards are read only after approval.** `use_payment_method` shows the side-panel confirmation using card metadata, reads the card from 1Password only after the user approves, and refuses if the tab moved to another site in between. Billing addresses stored on the 1Password card now reach checkout forms.
+- The Passwords and Payments settings now connect 1Password (account name for the desktop app), choose the allowed vaults and an optional vault for new logins, and list what FSB can see. Adding, editing, and deleting logins or cards happens in 1Password. The login prompt offers "Save to 1Password" only when a save vault is set.
+
+### Added
+
+- **One-time codes.** `fill_credential` fills two-factor code fields (including split one-digit boxes) with the current TOTP code from the matching 1Password item.
+- **`fsb-mcp-server onepassword`** configures the connection from a terminal: `--desktop <account>`, `--service-account` (token read hidden or from `OP_SERVICE_ACCOUNT_TOKEN`), `--vaults`, `--allow <ids>`, `--save-vault <id>`, and `--reset`. Settings live in `~/.fsb/onepassword.json` with owner-only permissions; tokens are never accepted from the extension.
+- **Moving the old FSB vault.** Existing users see how many logins and cards are left in the old vault and can move them into 1Password with their old PIN. Only entries 1Password confirms it saved are erased from FSB; "Delete old vault" erases the rest.
+
+### Removed
+
+- The PIN vault, its unlock page, and the saved-payment unlock in the extension. `secure-config.js` keeps only a read-once reader for moving old entries to 1Password.
+
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline and Antigravity installer fixes, Grok Build capability checks, and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.

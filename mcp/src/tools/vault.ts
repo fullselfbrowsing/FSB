@@ -6,16 +6,26 @@ import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 
-// Must exceed the extension-side 120_000ms payment confirmation gate.
-const PAYMENT_CONFIRMATION_TIMEOUT_MS = 125_000;
+// The first 1Password call in a while can wait on the user approving FSB in the
+// 1Password desktop app, so these leave room for that prompt.
+const LIST_TIMEOUT_MS = 75_000;
+const FILL_TIMEOUT_MS = 90_000;
+// Card metadata lookup + the extension's 120_000ms confirmation gate + the
+// post-approval card read, with headroom.
+const PAYMENT_CONFIRMATION_TIMEOUT_MS = 250_000;
 
 /**
- * Register vault tools: list_credentials, fill_credential,
+ * Register the credential tools: list_credentials, fill_credential,
  * list_payment_methods, use_payment_method.
  *
- * SECURITY: These tools are registered directly (not via TOOL_REGISTRY)
- * to maintain an explicit security boundary. Raw secrets never traverse
- * the WebSocket bridge -- only opaque IDs and masked metadata.
+ * Credentials come from the user's 1Password account, limited to the vaults
+ * they allowed FSB to use. The FSB server's 1Password broker resolves items
+ * for the extension over the paired loopback bridge; the extension fills them
+ * into the page. Tool results carry only ids, titles, hosts, usernames, and
+ * card brand/last4 -- never passwords, one-time codes, card numbers, or CVVs.
+ *
+ * SECURITY: registered directly (not via TOOL_REGISTRY) to keep an explicit
+ * security boundary around everything that ends in a secret being typed.
  */
 export function registerVaultTools(
   server: McpServer,
@@ -23,17 +33,12 @@ export function registerVaultTools(
   queue: TaskQueue,
   agentScope: AgentScope,
 ): void {
-  // Phase 246 D-13 vault overturn: Phase 238 D-06's "no agent identity
-  // injection here" is OVERTURNED for fill_credential and use_payment_method.
-  // The vault tools now thread agentId + optional tab_id so the extension-side
-  // resolver picks the right tab and the dispatch gate enforces ownership.
-  // list_credentials and list_payment_methods stay tab-agnostic (vault read-
-  // only) so they remain signature-only.
-  // list_credentials -- returns domain + username pairs only (MCP-01)
-  // Password field is NEVER present in the response.
+  // Phase 246 D-13: fill_credential and use_payment_method are agent-scoped
+  // (agentId + optional tab_id reach the extension-side resolver, the dispatch
+  // gate enforces ownership). The list tools stay tab-agnostic.
   server.tool(
     'list_credentials',
-    'List saved credentials. Returns domain and username pairs only -- passwords are never included in the response. Use fill_credential to autofill a login form.',
+    'List the 1Password logins FSB may use (only vaults the user allowed in FSB settings). Returns id, title, saved website domains, and username for each login -- passwords and one-time codes are never included. Use fill_credential to sign in.',
     {},
     async () => {
       if (!bridge.isConnected) {
@@ -41,49 +46,44 @@ export function registerVaultTools(
       }
       const result = await bridge.sendAndWait(
         { type: 'mcp:list-credentials', payload: {} },
-        { timeout: 5_000 },
+        { timeout: LIST_TIMEOUT_MS },
       );
       return mapFSBError(result);
     },
   );
 
-  // fill_credential -- triggers autofill on the active tab (MCP-02)
-  // Password travels background.js -> content script only, never over WebSocket.
-  // Phase 246 D-13: vault overturn. agentId + optional tab_id + ownershipToken
-  // + connectionId now thread through the bridge payload so the extension-side
-  // resolver picks the right tab and the dispatch gate enforces ownership.
   server.tool(
     'fill_credential',
-    'Auto-fill login form on the active tab with a saved credential. The password is resolved inside the extension and injected directly into the page -- it never crosses the WebSocket bridge. The domain parameter is accepted for backward compatibility but the actual lookup domain is derived from the tab URL for security. Requires the credential vault to be unlocked. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    'Sign in on the agent\'s tab with a login from the user\'s 1Password. Fills whichever login fields the page shows: username, password, and a one-time (TOTP) code when the 1Password item has one -- call it again on a two-factor code page. Values are resolved by FSB and typed into the page; they never appear in this tool\'s result. The login is chosen from the tab\'s real URL, never from a parameter: it must be saved in 1Password for that site. If several logins match, the call fails with the candidates; pass credential_id (from list_credentials or that error) to pick one. Does not press submit. The first call may wait for the user to approve FSB in the 1Password app. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
     {
-      domain: z.string().optional().describe('Hint for which credential to fill. Ignored for security -- the actual domain is derived from the resolved tab URL. Kept for backward compatibility.'),
+      credential_id: z.string().max(140).optional().describe('Optional. A login id from list_credentials. It must still be saved for the tab\'s site, otherwise the fill is refused.'),
+      domain: z.string().optional().describe('Ignored. The site is always derived from the resolved tab URL. Kept for backward compatibility.'),
       tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple.'),
     },
-    async ({ domain, tab_id }) => {
+    async ({ credential_id, domain, tab_id }) => {
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       return queue.enqueue('fill_credential', async () => {
         const targetTabId = typeof tab_id === 'number' ? tab_id : null;
         const payload: Record<string, unknown> = { domain };
+        if (credential_id !== undefined) payload.credentialId = credential_id;
         if (tab_id !== undefined) payload.tab_id = tab_id;
         const result = await sendAgentScopedBridgeMessage(
           bridge,
           agentScope,
           'mcp:fill-credential',
           payload,
-          { timeout: 15_000, targetTabId },
+          { timeout: FILL_TIMEOUT_MS, targetTabId },
         );
         return mapFSBError(result);
       });
     },
   );
 
-  // list_payment_methods -- returns last 4 + brand only (MCP-03)
-  // Full card data is NEVER present in the response.
   server.tool(
     'list_payment_methods',
-    'List saved payment methods. Returns card brand, last 4 digits, and cardholder name only -- full card numbers and CVV are never included. Use use_payment_method to fill a checkout form.',
+    'List the credit cards saved in the 1Password vaults FSB may use. Returns id, title, card brand, last 4 digits, cardholder name, and expiry month/year -- full card numbers and CVVs are never included. Use use_payment_method to fill a checkout form.',
     {},
     async () => {
       if (!bridge.isConnected) {
@@ -91,22 +91,19 @@ export function registerVaultTools(
       }
       const result = await bridge.sendAndWait(
         { type: 'mcp:list-payments', payload: {} },
-        { timeout: 5_000 },
+        { timeout: LIST_TIMEOUT_MS },
       );
       return mapFSBError(result);
     },
   );
 
-  // use_payment_method -- terminal confirmation before fill (MCP-04)
-  // Fill domain is derived from chrome.tabs.get inside the extension,
-  // NOT from this MCP request payload.
-  // Phase 246 D-13: vault overturn. agentId + optional tab_id + ownershipToken
-  // + connectionId now thread through the bridge payload (mirrors fill_credential).
+  // Fill domain comes from chrome.tabs.get inside the extension, not from this
+  // request. Card data is read from 1Password only after the user approves.
   server.tool(
     'use_payment_method',
-    'Fill checkout form on the active tab with a saved payment method. Shows a confirmation prompt with card brand, last 4 digits, and merchant domain before any fill occurs. The fill domain is derived from the resolved tab URL inside the extension, not from this request. Requires both credential vault and payment access to be unlocked. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    'Fill the checkout form on the agent\'s tab with a credit card from the user\'s 1Password. FSB first shows the user a confirmation with the card brand, last 4 digits, and the merchant site (taken from the tab URL, not this request); the card is read from 1Password and filled only after they approve. Never submits the payment. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
     {
-      payment_method_id: z.string().describe('ID of the payment method to use (from list_payment_methods)'),
+      payment_method_id: z.string().max(140).describe('ID of the card to use (from list_payment_methods)'),
       tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple.'),
     },
     async ({ payment_method_id, tab_id }) => {

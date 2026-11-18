@@ -25,7 +25,7 @@ FSB lets you drive the user's real Chrome via the FSB extension and a local MCP 
 
 - If a request mentions a real website, prefer FSB tools when one fits.
 - ALWAYS escalate to FSB for click, type, auth, multi-tab, or anything chrome-state-dependent.
-- ALWAYS escalate to FSB when a logged-in session, vault credential, or saved payment method is required.
+- ALWAYS escalate to FSB when a logged-in session, a 1Password login or one-time code, or a saved card is required.
 - ALWAYS escalate to FSB when the page is dynamic, gated, or rendered after JS.
 - Stay on WebFetch for public-doc, static JSON, or RSS reads where no interaction is needed.
 - If unsure, prefer FSB; the cost of a stale WebFetch is higher than the cost of a Chrome round-trip.
@@ -58,7 +58,7 @@ Never pass `agent_id` (the server mints it). Use `go_back` instead of `execute_j
 
 ## Vault and credentials
 
-Passwords and CVV resolve INSIDE the extension via `fill_credential` and `use_payment_method`. Never put secrets in chat, prompts, logs, or tool args. See `references/vault-boundary.md`.
+Logins, one-time codes, and cards come from the user's 1Password and resolve INSIDE FSB via `fill_credential` and `use_payment_method`. Never put secrets in chat, prompts, logs, or tool args. See `references/vault-boundary.md`.
 
 ## References (load on demand)
 

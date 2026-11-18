@@ -2777,6 +2777,55 @@ textarea.form-input {
   line-height: 1.6;
 }
 
+/* 1Password connection */
+.onepassword-vault-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.onepassword-vault-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  cursor: pointer;
+}
+
+.onepassword-vault-option input {
+  margin: 0;
+}
+
+.onepassword-vault-title {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.onepassword-vault-count {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+
+.onepassword-command {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.85em;
+  user-select: all;
+  overflow-x: auto;
+}
+
+.legacy-vault-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
 /* PIN Input */
 .pin-input-container {
   display: flex;

@@ -74,6 +74,7 @@ function loadSecureConfig(localSeed = {}, sessionSeed = {}) {
     btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
     TextEncoder,
     TextDecoder,
+    URL,
     console,
     self: {},
     window: undefined,
@@ -94,189 +95,100 @@ function loadSecureConfig(localSeed = {}, sessionSeed = {}) {
   };
 }
 
+// FSB's own PIN vault was replaced by 1Password. What remains in
+// secure-config.js only reads the old vault once (so the background can import
+// it into 1Password) and erases it. The fixture was written by the original
+// vault code, so these checks prove old data still decrypts.
+const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'legacy-vault', 'storage.json'), 'utf8'));
+
 async function run() {
-  console.log('\n--- credential vault setup and locking ---');
-  {
-    const { secureConfig, storageSession } = loadSecureConfig();
-
-    const setup = await secureConfig.createCredentialVault('123456');
-    assert(setup.success, 'createCredentialVault succeeds with a strong passphrase');
-
-    const status = await secureConfig.getCredentialVaultStatus();
-    assert(status.configured && status.unlocked, 'vault status reports configured and unlocked after setup');
-
-    const save = await secureConfig.saveCredential('example.com', {
-      username: 'user@example.com',
-      password: 'secret',
-      notes: 'primary',
-      allowSubdomains: false
-    });
-    assert(save.success, 'saveCredential succeeds while vault is unlocked');
-
-    const metadata = await secureConfig.getAllCredentials();
-    assertEqual(metadata.length, 1, 'getAllCredentials returns one saved credential');
-    assert(!('password' in metadata[0]), 'metadata list does not expose passwords');
-
-    await secureConfig.lockCredentialVault();
-    const lockedStatus = await secureConfig.getCredentialVaultStatus();
-    assert(lockedStatus.configured && !lockedStatus.unlocked, 'lockCredentialVault clears unlocked state');
-
-    const lockedSave = await secureConfig.saveCredential('example.com', {
-      username: 'user@example.com',
-      password: 'new-secret'
-    });
-    assertEqual(lockedSave.errorCode, 'locked', 'saveCredential fails closed while vault is locked');
-
-    const sessionDump = storageSession._dump();
-    assert(!sessionDump.fsbCredentialVaultSessionKey, 'locking removes the session key from chrome.storage.session');
-  }
-
-  console.log('\n--- subdomain matching policy ---');
+  console.log('\n--- the vault API is gone ---');
   {
     const { secureConfig } = loadSecureConfig();
-    await secureConfig.createCredentialVault('123456');
-
-    await secureConfig.saveCredential('example.com', {
-      username: 'parent-user',
-      password: 'parent-pass',
-      allowSubdomains: false
-    });
-
-    const noSubdomainMatch = await secureConfig.getCredential('login.example.com');
-    assert(noSubdomainMatch === null, 'parent-domain credentials do not match subdomains by default');
-
-    await secureConfig.updateCredential('example.com', { allowSubdomains: true });
-    const subdomainMatch = await secureConfig.getCredential('login.example.com');
-    assertEqual(subdomainMatch.username, 'parent-user', 'allowSubdomains enables parent-domain matching');
-  }
-
-  console.log('\n--- legacy migration ---');
-  {
-    const { secureConfig, storageLocal } = loadSecureConfig();
-    const legacyPayload = {
-      username: 'legacy-user',
-      password: 'legacy-pass',
-      notes: '',
-      domain: 'legacy.example.com',
-      createdAt: 123,
-      updatedAt: 456
-    };
-    const legacyEncrypted = await secureConfig.encrypt(
-      JSON.stringify(legacyPayload),
-      secureConfig.getLegacyCredentialPassword()
-    );
-    await storageLocal.set({ 'cred_legacy.example.com': legacyEncrypted });
-
-    const setup = await secureConfig.createCredentialVault('123456');
-    assertEqual(setup.migratedCount, 1, 'creating the vault migrates legacy credential entries');
-
-    const migratedCredential = await secureConfig.getCredential('legacy.example.com');
-    assertEqual(migratedCredential.username, 'legacy-user', 'migrated credential remains readable with the vault key');
-    assertEqual(migratedCredential.allowSubdomains, false, 'migration normalizes allowSubdomains to false');
-
-    const rawStore = storageLocal._dump();
-    let legacyDecryptFailed = false;
-    try {
-      await secureConfig.decrypt(rawStore['cred_legacy.example.com'], secureConfig.getLegacyCredentialPassword());
-    } catch (_error) {
-      legacyDecryptFailed = true;
+    for (const name of [
+      'createCredentialVault', 'unlockCredentialVault', 'saveCredential', 'getCredential', 'getFullCredential',
+      'getAllCredentials', 'savePaymentMethod', 'getFullPaymentMethod', 'unlockPaymentMethods'
+    ]) {
+      assert(typeof secureConfig[name] !== 'function', `secureConfig.${name} no longer exists`);
     }
-    assert(legacyDecryptFailed, 'migrated credentials are no longer decryptable with the legacy fallback key');
+    assertEqual(secureConfig.normalizeDomain('https://www.example.com/login'), 'example.com', 'normalizeDomain still strips www');
+    assertEqual(secureConfig.getParentDomain('mail.google.co.uk'), 'google.co.uk', 'getParentDomain still handles multi-level TLDs');
   }
 
-  console.log('\n--- payment methods require separate unlock ---');
-  {
-    const { secureConfig, storageSession } = loadSecureConfig();
-    await secureConfig.createCredentialVault('123456');
-
-    const initialStatus = await secureConfig.getPaymentVaultStatus();
-    assert(initialStatus.configured && initialStatus.unlocked && !initialStatus.paymentUnlocked, 'payment vault status starts locked even when the credential vault is unlocked');
-
-    const lockedSave = await secureConfig.savePaymentMethod({
-      nickname: 'Primary Visa',
-      cardholderName: 'Test User',
-      cardNumber: '4111111111111111',
-      expiryMonth: '07',
-      expiryYear: '2029',
-      cvv: '123',
-      billingName: 'Test User',
-      addressLine1: '123 Main St',
-      city: 'Chicago',
-      stateRegion: 'IL',
-      postalCode: '60601',
-      country: 'United States'
-    });
-    assertEqual(lockedSave.errorCode, 'payment_locked', 'savePaymentMethod fails closed until saved payment methods are explicitly unlocked');
-
-    const wrongPassphrase = await secureConfig.unlockPaymentMethods('wrong-passphrase');
-    assertEqual(wrongPassphrase.errorCode, 'invalid_passphrase', 'unlockPaymentMethods rejects an incorrect passphrase');
-
-    const unlock = await secureConfig.unlockPaymentMethods('123456');
-    assert(unlock.success, 'unlockPaymentMethods succeeds with the vault passphrase');
-
-    const saved = await secureConfig.savePaymentMethod({
-      nickname: 'Primary Visa',
-      cardholderName: 'Test User',
-      cardNumber: '4111111111111111',
-      expiryMonth: '07',
-      expiryYear: '2029',
-      cvv: '123',
-      billingName: 'Test User',
-      addressLine1: '123 Main St',
-      addressLine2: 'Suite 400',
-      city: 'Chicago',
-      stateRegion: 'IL',
-      postalCode: '60601',
-      country: 'United States'
-    });
-    assert(saved.success, 'savePaymentMethod succeeds once saved payment methods are unlocked');
-
-    const metadata = await secureConfig.getAllPaymentMethods();
-    assertEqual(metadata.length, 1, 'getAllPaymentMethods returns one saved card');
-    assert(!('cardNumber' in metadata[0]), 'payment metadata list does not expose raw card numbers');
-    assert(!('cvv' in metadata[0]), 'payment metadata list does not expose CVV');
-    assertEqual(metadata[0].cardBrand, 'visa', 'payment metadata includes detected card brand');
-    assertEqual(metadata[0].last4, '1111', 'payment metadata includes last four digits');
-
-    const full = await secureConfig.getFullPaymentMethod(saved.id);
-    assertEqual(full.cardNumber, '4111111111111111', 'getFullPaymentMethod returns the stored card number while payment access is unlocked');
-    assertEqual(full.cvv, '123', 'getFullPaymentMethod returns the stored CVV while payment access is unlocked');
-
-    await secureConfig.lockPaymentMethods();
-    const lockedStatus = await secureConfig.getPaymentVaultStatus();
-    assert(lockedStatus.unlocked && !lockedStatus.paymentUnlocked, 'lockPaymentMethods clears the separate payment access gate');
-
-    const lockedUpdate = await secureConfig.updatePaymentMethod(saved.id, { nickname: 'Updated' });
-    assertEqual(lockedUpdate.errorCode, 'payment_locked', 'updatePaymentMethod fails closed while payment access is locked');
-
-    const sessionDump = storageSession._dump();
-    assert(!sessionDump.fsbPaymentAccessUnlocked, 'locking payment methods removes the separate payment-access session flag');
-  }
-
-  console.log('\n--- payment access resets when the credential vault locks ---');
-  {
-    const { secureConfig, storageSession } = loadSecureConfig();
-    await secureConfig.createCredentialVault('123456');
-    await secureConfig.unlockPaymentMethods('123456');
-    await secureConfig.lockCredentialVault();
-
-    const status = await secureConfig.getPaymentVaultStatus();
-    assert(status.configured && !status.unlocked && !status.paymentUnlocked, 'locking the credential vault also clears saved payment method access');
-
-    const sessionDump = storageSession._dump();
-    assert(!sessionDump.fsbCredentialVaultSessionKey, 'credential vault session key is cleared after lock');
-    assert(!sessionDump.fsbPaymentAccessUnlocked, 'payment access flag is cleared when the credential vault locks');
-  }
-
-  console.log('\n--- payment card brand and validation helpers ---');
+  console.log('\n--- empty install ---');
   {
     const { secureConfig } = loadSecureConfig();
-    assertEqual(secureConfig.detectCardBrand('4111111111111111'), 'visa', 'detectCardBrand identifies Visa numbers');
-    assertEqual(secureConfig.detectCardBrand('5555555555554444'), 'mastercard', 'detectCardBrand identifies Mastercard numbers');
-    assertEqual(secureConfig.detectCardBrand('378282246310005'), 'amex', 'detectCardBrand identifies American Express numbers');
-    assertEqual(secureConfig.getMaskedCardNumber('4111111111111111'), '**** **** **** 1111', 'getMaskedCardNumber preserves only the last four digits');
-    assert(secureConfig.isValidCardNumber('4111111111111111'), 'isValidCardNumber accepts a valid Luhn card number');
-    assert(!secureConfig.isValidCardNumber('4111111111111112'), 'isValidCardNumber rejects an invalid Luhn card number');
+    const summary = await secureConfig.getLegacyVaultSummary();
+    assert(!summary.present, 'no legacy data reports present: false');
+    const read = await secureConfig.readLegacyVault('');
+    assert(read.success && read.logins.length === 0 && read.cards.length === 0, 'reading an empty install yields nothing');
+  }
+
+  console.log('\n--- PIN-protected vault written by the old code ---');
+  {
+    const { secureConfig, storageLocal, storageSession } = loadSecureConfig(
+      fixture.pinVault,
+      { fsbCredentialVaultSessionKey: 'stale', fsbPaymentAccessUnlocked: true }
+    );
+    const summary = await secureConfig.getLegacyVaultSummary();
+    assert(summary.present && summary.pinProtected, 'summary reports a PIN-protected legacy vault');
+    assertEqual(summary.pinLength, 6, 'summary reports the PIN length');
+    assertEqual(summary.logins, 2, 'summary counts both logins');
+    assertEqual(summary.cards, 1, 'summary counts the card');
+
+    const wrong = await secureConfig.readLegacyVault('000000');
+    assertEqual(wrong.success, false, 'a wrong PIN is rejected');
+    assertEqual(wrong.errorCode, 'invalid_pin', 'a wrong PIN reports invalid_pin');
+    const missing = await secureConfig.readLegacyVault('');
+    assertEqual(missing.errorCode, 'invalid_pin', 'a missing PIN reports invalid_pin');
+
+    const read = await secureConfig.readLegacyVault(fixture.pin);
+    assert(read.success, 'the right PIN reads the old vault');
+    assertEqual(read.unreadable, 0, 'every entry decrypts');
+    const byDomain = Object.fromEntries(read.logins.map((login) => [login.domain, login]));
+    assertEqual(byDomain['example.com']?.password, 'correct horse battery', 'login password decrypts');
+    assertEqual(byDomain['example.com']?.allowSubdomains, true, 'subdomain setting is kept');
+    assertEqual(byDomain['example.com']?.notes, 'primary', 'notes are kept');
+    assertEqual(byDomain['login.shop.test']?.username, 'bob', 'second login decrypts');
+    assertEqual(read.cards.length, 1, 'card decrypts');
+    assertEqual(read.cards[0].cardNumber, '4111111111111111', 'card number decrypts as digits');
+    assertEqual(read.cards[0].cvv, '737', 'CVV decrypts');
+    assertEqual(read.cards[0].city, 'Chicago', 'billing address decrypts');
+    assert(read.cards[0].storageKey.startsWith('payment_method_'), 'card keeps its storage key for the purge');
+
+    // Erase only what 1Password confirmed: one login.
+    const partial = await secureConfig.purgeLegacyVault([byDomain['example.com'].storageKey]);
+    assertEqual(partial.removed, 1, 'partial purge removes one entry');
+    assertEqual(partial.remaining, 2, 'partial purge keeps the rest');
+    const afterPartial = storageLocal._dump();
+    assert(!('cred_example.com' in afterPartial), 'imported login is erased');
+    assert('cred_login.shop.test' in afterPartial, 'login that was not imported stays');
+    assert('credentialVaultConfig' in afterPartial, 'PIN verifier stays while entries remain');
+    const stillReadable = await secureConfig.readLegacyVault(fixture.pin);
+    assertEqual(stillReadable.logins.length, 1, 'the remaining login can still be read with the PIN');
+
+    const ignored = await secureConfig.purgeLegacyVault(['apiKey', 'credentialVaultConfig']);
+    assertEqual(ignored.removed, 0, 'purge ignores keys that are not legacy entries');
+
+    const full = await secureConfig.purgeLegacyVault(null);
+    assertEqual(full.remaining, 0, 'full purge leaves nothing');
+    const afterFull = storageLocal._dump();
+    assert(!Object.keys(afterFull).some((key) => key.startsWith('cred_') || key.startsWith('payment_method_')), 'no legacy entries remain');
+    assert(!('credentialVaultConfig' in afterFull), 'PIN verifier is erased once the vault is empty');
+    const session = storageSession._dump();
+    assert(!('fsbCredentialVaultSessionKey' in session) && !('fsbPaymentAccessUnlocked' in session), 'leftover session unlock state is erased');
+    assert(!(await secureConfig.getLegacyVaultSummary()).present, 'summary reports nothing left');
+  }
+
+  console.log('\n--- pre-vault credentials (no PIN) ---');
+  {
+    const { secureConfig } = loadSecureConfig(fixture.preVault);
+    const summary = await secureConfig.getLegacyVaultSummary();
+    assert(summary.present && !summary.pinProtected, 'pre-vault credentials need no PIN');
+    const read = await secureConfig.readLegacyVault('');
+    assert(read.success, 'pre-vault credentials read without a PIN');
+    assertEqual(read.logins[0]?.domain, 'old.example', 'pre-vault login domain comes from its key');
+    assertEqual(read.logins[0]?.password, 'legacy-secret', 'pre-vault login decrypts with the extension key');
   }
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');

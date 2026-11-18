@@ -62,7 +62,7 @@ function makeArea(seed, getImpl) {
     'registry bootstrap is not nested behind session-restore awaits');
 
   const wakeStart = restoreEnd;
-  const wakeEnd = background.indexOf('// Eagerly rehydrate vault session key', wakeStart);
+  const wakeEnd = background.indexOf('// Periodic cleanup of stale sessions', wakeStart);
   const wakeSource = background.slice(wakeStart, wakeEnd);
   const registryKickoff = wakeSource.indexOf('.then(() => bootstrapAgentRegistry())');
   const registryPublish = wakeSource.indexOf('globalThis.fsbAgentRegistryReady = registry.catch');
