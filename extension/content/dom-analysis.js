@@ -1726,6 +1726,17 @@
   // ============================================================================
 
   /**
+   * The visible label that stands in for a styled checkbox or radio whose
+   * native input is hidden (opacity 0, no size, display none), else null.
+   * Such an input is listed in its label's place, and the label's box is the
+   * one that says where the control is.
+   */
+  function labelOfHiddenToggle(el) {
+    const find = FSB.visibleLabelOfHiddenToggle;
+    return typeof find === 'function' ? find(el) : null;
+  }
+
+  /**
    * Calculate relevance score for an element
    */
   function calculateElementScore(element, taskType, prioritizeViewport) {
@@ -1733,7 +1744,7 @@
 
     // Viewport bonus
     if (prioritizeViewport) {
-      const rect = element.getBoundingClientRect();
+      const rect = (labelOfHiddenToggle(element) || element).getBoundingClientRect();
       if (rect.top >= 0 && rect.bottom <= window.innerHeight &&
           rect.left >= 0 && rect.right <= window.innerWidth) {
         score += 10;
@@ -1914,7 +1925,7 @@
     }
 
     // Stage 2: Filter by visibility
-    const visible = candidateArray.filter(el => {
+    const isShown = (el) => {
       // Bypass ALL visibility checks for FSB-injected canvas editor elements
       if (el.dataset.fsbRole) return true;
 
@@ -1939,7 +1950,22 @@
       if (el.getAttribute('aria-hidden') === 'true') return false;
 
       return true;
-    });
+    };
+
+    // A styled checkbox or radio hides the native input and draws the control
+    // with its label. The input is listed while that label is shown, and its
+    // labels are left out, so the control is listed once and as itself.
+    const shown = new Set(candidateArray.filter(isShown));
+    const drawnByLabel = new Set();
+    const standInLabels = new Set();
+    for (const el of candidateArray) {
+      if (shown.has(el) || el.getAttribute('aria-hidden') === 'true') continue;
+      const label = labelOfHiddenToggle(el);
+      if (!label || !isShown(label)) continue;
+      drawnByLabel.add(el);
+      for (const other of FSB.controlLabels(el)) standInLabels.add(other);
+    }
+    const visible = candidateArray.filter(el => drawnByLabel.has(el) || (shown.has(el) && !standInLabels.has(el)));
 
     // Log when fsbElements are filtered by visibility
     {
@@ -2355,8 +2381,9 @@
 
       if (node.nodeType !== Node.ELEMENT_NODE) return;
 
-      // Skip hidden elements (entire subtree)
-      if (!isVisibleForSnapshot(node)) return;
+      // Skip hidden elements (entire subtree). A listed checkbox or radio that
+      // is drawn by its visible label stays, whatever hides the input itself.
+      if (!isVisibleForSnapshot(node) && !(interactiveSet.has(node) && FSB.visibleLabelOfHiddenToggle?.(node))) return;
 
       const tag = node.tagName.toLowerCase();
 
@@ -3315,7 +3342,9 @@
       try {
         if (node.nodeType !== Node.ELEMENT_NODE) return;
 
-        const rect = node.getBoundingClientRect();
+        // A checkbox or radio drawn by its label is placed by that label's box.
+        const box = labelOfHiddenToggle(node) || node;
+        const rect = box.getBoundingClientRect();
 
         const semanticId = generateSemanticElementId(node, totalElementCount);
 
@@ -3358,7 +3387,7 @@
           accessibilityName: computeAccessibleName(node),
           implicitRole: getImplicitRole(node),
           ariaRelationships: getARIARelationships(node),
-          actionability: isElementActionable(node),
+          actionability: isElementActionable(box),
           selectors: generateSelectors(node, semanticId).map(s => s.selector),
           cluster: getElementCluster(node),
           context: {
@@ -4699,9 +4728,12 @@
     };
     const inputType = tag === 'INPUT' ? jevInputType(el) : null;
     const autocomplete = jevCollapse(jevAttr(el, 'autocomplete') || '');
+    // A checkbox or radio drawn by its label is hidden itself: the strict
+    // resolver would refuse it, so it is never offered as a fast step.
     const hidden = inputType === 'hidden'
       || (typeof el.hasAttribute === 'function' && el.hasAttribute('hidden'))
-      || jevAttr(el, 'aria-hidden') === 'true';
+      || jevAttr(el, 'aria-hidden') === 'true'
+      || labelOfHiddenToggle(el) !== null;
     const vaultFilled = jevIsVaultFilled(el);
     const risk = classifyJevRisk(el, { label, purpose: rawPurpose, formCache });
     const disabled = el.disabled === true || jevLower(jevAttr(el, 'aria-disabled') || '') === 'true';
@@ -5499,9 +5531,11 @@
         if (pointer !== true || !bindMayBePointerTarget(el)) return;
         needsPointer = true;
       }
+      // A label gives way to its control when the control is a candidate
+      // itself: a visible one, or a hidden checkbox or radio it draws.
       if (family === 'interactive' && jevTag(el) === 'LABEL') {
         const control = bindLabelControl(el);
-        if (control && bindIsVisible(control)) return;
+        if (control && bindIsVisibleFor(control)) return;
       }
       const strength = needsPointer ? 1 : bindStrength(el);
       const name = bindNameOf(el, needsPointer ? 0 : strength);

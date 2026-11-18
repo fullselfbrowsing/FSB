@@ -1550,6 +1550,63 @@ function checkBinaryState(element, intent) {
   return { shouldAct: true, reason: 'no_aria_state' };
 }
 
+/**
+ * Ticks a checkbox or radio whose native input is hidden by clicking the
+ * visible label that draws it, as a person would, then reads the input's
+ * checked state back. One click event is dispatched, so the input toggles once.
+ * @param {HTMLInputElement} input - The hidden checkbox or radio
+ * @param {Element} label - Its visible label
+ * @param {boolean} [wanted] - The checked state the caller wants; omitted when any change will do
+ * @param {Function} [onDispatch] - Called just before the click is dispatched
+ * @returns {Promise<Object>} { dispatched, confirmed, error, scrolled?, stable?, preState?, postState?, verification? }
+ *   confirmed is true only when the input's checked state changed, and to the wanted state when one was given.
+ */
+async function tickThroughLabel(input, label, wanted, onDispatch) {
+  const enabled = FSB.checkElementEnabled(input);
+  if (!enabled.passed) {
+    return { dispatched: false, confirmed: false, error: `Element not ready: ${enabled.reason}` };
+  }
+  const readiness = await FSB.smartEnsureReady(label, 'click');
+  if (!readiness.ready) {
+    return { dispatched: false, confirmed: false, error: `Element not ready: its label is not ready (${readiness.failureReason})` };
+  }
+  if (!input.isConnected || !label.isConnected) {
+    return { dispatched: false, confirmed: false, error: 'Element no longer in DOM' };
+  }
+
+  const preState = captureActionState(input, 'toggleCheckbox');
+  const rect = label.getBoundingClientRect();
+  const labelEventInit = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window,
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    button: 0,
+    buttons: 1
+  };
+  if (typeof onDispatch === 'function') onDispatch();
+  label.dispatchEvent(new MouseEvent('mousedown', labelEventInit));
+  label.dispatchEvent(new MouseEvent('mouseup', labelEventInit));
+  label.dispatchEvent(new MouseEvent('click', labelEventInit));
+
+  const stability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+  const postState = captureActionState(input, 'toggleCheckbox');
+  const verification = verifyActionEffect(preState, postState, 'toggleCheckbox');
+  const confirmed = verification.verified && (wanted === undefined || input.checked === wanted);
+  return {
+    dispatched: true,
+    confirmed,
+    error: confirmed ? null : `Clicked its label, but the ${input.type} is ${verification.verified ? 'now' : 'still'} ${input.checked ? 'checked' : 'unchecked'}`,
+    scrolled: readiness.scrolled,
+    stable: !!(stability && stability.stable === true),
+    preState,
+    postState,
+    verification
+  };
+}
+
 // ============================================================================
 // SELECT OPTION RESOLUTION
 // A caller names an option by its value, its visible text or its position.
@@ -2409,13 +2466,16 @@ const tools = {
     if (!selector) return { success: false, error: 'No selector provided' };
     const element = FSB.querySelectorWithShadow(selector);
     if (!element) return { success: false, error: `Element not found: ${selector}` };
+    // A checkbox or radio drawn by its label may have no box of its own; the
+    // label's box is the one to bring into view.
+    const box = FSB.visibleLabelOfHiddenToggle?.(element) || element;
     const position = params.position || 'center';
-    element.scrollIntoView({
+    box.scrollIntoView({
       behavior: typeof FSB.scrollBehavior === 'function' ? FSB.scrollBehavior() : 'smooth',
       block: position === 'center' ? 'center' : 'start'
     });
     await waitForStability('scroll');
-    const rect = element.getBoundingClientRect();
+    const rect = box.getBoundingClientRect();
     const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight;
     return { success: true, scrollY: window.scrollY, elementInViewport: inViewport };
   },
@@ -2551,6 +2611,70 @@ const tools = {
     // checks to hang or return false positives. DOM toolbar elements (Name Box, formula bar)
     // are always interactive despite what readiness checks report.
     const isCanvasEditor = FSB.isCanvasBasedEditor && FSB.isCanvasBasedEditor();
+
+    // A styled checkbox or radio hides the native input and draws the control
+    // with its label. The label is clicked in the input's place, and the click
+    // succeeds only when the input's checked state changed. Canvas editors keep
+    // their own path, which runs no readiness checks.
+    const toggleLabel = isCanvasEditor ? null : FSB.visibleLabelOfHiddenToggle?.(element);
+    if (toggleLabel) {
+      let labelSettlesEarly = false;
+      try { labelSettlesEarly = typeof FSB.classifyJevRisk === 'function' && FSB.classifyJevRisk(element, {}) === null; } catch (_e) { labelSettlesEarly = false; }
+      const ticked = await tickThroughLabel(element, toggleLabel, undefined, () => { clickDispatched = true; });
+      const labelPageStable = labelSettlesEarly && ticked.stable === true;
+      actionRecorder.record(null, 'click', params, {
+        selectorTried,
+        selectorUsed,
+        elementFound: true,
+        elementDetails: captureElementDetails(toggleLabel),
+        success: ticked.confirmed,
+        error: ticked.error,
+        hadEffect: ticked.dispatched ? ticked.confirmed : null,
+        effectDetails: ticked.verification ? ticked.verification.changes : null,
+        duration: Date.now() - startTime
+      });
+      if (!ticked.dispatched) {
+        return buildFailureReport('click', params.selector, element, ticked.error);
+      }
+      if (!ticked.confirmed) {
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          clicked: params.selector,
+          hadEffect: false,
+          pageStable: labelPageStable,
+          viaLabel: true,
+          error: `${ticked.error}. Inspect the page before retrying.`,
+          verification: ticked.verification
+        };
+      }
+      return {
+        success: true,
+        clicked: params.selector,
+        hadEffect: true,
+        checked: element.checked,
+        viaLabel: true,
+        scrolled: ticked.scrolled,
+        pageStable: labelPageStable,
+        verification: {
+          localChanges: ticked.verification.localChanges,
+          confidence: ticked.verification.confidence,
+          whatChanged: ticked.verification.whatChanged,
+          preState: ticked.preState,
+          postState: ticked.postState,
+          verified: ticked.verification.verified,
+          changes: ticked.verification.changes,
+          reason: ticked.verification.reason
+        },
+        elementInfo: {
+          tag: element.tagName,
+          text: toggleLabel.textContent?.trim().substring(0, 50),
+          wasScrolledIntoView: ticked.scrolled
+        }
+      };
+    }
+
     let readiness = { ready: true, scrolled: false };
     if (!isCanvasEditor) {
       // SPEED-05: Use smart readiness check with fast-path for ready elements
@@ -5179,6 +5303,17 @@ const tools = {
               selector: currentSelector
             };
           }
+        }
+
+        // A styled checkbox or radio hides the native input and draws the
+        // control with its label. The label is clicked in the input's place,
+        // and the toggle succeeds only when the input reached the wanted state.
+        const toggleLabel = FSB.visibleLabelOfHiddenToggle?.(element);
+        if (toggleLabel) {
+          const ticked = await tickThroughLabel(element, toggleLabel, params.checked !== undefined ? !!params.checked : !element.checked);
+          if (!ticked.confirmed) { lastAttemptError = ticked.error; continue; }
+          actionRecorder.record(null, 'toggleCheckbox', params, { selectorTried: selectors[0], selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(toggleLabel), success: true, hadEffect: true, verification: ticked.verification, duration: Date.now() - startTime });
+          return { success: true, checked: element.checked, viaLabel: true, selector: currentSelector, selectorIndex, usedFallback: selectorIndex > 0, hadEffect: true, verification: { verified: ticked.verification.verified, reason: ticked.verification.reason, changes: ticked.verification.changes } };
         }
 
         const readiness = await FSB.smartEnsureReady(element, 'toggleCheckbox');

@@ -423,6 +423,51 @@
   }
 
   /**
+   * Labels of a form control: its labels list or, where it has no such list,
+   * a label wrapped around it and every label whose for attribute names its id.
+   * @param {Element} control - The form control
+   * @returns {Element[]} The labels, empty when there are none
+   */
+  function controlLabels(control) {
+    try {
+      if (control.labels && typeof control.labels.length === 'number') return Array.from(control.labels);
+      const found = [];
+      const wrapping = control.closest('label');
+      if (wrapping && (!wrapping.hasAttribute('for') || wrapping.getAttribute('for') === control.id)) found.push(wrapping);
+      if (control.id) {
+        for (const label of document.querySelectorAll('label[for]')) {
+          if (label.getAttribute('for') === control.id && !found.includes(label)) found.push(label);
+        }
+      }
+      return found;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * The label that stands in for a styled checkbox or radio. Many sites hide
+   * the native input (opacity 0, no size, display none) and draw the control
+   * with its label, which is what a person sees and clicks. Returns the first
+   * label of such an input that passes the visibility check. Returns null for
+   * any other element, for an input that passes the check itself, and for an
+   * input with no visible label.
+   * @param {Element} element - The element an action or a listing targets
+   * @returns {Element|null} The visible label, or null
+   */
+  function visibleLabelOfHiddenToggle(element) {
+    if (!element || element.tagName !== 'INPUT') return null;
+    const type = String(element.type || '').toLowerCase();
+    if (type !== 'checkbox' && type !== 'radio') return null;
+    try {
+      if (checkElementVisibility(element).passed) return null;
+      return controlLabels(element).find(label => checkElementVisibility(label).passed) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
    * Check if element is enabled (not disabled by various mechanisms)
    * @param {Element} element - The DOM element to check
    * @returns {Object} { passed: boolean, reason: string|null, details: object }
@@ -1420,6 +1465,8 @@
   // Element readiness check functions
   FSB.getStickyHeaderHeight = getStickyHeaderHeight;
   FSB.checkElementVisibility = checkElementVisibility;
+  FSB.controlLabels = controlLabels;
+  FSB.visibleLabelOfHiddenToggle = visibleLabelOfHiddenToggle;
   FSB.checkElementEnabled = checkElementEnabled;
   FSB.checkElementStable = checkElementStable;
   FSB.scrollBehavior = scrollBehavior;

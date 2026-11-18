@@ -226,6 +226,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/hidden-tab-readiness.test.js',
   'node tests/select-option-matching.test.js',
   'node tests/mcp-action-navigation.test.js',
+  'node tests/styled-toggle-label.test.js',
   'node tests/mcp-page-view.test.js',
 ]);
 
