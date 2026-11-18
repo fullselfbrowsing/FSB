@@ -248,9 +248,6 @@ test('an action that got its answer is untouched, whatever the tab did', async (
   const answers = [
     { success: true, clicked: '#add', hadEffect: true, pageStable: true },
     { success: false, error: 'Element not found' },
-    // The content script answered, so its own unknown outcome stands even
-    // though the URL moved (an instant-search field rewriting the query).
-    { success: false, outcome: 'unknown', mayHaveExecuted: true, error: 'Click was dispatched but its effect could not be confirmed. Inspect the page before retrying.' },
   ];
   for (const answer of answers) {
     const b = freshBrowser();
@@ -267,6 +264,104 @@ test('an action that got its answer is untouched, whatever the tab did', async (
     assert.ok(Date.now() - started < 150, 'and not delayed');
     assert.equal(listenerCount(b), 0);
   }
+});
+
+// ---------------------------------------------------------------------------
+// A click or an Enter answered before its navigation committed
+
+const UNCONFIRMED_CLICK = Object.freeze({
+  success: false,
+  outcome: 'unknown',
+  mayHaveExecuted: true,
+  hadEffect: false,
+  error: 'Click was dispatched but its effect could not be confirmed. Inspect the page before retrying.',
+});
+
+// Runs one action that the content script answers with `answer`, after
+// `duringAction` has run. The connection stays open.
+async function runAnswered(b, duringAction, toolName = 'click', answer = UNCONFIRMED_CLICK) {
+  const given = { ...answer };
+  const started = Date.now();
+  const result = await dispatcher.runActionAcrossNavigation({
+    toolName,
+    tabId: 7,
+    execute: async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      if (duringAction) duringAction();
+      return given;
+    },
+    connectionClosed: () => false,
+  });
+  return { result, given, elapsed: Date.now() - started };
+}
+
+test('an unconfirmed click whose navigation is pending is answered by that navigation once it commits', async () => {
+  const b = freshBrowser();
+  const { result, given, elapsed } = await runAnswered(b, () => {
+    b.page.pendingUrl = ORDER;
+    setTimeout(() => b.navigate(ORDER, { title: 'Order 42 - Shop' }), 200);
+  });
+  assert.notEqual(result, given);
+  assert.deepEqual(result, {
+    success: true,
+    tool: 'click',
+    tabId: 7,
+    url: ORDER,
+    domain: 'shop.example',
+    title: 'Order 42 - Shop',
+    hadEffect: true,
+    navigationTriggered: true,
+  });
+  assert.ok(elapsed >= 180 && elapsed < 900, `answered at the commit (${elapsed} ms)`);
+  assert.equal(listenerCount(b), 0);
+
+  // The commit can also land between the script's answer and this check.
+  const done = freshBrowser();
+  const committed = await runAnswered(done, () => done.navigate(ORDER));
+  assert.equal(committed.result.success, true);
+  assert.equal(committed.result.navigationTriggered, true);
+  assert.ok(committed.elapsed < 300, `a committed navigation is not waited for (${committed.elapsed} ms)`);
+});
+
+test('an unconfirmed click or Enter with no navigation due keeps its unknown outcome and waits for nothing', async () => {
+  for (const toolName of ['click', 'pressEnter']) {
+    const b = freshBrowser();
+    const { result, given, elapsed } = await runAnswered(b, null, toolName);
+    assert.equal(result, given, 'the same result object');
+    assert.deepEqual(result, UNCONFIRMED_CLICK, 'with nothing added or removed');
+    assert.ok(elapsed < 150, `no wait where nothing navigated (${elapsed} ms)`);
+    assert.equal(listenerCount(b), 0);
+  }
+});
+
+test('an unconfirmed click whose navigation never commits is given up on after the longer bounded wait', async () => {
+  assert.equal(dispatcher.ACTION_LATE_NAVIGATION_WAIT_MS, 3000);
+  const b = freshBrowser();
+  const { result, given, elapsed } = await runAnswered(b, () => { b.page.pendingUrl = 'https://slow.example/'; });
+  assert.equal(result, given, 'no commit, no success');
+  assert.deepEqual(result, UNCONFIRMED_CLICK);
+  assert.ok(elapsed >= 2950 && elapsed < 3700, `gave up after ${elapsed} ms`);
+  assert.equal(listenerCount(b), 0);
+});
+
+test('only a click or an Enter is looked at again after an answer, and never a tab that was already navigating', async () => {
+  // Typing answered "unknown": the URL moving is not taken as its result.
+  const typed = freshBrowser();
+  const typing = await runAnswered(typed, () => typed.navigate(ORDER), 'type');
+  assert.equal(typing.result, typing.given);
+  assert.ok(typing.elapsed < 150);
+
+  // The tab was on its way elsewhere before the click was sent.
+  const busy = freshBrowser();
+  busy.page.pendingUrl = ORDER;
+  const already = await runAnswered(busy, () => busy.navigate(ORDER));
+  assert.equal(already.result, already.given);
+  assert.ok(already.elapsed < 150, `and is not waited on (${already.elapsed} ms)`);
+
+  // An answer that is a plain failure is never rewritten.
+  const failed = freshBrowser();
+  const refusal = await runAnswered(failed, () => failed.navigate(ORDER), 'click', { success: false, error: 'Element not found' });
+  assert.equal(refusal.result, refusal.given);
 });
 
 test('reads, sheet fills and tools that do not run in the content script are never answered by a navigation', async () => {

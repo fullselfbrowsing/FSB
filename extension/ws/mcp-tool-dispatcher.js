@@ -5791,8 +5791,27 @@ async function runActionWithPageView(ctx) {
 // the tab was already navigating as the action was sent, since that navigation
 // is not the action's. Reads and sheet fills are never rewritten: their answer
 // is their product, which a navigation cannot stand in for.
+//
+// A click or an Enter can also be answered before its navigation commits. A
+// link to a slow page, or a form whose server takes a second to reply, leaves
+// the old document in place and unchanged, so its content script answers
+// "dispatched, effect not confirmed" while the navigation is still pending.
+// That answer is checked the same way: when a navigation is due as the answer
+// arrives, its commit is awaited for at most ACTION_LATE_NAVIGATION_WAIT_MS
+// and the action is then reported as the navigation. With no navigation due,
+// the unknown outcome is returned at once.
 
 const ACTION_NAVIGATION_WAIT_MS = 1000;
+const ACTION_LATE_NAVIGATION_WAIT_MS = 3000;
+const _LATE_NAVIGATION_TOOLS = Object.freeze(['click', 'press_enter']);
+
+function _actionMayNavigateLate(toolNameOrVerb) {
+  let def = null;
+  try {
+    def = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolNameOrVerb) : null;
+  } catch (_) { def = null; }
+  return !!def && _LATE_NAVIGATION_TOOLS.includes(def.name);
+}
 
 function _actionAnswersWithNavigation(toolNameOrVerb) {
   let def = null;
@@ -5864,7 +5883,8 @@ async function _refreshNavigatedActionResult(response, tabId) {
  * @param {number} ctx.tabId - the tab the action runs in
  * @param {Function} ctx.execute - async () => response
  * @param {Function} ctx.connectionClosed - () => true once the action was sent
- *   and its connection closed before an answer
+ *   and its connection closed before an answer. A click or an Enter that was
+ *   answered with an unknown outcome is checked for a navigation as well.
  * @returns {Promise<Object>} the response, or a success that names the navigation
  */
 async function runActionAcrossNavigation(ctx) {
@@ -5886,12 +5906,17 @@ async function runActionAcrossNavigation(ctx) {
       () => null
     );
     const response = await execute();
-    if (ctx.connectionClosed() !== true) return response;
     if (!response || typeof response !== 'object' || response.success === true || response.mayHaveExecuted !== true) {
       return response;
     }
+    const closed = ctx.connectionClosed() === true;
+    // The content script answered, but could not confirm an effect: only a
+    // click or an Enter is looked at again, and only for a navigation.
+    const answeredUnconfirmed = !closed && response.outcome === 'unknown' && _actionMayNavigateLate(ctx.toolName);
+    if (!closed && !answeredUnconfirmed) return response;
     try {
-      const tab = await _awaitActionNavigation(tabId, sentFrom, watcher, Date.now() + ACTION_NAVIGATION_WAIT_MS);
+      const wait = closed ? ACTION_NAVIGATION_WAIT_MS : ACTION_LATE_NAVIGATION_WAIT_MS;
+      const tab = await _awaitActionNavigation(tabId, sentFrom, watcher, Date.now() + wait);
       if (!tab) return response;
       const navigated = sanitizeSingleTab(_pageViewToolName(ctx.toolName), tab, { hadEffect: true, navigationTriggered: true });
       Object.defineProperty(navigated, _ACTION_NAVIGATED, { value: true });
@@ -5928,6 +5953,7 @@ const _mcp_dispatcher_exports = {
   // Actions answered by the navigation they started.
   runActionAcrossNavigation,
   ACTION_NAVIGATION_WAIT_MS,
+  ACTION_LATE_NAVIGATION_WAIT_MS,
   _getChangeReportsEnabled,
   _setChangeReportsEnabledForTest,
   // Phase 69 same-call expect helpers (test-only accessors).
