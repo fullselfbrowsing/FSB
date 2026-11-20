@@ -4666,5 +4666,161 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB входит на сайты с данными для входа из вашего 1Password. Сам FSB не хранит пароли."
+  },
+  "panel_8b70975df7": {
+    "message": "Если включено, FSB распознаёт страницы входа и входит с подходящими данными из 1Password."
+  },
+  "panel_818962bda5": {
+    "message": "Проверка подключения к 1Password..."
+  },
+  "panel_b84510154a": {
+    "message": "Аккаунт 1Password"
+  },
+  "panel_a6f394d865": {
+    "message": "Имя аккаунта, которое показано вверху боковой панели 1Password. В приложении 1Password включите Settings > Developer > Integrate with other apps."
+  },
+  "panel_5dec08e310": {
+    "message": "Подключить 1Password"
+  },
+  "panel_e175b45390": {
+    "message": "Хотите использовать сервисный аккаунт? Выполните это в терминале, затем перезагрузите страницу:"
+  },
+  "panel_5c0a336c67": {
+    "message": "Выберите сейфы, которые может читать FSB. Надёжнее всего сейф, который использует только FSB."
+  },
+  "panel_161c79f605": {
+    "message": "Сохранять новые данные для входа в"
+  },
+  "panel_cc6d7a8340": {
+    "message": "Не сохранять"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "Сохранить доступ к сейфам"
+  },
+  "panel_5ab21b8830": {
+    "message": "Перенесите старый сейф FSB в 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "Введите PIN старого сейфа FSB. Перенесённые в 1Password элементы удаляются из FSB."
+  },
+  "panel_3f6118f701": {
+    "message": "Перенести в 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "Удалить старый сейф"
+  },
+  "panel_00f3328a04": {
+    "message": "В сейфах, доступных FSB, нет данных для входа. Добавляйте и изменяйте их в 1Password."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB заполняет формы оплаты картами из вашего 1Password после того, как вы одобрите каждое заполнение."
+  },
+  "panel_4875f94fbf": {
+    "message": "Чтобы использовать карты, подключите 1Password в разделе «Пароли»."
+  },
+  "panel_b9675cca57": {
+    "message": "В сейфах, доступных FSB, нет банковских карт. Добавляйте и изменяйте карты в 1Password."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password подключён через настольное приложение ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password подключён через сервисный аккаунт."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password не подключён."
+  },
+  "panel_5848961ce6": {
+    "message": "Чтобы завершить настройку, выберите сейфы, которые может использовать FSB."
+  },
+  "panel_216dcfd214": {
+    "message": "Введите имя аккаунта 1Password"
+  },
+  "panel_a94d6f85db": {
+    "message": "Подключение... Если появится запрос, разрешите доступ FSB в приложении 1Password."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password подключён"
+  },
+  "panel_e520e3cf11": {
+    "message": "Выберите хотя бы один сейф"
+  },
+  "panel_cc541e4c1e": {
+    "message": "Доступ к сейфам сохранён"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password отключён"
+  },
+  "panel_e95f94cbda": {
+    "message": "В старом сейфе FSB остались элементы, которые FSB больше не использует. Данные для входа: $LOGINS$. Карты: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "Перенесено в 1Password. Данные для входа: $LOGINS$. Карты: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "Не перенесено и оставлено в FSB: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "Удалить старый сейф FSB? Всё, что не перенесено в 1Password, будет потеряно."
+  },
+  "panel_ed17465290": {
+    "message": "Старый сейф удалён"
+  },
+  "panel_3d763a56b2": {
+    "message": "Элементов: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "Перенос..."
+  },
+  "panel_498fd066bf": {
+    "message": "Не удалось связаться с 1Password: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "Введите данные для входа. FSB может сохранить их в 1Password на следующий раз."
+  },
+  "copy_751ac3de88": {
+    "message": "Введите данные для входа. FSB использует их один раз и не сохраняет."
+  },
+  "copy_264681c742": {
+    "message": "Сохранить в 1Password"
   }
 }

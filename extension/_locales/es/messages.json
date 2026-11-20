@@ -4666,5 +4666,161 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB inicia sesión con los inicios de sesión de tu 1Password. FSB no guarda ninguna contraseña."
+  },
+  "panel_8b70975df7": {
+    "message": "Si está activado, FSB detecta las páginas de inicio de sesión e inicia sesión con el inicio de sesión de 1Password correspondiente."
+  },
+  "panel_818962bda5": {
+    "message": "Comprobando la conexión con 1Password..."
+  },
+  "panel_b84510154a": {
+    "message": "Cuenta de 1Password"
+  },
+  "panel_a6f394d865": {
+    "message": "El nombre de la cuenta que aparece en la parte superior de la barra lateral de 1Password. En la app de 1Password, activa Settings > Developer > Integrate with other apps."
+  },
+  "panel_5dec08e310": {
+    "message": "Conectar 1Password"
+  },
+  "panel_e175b45390": {
+    "message": "¿Prefieres usar una cuenta de servicio? Ejecuta esto en una terminal y vuelve a cargar esta página:"
+  },
+  "panel_5c0a336c67": {
+    "message": "Elige las bóvedas que FSB puede leer. Lo más seguro es una bóveda que solo use FSB."
+  },
+  "panel_161c79f605": {
+    "message": "Guardar nuevos inicios de sesión en"
+  },
+  "panel_cc6d7a8340": {
+    "message": "No guardar"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "Guardar acceso a bóvedas"
+  },
+  "panel_5ab21b8830": {
+    "message": "Mueve tu antigua bóveda de FSB a 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "Introduce el PIN de tu antigua bóveda de FSB. Los elementos movidos a 1Password se borran de FSB."
+  },
+  "panel_3f6118f701": {
+    "message": "Mover a 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "Eliminar bóveda antigua"
+  },
+  "panel_00f3328a04": {
+    "message": "No hay inicios de sesión en las bóvedas que FSB puede usar. Añade o edita inicios de sesión en 1Password."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB rellena los formularios de pago con tarjetas de crédito de tu 1Password, después de que apruebes cada uso."
+  },
+  "panel_4875f94fbf": {
+    "message": "Conecta 1Password en Contraseñas para usar tus tarjetas."
+  },
+  "panel_b9675cca57": {
+    "message": "No hay tarjetas de crédito en las bóvedas que FSB puede usar. Añade o edita tarjetas en 1Password."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password está conectado a través de la app de escritorio ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password está conectado con una cuenta de servicio."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password no está conectado."
+  },
+  "panel_5848961ce6": {
+    "message": "Elige las bóvedas que FSB puede usar para terminar la configuración."
+  },
+  "panel_216dcfd214": {
+    "message": "Introduce el nombre de tu cuenta de 1Password"
+  },
+  "panel_a94d6f85db": {
+    "message": "Conectando... Si se te pide, aprueba FSB en la app de 1Password."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password conectado"
+  },
+  "panel_e520e3cf11": {
+    "message": "Elige al menos una bóveda"
+  },
+  "panel_cc541e4c1e": {
+    "message": "Acceso a bóvedas guardado"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password desconectado"
+  },
+  "panel_e95f94cbda": {
+    "message": "La antigua bóveda de FSB aún contiene elementos que FSB ya no usa. Inicios de sesión: $LOGINS$. Tarjetas: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "Movido a 1Password. Inicios de sesión: $LOGINS$. Tarjetas: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "No movidos y conservados en FSB: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "¿Eliminar la antigua bóveda de FSB? Se perderá todo lo que no se haya movido a 1Password."
+  },
+  "panel_ed17465290": {
+    "message": "Bóveda antigua eliminada"
+  },
+  "panel_3d763a56b2": {
+    "message": "Elementos: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "Moviendo..."
+  },
+  "panel_498fd066bf": {
+    "message": "No se pudo acceder a 1Password: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "Introduce tus credenciales para iniciar sesión. FSB puede guardarlas en 1Password para la próxima vez."
+  },
+  "copy_751ac3de88": {
+    "message": "Introduce tus credenciales para iniciar sesión. FSB las usa una vez y no las guarda."
+  },
+  "copy_264681c742": {
+    "message": "Guardar en 1Password"
   }
 }

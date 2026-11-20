@@ -122,6 +122,9 @@ try { importScripts('utils/action-icon.js'); } catch (e) { console.error('[FSB] 
 // MCP bridge client for local MCP server connection
 try { importScripts('ws/mcp-bridge-client.js'); } catch (e) { console.error('[FSB] Failed to load mcp-bridge-client.js:', e.message); }
 
+// 1Password client: logins and cards resolve through the FSB local server
+try { importScripts('utils/onepassword-client.js'); } catch (e) { console.error('[FSB] Failed to load onepassword-client.js:', e.message); }
+
 // Native registration detection is advisory only. The helper installs its
 // native-port listeners synchronously, sends no message, and closes on its own
 // short timer. This promise is deliberately independent from SW bootstrap.
@@ -5198,22 +5201,6 @@ function restoreServiceWorkerStateOnWake() {
 // Immediately restore service-worker state on both worker restarts and browser
 // startups. Each chain catches its own failure before the aggregate settles.
 restoreServiceWorkerStateOnWake();
-
-// Eagerly rehydrate vault session key on service worker startup (Phase 191 - VAULT-03)
-// chrome.storage.session survives SW restarts but the in-memory SecureConfig fields reset to null.
-// Calling these methods loads persisted keys back into memory so vault operations work
-// without requiring re-unlock after Chrome kills the idle service worker.
-(async () => {
-  try {
-    const sessionKey = await secureConfig._loadCredentialSessionKey();
-    await secureConfig._loadPaymentAccessState();
-    if (sessionKey) {
-      console.log('[FSB] Vault session key rehydrated from chrome.storage.session');
-    }
-  } catch (err) {
-    console.warn('[FSB] Failed to rehydrate vault session on wake:', err.message || err);
-  }
-})();
 
 // Periodic cleanup of stale sessions (every 5 minutes)
 setInterval(async () => {
@@ -12708,206 +12695,24 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       })();
       return true; // Will respond asynchronously
 
-    // Credential management actions (Passwords Beta)
-    case 'getCredential':
-      (async () => {
-        try {
-          const cred = await secureConfig.getCredential(request.domain);
-          sendResponse({ success: true, credential: cred });
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'getFullCredential':
-      (async () => {
-        try {
-          const cred = await secureConfig.getFullCredential(request.domain);
-          sendResponse({ success: true, credential: cred });
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'saveCredential':
-      (async () => {
-        try {
-          const result = await secureConfig.saveCredential(request.domain, request.data);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'getAllCredentials':
-      (async () => {
-        try {
-          const credentials = await secureConfig.getAllCredentials();
-          sendResponse({ success: true, credentials });
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'deleteCredential':
-      (async () => {
-        try {
-          const result = await secureConfig.deleteCredential(request.domain);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'updateCredential':
-      (async () => {
-        try {
-          const result = await secureConfig.updateCredential(request.domain, request.updates);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    // Vault lifecycle actions (Phase 191)
-    case 'createCredentialVault':
-      (async () => {
-        try {
-          const result = await secureConfig.createCredentialVault(request.passphrase);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'unlockCredentialVault':
-      (async () => {
-        try {
-          const result = await secureConfig.unlockCredentialVault(request.passphrase);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'lockCredentialVault':
-      (async () => {
-        try {
-          const result = await secureConfig.lockCredentialVault();
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'getCredentialVaultStatus':
-      (async () => {
-        try {
-          const result = await secureConfig.getCredentialVaultStatus();
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    // Payment method CRUD actions (Phase 192)
-    case 'savePaymentMethod':
-      (async () => {
-        try {
-          const result = await secureConfig.savePaymentMethod(request.data);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'getAllPaymentMethods':
-      (async () => {
-        try {
-          const methods = await secureConfig.getAllPaymentMethods();
-          sendResponse({ success: true, paymentMethods: methods });
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'getFullPaymentMethod':
-      (async () => {
-        try {
-          const method = await secureConfig.getFullPaymentMethod(request.id);
-          sendResponse({ success: true, paymentMethod: method });
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'updatePaymentMethod':
-      (async () => {
-        try {
-          const result = await secureConfig.updatePaymentMethod(request.id, request.updates);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'deletePaymentMethod':
-      (async () => {
-        try {
-          const result = await secureConfig.deletePaymentMethod(request.id);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    // Payment access gate actions (Phase 192)
-    case 'unlockPaymentMethods':
-      (async () => {
-        try {
-          const result = await secureConfig.unlockPaymentMethods(request.passphrase);
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'lockPaymentMethods':
-      (async () => {
-        try {
-          const result = await secureConfig.lockPaymentMethods();
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
-      return true;
-
-    case 'getPaymentVaultStatus':
-      (async () => {
-        try {
-          const result = await secureConfig.getPaymentVaultStatus();
-          sendResponse(result);
-        } catch (error) {
-          sendResponse({ success: false, error: error.message });
-        }
-      })();
+    // 1Password settings (Passwords / Payments sections). These carry no
+    // secret values: logins and cards are only ever resolved for a page fill.
+    case 'onePasswordStatus':
+    case 'onePasswordConfigure':
+    case 'onePasswordListVaults':
+    case 'onePasswordListLogins':
+    case 'onePasswordListCards':
+    case 'onePasswordDisconnect':
+    case 'legacyVaultImport':
+    case 'legacyVaultDelete':
+      if (!fsbReplayIsTrustedUiSender(sender)) {
+        sendResponse({ success: false, errorCode: 'untrusted_sender', error: 'Unauthorized sender' });
+        return false;
+      }
+      fsbHandleOnePasswordUiAction(request).then(
+        (result) => sendResponse(result),
+        (error) => sendResponse({ success: false, errorCode: 'onepassword_request_failed', error: (error && error.message) || '1Password request failed' })
+      );
       return true;
 
     // SM-22: Site map retrieval for AI context injection
@@ -14993,30 +14798,234 @@ function extractLoginFields(domData) {
   return { usernameSelector, passwordSelector, submitSelector, usernameType };
 }
 
-// Fill credentials on page using saved credentials (looks up from storage)
-async function fillCredentialsOnPage(tabId, domain, domData) {
-  const cred = await secureConfig.getCredential(domain);
-  if (!cred) return { success: false, error: 'No credentials found' };
+// ==========================================
+// 1Password (logins and cards)
+// ==========================================
+// FSB keeps no passwords or cards of its own. fsbOnePassword (utils/
+// onepassword-client.js) asks the FSB local server, which reads the user's
+// 1Password vaults. Resolved secrets go only to the page-fill step.
+
+function fsbOnePasswordClient() {
+  return (typeof fsbOnePassword !== 'undefined' && fsbOnePassword) ? fsbOnePassword : null;
+}
+
+function fsbOnePasswordFailure(result, fallback) {
+  return {
+    success: false,
+    errorCode: (result && result.errorCode) || 'onepassword_request_failed',
+    error: (result && result.error) || fallback || '1Password request failed'
+  };
+}
+
+function fsbProjectLoginSummary(login) {
+  return {
+    id: String(login && login.id || ''),
+    title: String(login && login.title || ''),
+    domains: Array.isArray(login && login.domains) ? login.domains.map(String) : [],
+    username: String(login && login.username || '')
+  };
+}
+
+function fsbProjectCardSummary(card) {
+  return {
+    id: String(card && card.id || ''),
+    title: String(card && card.title || ''),
+    cardBrand: String(card && card.cardBrand || 'unknown'),
+    last4: String(card && card.last4 || ''),
+    cardholderName: String(card && card.cardholderName || ''),
+    expiryMonth: String(card && card.expiryMonth || ''),
+    expiryYearLast2: String(card && card.expiryYearLast2 || '')
+  };
+}
+
+async function fsbLegacyVaultSummary() {
+  try {
+    return await secureConfig.getLegacyVaultSummary();
+  } catch (_error) {
+    return null;
+  }
+}
+
+// The move goes to 1Password in small batches, and each batch is erased from
+// the old vault as soon as 1Password confirms it. A reply that never arrives
+// (a timeout, or a worker or server restart) then leaves at most one batch
+// unaccounted for, instead of the whole vault being created again next time.
+const FSB_LEGACY_IMPORT_BATCH = 10;
+// No new batch starts after this, so one click stays well inside the service
+// worker's per-request limit. Whatever is left moves on the next click.
+const FSB_LEGACY_IMPORT_CALL_BUDGET_MS = 120000;
+
+function fsbLegacyCount(value, max) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.min(max, Math.floor(count))) : 0;
+}
+
+// Move the old FSB vault into 1Password, then erase exactly the entries
+// 1Password confirmed it saved. Decrypted values stay in this worker.
+async function fsbImportLegacyVault(pin) {
+  const op = fsbOnePasswordClient();
+  if (!op) return { success: false, errorCode: 'onepassword_unavailable', error: '1Password support did not load' };
+  const read = await secureConfig.readLegacyVault(pin);
+  if (!read || !read.success) {
+    return { success: false, errorCode: (read && read.errorCode) || 'legacy_read_failed', error: (read && read.error) || 'Could not read the old FSB vault' };
+  }
+  if (read.logins.length === 0 && read.cards.length === 0) {
+    return { success: true, imported: { logins: 0, cards: 0 }, failed: { logins: 0, cards: 0 }, notAttempted: { logins: 0, cards: 0 }, unreadable: read.unreadable, legacy: await fsbLegacyVaultSummary() };
+  }
+
+  // Sign in before anything is written, so a 1Password approval prompt waits
+  // here and not inside a batch that has a deadline.
+  const ready = await op.listVaults();
+  if (!ready || !ready.ok) return fsbOnePasswordFailure(ready, 'Could not reach 1Password');
+
+  const imported = { logins: 0, cards: 0 };
+  const failed = { logins: 0, cards: 0 };
+  // Entries inside a batch that 1Password ended early, never sent.
+  const unreached = { logins: 0, cards: 0 };
+  const deadline = Date.now() + FSB_LEGACY_IMPORT_CALL_BUDGET_MS;
+  let nextLogin = 0;
+  let nextCard = 0;
+
+  while ((nextLogin < read.logins.length || nextCard < read.cards.length) && Date.now() < deadline) {
+    const loginBatch = read.logins.slice(nextLogin, nextLogin + FSB_LEGACY_IMPORT_BATCH);
+    const cardBatch = read.cards.slice(nextCard, nextCard + FSB_LEGACY_IMPORT_BATCH - loginBatch.length);
+    const response = await op.importLegacy(
+      loginBatch.map(({ storageKey, ...rest }) => rest),
+      cardBatch.map(({ storageKey, ...rest }) => rest)
+    );
+    if (!response || !response.ok) {
+      // Nothing in this batch is confirmed, so none of it is erased.
+      if (imported.logins + imported.cards === 0) return fsbOnePasswordFailure(response, 'Import to 1Password failed');
+      break;
+    }
+    const result = response.result || {};
+    const importedDomains = new Set(Array.isArray(result.importedLoginDomains) ? result.importedLoginDomains : []);
+    const confirmedKeys = loginBatch.filter((login) => importedDomains.has(login.domain)).map((login) => login.storageKey);
+    for (const index of Array.isArray(result.importedCardIndexes) ? result.importedCardIndexes : []) {
+      if (cardBatch[index]) confirmedKeys.push(cardBatch[index].storageKey);
+    }
+    if (confirmedKeys.length > 0) await secureConfig.purgeLegacyVault(confirmedKeys);
+    imported.logins += fsbLegacyCount(result.logins?.imported, loginBatch.length);
+    imported.cards += fsbLegacyCount(result.cards?.imported, cardBatch.length);
+    failed.logins += fsbLegacyCount(result.logins?.failed, loginBatch.length);
+    failed.cards += fsbLegacyCount(result.cards?.failed, cardBatch.length);
+    nextLogin += loginBatch.length;
+    nextCard += cardBatch.length;
+    if (result.stopped) {
+      // 1Password ended this batch early (rate limit, expired session, or the
+      // server's time limit). What it never reached stays for the next attempt.
+      const left = result.stopped.notAttempted || {};
+      unreached.logins = fsbLegacyCount(left.logins, loginBatch.length);
+      unreached.cards = fsbLegacyCount(left.cards, cardBatch.length);
+      if (imported.logins + imported.cards === 0) {
+        return fsbOnePasswordFailure({ errorCode: result.stopped.code }, '1Password stopped before anything was moved. Try again.');
+      }
+      break;
+    }
+  }
+
+  return {
+    success: true,
+    imported,
+    failed,
+    notAttempted: {
+      logins: read.logins.length - nextLogin + unreached.logins,
+      cards: read.cards.length - nextCard + unreached.cards
+    },
+    unreadable: read.unreadable,
+    legacy: await fsbLegacyVaultSummary()
+  };
+}
+
+async function fsbHandleOnePasswordUiAction(request) {
+  const op = fsbOnePasswordClient();
+  if (!op) return { success: false, errorCode: 'onepassword_unavailable', error: '1Password support did not load' };
+  switch (request.action) {
+    case 'onePasswordStatus': {
+      const [result, legacy] = await Promise.all([op.status(), fsbLegacyVaultSummary()]);
+      if (!result || !result.ok) return { ...fsbOnePasswordFailure(result), legacy };
+      return { success: true, status: result.status, legacy };
+    }
+    case 'onePasswordConfigure': {
+      const settings = {};
+      for (const key of ['authKind', 'accountName', 'vaultIds', 'saveVaultId']) {
+        if (Object.prototype.hasOwnProperty.call(request, key)) settings[key] = request[key];
+      }
+      const result = await op.configure(settings);
+      return result && result.ok ? { success: true, status: result.status } : fsbOnePasswordFailure(result);
+    }
+    case 'onePasswordListVaults': {
+      const result = await op.listVaults();
+      return result && result.ok ? { success: true, vaults: result.vaults || [] } : fsbOnePasswordFailure(result);
+    }
+    case 'onePasswordListLogins': {
+      const result = await op.listLogins();
+      return result && result.ok
+        ? { success: true, logins: (result.logins || []).map(fsbProjectLoginSummary) }
+        : fsbOnePasswordFailure(result);
+    }
+    case 'onePasswordListCards': {
+      const result = await op.listCards();
+      return result && result.ok
+        ? { success: true, cards: (result.cards || []).map(fsbProjectCardSummary) }
+        : fsbOnePasswordFailure(result);
+    }
+    case 'onePasswordDisconnect': {
+      const result = await op.disconnect(request.forget === true);
+      return result && result.ok ? { success: true, status: result.status } : fsbOnePasswordFailure(result);
+    }
+    case 'legacyVaultImport':
+      return fsbImportLegacyVault(request.pin);
+    case 'legacyVaultDelete':
+      await secureConfig.purgeLegacyVault(null);
+      return { success: true, legacy: await fsbLegacyVaultSummary() };
+    default:
+      return { success: false, errorCode: 'invalid_request', error: 'Unknown 1Password action' };
+  }
+}
+
+// Fill a login resolved from 1Password into the page's detected login form.
+// expectedOrigin is the origin the login was looked up for.
+async function fillCredentialsOnPage(tabId, login, domData, expectedOrigin) {
+  if (!login || (!login.username && !login.password)) return { success: false, error: 'No credentials found' };
 
   const fields = extractLoginFields(domData);
 
   return await fillCredentialsOnPageDirect(tabId, {
+    expectedOrigin,
     usernameSelector: fields.usernameSelector,
     passwordSelector: fields.passwordSelector,
     submitSelector: fields.submitSelector,
-    username: cred.username,
-    password: cred.password
+    username: login.username,
+    password: login.password
   });
 }
 
 // Fill credentials on page directly via chrome.scripting.executeScript
 // This avoids sending credentials over message passing where they could be intercepted
 // Uses React-compatible native setter to work with frameworks that intercept value changes
-async function fillCredentialsOnPageDirect(tabId, { usernameSelector, passwordSelector, submitSelector, username, password }) {
+//
+// Credentials belong to the origin they were looked up or typed for
+// (expectedOrigin). The 1Password lookup or the user's answer can take long
+// enough for the tab to navigate, so the tab is re-read here and the origin is
+// checked again inside the page before either value is used.
+async function fillCredentialsOnPageDirect(tabId, { expectedOrigin, usernameSelector, passwordSelector, submitSelector, username, password }) {
+  const originChanged = { success: false, originChanged: true, error: 'The page changed before the credential fill' };
+  if (!expectedOrigin) return { success: false, error: 'Credentials can only be filled on http(s) pages' };
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (fsbReplayOrigin(tab && tab.url) !== expectedOrigin) return originChanged;
+  } catch (_error) {
+    return { success: false, error: 'Credential fill failed' };
+  }
   try {
     const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (uSel, pSel, sSel, u, p) => {
+      target: { tabId, frameIds: [0] },
+      func: (origin, uSel, pSel, sSel, u, p) => {
+        // First, before u or p reach any page API: is this still the page the
+        // credentials were meant for?
+        if (location.origin !== origin) return { success: false, originChanged: true };
+
         // React-compatible value setter: uses the native HTMLInputElement prototype setter
         // which triggers React's synthetic event system, unlike direct .value assignment
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
@@ -15069,10 +15078,11 @@ async function fillCredentialsOnPageDirect(tabId, { usernameSelector, passwordSe
           passwordVerified: pVerified
         };
       },
-      args: [usernameSelector, passwordSelector, submitSelector, username, password],
+      args: [expectedOrigin, usernameSelector, passwordSelector, submitSelector, username, password],
       world: 'MAIN'
     });
     const result = results[0]?.result || { success: false, error: 'No result from script injection' };
+    if (result.originChanged) return originChanged;
     automationLogger.debug('fillCredentialsOnPageDirect result', result);
     return result;
   } catch (error) {
@@ -17100,17 +17110,43 @@ async function startAutomationLoop(sessionId) {
 
     if (enableLogin && hasPasswordField && !session._loginHandledForUrl?.includes(currentUrl)) {
       const loginDomain = secureConfig.normalizeDomain(currentUrl);
+      // Credentials are only filled into this origin, even if the tab moves
+      // while 1Password or the user is answering.
+      const loginOrigin = fsbReplayOrigin(currentUrl);
+      // A refused fill means this DOM snapshot is stale: read the new page
+      // instead of handing the old one to the AI.
+      const restartOnNewPage = () => {
+        automationLogger.info('Page changed before the login fill, nothing was filled', { sessionId, domain: loginDomain });
+        loopResolve?.();
+        if (!isSessionTerminating(sessionId) && activeSessions.has(sessionId)) {
+          setTimeout(() => startAutomationLoop(sessionId), 500);
+        }
+      };
       automationLogger.debug('Login page detected', { sessionId, domain: loginDomain, url: currentUrl });
 
       // Track that we've handled login for this URL to avoid repeated prompts
       if (!session._loginHandledForUrl) session._loginHandledForUrl = [];
 
-      // Check for saved credentials
-      const savedCred = await secureConfig.getCredential(loginDomain);
+      // Look the site up in 1Password (only the vaults the user allowed).
+      // Like fill_credential, this never guesses between several matching
+      // logins (personal and work, say): it gets multiple_credentials, and the
+      // user is asked below instead of the newest login being submitted.
+      const onePassword = fsbOnePasswordClient();
+      const lookup = onePassword ? await onePassword.resolveLogin(currentUrl, { requireUnique: true }) : null;
+      const savedCred = lookup && lookup.ok ? lookup.login : null;
+      if (lookup && !lookup.ok && lookup.errorCode === 'multiple_credentials') {
+        automationLogger.info('Several 1Password logins match this site; asking the user instead of choosing one', {
+          sessionId,
+          domain: loginDomain,
+          candidates: Array.isArray(lookup.candidates) ? lookup.candidates.length : 0
+        });
+      } else if (lookup && !lookup.ok && lookup.errorCode !== 'credential_not_found') {
+        automationLogger.info('1Password lookup unavailable on login page', { sessionId, domain: loginDomain, errorCode: lookup.errorCode });
+      }
 
-      if (savedCred) {
-        // SILENT AUTO-FILL: use saved credentials
-        automationLogger.info('Auto-filling saved credentials', { sessionId, domain: loginDomain });
+      if (savedCred && (savedCred.username || savedCred.password)) {
+        // SILENT AUTO-FILL: use the 1Password login
+        automationLogger.info('Auto-filling 1Password login', { sessionId, domain: loginDomain });
 
         sendSessionStatus(session.tabId, {
           phase: 'acting',
@@ -17135,9 +17171,14 @@ async function startAutomationLoop(sessionId) {
         });
 
         const loginFields = extractLoginFields(domResponse.structuredDOM);
-        const fillResult = await fillCredentialsOnPage(session.tabId, loginDomain, domResponse.structuredDOM);
+        const fillResult = await fillCredentialsOnPage(session.tabId, savedCred, domResponse.structuredDOM, loginOrigin);
 
         automationLogger.debug('Auto-fill result', { sessionId, success: fillResult?.success, filledUsername: fillResult?.filledUsername, filledPassword: fillResult?.filledPassword ? '***' : false, usernameVerified: fillResult?.usernameVerified, passwordVerified: fillResult?.passwordVerified });
+
+        if (fillResult?.originChanged) {
+          restartOnNewPage();
+          return;
+        }
 
         if (fillResult?.success) {
           session._loginHandledForUrl.push(currentUrl);
@@ -17168,15 +17209,24 @@ async function startAutomationLoop(sessionId) {
         automationLogger.info('Auto-fill failed, deferring to AI for login handling', { sessionId, domain: loginDomain });
         session._loginHandledForUrl.push(currentUrl); // Prevent re-triggering hook next iteration
       } else {
-        // NO SAVED CREDS: interrupt sidepanel for credentials
+        // NO 1PASSWORD LOGIN: interrupt sidepanel for credentials
         const loginFields = extractLoginFields(domResponse.structuredDOM);
-        automationLogger.info('No saved credentials, requesting from user', { sessionId, domain: loginDomain });
+        automationLogger.info('No 1Password login for site, requesting from user', { sessionId, domain: loginDomain });
+
+        // Offer "Save to 1Password" only when FSB has a vault to save into.
+        let canSaveToOnePassword = false;
+        if (onePassword && lookup && lookup.errorCode === 'credential_not_found') {
+          const opStatus = await onePassword.status();
+          canSaveToOnePassword = !!(opStatus && opStatus.ok && opStatus.status
+            && opStatus.status.configured && opStatus.status.saveVaultId);
+        }
 
         chrome.runtime.sendMessage({
           action: 'loginDetected',
           sessionId,
           domain: loginDomain,
-          fields: loginFields
+          fields: loginFields,
+          canSave: canSaveToOnePassword
         }).catch((err) => {
           console.warn('[FSB] loginDetected sendMessage delivery failed', { sessionId, error: err && err.message });
         });
@@ -17185,22 +17235,35 @@ async function startAutomationLoop(sessionId) {
         const userResponse = await waitForLoginResponse(sessionId);
 
         if (userResponse.action === 'loginFormSubmitted') {
-          // Save credentials if requested
-          if (userResponse.save) {
-            await secureConfig.saveCredential(loginDomain, {
-              username: userResponse.credentials.username,
-              password: userResponse.credentials.password
+          // Save to 1Password if the user asked and FSB has a save vault
+          if (userResponse.save && canSaveToOnePassword && onePassword) {
+            const saved = await onePassword.saveLogin(
+              currentUrl,
+              userResponse.credentials.username,
+              userResponse.credentials.password
+            );
+            automationLogger.info('Save login to 1Password', {
+              sessionId,
+              domain: loginDomain,
+              saved: !!(saved && saved.ok),
+              errorCode: saved && !saved.ok ? saved.errorCode : undefined
             });
           }
 
           // Fill the form on page
           const directFillResult = await fillCredentialsOnPageDirect(session.tabId, {
+            expectedOrigin: loginOrigin,
             usernameSelector: loginFields.usernameSelector,
             passwordSelector: loginFields.passwordSelector,
             submitSelector: loginFields.submitSelector,
             username: userResponse.credentials.username,
             password: userResponse.credentials.password
           });
+
+          if (directFillResult?.originChanged) {
+            restartOnNewPage();
+            return;
+          }
 
           if (directFillResult?.success) {
             session._loginHandledForUrl.push(currentUrl);

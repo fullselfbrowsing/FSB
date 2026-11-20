@@ -336,26 +336,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize analytics
   initializePopupAnalytics();
   
-  // Check if extension is locked (using encrypted config)
-  const hasEncryptedConfig = await checkEncryptedConfig();
-  
-  if (hasEncryptedConfig) {
-    // Check if already unlocked in this session
-    const session = await chrome.storage.session.get('masterPassword');
-    
-    if (!session.masterPassword) {
-      // Need to unlock - open unlock page
-      chrome.windows.create({
-        url: chrome.runtime.getURL('ui/unlock.html'),
-        type: 'popup',
-        width: 400,
-        height: 500
-      });
-      window.close();
-      return;
-    }
-  }
-  
   // Load saved task if any and restore it to input
   chrome.storage.local.get(['lastTask'], (data) => {
     if (data.lastTask && data.lastTask.trim()) {
@@ -391,27 +371,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Focus the input
   chatInput.focus();
 });
-
-// Check if using encrypted configuration
-async function checkEncryptedConfig() {
-  const stored = await chrome.storage.local.get(['apiKey', 'captchaApiKey']);
-  
-  // Check if any key looks encrypted
-  for (const value of Object.values(stored)) {
-    if (value && typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        if (parsed.encrypted && parsed.salt && parsed.iv) {
-          return true;
-        }
-      } catch {
-        // Not JSON, so not encrypted
-      }
-    }
-  }
-  
-  return false;
-}
 
 // Event listeners
 sendBtn.addEventListener('click', handleSendMessage);

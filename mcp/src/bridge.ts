@@ -28,6 +28,7 @@ import {
 } from './bridge-auth.js';
 import { logBridgeEvent } from './bridge-events.js';
 import { makeExtError, parseExtFrame } from './ext-protocol.js';
+import { createOnePasswordExtHandler, isOnePasswordExtMethod } from './onepassword/ext-handler.js';
 
 interface PendingRequest {
   resolve: (value: MCPResponse) => void;
@@ -54,6 +55,11 @@ interface ActiveExtRequest {
 interface ActiveRelayedExtRequest {
   hubSocket: WebSocket;
   abortController: AbortController;
+}
+
+/** onepassword.* handler; defaults to the shared broker, null disables it. */
+export interface OnePasswordBridgeOptions {
+  handleOnePasswordRequest?: ExtRequestHandler | null;
 }
 
 // The three error messages this file's disconnect paths reject in-flight
@@ -117,6 +123,8 @@ export class WebSocketBridge {
   private allowedBrowserOrigins: string[];
   private capabilities: Set<BridgeCapability>;
   private handleExtRequest: ExtRequestHandler | null;
+  // Answers the extension's onepassword.* requests in whichever process is hub.
+  private handleOnePasswordRequest: ExtRequestHandler | null;
 
   // Hub mode state
   private wss: WebSocketServer | null = null;
@@ -153,7 +161,7 @@ export class WebSocketBridge {
   private lastDisconnectReason: string | null = null;
   private extensionAttachment: ExtensionAttachmentState | null = null;
 
-  constructor(options: BridgeOptions = {}) {
+  constructor(options: BridgeOptions & OnePasswordBridgeOptions = {}) {
     this.port = options.port ?? 7225;
     this.host = options.host ?? '127.0.0.1';
     if (!WebSocketBridge.isLoopbackBindHost(this.host)) {
@@ -175,6 +183,11 @@ export class WebSocketBridge {
     this.handleExtRequest = typeof options.handleExtRequest === 'function'
       ? options.handleExtRequest
       : null;
+    this.handleOnePasswordRequest = options.handleOnePasswordRequest === null
+      ? null
+      : (typeof options.handleOnePasswordRequest === 'function'
+          ? options.handleOnePasswordRequest
+          : createOnePasswordExtHandler());
     this.capabilities = new Set(
       this.handleExtRequest && options.capabilities?.includes('agent-spawn')
         ? ['agent-spawn']
@@ -1246,6 +1259,31 @@ export class WebSocketBridge {
       return;
     }
 
+    // 1Password requests never leave the hub: the secret values in their
+    // responses go back on the extension socket only, never to a relay.
+    if (isOnePasswordExtMethod(request.method)) {
+      const handler = this.handleOnePasswordRequest;
+      if (!handler) {
+        this._sendExtResponse(ws, makeExtError(
+          request.id,
+          'invalid_ext_request',
+          '1Password is not available in this FSB server',
+          false,
+        ));
+        return;
+      }
+      const route: ActiveExtRequest = {
+        id: request.id,
+        originSocket: ws,
+        target: 'local',
+        settled: false,
+        abortController: new AbortController(),
+      };
+      this.activeExtRequests.set(request.id, route);
+      void this._invokeLocalExtHandler(request, route, handler);
+      return;
+    }
+
     if (this.capabilities.has('agent-spawn') && this.handleExtRequest) {
       const route: ActiveExtRequest = {
         id: request.id,
@@ -1289,8 +1327,9 @@ export class WebSocketBridge {
   private async _invokeLocalExtHandler(
     request: ExtRequest,
     route: ActiveExtRequest,
+    handlerOverride?: ExtRequestHandler,
   ): Promise<void> {
-    const handler = this.handleExtRequest;
+    const handler = handlerOverride ?? this.handleExtRequest;
     if (!handler) return;
     const emit = (event: ExtEvent): void => {
       const current = this.activeExtRequests.get(request.id);

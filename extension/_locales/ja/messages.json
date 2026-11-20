@@ -4666,5 +4666,161 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB は 1Password のログイン情報でサインインします。FSB 自体はパスワードを保存しません。"
+  },
+  "panel_8b70975df7": {
+    "message": "有効にすると、FSB はログインページを検出し、一致する 1Password のログイン情報でサインインします。"
+  },
+  "panel_818962bda5": {
+    "message": "1Password との接続を確認しています..."
+  },
+  "panel_b84510154a": {
+    "message": "1Password アカウント"
+  },
+  "panel_a6f394d865": {
+    "message": "1Password のサイドバー上部に表示されるアカウント名です。1Password アプリで Settings > Developer > Integrate with other apps をオンにしてください。"
+  },
+  "panel_5dec08e310": {
+    "message": "1Password を接続"
+  },
+  "panel_e175b45390": {
+    "message": "代わりにサービスアカウントを使う場合は、ターミナルで次を実行してからこのページを再読み込みしてください:"
+  },
+  "panel_5c0a336c67": {
+    "message": "FSB が読み取れる保管庫を選んでください。FSB 専用の保管庫が最も安全です。"
+  },
+  "panel_161c79f605": {
+    "message": "新しいログイン情報の保存先"
+  },
+  "panel_cc6d7a8340": {
+    "message": "保存しない"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "保管庫へのアクセスを保存"
+  },
+  "panel_5ab21b8830": {
+    "message": "古い FSB 保管庫を 1Password に移動"
+  },
+  "panel_911c744cd5": {
+    "message": "古い FSB 保管庫の PIN を入力してください。1Password に移動した項目は FSB から消去されます。"
+  },
+  "panel_3f6118f701": {
+    "message": "1Password に移動"
+  },
+  "panel_0f5320398c": {
+    "message": "古い保管庫を削除"
+  },
+  "panel_00f3328a04": {
+    "message": "FSB が使える保管庫にログイン情報がありません。ログイン情報の追加や編集は 1Password で行ってください。"
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB は、入力のたびにあなたが承認した後で、1Password のクレジットカードで支払いフォームに入力します。"
+  },
+  "panel_4875f94fbf": {
+    "message": "カードを使うには、「パスワード」で 1Password を接続してください。"
+  },
+  "panel_b9675cca57": {
+    "message": "FSB が使える保管庫にクレジットカードがありません。カードの追加や編集は 1Password で行ってください。"
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password はデスクトップアプリ経由で接続されています ($ACCOUNT$)。",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password はサービスアカウントで接続されています。"
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password は接続されていません。"
+  },
+  "panel_5848961ce6": {
+    "message": "設定を完了するには、FSB が使える保管庫を選んでください。"
+  },
+  "panel_216dcfd214": {
+    "message": "1Password のアカウント名を入力してください"
+  },
+  "panel_a94d6f85db": {
+    "message": "接続しています... 求められたら 1Password アプリで FSB を承認してください。"
+  },
+  "panel_616c3a2010": {
+    "message": "1Password を接続しました"
+  },
+  "panel_e520e3cf11": {
+    "message": "保管庫を 1 つ以上選んでください"
+  },
+  "panel_cc541e4c1e": {
+    "message": "保管庫へのアクセスを保存しました"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password の接続を解除しました"
+  },
+  "panel_e95f94cbda": {
+    "message": "古い FSB 保管庫には、FSB がもう使わない項目が残っています。ログイン情報: $LOGINS$。カード: $CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "1Password に移動しました。ログイン情報: $LOGINS$。カード: $CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "移動されず FSB に残した項目: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "古い FSB 保管庫を削除しますか? 1Password に移動していないものはすべて失われます。"
+  },
+  "panel_ed17465290": {
+    "message": "古い保管庫を削除しました"
+  },
+  "panel_3d763a56b2": {
+    "message": "項目数: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "移動しています..."
+  },
+  "panel_498fd066bf": {
+    "message": "1Password に接続できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "サインインするには認証情報を入力してください。FSB は次回のために 1Password に保存できます。"
+  },
+  "copy_751ac3de88": {
+    "message": "サインインするには認証情報を入力してください。FSB は一度だけ使用し、保存しません。"
+  },
+  "copy_264681c742": {
+    "message": "1Password に保存"
   }
 }

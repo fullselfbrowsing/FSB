@@ -294,10 +294,9 @@ function initializeDashboard() {
   // Initialize sections
   initializeSections();
 
-  // Initialize credential vault UI
-  loadCredentialVaultStatus();
-  loadPaymentVaultStatus();
-  initCredentialVaultListeners();
+  // Initialize the 1Password connection UI (Passwords / Payments) from saved
+  // settings only; items are read when one of those sections is shown.
+  loadOnePasswordStatus({ readItems: false });
 
   // Setup theme
   setupTheme();
@@ -5055,230 +5054,272 @@ async function exportSessionText(sessionId, storageBackend) {
 }
 
 // ==========================================
-// Credential Vault Lifecycle (Passwords Beta)
+// 1Password (Passwords and Payments sections)
 // ==========================================
+// FSB keeps no passwords or cards of its own. These sections show the 1Password
+// connection the FSB local server uses, the vaults FSB may read, and read-only
+// lists of what is in them. Nothing here ever receives a password, one-time
+// code, card number, or CVV: the background answers with metadata only.
 
-let _vaultPinSetup = null;
-let _vaultPinConfirm = null;
-let _vaultPinUnlock = null;
-let _vaultSetupDigits = 6;
-let _unlockSubmitting = false;
+let _onePasswordStatus = null;
+let _onePasswordLegacy = null;
+let _legacyVaultPin = null;
+let _onePasswordBusy = false;
 
-async function loadCredentialVaultStatus() {
-  const statusText = document.getElementById('credentialVaultStatusText');
-  const setupPanel = document.getElementById('credentialVaultSetup');
-  const unlockPanel = document.getElementById('credentialVaultUnlock');
-  const unlockedPanel = document.getElementById('credentialVaultUnlocked');
-  const lockBtn = document.getElementById('lockCredentialVaultBtn');
+function onePasswordIsReady(status) {
+  return !!(status && status.configured);
+}
+
+// Reading the saved settings needs no 1Password sign-in. Listing vaults,
+// logins, or cards does, and with the desktop app that can show an approval
+// prompt, so those calls wait until the user opens Passwords or Payments.
+function onePasswordSectionVisible() {
+  return ['passwords', 'payments'].some((id) => document.getElementById(id)?.classList.contains('active'));
+}
+
+function setOnePasswordStatusText(english, subs) {
+  const statusText = document.getElementById('onePasswordStatusText');
+  if (statusText) fsbUiSet(statusText, english, subs);
+}
+
+async function loadOnePasswordStatus(options = {}) {
+  const readItems = options.readItems === true || (options.readItems !== false && onePasswordSectionVisible());
+  const setupPanel = document.getElementById('onePasswordSetup');
+  const vaultsPanel = document.getElementById('onePasswordVaults');
+  const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
   const manager = document.getElementById('credentialsManager');
 
+  let response;
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'getCredentialVaultStatus' });
-    if (!response) {
-      if (statusText) fsbUiSet(statusText, "Unable to reach vault service");
-      return;
-    }
-
-    // Hide all state panels first
-    if (setupPanel) setupPanel.style.display = 'none';
-    if (unlockPanel) unlockPanel.style.display = 'none';
-    if (unlockedPanel) unlockedPanel.style.display = 'none';
-    if (lockBtn) lockBtn.style.display = 'none';
-
-    if (!response.configured) {
-      if (statusText) fsbUiSet(statusText, "No vault configured. Create one to protect saved credentials.");
-      if (setupPanel) setupPanel.style.display = 'block';
-      if (manager) manager.style.display = 'none';
-      // Initialize setup PIN inputs
-      const setupContainer = document.getElementById('credentialVaultPinSetup');
-      const confirmContainer = document.getElementById('credentialVaultPinConfirm');
-      if (setupContainer && !_vaultPinSetup) {
-        _vaultPinSetup = createPinInput(setupContainer, _vaultSetupDigits);
-        _vaultPinConfirm = createPinInput(confirmContainer, _vaultSetupDigits);
-      }
-    } else if (!response.unlocked) {
-      if (statusText) fsbUiSet(statusText, "Vault is locked.");
-      if (unlockPanel) unlockPanel.style.display = 'block';
-      if (manager) manager.style.display = 'none';
-      // Initialize unlock PIN input
-      const unlockContainer = document.getElementById('credentialVaultPinUnlock');
-      const pinLen = response.pinLength || 6;
-      if (unlockContainer) {
-        _unlockSubmitting = false;
-        _vaultPinUnlock = createPinInput(unlockContainer, pinLen, {
-          onComplete: (pin) => submitVaultUnlock(pin)
-        });
-      }
-    } else {
-      if (statusText) fsbUiSet(statusText, "Vault unlocked for this session.");
-      if (unlockedPanel) unlockedPanel.style.display = 'block';
-      if (lockBtn) lockBtn.style.display = 'inline-flex';
-      if (manager) {
-        manager.style.display = 'block';
-        loadCredentials();
-      }
-    }
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordStatus' });
   } catch (error) {
-    console.error('Failed to check vault status:', error);
-    if (statusText) fsbUiSet(statusText, "Error checking vault status.");
+    response = { success: false, error: error.message };
+  }
+
+  _onePasswordLegacy = response && response.legacy ? response.legacy : null;
+  renderLegacyVault(_onePasswordLegacy);
+
+  if (setupPanel) setupPanel.style.display = 'none';
+  if (vaultsPanel) vaultsPanel.style.display = 'none';
+  if (disconnectBtn) disconnectBtn.style.display = 'none';
+
+  if (!response || !response.success) {
+    _onePasswordStatus = null;
+    setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
+    if (manager) manager.style.display = 'none';
+    updatePaymentsAvailability();
+    return;
+  }
+
+  const status = response.status || {};
+  _onePasswordStatus = status;
+
+  if (!status.authKind) {
+    setOnePasswordStatusText('1Password is not connected.');
+    if (setupPanel) setupPanel.style.display = 'flex';
+  } else {
+    if (status.authKind === 'desktop') {
+      setOnePasswordStatusText('1Password is connected through the desktop app ($ACCOUNT$).', { account: status.accountName || '' });
+      const accountInput = document.getElementById('onePasswordAccount');
+      if (accountInput && !accountInput.value) accountInput.value = status.accountName || '';
+    } else {
+      setOnePasswordStatusText('1Password is connected with a service account.');
+    }
+    if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
+    if (!status.vaultIds || status.vaultIds.length === 0) {
+      setOnePasswordStatusText('Choose the vaults FSB may use to finish setup.');
+    }
+    if (vaultsPanel) vaultsPanel.style.display = 'flex';
+    if (readItems) loadOnePasswordVaults();
+  }
+
+  if (manager) {
+    manager.style.display = onePasswordIsReady(status) ? 'block' : 'none';
+    if (onePasswordIsReady(status) && readItems) loadCredentials();
+  }
+  updatePaymentsAvailability();
+}
+
+async function loadOnePasswordVaults() {
+  const list = document.getElementById('onePasswordVaultList');
+  const saveSelect = document.getElementById('onePasswordSaveVault');
+  if (!list) return;
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordListVaults' });
+  } catch (error) {
+    response = { success: false, error: error.message };
+  }
+  if (!response || !response.success) {
+    list.textContent = '';
+    setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
+    return;
+  }
+  const allowed = new Set((_onePasswordStatus && _onePasswordStatus.vaultIds) || []);
+  const vaults = response.vaults || [];
+  list.innerHTML = vaults.map((vault) => `
+    <label class="onepassword-vault-option">
+      <input type="checkbox" value="${escapeHtml(vault.id)}" ${allowed.has(vault.id) ? 'checked' : ''}>
+      <span class="onepassword-vault-title">${escapeHtml(vault.title || vault.id)}</span>
+      <span class="onepassword-vault-count">${fsbUiHtml('Items: $COUNT$', { count: String(vault.itemCount || 0) })}</span>
+    </label>
+  `).join('');
+
+  if (saveSelect) {
+    const current = (_onePasswordStatus && _onePasswordStatus.saveVaultId) || '';
+    while (saveSelect.options.length > 1) saveSelect.remove(1);
+    for (const vault of vaults) {
+      const option = document.createElement('option');
+      option.value = vault.id;
+      option.textContent = vault.title || vault.id;
+      if (vault.id === current) option.selected = true;
+      saveSelect.appendChild(option);
+    }
   }
 }
 
-async function submitVaultUnlock(pin) {
-  if (_unlockSubmitting) return;
-  _unlockSubmitting = true;
-  const unlockBtn = document.getElementById('unlockCredentialVaultBtn');
-  if (unlockBtn) { unlockBtn.disabled = true; fsbUiSet(unlockBtn, "Unlocking..."); }
+async function connectOnePassword() {
+  if (_onePasswordBusy) return;
+  const accountInput = document.getElementById('onePasswordAccount');
+  const connectBtn = document.getElementById('onePasswordConnectBtn');
+  const accountName = (accountInput && accountInput.value || '').trim();
+  if (!accountName) {
+    showToast('Enter your 1Password account name', 'error');
+    return;
+  }
+  _onePasswordBusy = true;
+  if (connectBtn) connectBtn.disabled = true;
+  setOnePasswordStatusText('Connecting... Approve FSB in the 1Password app if asked.');
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'unlockCredentialVault', passphrase: pin });
-    if (response?.success) {
-      showToast('Vault unlocked', 'success');
-      loadCredentialVaultStatus();
-      loadPaymentVaultStatus();
+    const configured = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', authKind: 'desktop', accountName });
+    if (!configured || !configured.success) {
+      showToast((configured && configured.error) || 'Unknown error', 'error');
+      return;
+    }
+    // Listing vaults is what triggers the 1Password approval prompt.
+    const vaults = await chrome.runtime.sendMessage({ action: 'onePasswordListVaults' });
+    if (!vaults || !vaults.success) {
+      showToast((vaults && vaults.error) || 'Unknown error', 'error');
     } else {
-      showToast(response?.error || 'Incorrect PIN', 'error');
-      if (_vaultPinUnlock) _vaultPinUnlock.clear();
+      showToast('1Password connected', 'success');
     }
   } catch (error) {
-    showToast(fsbUiLine('Error unlocking vault: $ERROR$', { error: error.message }), 'error');
-    if (_vaultPinUnlock) _vaultPinUnlock.clear();
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   } finally {
-    _unlockSubmitting = false;
-    if (unlockBtn) { unlockBtn.disabled = false; fsbUiSet(unlockBtn, "Unlock Vault"); }
+    _onePasswordBusy = false;
+    if (connectBtn) connectBtn.disabled = false;
+    loadOnePasswordStatus();
   }
 }
 
-function initCredentialVaultListeners() {
-  const setupBtn = document.getElementById('setupCredentialVaultBtn');
-  const unlockBtn = document.getElementById('unlockCredentialVaultBtn');
-  const lockBtn = document.getElementById('lockCredentialVaultBtn');
-
-  // PIN length toggle for setup
-  document.querySelectorAll('.pin-length-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const len = parseInt(btn.dataset.pinLength);
-      _vaultSetupDigits = len;
-      document.querySelectorAll('.pin-length-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      if (_vaultPinSetup) _vaultPinSetup.setDigitCount(len);
-      if (_vaultPinConfirm) _vaultPinConfirm.setDigitCount(len);
-    });
-  });
-
-  if (setupBtn) {
-    setupBtn.addEventListener('click', async () => {
-      const pin = _vaultPinSetup ? _vaultPinSetup.getValue() : '';
-      const confirmPin = _vaultPinConfirm ? _vaultPinConfirm.getValue() : '';
-      if (!pin || !/^\d{4}$|^\d{6}$/.test(pin)) {
-        showToast('Enter all ' + _vaultSetupDigits + ' digits', 'error');
-        return;
-      }
-      if (pin !== confirmPin) {
-        showToast('PINs do not match', 'error');
-        if (_vaultPinConfirm) _vaultPinConfirm.clear();
-        return;
-      }
-      setupBtn.disabled = true;
-      fsbUiSet(setupBtn, "Creating...");
-      try {
-        const response = await chrome.runtime.sendMessage({ action: 'createCredentialVault', passphrase: pin });
-        if (response?.success) {
-          showToast('Credential vault created', 'success');
-          _vaultPinSetup = null;
-          _vaultPinConfirm = null;
-          loadCredentialVaultStatus();
-          loadPaymentVaultStatus();
-        } else {
-          showToast(response?.error || 'Failed to create vault', 'error');
-        }
-      } catch (error) {
-        showToast(fsbUiLine('Error creating vault: $ERROR$', { error: error.message }), 'error');
-      } finally {
-        setupBtn.disabled = false;
-        fsbUiSet(setupBtn, "Set Up Vault");
-      }
-    });
+async function saveOnePasswordVaults() {
+  const list = document.getElementById('onePasswordVaultList');
+  const saveSelect = document.getElementById('onePasswordSaveVault');
+  const vaultIds = Array.from(list ? list.querySelectorAll('input[type="checkbox"]:checked') : []).map((input) => input.value);
+  if (vaultIds.length === 0) {
+    showToast('Choose at least one vault', 'error');
+    return;
   }
-
-  if (unlockBtn) {
-    unlockBtn.addEventListener('click', async () => {
-      const pin = _vaultPinUnlock ? _vaultPinUnlock.getValue() : '';
-      if (!pin || !/^\d+$/.test(pin)) {
-        showToast('Enter your PIN', 'error');
-        return;
-      }
-      submitVaultUnlock(pin);
-    });
-  }
-
-  if (lockBtn) {
-    lockBtn.addEventListener('click', async () => {
-      try {
-        const response = await chrome.runtime.sendMessage({ action: 'lockCredentialVault' });
-        if (response?.success) {
-          showToast('Vault locked', 'success');
-          _vaultPinUnlock = null;
-          loadCredentialVaultStatus();
-          loadPaymentVaultStatus();
-        }
-      } catch (error) {
-        showToast(fsbUiLine('Error locking vault: $ERROR$', { error: error.message }), 'error');
-      }
-    });
-  }
-}
-
-async function loadPaymentVaultStatus() {
-  const statusText = document.getElementById('paymentMethodsStatusText');
-  const blockedPanel = document.getElementById('paymentMethodsBlocked');
-  const unlockPanel = document.getElementById('paymentMethodsUnlock');
-  const unlockedPanel = document.getElementById('paymentMethodsUnlocked');
-  const lockBtn = document.getElementById('lockPaymentMethodsBtn');
-  const paymentManager = document.getElementById('paymentMethodsManager');
-
+  const saveVaultId = saveSelect && vaultIds.includes(saveSelect.value) ? saveSelect.value : null;
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'getPaymentVaultStatus' });
-    if (!response) {
-      if (statusText) fsbUiSet(statusText, "Unable to reach vault service");
-      return;
-    }
-
-    // Hide all state panels first
-    if (blockedPanel) blockedPanel.style.display = 'none';
-    if (unlockPanel) unlockPanel.style.display = 'none';
-    if (unlockedPanel) unlockedPanel.style.display = 'none';
-    if (lockBtn) lockBtn.style.display = 'none';
-    if (paymentManager) paymentManager.style.display = 'none';
-
-    if (!response.configured || !response.unlocked) {
-      // Credential vault not configured or locked -- payment methods blocked
-      if (statusText) fsbUiSet(statusText, "Unlock the credential vault first.");
-      if (blockedPanel) blockedPanel.style.display = 'block';
-    } else if (!response.paymentUnlocked) {
-      // Credential vault unlocked but payment access locked
-      if (statusText) fsbUiSet(statusText, "Payment methods are locked.");
-      if (unlockPanel) unlockPanel.style.display = 'block';
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', vaultIds, saveVaultId });
+    if (response && response.success) {
+      showToast('Vault access saved', 'success');
     } else {
-      // Payment methods fully unlocked
-      if (statusText) fsbUiSet(statusText, "Payment methods unlocked for this session.");
-      if (unlockedPanel) unlockedPanel.style.display = 'block';
-      if (lockBtn) lockBtn.style.display = 'inline-flex';
+      showToast((response && response.error) || 'Unknown error', 'error');
     }
   } catch (error) {
-    console.error('Failed to check payment vault status:', error);
-    if (statusText) fsbUiSet(statusText, "Error checking payment status.");
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  loadOnePasswordStatus();
+}
+
+async function disconnectOnePassword() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
+    if (response && response.success) showToast('1Password disconnected', 'success');
+    else showToast((response && response.error) || 'Unknown error', 'error');
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  loadOnePasswordStatus();
+}
+
+function renderLegacyVault(legacy) {
+  const panel = document.getElementById('legacyVaultPanel');
+  if (!panel) return;
+  if (!legacy || !legacy.present) {
+    panel.style.display = 'none';
+    _legacyVaultPin = null;
+    return;
+  }
+  panel.style.display = 'block';
+  const summary = document.getElementById('legacyVaultSummaryText');
+  if (summary) {
+    fsbUiSet(summary, 'FSB\'s old vault still holds items FSB no longer uses. Logins: $LOGINS$. Cards: $CARDS$.', {
+      logins: String(legacy.logins || 0),
+      cards: String(legacy.cards || 0)
+    });
+  }
+  const pinWrapper = document.getElementById('legacyVaultPinWrapper');
+  const pinContainer = document.getElementById('legacyVaultPin');
+  if (pinWrapper) pinWrapper.style.display = legacy.pinProtected ? 'block' : 'none';
+  if (legacy.pinProtected && pinContainer && !_legacyVaultPin && typeof createPinInput === 'function') {
+    _legacyVaultPin = createPinInput(pinContainer, legacy.pinLength || 6);
   }
 }
 
-// ==========================================
-// Credential Manager Functions (Passwords Beta)
-// ==========================================
+async function importLegacyVault() {
+  const importBtn = document.getElementById('legacyVaultImportBtn');
+  const pin = _legacyVaultPin ? _legacyVaultPin.getValue() : '';
+  if (_onePasswordLegacy && _onePasswordLegacy.pinProtected && !/^\d{4,6}$/.test(pin)) {
+    showToast('Enter your PIN', 'error');
+    return;
+  }
+  if (importBtn) {
+    importBtn.disabled = true;
+    fsbUiSet(importBtn, 'Moving...');
+  }
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'legacyVaultImport', pin });
+    if (!response || !response.success) {
+      showToast((response && response.error) || 'Unknown error', 'error');
+      if (_legacyVaultPin) _legacyVaultPin.clear();
+      return;
+    }
+    showToast(fsbUiLine('Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$.', {
+      logins: String(response.imported?.logins || 0),
+      cards: String(response.imported?.cards || 0)
+    }), 'success');
+    const kept = (response.failed?.logins || 0) + (response.failed?.cards || 0)
+      + (response.notAttempted?.logins || 0) + (response.notAttempted?.cards || 0)
+      + (response.unreadable || 0);
+    if (kept > 0) showToast(fsbUiLine('Not moved and kept in FSB: $COUNT$', { count: String(kept) }), 'warning');
+    _legacyVaultPin = null;
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  } finally {
+    if (importBtn) {
+      importBtn.disabled = false;
+      fsbUiSet(importBtn, 'Move to 1Password');
+    }
+    loadOnePasswordStatus();
+  }
+}
 
-// Current state for credential modal
-let credentialModalMode = 'add'; // 'add' or 'edit'
-let credentialEditingDomain = null;
+async function deleteLegacyVault() {
+  if (!confirm(fsbUiLine('Delete the old FSB vault? Anything not moved to 1Password will be lost.'))) return;
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'legacyVaultDelete' });
+    if (response && response.success) showToast('Old vault deleted', 'success');
+    else showToast((response && response.error) || 'Unknown error', 'error');
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  _legacyVaultPin = null;
+  loadOnePasswordStatus();
+}
 
-// Show/hide credentials manager based on toggle
 function updateCaptchaSolverVisibility(enabled) {
   const configPanel = document.getElementById('captchaSolverConfig');
   if (configPanel) {
@@ -5286,343 +5327,117 @@ function updateCaptchaSolverVisibility(enabled) {
   }
 }
 
-function updateCredentialsManagerVisibility(enabled) {
-  const manager = document.getElementById('credentialsManager');
-  if (manager) {
-    // Only show manager if vault is unlocked (vault status drives visibility now)
-    if (enabled) {
-      loadCredentialVaultStatus();
-      loadPaymentVaultStatus();
-    } else {
-      manager.style.display = 'none';
-    }
-  }
+// The login list follows the 1Password connection, not the Auto-Login toggle:
+// MCP agents can fill logins even when autopilot auto-login is off.
+function updateCredentialsManagerVisibility(_enabled) {
+  loadOnePasswordStatus();
 }
 
-// Load and display all credentials
+// Load and display the logins FSB may use (read-only; edit them in 1Password)
 async function loadCredentials() {
+  const listEl = document.getElementById('credentialsList');
+  const emptyEl = document.getElementById('credentialsEmpty');
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'getAllCredentials' });
-
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordListLogins' });
     if (!response || !response.success) {
-      console.error('Failed to load credentials:', response?.error);
+      if (listEl) listEl.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'flex';
+      if (response && response.error) showToast(response.error, 'error');
       return;
     }
-
-    const credentials = response.credentials || [];
-    const listEl = document.getElementById('credentialsList');
-    const emptyEl = document.getElementById('credentialsEmpty');
-
-    if (credentials.length === 0) {
+    const logins = response.logins || [];
+    if (logins.length === 0) {
       if (listEl) listEl.innerHTML = '';
       if (emptyEl) emptyEl.style.display = 'flex';
       return;
     }
-
     if (emptyEl) emptyEl.style.display = 'none';
-
-    if (listEl) {
-      listEl.innerHTML = credentials.map(cred => renderCredentialCard(cred)).join('');
-    }
+    if (listEl) listEl.innerHTML = logins.map(renderCredentialCard).join('');
   } catch (error) {
-    console.error('Error loading credentials:', error);
+    console.error('Error loading 1Password logins:', error.message);
   }
 }
 
-// Render a single credential card
-function renderCredentialCard(cred) {
-  const initial = (cred.domain || '?')[0].toUpperCase();
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(cred.domain)}&sz=32`;
-  const dateStr = cred.updatedAt ? new Date(cred.updatedAt).toLocaleDateString() : '';
-
+// Render a single login (no favicon fetch: the site list stays on this device)
+function renderCredentialCard(login) {
+  const domains = Array.isArray(login.domains) ? login.domains : [];
+  const label = login.title || domains[0] || '?';
+  const initial = label[0].toUpperCase();
   return `
-    <div class="credential-card" data-domain="${escapeHtml(cred.domain)}">
-      <div class="credential-card-icon">
-        <img src="${faviconUrl}" alt="${initial}" onerror="this.style.display='none';this.parentNode.textContent='${initial}'">
-      </div>
+    <div class="credential-card" data-domain="${escapeHtml(domains.join(' '))}" data-title="${escapeHtml(login.title || '')}">
+      <div class="credential-card-icon">${escapeHtml(initial)}</div>
       <div class="credential-card-info">
-        <div class="credential-card-domain">${escapeHtml(cred.domain)}</div>
-        <div class="credential-card-username">${cred.username ? escapeHtml(cred.username) : fsbUiHtml('No username')}</div>
-      </div>
-      <div class="credential-card-password" data-domain="${escapeHtml(cred.domain)}">
-        <span class="password-dots">--------</span>
-      </div>
-      <div class="credential-card-actions">
-        <button class="credential-action-btn" data-cred-action="toggle-password" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Show password')}>
-          <i class="fas fa-eye"></i>
-        </button>
-        <button class="credential-action-btn" data-cred-action="edit" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Edit')}>
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="credential-action-btn delete" data-cred-action="delete" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Delete')}>
-          <i class="fas fa-trash"></i>
-        </button>
+        <div class="credential-card-domain">${escapeHtml(label)}</div>
+        <div class="credential-card-username">${login.username ? escapeHtml(login.username) : fsbUiHtml('No username')}</div>
+        ${domains.length ? `<div class="credential-card-scope">${escapeHtml(domains.join(', '))}</div>` : ''}
       </div>
     </div>
   `;
 }
 
-// Filter credentials by search query
+// Filter logins by search query
 function filterCredentials(query) {
-  const cards = document.querySelectorAll('.credential-card');
+  const cards = document.querySelectorAll('#credentialsList .credential-card');
   const lowerQuery = query.toLowerCase();
-
   cards.forEach(card => {
-    const domain = card.dataset.domain || '';
-    const username = card.querySelector('.credential-card-username')?.textContent || '';
-    const matches = domain.toLowerCase().includes(lowerQuery) ||
-                    username.toLowerCase().includes(lowerQuery);
-    card.style.display = matches ? 'flex' : 'none';
+    const haystack = [
+      card.dataset.domain || '',
+      card.dataset.title || '',
+      card.querySelector('.credential-card-username')?.textContent || ''
+    ].join(' ').toLowerCase();
+    card.style.display = haystack.includes(lowerQuery) ? 'flex' : 'none';
   });
 }
 
-// Show add/edit modal
-async function showCredentialModal(mode, domain) {
-  credentialModalMode = mode;
-  credentialEditingDomain = domain || null;
-
-  const modal = document.getElementById('credentialModal');
-  const titleEl = document.getElementById('credentialModalTitle');
-  const domainInput = document.getElementById('credModalDomain');
-  const usernameInput = document.getElementById('credModalUsername');
-  const passwordInput = document.getElementById('credModalPassword');
-  const notesInput = document.getElementById('credModalNotes');
-
-  if (titleEl) fsbUiSet(titleEl, mode === 'edit' ? 'Edit Credential' : 'Add Credential');
-
-  // Clear fields
-  if (domainInput) domainInput.value = '';
-  if (usernameInput) usernameInput.value = '';
-  if (passwordInput) passwordInput.value = '';
-  if (notesInput) notesInput.value = '';
-
-  // Pre-fill for edit mode
-  if (mode === 'edit' && domain) {
-    if (domainInput) {
-      domainInput.value = domain;
-      domainInput.readOnly = true;
-    }
-
-    // Fetch full credential (including password) for editing
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'getFullCredential',
-        domain: domain
-      });
-
-      if (response?.success && response.credential) {
-        if (usernameInput) usernameInput.value = response.credential.username || '';
-        if (passwordInput) passwordInput.value = response.credential.password || '';
-        if (notesInput) notesInput.value = response.credential.notes || '';
-      }
-    } catch (error) {
-      console.error('Failed to load credential for editing:', error);
-    }
-  } else {
-    if (domainInput) domainInput.readOnly = false;
-  }
-
-  // Show modal
-  if (modal) modal.classList.remove('hidden');
-}
-
-// Hide modal
-function hideCredentialModal() {
-  const modal = document.getElementById('credentialModal');
-  if (modal) modal.classList.add('hidden');
-  credentialModalMode = 'add';
-  credentialEditingDomain = null;
-}
-
-// Save credential from modal
-async function saveCredentialFromModal() {
-  const domain = document.getElementById('credModalDomain')?.value?.trim();
-  const username = document.getElementById('credModalUsername')?.value?.trim();
-  const password = document.getElementById('credModalPassword')?.value;
-  const notes = document.getElementById('credModalNotes')?.value?.trim();
-
-  if (!domain) {
-    showToast('Domain is required', 'error');
-    return;
-  }
-
-  if (!username && !password) {
-    showToast('Username or password is required', 'error');
-    return;
-  }
-
-  try {
-    const action = credentialModalMode === 'edit' ? 'updateCredential' : 'saveCredential';
-    const message = credentialModalMode === 'edit'
-      ? { action, domain: credentialEditingDomain || domain, updates: { username, password, notes } }
-      : { action, domain, data: { username, password, notes } };
-
-    const response = await chrome.runtime.sendMessage(message);
-
-    if (response?.success) {
-      showToast(credentialModalMode === 'edit' ? 'Credential updated' : 'Credential saved', 'success');
-      hideCredentialModal();
-      loadCredentials();
-    } else {
-      showToast(fsbUiLine('Failed to save: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error saving credential: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-// Delete credential with confirmation
-async function deleteCredentialConfirm(domain) {
-  if (!confirm(fsbUiLine('Delete saved credential for "$DOMAIN$"? This cannot be undone.', { domain: domain }))) {
-    return;
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'deleteCredential',
-      domain: domain
-    });
-
-    if (response?.success) {
-      showToast('Credential deleted', 'success');
-      loadCredentials();
-    } else {
-      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error deleting credential: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-// Toggle password visibility for a credential card
-async function toggleCredentialPassword(domain) {
-  const passwordEl = document.querySelector(`.credential-card-password[data-domain="${domain}"]`);
-  if (!passwordEl) return;
-
-  const dotsEl = passwordEl.querySelector('.password-dots');
-  if (!dotsEl) return;
-
-  // If currently showing dots, fetch and show password
-  if (dotsEl.textContent === '--------') {
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'getFullCredential',
-        domain: domain
-      });
-
-      if (response?.success && response.credential) {
-        dotsEl.textContent = response.credential.password || '(empty)';
-        dotsEl.style.color = 'var(--text-primary)';
-
-        // Find the eye icon and switch it
-        const card = passwordEl.closest('.credential-card');
-        const eyeBtn = card?.querySelector('.credential-action-btn:first-child i');
-        if (eyeBtn) eyeBtn.className = 'fas fa-eye-slash';
-
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          dotsEl.textContent = '--------';
-          dotsEl.style.color = '';
-          if (eyeBtn) eyeBtn.className = 'fas fa-eye';
-        }, 5000);
-      }
-    } catch (error) {
-      console.error('Failed to fetch password:', error);
-    }
-  } else {
-    // Hide password
-    dotsEl.textContent = '--------';
-    dotsEl.style.color = '';
-
-    const card = passwordEl.closest('.credential-card');
-    const eyeBtn = card?.querySelector('.credential-action-btn:first-child i');
-    if (eyeBtn) eyeBtn.className = 'fas fa-eye';
-  }
-}
-
-// Initialize credential manager event listeners
 function initializeCredentialManager() {
-  // Event delegation for credential card action buttons (avoids inline onclick XSS risk)
-  const credList = document.getElementById('credentialsList');
-  if (credList) {
-    credList.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-cred-action]');
-      if (!btn) return;
-      const action = btn.dataset.credAction;
-      const domain = btn.dataset.credDomain;
-      if (!domain) return;
-      if (action === 'toggle-password') toggleCredentialPassword(domain);
-      else if (action === 'edit') showCredentialModal('edit', domain);
-      else if (action === 'delete') deleteCredentialConfirm(domain);
-    });
-  }
-
-  // Enable login toggle
   const enableLoginToggle = document.getElementById('enableLogin');
   if (enableLoginToggle) {
-    enableLoginToggle.addEventListener('change', (e) => {
-      updateCredentialsManagerVisibility(e.target.checked);
+    enableLoginToggle.addEventListener('change', () => {
       markUnsavedChanges();
     });
   }
 
-  // Search filter
   const searchInput = document.getElementById('credentialSearch');
   if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      filterCredentials(e.target.value);
-    });
+    searchInput.addEventListener('input', (e) => filterCredentials(e.target.value));
   }
 
-  // Add New button
-  const addBtn = document.getElementById('addCredentialBtn');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => showCredentialModal('add'));
-  }
+  const refreshBtn = document.getElementById('refreshCredentialsBtn');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadCredentials());
 
-  // Modal buttons
-  const modalSave = document.getElementById('credentialModalSave');
-  const modalCancel = document.getElementById('credentialModalCancel');
-  const modalClose = document.getElementById('credentialModalClose');
-  const modalBackdrop = document.querySelector('.credential-modal-backdrop');
-
-  if (modalSave) modalSave.addEventListener('click', saveCredentialFromModal);
-  if (modalCancel) modalCancel.addEventListener('click', hideCredentialModal);
-  if (modalClose) modalClose.addEventListener('click', hideCredentialModal);
-  if (modalBackdrop) modalBackdrop.addEventListener('click', hideCredentialModal);
-
-  // Modal password toggle
-  const toggleModalPw = document.getElementById('toggleCredModalPassword');
-  if (toggleModalPw) {
-    toggleModalPw.addEventListener('click', () => {
-      const pwField = document.getElementById('credModalPassword');
-      if (pwField) {
-        const isPassword = pwField.type === 'password';
-        pwField.type = isPassword ? 'text' : 'password';
-        const icon = toggleModalPw.querySelector('i');
-        if (icon) icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+  const connectBtn = document.getElementById('onePasswordConnectBtn');
+  if (connectBtn) connectBtn.addEventListener('click', connectOnePassword);
+  const accountInput = document.getElementById('onePasswordAccount');
+  if (accountInput) {
+    accountInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        connectOnePassword();
       }
     });
   }
+  const saveVaultsBtn = document.getElementById('onePasswordSaveVaultsBtn');
+  if (saveVaultsBtn) saveVaultsBtn.addEventListener('click', saveOnePasswordVaults);
+  const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
+  if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectOnePassword);
+  const importBtn = document.getElementById('legacyVaultImportBtn');
+  if (importBtn) importBtn.addEventListener('click', importLegacyVault);
+  const deleteBtn = document.getElementById('legacyVaultDeleteBtn');
+  if (deleteBtn) deleteBtn.addEventListener('click', deleteLegacyVault);
 
-  // Load credentials when switching to passwords section (override inside init to ensure DOM is ready)
-  // Also refresh memory data when switching to memory section (catches stale data)
+  // Refresh data when switching sections (DOM is ready by now)
   const origSwitchSection = switchSection;
   switchSection = function(sectionId) {
     origSwitchSection(sectionId);
     if (sectionId === 'passwords') {
-      const enableLogin = document.getElementById('enableLogin');
-      if (enableLogin?.checked) {
-        loadCredentials();
-      }
+      loadOnePasswordStatus({ readItems: true });
     }
     // Refresh memory tab when switching to it (picks up changes made while off-screen)
     if (sectionId === 'memory') {
       loadMemoryDashboard();
     }
-    // Refresh payment vault status when switching to payments section
     if (sectionId === 'payments') {
-      loadPaymentVaultStatus();
+      loadPaymentMethods();
     }
     // Phase 213: Sync tab pill state machine (SYNC-02)
     if (sectionId === 'sync') {
@@ -5635,244 +5450,57 @@ function initializeCredentialManager() {
 // Initialize credential manager after DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   // Delay slightly to ensure all other init is done
-  setTimeout(initializeCredentialManager, 200);
+  setTimeout(() => {
+    initializeCredentialManager();
+    // Opened straight onto Passwords or Payments (URL hash): read items now.
+    if (document.getElementById('passwords')?.classList.contains('active')) loadOnePasswordStatus({ readItems: true });
+    if (document.getElementById('payments')?.classList.contains('active')) loadPaymentMethods();
+  }, 200);
 });
 
 // ==========================================
-// Payment Manager Functions (Payments Beta)
+// Payments: credit cards from 1Password (read-only)
 // ==========================================
 
-// Payment vault state
-let _paymentPinUnlock = null;
-let _paymentUnlockSubmitting = false;
-
-// Load payment vault status and render appropriate UI state
-async function loadPaymentVaultStatus() {
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getPaymentVaultStatus' });
-    if (!response) return;
-
-    const statusText = document.getElementById('paymentMethodsStatusText');
-    const blockedPanel = document.getElementById('paymentMethodsBlocked');
-    const unlockPanel = document.getElementById('paymentMethodsUnlock');
-    const unlockedPanel = document.getElementById('paymentMethodsUnlocked');
-    const lockBtn = document.getElementById('lockPaymentMethodsBtn');
-    const paymentManager = document.getElementById('paymentMethodsManager');
-
-    // Hide all states initially
-    if (blockedPanel) blockedPanel.style.display = 'none';
-    if (unlockPanel) unlockPanel.style.display = 'none';
-    if (unlockedPanel) unlockedPanel.style.display = 'none';
-    if (lockBtn) lockBtn.style.display = 'none';
-    if (paymentManager) paymentManager.style.display = 'none';
-
-    if (!response.configured) {
-      // Vault not configured -- direct user to Passwords section
-      if (statusText) fsbUiSet(statusText, "Configure a vault PIN in Passwords first.");
-      if (blockedPanel) blockedPanel.style.display = 'block';
-    } else if (!response.paymentUnlocked) {
-      // Vault configured but payment methods locked -- show PIN unlock
-      if (statusText) fsbUiSet(statusText, "Payment methods are locked.");
-      if (unlockPanel) unlockPanel.style.display = 'block';
-
-      // Fetch pinLength and create PIN input
-      const vaultStatus = await chrome.runtime.sendMessage({ action: 'getCredentialVaultStatus' });
-      const pinLength = (vaultStatus && vaultStatus.pinLength) || 6;
-      const container = document.getElementById('paymentMethodsPinUnlock');
-
-      if (container && !_paymentPinUnlock) {
-        _paymentPinUnlock = createPinInput(container, pinLength, {
-          onComplete: (pin) => submitPaymentUnlock(pin)
-        });
-      }
-    } else {
-      // Fully unlocked
-      if (statusText) fsbUiSet(statusText, "Payment methods are unlocked.");
-      if (unlockedPanel) unlockedPanel.style.display = 'block';
-      if (lockBtn) lockBtn.style.display = 'inline-flex';
-      if (paymentManager) paymentManager.style.display = 'block';
-      loadPaymentMethods();
-    }
-  } catch (error) {
-    console.error('Error loading payment vault status:', error);
-  }
+function updatePaymentsAvailability() {
+  const blocked = document.getElementById('paymentMethodsBlocked');
+  const manager = document.getElementById('paymentMethodsManager');
+  const ready = onePasswordIsReady(_onePasswordStatus);
+  if (blocked) blocked.style.display = ready ? 'none' : 'block';
+  if (manager) manager.style.display = ready ? 'block' : 'none';
 }
 
-// Submit payment unlock with PIN
-async function submitPaymentUnlock(pin) {
-  if (_paymentUnlockSubmitting) return;
-  _paymentUnlockSubmitting = true;
-
-  const unlockBtn = document.getElementById('unlockPaymentMethodsBtn');
-  const originalText = unlockBtn ? unlockBtn.textContent : '';
-  if (unlockBtn) {
-    unlockBtn.disabled = true;
-    fsbUiSet(unlockBtn, "Unlocking...");
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'unlockPaymentMethods',
-      passphrase: pin
-    });
-
-    if (response && response.success) {
-      showToast('Payment methods unlocked', 'success');
-      _paymentPinUnlock = null;
-      loadPaymentVaultStatus();
-    } else {
-      showToast(response?.error || 'Incorrect PIN', 'error');
-      if (_paymentPinUnlock) _paymentPinUnlock.clear();
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error unlocking payment methods: $ERROR$', { error: error.message }), 'error');
-    if (_paymentPinUnlock) _paymentPinUnlock.clear();
-  } finally {
-    _paymentUnlockSubmitting = false;
-    if (unlockBtn) {
-      unlockBtn.disabled = false;
-      unlockBtn.textContent = originalText;
-    }
-  }
-}
-
-// Initialize payment manager event listeners
-function initializePaymentManager() {
-  // Lock button
-  const lockBtn = document.getElementById('lockPaymentMethodsBtn');
-  if (lockBtn) {
-    lockBtn.addEventListener('click', async () => {
-      try {
-        const response = await chrome.runtime.sendMessage({ action: 'lockPaymentMethods' });
-        if (response && response.success) {
-          showToast('Payment methods locked', 'success');
-          _paymentPinUnlock = null;
-          loadPaymentVaultStatus();
-        } else {
-          showToast('Failed to lock payment methods', 'error');
-        }
-      } catch (error) {
-        showToast(fsbUiLine('Error locking payment methods: $ERROR$', { error: error.message }), 'error');
-      }
-    });
-  }
-
-  // Unlock button (manual trigger when PIN is typed but not auto-submitted)
-  const unlockBtn = document.getElementById('unlockPaymentMethodsBtn');
-  if (unlockBtn) {
-    unlockBtn.addEventListener('click', () => {
-      if (!_paymentPinUnlock) return;
-      const pin = _paymentPinUnlock.getValue();
-      if (!pin || !/^\d+$/.test(pin)) {
-        showToast('Please enter your numeric PIN', 'error');
-        return;
-      }
-      submitPaymentUnlock(pin);
-    });
-  }
-
-  // Payment card list event delegation
-  const paymentList = document.getElementById('paymentMethodsList');
-  if (paymentList) {
-    paymentList.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-payment-action]');
-      if (!btn) return;
-      const action = btn.dataset.paymentAction;
-      const id = btn.dataset.paymentId;
-      if (!id) return;
-      if (action === 'edit') showPaymentMethodModal('edit', id);
-      else if (action === 'delete') deletePaymentMethodConfirm(id);
-    });
-  }
-
-  // Payment search filter
-  const searchInput = document.getElementById('paymentMethodSearch');
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      filterPaymentMethods(e.target.value);
-    });
-  }
-
-  // Add Card button
-  const addBtn = document.getElementById('addPaymentMethodBtn');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => showPaymentMethodModal('add'));
-  }
-
-  // Modal buttons (Save, Cancel, Close, Backdrop)
-  const pmModalSave = document.getElementById('paymentMethodModalSave');
-  const pmModalCancel = document.getElementById('paymentMethodModalCancel');
-  const pmModalClose = document.getElementById('paymentMethodModalClose');
-  const pmModalBackdrop = document.querySelector('#paymentMethodModal .credential-modal-backdrop');
-
-  if (pmModalSave) pmModalSave.addEventListener('click', savePaymentMethodFromModal);
-  if (pmModalCancel) pmModalCancel.addEventListener('click', hidePaymentMethodModal);
-  if (pmModalClose) pmModalClose.addEventListener('click', hidePaymentMethodModal);
-  if (pmModalBackdrop) pmModalBackdrop.addEventListener('click', hidePaymentMethodModal);
-
-  // CVV visibility toggle
-  const toggleCvv = document.getElementById('togglePaymentMethodCvv');
-  if (toggleCvv) {
-    toggleCvv.addEventListener('click', () => {
-      const cvvField = document.getElementById('paymentMethodCvv');
-      if (cvvField) {
-        const isPassword = cvvField.type === 'password';
-        cvvField.type = isPassword ? 'text' : 'password';
-        const icon = toggleCvv.querySelector('i');
-        if (icon) icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
-      }
-    });
-  }
-
-  // Real-time brand detection on card number input
-  const cardNumInput = document.getElementById('paymentMethodCardNumber');
-  if (cardNumInput) {
-    cardNumInput.addEventListener('input', (e) => {
-      const brand = detectPaymentCardBrand(e.target.value);
-      const brandEl = document.getElementById('paymentMethodCardBrand');
-      const brandLabels = { visa: 'Visa', mastercard: 'MC', amex: 'Amex', discover: 'Discover', unknown: 'Unknown' };
-      if (brandEl) {
-        brandEl.textContent = brandLabels[brand] || 'Unknown';
-        brandEl.className = 'payment-card-brand ' + brand;
-      }
-    });
-  }
-
-  // Load vault status on init
-  loadPaymentVaultStatus();
-}
-
-// Load and display all payment methods
 async function loadPaymentMethods() {
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getAllPaymentMethods' });
+  if (!_onePasswordStatus) {
+    await loadOnePasswordStatus({ readItems: false });
+  }
+  updatePaymentsAvailability();
+  if (!onePasswordIsReady(_onePasswordStatus)) return;
 
+  const listEl = document.getElementById('paymentMethodsList');
+  const emptyEl = document.getElementById('paymentMethodsEmpty');
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordListCards' });
     if (!response || !response.success) {
-      console.error('Failed to load payment methods:', response?.error);
+      if (listEl) listEl.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'flex';
+      if (response && response.error) showToast(response.error, 'error');
       return;
     }
-
-    const paymentMethods = response.paymentMethods || [];
-    const listEl = document.getElementById('paymentMethodsList');
-    const emptyEl = document.getElementById('paymentMethodsEmpty');
-
-    if (paymentMethods.length === 0) {
+    const cards = response.cards || [];
+    if (cards.length === 0) {
       if (listEl) listEl.innerHTML = '';
       if (emptyEl) emptyEl.style.display = 'flex';
       return;
     }
-
     if (emptyEl) emptyEl.style.display = 'none';
-
-    if (listEl) {
-      listEl.innerHTML = paymentMethods.map(pm => renderPaymentCard(pm)).join('');
-    }
+    if (listEl) listEl.innerHTML = cards.map(renderPaymentCard).join('');
   } catch (error) {
-    console.error('Error loading payment methods:', error);
+    console.error('Error loading 1Password cards:', error.message);
   }
 }
 
-// Render a single payment card entry
+// Render a single card (brand and last 4 only)
 function renderPaymentCard(pm) {
   const brandLabels = {
     visa: 'Visa',
@@ -5883,33 +5511,28 @@ function renderPaymentCard(pm) {
     jcb: 'JCB'
   };
   const brandLabel = brandLabels[pm.cardBrand];
-
+  const name = pm.title || pm.cardholderName;
+  const masked = '**** ' + (pm.last4 || '****');
+  const expiry = pm.expiryMonth && pm.expiryYearLast2
+    ? ' -- ' + fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })
+    : '';
   return `
     <div class="credential-card payment-card" data-payment-id="${escapeHtml(pm.id)}">
       <div class="credential-card-icon">
         <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
       </div>
       <div class="credential-card-info">
-        <div class="credential-card-domain">${(pm.nickname || pm.cardholderName) ? escapeHtml(pm.nickname || pm.cardholderName) : fsbUiHtml('Card')}</div>
-        <div class="credential-card-username">${escapeHtml(pm.maskedNumber)} -- ${fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })}</div>
-      </div>
-      <div class="credential-card-actions">
-        <button class="credential-action-btn" data-payment-action="edit" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Edit')}>
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="credential-action-btn delete" data-payment-action="delete" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Delete')}>
-          <i class="fas fa-trash"></i>
-        </button>
+        <div class="credential-card-domain">${name ? escapeHtml(name) : fsbUiHtml('Card')}</div>
+        <div class="credential-card-username">${escapeHtml(masked)}${expiry}</div>
       </div>
     </div>
   `;
 }
 
-// Filter payment methods by search query
+// Filter cards by search query
 function filterPaymentMethods(query) {
   const cards = document.querySelectorAll('.payment-card');
   const lowerQuery = query.toLowerCase();
-
   cards.forEach(card => {
     const name = card.querySelector('.credential-card-domain')?.textContent || '';
     const details = card.querySelector('.credential-card-username')?.textContent || '';
@@ -5919,234 +5542,15 @@ function filterPaymentMethods(query) {
   });
 }
 
-// ==========================================
-// Payment Method Modal & Validation (193-02)
-// ==========================================
-
-// Client-side card brand detection (mirrors secure-config.js logic)
-function detectPaymentCardBrand(cardNumber) {
-  const digits = String(cardNumber || '').replace(/\D/g, '');
-  if (!digits) return 'unknown';
-  if (/^4/.test(digits)) return 'visa';
-  if (/^(5[1-5]|2[2-7])/.test(digits)) return 'mastercard';
-  if (/^3[47]/.test(digits)) return 'amex';
-  if (/^(6011|65|64[4-9])/.test(digits)) return 'discover';
-  return 'unknown';
-}
-
-// Luhn algorithm for card number validation
-function isValidPaymentCardNumber(cardNumber) {
-  const digits = String(cardNumber || '').replace(/\D/g, '');
-  if (!/^\d{12,19}$/.test(digits)) return false;
-  let sum = 0, shouldDouble = false;
-  for (let i = digits.length - 1; i >= 0; i--) {
-    let digit = Number(digits[i]);
-    if (shouldDouble) { digit *= 2; if (digit > 9) digit -= 9; }
-    sum += digit;
-    shouldDouble = !shouldDouble;
+function initializePaymentManager() {
+  const searchInput = document.getElementById('paymentMethodSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => filterPaymentMethods(e.target.value));
   }
-  return sum % 10 === 0;
-}
-
-// Validate expiry is a future date
-function isValidPaymentExpiry(month, year) {
-  const m = parseInt(month, 10);
-  const y = String(year).length === 2 ? 2000 + parseInt(year, 10) : parseInt(year, 10);
-  if (!m || m < 1 || m > 12 || !y) return false;
-  const now = new Date();
-  if (y < now.getFullYear()) return false;
-  if (y === now.getFullYear() && m < now.getMonth() + 1) return false;
-  return true;
-}
-
-// Payment modal state
-let paymentModalMode = 'add'; // 'add' or 'edit'
-let paymentEditingId = null;
-
-// Show the payment method modal (add or edit mode)
-async function showPaymentMethodModal(mode, id) {
-  paymentModalMode = mode || 'add';
-  paymentEditingId = id || null;
-
-  const modal = document.getElementById('paymentMethodModal');
-  const title = document.getElementById('paymentMethodModalTitle');
-  const brandEl = document.getElementById('paymentMethodCardBrand');
-  const cardNumInput = document.getElementById('paymentMethodCardNumber');
-
-  if (title) fsbUiSet(title, mode === 'edit' ? 'Edit Payment Method' : 'Add Payment Method');
-
-  // Clear all form fields
-  const fieldIds = [
-    'paymentMethodNickname', 'paymentMethodCardholderName', 'paymentMethodCardNumber',
-    'paymentMethodExpiryYear', 'paymentMethodCvv',
-    'paymentMethodBillingName', 'paymentMethodAddressLine1', 'paymentMethodAddressLine2',
-    'paymentMethodCity', 'paymentMethodStateRegion', 'paymentMethodPostalCode', 'paymentMethodCountry'
-  ];
-  fieldIds.forEach(fid => {
-    const el = document.getElementById(fid);
-    if (el) el.value = '';
-  });
-
-  // Reset expiry month dropdown
-  const expiryMonthEl = document.getElementById('paymentMethodExpiryMonth');
-  if (expiryMonthEl) expiryMonthEl.value = '';
-
-  // Reset brand badge
-  if (brandEl) {
-    fsbUiSet(brandEl, "Unknown");
-    brandEl.className = 'payment-card-brand unknown';
-  }
-
-  if (mode === 'edit' && id) {
-    // Disable card number field in edit mode (immutable)
-    if (cardNumInput) {
-      cardNumInput.disabled = true;
-      cardNumInput.placeholder = '(cannot change card number)';
-    }
-
-    // Fetch full card data to pre-fill
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'getFullPaymentMethod', id });
-      if (response && response.success && response.paymentMethod) {
-        const pm = response.paymentMethod;
-        const setField = (fid, val) => {
-          const el = document.getElementById(fid);
-          if (el && val != null) el.value = val;
-        };
-        setField('paymentMethodNickname', pm.nickname);
-        setField('paymentMethodCardholderName', pm.cardholderName);
-        setField('paymentMethodCardNumber', pm.cardNumber);
-        setField('paymentMethodExpiryYear', pm.expiryYear);
-        setField('paymentMethodCvv', pm.cvv);
-        setField('paymentMethodBillingName', pm.billingName);
-        setField('paymentMethodAddressLine1', pm.addressLine1);
-        setField('paymentMethodAddressLine2', pm.addressLine2);
-        setField('paymentMethodCity', pm.city);
-        setField('paymentMethodStateRegion', pm.stateRegion);
-        setField('paymentMethodPostalCode', pm.postalCode);
-        setField('paymentMethodCountry', pm.country);
-        if (expiryMonthEl && pm.expiryMonth) expiryMonthEl.value = pm.expiryMonth;
-
-        // Set brand badge from stored data
-        if (brandEl && pm.cardBrand) {
-          const brandLabels = { visa: 'Visa', mastercard: 'MC', amex: 'Amex', discover: 'Discover', unknown: 'Unknown' };
-          brandEl.textContent = brandLabels[pm.cardBrand] || 'Unknown';
-          brandEl.className = 'payment-card-brand ' + (pm.cardBrand || 'unknown');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load payment method for editing:', error);
-    }
-  } else {
-    // Add mode: enable card number field
-    if (cardNumInput) {
-      cardNumInput.disabled = false;
-      cardNumInput.placeholder = '1234 5678 9012 3456';
-    }
-  }
-
-  // Show modal
-  if (modal) modal.classList.remove('hidden');
-}
-
-// Hide the payment method modal and reset state
-function hidePaymentMethodModal() {
-  const modal = document.getElementById('paymentMethodModal');
-  if (modal) modal.classList.add('hidden');
-  paymentModalMode = 'add';
-  paymentEditingId = null;
-
-  // Clear sensitive fields on close (T-193-04 mitigation)
-  const cvvField = document.getElementById('paymentMethodCvv');
-  if (cvvField) cvvField.value = '';
-  const cardNumField = document.getElementById('paymentMethodCardNumber');
-  if (cardNumField) cardNumField.value = '';
-}
-
-// Save or update payment method from modal data
-async function savePaymentMethodFromModal() {
-  const nickname = document.getElementById('paymentMethodNickname')?.value?.trim() || '';
-  const cardholderName = document.getElementById('paymentMethodCardholderName')?.value?.trim() || '';
-  const cardNumber = document.getElementById('paymentMethodCardNumber')?.value?.trim() || '';
-  const expiryMonth = document.getElementById('paymentMethodExpiryMonth')?.value || '';
-  const expiryYear = document.getElementById('paymentMethodExpiryYear')?.value?.trim() || '';
-  const cvv = document.getElementById('paymentMethodCvv')?.value?.trim() || '';
-  const billingName = document.getElementById('paymentMethodBillingName')?.value?.trim() || '';
-  const addressLine1 = document.getElementById('paymentMethodAddressLine1')?.value?.trim() || '';
-  const addressLine2 = document.getElementById('paymentMethodAddressLine2')?.value?.trim() || '';
-  const city = document.getElementById('paymentMethodCity')?.value?.trim() || '';
-  const stateRegion = document.getElementById('paymentMethodStateRegion')?.value?.trim() || '';
-  const postalCode = document.getElementById('paymentMethodPostalCode')?.value?.trim() || '';
-  const country = document.getElementById('paymentMethodCountry')?.value?.trim() || '';
-
-  // Validate required fields
-  if (paymentModalMode === 'add') {
-    if (!cardholderName || !cardNumber || !expiryMonth || !expiryYear || !cvv || !billingName || !addressLine1 || !city || !stateRegion || !postalCode || !country) {
-      showToast('All fields except Nickname and Address Line 2 are required', 'error');
-      return;
-    }
-    // Validate card number with Luhn algorithm
-    if (!isValidPaymentCardNumber(cardNumber)) {
-      showToast('Invalid card number', 'error');
-      return;
-    }
-    // Validate expiry date is in the future
-    if (!isValidPaymentExpiry(expiryMonth, expiryYear)) {
-      showToast('Card is expired or expiry is invalid', 'error');
-      return;
-    }
-  } else {
-    // Edit mode: only non-card fields are required
-    if (!cardholderName || !billingName || !addressLine1 || !city || !stateRegion || !postalCode || !country) {
-      showToast('All fields except Nickname and Address Line 2 are required', 'error');
-      return;
-    }
-  }
-
-  try {
-    let response;
-    if (paymentModalMode === 'edit' && paymentEditingId) {
-      // Update: only send mutable fields
-      response = await chrome.runtime.sendMessage({
-        action: 'updatePaymentMethod',
-        id: paymentEditingId,
-        updates: { cardholderName, nickname, billingName, addressLine1, addressLine2, city, stateRegion, postalCode, country }
-      });
-    } else {
-      // Create new payment method
-      response = await chrome.runtime.sendMessage({
-        action: 'savePaymentMethod',
-        data: { cardNumber, expiryMonth, expiryYear, cvv, cardholderName, nickname, billingName, addressLine1, addressLine2, city, stateRegion, postalCode, country }
-      });
-    }
-
-    if (response && response.success) {
-      showToast(paymentModalMode === 'edit' ? 'Payment method updated' : 'Payment method saved', 'success');
-      hidePaymentMethodModal();
-      loadPaymentMethods();
-    } else {
-      showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-// Delete payment method with confirmation
-async function deletePaymentMethodConfirm(id) {
-  if (!confirm(fsbUiLine('Delete this payment method? This cannot be undone.'))) return;
-
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'deletePaymentMethod', id });
-    if (response && response.success) {
-      showToast('Payment method deleted', 'success');
-      loadPaymentMethods();
-    } else {
-      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error deleting payment method: $ERROR$', { error: error.message }), 'error');
-  }
+  const refreshBtn = document.getElementById('refreshPaymentMethodsBtn');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadPaymentMethods());
+  const openPasswordsBtn = document.getElementById('openPasswordsForPaymentsBtn');
+  if (openPasswordsBtn) openPasswordsBtn.addEventListener('click', () => switchSection('passwords'));
 }
 
 // Initialize payment manager after DOM is ready

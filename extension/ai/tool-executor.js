@@ -445,176 +445,74 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
       }
 
       case 'fill_credential': {
-        // Vault fill: look up credential by domain, send to content script for form fill.
-        // AI only sends {domain} -- actual username/password resolved here in background,
-        // never exposed in tool_use params or AI conversation.
-        const domain = params?.domain;
-        if (!domain) {
-          return makeResult({ success: false, error: 'fill_credential requires domain parameter' });
+        // 1Password fill. The login is chosen from the tab's real URL (any
+        // `domain` the model passes is ignored) and an optional credential_id.
+        // Username, password, and one-time code go background -> content only
+        // and never appear in tool_use params or this result.
+        const onePassword = (typeof globalThis !== 'undefined' && globalThis.fsbOnePassword) || null;
+        if (!onePassword) {
+          return makeResult({ success: false, error: '1Password support is not available' });
         }
-
-        // secureConfig is a global in background.js context (loaded at SW startup)
-        if (typeof secureConfig === 'undefined' || !secureConfig.getFullCredential) {
-          return makeResult({ success: false, error: 'Credential vault not available' });
-        }
-
-        let credential;
-        try {
-          credential = await secureConfig.getFullCredential(domain);
-        } catch (err) {
-          return makeResult({ success: false, error: 'Vault lookup failed: ' + (err.message || err) });
-        }
-
-        if (!credential || (!credential.username && !credential.password)) {
-          return makeResult({ success: false, error: 'No saved credentials found for ' + domain });
-        }
-
-        // Send fill command to content script -- password travels background->content only
-        try {
-          const fillResult = await chrome.tabs.sendMessage(tabId, {
-            action: 'executeAction',
-            tool: 'fillCredentialFields',
-            params: {
-              username: credential.username || '',
-              password: credential.password || ''
-            }
-          });
-
-          const success = fillResult && fillResult.success !== false;
-          return makeResult({
-            success: success,
-            hadEffect: success,
-            error: fillResult?.error || null,
-            result: {
-              domain: domain,
-              filled: fillResult?.filled || [],
-              fieldsFound: fillResult?.fieldsFound || {}
-            }
-          });
-        } catch (err) {
-          return makeResult({
-            success: false,
-            error: 'Content script fill failed: ' + (err.message || err)
-          });
-        }
+        const itemId = typeof params?.credential_id === 'string' ? params.credential_id
+          : (typeof params?.credentialId === 'string' ? params.credentialId : undefined);
+        // Same contract as the MCP tool: several matching logins (personal and
+        // work, say) fail with candidates instead of typing the newest one.
+        const fill = await onePassword.fillLoginInTab(
+          tabId,
+          { itemId, requireUnique: true },
+          (targetTabId, message) => chrome.tabs.sendMessage(targetTabId, message)
+        );
+        return makeResult({
+          success: fill.success === true,
+          hadEffect: fill.success === true,
+          error: fill.success ? null : (fill.error || 'Fill failed'),
+          result: {
+            site: fill.site || null,
+            credentialId: fill.credentialId || null,
+            filled: fill.filled || [],
+            fieldsFound: fill.fieldsFound || {},
+            errorCode: fill.success ? undefined : fill.errorCode,
+            // id, title, username only: pass one id back as credential_id.
+            candidates: !fill.success && Array.isArray(fill.candidates) ? fill.candidates : undefined
+          }
+        });
       }
 
       case 'fill_payment_method': {
-        // Vault fill: look up payment method by ID, show confirmation in sidepanel,
-        // then send to content script on approval. AI only sends {paymentMethodId}.
+        // 1Password card fill. The model sends only {paymentMethodId}; the side
+        // panel confirms brand, last 4, and merchant before the card is read.
         const pmId = params?.paymentMethodId;
         if (!pmId) {
           return makeResult({ success: false, error: 'fill_payment_method requires paymentMethodId parameter' });
         }
-
-        if (typeof secureConfig === 'undefined' || !secureConfig.getFullPaymentMethod) {
-          return makeResult({ success: false, error: 'Payment vault not available' });
+        const onePassword = (typeof globalThis !== 'undefined' && globalThis.fsbOnePassword) || null;
+        if (!onePassword) {
+          return makeResult({ success: false, error: '1Password support is not available' });
         }
-
-        let paymentMethod;
-        try {
-          paymentMethod = await secureConfig.getFullPaymentMethod(pmId);
-        } catch (err) {
-          return makeResult({ success: false, error: 'Payment vault lookup failed: ' + (err.message || err) });
-        }
-
-        if (!paymentMethod) {
-          return makeResult({ success: false, error: 'No saved payment method found for ID ' + pmId });
-        }
-
-        // Get the active tab's domain for the confirmation dialog
-        let merchantDomain = 'unknown';
-        try {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab?.url) {
-            merchantDomain = new URL(tab.url).hostname;
-          }
-        } catch (_) { /* best effort */ }
-
-        // Send confirmation request to sidepanel -- show card brand, last 4, merchant domain
-        // Then wait for user approval or denial
-        const confirmationResult = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => {
-            chrome.runtime.onMessage.removeListener(handler);
-            resolve({ approved: false, reason: 'timeout' });
-          }, 120000); // 2 minute timeout
-
-          function handler(request, sender, sendResponse) {
-            if (request.action === 'paymentFillApproved' && request.paymentMethodId === pmId) {
-              clearTimeout(timeoutId);
-              chrome.runtime.onMessage.removeListener(handler);
-              resolve({ approved: true });
-              sendResponse({ received: true });
-            } else if (request.action === 'paymentFillDenied' && request.paymentMethodId === pmId) {
-              clearTimeout(timeoutId);
-              chrome.runtime.onMessage.removeListener(handler);
-              resolve({ approved: false, reason: 'user_declined' });
-              sendResponse({ received: true });
-            }
-          }
-
-          chrome.runtime.onMessage.addListener(handler);
-
-          // Send the confirmation request to sidepanel
-          chrome.runtime.sendMessage({
-            action: 'paymentFillConfirmation',
-            paymentMethodId: pmId,
-            cardBrand: paymentMethod.cardBrand || 'unknown',
-            last4: paymentMethod.last4 || '****',
-            merchantDomain: merchantDomain
-          }).catch(() => {
-            // Sidepanel may not be open -- resolve as declined
-            clearTimeout(timeoutId);
-            chrome.runtime.onMessage.removeListener(handler);
-            resolve({ approved: false, reason: 'sidepanel_unavailable' });
-          });
-        });
-
-        if (!confirmationResult.approved) {
+        const fill = await onePassword.fillCardInTab(
+          tabId,
+          String(pmId),
+          (targetTabId, message) => chrome.tabs.sendMessage(targetTabId, message)
+        );
+        if (fill.declined) {
           return makeResult({
             success: false,
             hadEffect: false,
             error: null,
-            result: {
-              declined: true,
-              reason: confirmationResult.reason || 'user_declined'
-            }
+            result: { declined: true, reason: fill.reason || 'user_declined' }
           });
         }
-
-        // User approved -- send fill command to content script
-        try {
-          const fillResult = await chrome.tabs.sendMessage(tabId, {
-            action: 'executeAction',
-            tool: 'fillPaymentFields',
-            params: {
-              cardNumber: paymentMethod.cardNumber || '',
-              cvv: paymentMethod.cvv || '',
-              expiryMonth: paymentMethod.expiryMonth || '',
-              expiryYear: paymentMethod.expiryYear || '',
-              cardholderName: paymentMethod.cardholderName || '',
-              billingAddress: paymentMethod.billingAddress || {}
-            }
-          });
-
-          const success = fillResult && fillResult.success !== false;
-          return makeResult({
-            success: success,
-            hadEffect: success,
-            error: fillResult?.error || null,
-            result: {
-              paymentMethodId: pmId,
-              merchantDomain: merchantDomain,
-              filled: fillResult?.filled || [],
-              totalFieldsDetected: fillResult?.totalFieldsDetected || 0
-            }
-          });
-        } catch (err) {
-          return makeResult({
-            success: false,
-            error: 'Content script payment fill failed: ' + (err.message || err)
-          });
-        }
+        return makeResult({
+          success: fill.success === true,
+          hadEffect: fill.success === true,
+          error: fill.success ? null : (fill.error || 'Payment fill failed'),
+          result: {
+            paymentMethodId: String(pmId),
+            merchantDomain: fill.merchantDomain || null,
+            filled: fill.filled || [],
+            totalFieldsDetected: fill.totalFieldsDetected || 0
+          }
+        });
       }
 
       default: {

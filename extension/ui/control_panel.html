@@ -1515,11 +1515,11 @@
         </section>
 
 
-        <!-- Passwords Section (Beta) -->
+        <!-- Passwords Section (Beta): logins come from the user's 1Password -->
         <section class="content-section" id="passwords">
           <div class="section-header">
             <h2><span data-i18n="panel_be146b37a0">Passwords</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></h2>
-            <p data-i18n="panel_e31b2a3d3f">Manage saved credentials and the shared credential vault for assisted sign-in</p>
+            <p data-i18n="panel_88c976fabd">FSB signs in with logins from your 1Password. FSB itself stores no passwords.</p>
           </div>
 
           <div class="toggle-grid single" style="margin-bottom: 1.5rem;">
@@ -1530,125 +1530,91 @@
               </span>
               <div class="toggle-content">
                 <span class="toggle-label" data-i18n="panel_bfe73827c5">Enable Auto-Login</span>
-                <span class="toggle-desc" data-i18n="panel_93f508370d">When enabled, FSB will detect login pages and offer to sign in automatically using saved credentials</span>
+                <span class="toggle-desc" data-i18n="panel_8b70975df7">When enabled, FSB detects login pages and signs in with the matching 1Password login.</span>
               </div>
             </label>
           </div>
 
-          <div id="credentialVaultPanel" class="credential-vault-panel">
+          <div id="onePasswordPanel" class="credential-vault-panel">
             <div class="credential-vault-header">
               <div>
-                <h3 data-i18n="panel_bbf6a83734">Credential Vault</h3>
-                <p id="credentialVaultStatusText" data-i18n="panel_07dd5f0064">Checking vault status...</p>
+                <h3 translate="no">1Password</h3>
+                <p id="onePasswordStatusText" data-i18n="panel_818962bda5">Checking 1Password connection...</p>
               </div>
-              <button id="lockCredentialVaultBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_50b231118c">Lock Vault</button>
+              <button id="onePasswordDisconnectBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_acfc5be785">Disconnect</button>
             </div>
 
-            <div id="credentialVaultSetup" class="credential-vault-state" style="display: none;">
-              <p class="pin-label" data-i18n="panel_ac22d297f8">Choose PIN length</p>
-              <div class="pin-length-toggle">
-                <button class="pin-length-btn" data-pin-length="4" data-i18n="panel_3e785bbc44">4 digits</button>
-                <button class="pin-length-btn active" data-pin-length="6" data-i18n="panel_7856e511a2">6 digits</button>
+            <div id="onePasswordSetup" class="credential-vault-state" style="display: none;">
+              <div class="form-group">
+                <label for="onePasswordAccount" data-i18n="panel_b84510154a">1Password account</label>
+                <input type="text" id="onePasswordAccount" class="form-input" placeholder="my.1password.com" autocomplete="off" spellcheck="false">
+                <div class="form-help" data-i18n="panel_a6f394d865">The account name shown at the top of the 1Password sidebar. In the 1Password app, turn on Settings &gt; Developer &gt; Integrate with other apps.</div>
               </div>
-              <p class="pin-label" data-i18n="panel_f246c76813">Enter PIN</p>
-              <div id="credentialVaultPinSetup"></div>
-              <p class="pin-label" data-i18n="panel_4fa10c7baa">Confirm PIN</p>
-              <div id="credentialVaultPinConfirm"></div>
-              <p class="credential-vault-helper" data-i18n="panel_10f7c25d31">Choose a PIN to protect saved credentials. Existing legacy credentials will be migrated automatically.</p>
-              <button id="setupCredentialVaultBtn" class="save-btn primary" data-i18n="panel_73134c8143">Set Up Vault</button>
+              <button id="onePasswordConnectBtn" class="save-btn primary" data-i18n="panel_5dec08e310">Connect 1Password</button>
+              <p class="credential-vault-helper" data-i18n="panel_e175b45390">Using a service account instead? Run this in a terminal, then reload this page:</p>
+              <code class="onepassword-command" translate="no">npx fsb-mcp-server onepassword --service-account</code>
             </div>
 
-            <div id="credentialVaultUnlock" class="credential-vault-state" style="display: none;">
-              <p class="pin-label" data-i18n="panel_872ac152d2">Enter your PIN to unlock</p>
-              <div id="credentialVaultPinUnlock"></div>
-              <p id="credentialVaultUnlockHint" class="credential-vault-helper" data-i18n="panel_50c3db852a">Unlock to view, edit, autofill, or save passwords.</p>
-              <button id="unlockCredentialVaultBtn" class="save-btn primary" data-i18n="panel_b41986e3f5">Unlock Vault</button>
+            <div id="onePasswordVaults" class="credential-vault-state" style="display: none;">
+              <p class="credential-vault-helper" data-i18n="panel_5c0a336c67">Choose the vaults FSB may read. A vault used only by FSB is safest.</p>
+              <div id="onePasswordVaultList" class="onepassword-vault-list"></div>
+              <div class="form-group">
+                <label for="onePasswordSaveVault" data-i18n="panel_161c79f605">Save new logins to</label>
+                <select id="onePasswordSaveVault" class="form-select">
+                  <option value="" data-i18n="panel_cc6d7a8340">Do not save</option>
+                </select>
+              </div>
+              <button id="onePasswordSaveVaultsBtn" class="save-btn primary" data-i18n="panel_5d4b7e9caa">Save vault access</button>
             </div>
+          </div>
 
-            <div id="credentialVaultUnlocked" class="credential-vault-state" style="display: none;">
-              <p class="credential-vault-helper" data-i18n="panel_b6680d54b2">Vault unlocked for this browser session. Saved credentials are available below.</p>
+          <div id="legacyVaultPanel" class="credential-vault-panel" style="display: none;">
+            <div class="credential-vault-header">
+              <div>
+                <h3 data-i18n="panel_5ab21b8830">Move your old FSB vault to 1Password</h3>
+                <p id="legacyVaultSummaryText"></p>
+              </div>
+            </div>
+            <div class="credential-vault-state">
+              <div id="legacyVaultPinWrapper" class="form-group">
+                <div id="legacyVaultPin"></div>
+                <p class="credential-vault-helper" data-i18n="panel_911c744cd5">Enter the PIN of your old FSB vault. Items moved to 1Password are erased from FSB.</p>
+              </div>
+              <div class="legacy-vault-actions">
+                <button id="legacyVaultImportBtn" class="save-btn primary" data-i18n="panel_3f6118f701">Move to 1Password</button>
+                <button id="legacyVaultDeleteBtn" class="save-btn secondary" data-i18n="panel_0f5320398c">Delete old vault</button>
+              </div>
             </div>
           </div>
 
           <div id="credentialsManager" style="display: none;">
-            <div id="credentialManagerDisabledNote" class="credential-vault-helper" style="display: none;" data-i18n="panel_8d5ab0fe44">
-              Auto-Login is currently disabled. You can still manage saved credentials here, but FSB will not use or save them automatically until you enable it.
-            </div>
-
             <div class="credentials-toolbar">
               <div class="credentials-search-wrapper">
                 <i class="fas fa-search"></i>
                 <input type="search" id="credentialSearch" placeholder="Search sites..." class="form-input">
               </div>
-              <button id="addCredentialBtn" class="test-btn">
-                <i class="fas fa-plus"></i>
-                <span data-i18n="panel_c1dc92c680">Add New</span>
+              <button id="refreshCredentialsBtn" class="test-btn">
+                <i class="fas fa-sync-alt"></i>
+                <span data-i18n="panel_0e91610117">Refresh</span>
               </button>
             </div>
 
             <div id="credentialsList" class="credentials-list">
-              <!-- Dynamically populated -->
+              <!-- Populated from 1Password by JS -->
             </div>
 
             <div id="credentialsEmpty" class="credentials-empty-state">
-              <i class="fas fa-lock"></i>
-              <p data-i18n="panel_c533cc0b87">No saved credentials yet. Credentials will be saved automatically when you sign in during automation, or you can add them manually.</p>
-            </div>
-          </div>
-
-          <div id="credentialModal" class="credential-modal hidden">
-            <div class="credential-modal-backdrop"></div>
-            <div class="credential-modal-content">
-              <div class="credential-modal-header">
-                <h3 id="credentialModalTitle" data-i18n="panel_35d74dfd8d">Add Credential</h3>
-                <button class="credential-modal-close" id="credentialModalClose">
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <div class="credential-modal-body">
-                <div class="form-group">
-                  <label for="credModalDomain" data-i18n="panel_85a85dc9a2">Website / Domain</label>
-                  <input type="text" id="credModalDomain" placeholder="example.com" class="form-input">
-                  <div class="form-help" data-i18n="panel_0153e2da59">Enter the website domain (e.g., github.com, mail.google.com)</div>
-                </div>
-                <div class="form-group">
-                  <label for="credModalUsername" data-i18n="panel_657144f3f7">Username / Email</label>
-                  <input type="text" id="credModalUsername" placeholder="user@example.com" class="form-input">
-                </div>
-                <div class="form-group">
-                  <label for="credModalPassword" data-i18n="panel_e7cf3ef4f1">Password</label>
-                  <div class="input-with-button">
-                    <input type="password" id="credModalPassword" placeholder="Enter password" class="form-input">
-                    <button type="button" class="input-btn" id="toggleCredModalPassword" title="Toggle visibility">
-                      <i class="fas fa-eye"></i>
-                    </button>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="credModalNotes" data-i18n="panel_6239b93e96">Notes (optional)</label>
-                  <input type="text" id="credModalNotes" placeholder="Optional notes" class="form-input">
-                </div>
-                <div class="form-group">
-                  <label class="credential-checkbox">
-                    <input type="checkbox" id="credModalAllowSubdomains">
-                    <span data-i18n="panel_9caa27b9d0">Allow this credential on subdomains</span>
-                  </label>
-                  <div class="form-help"><span data-i18n="panel_8816182605">Example: a credential saved for</span> <code>example.com</code> <span data-i18n="panel_eb1c90412b">can also be used on</span> <code>login.example.com</code>.</div>
-                </div>
-              </div>
-              <div class="credential-modal-footer">
-                <button class="save-btn secondary" id="credentialModalCancel" data-i18n="panel_19766ed6cc">Cancel</button>
-                <button class="save-btn primary" id="credentialModalSave" data-i18n="panel_1509f561f2">Save</button>
-              </div>
+              <i class="fas fa-key"></i>
+              <p data-i18n="panel_00f3328a04">No logins in the vaults FSB can use. Add or edit logins in 1Password.</p>
             </div>
           </div>
         </section>
 
-        <!-- Payments Section (Beta) -->
+        <!-- Payments Section (Beta): cards come from the user's 1Password -->
         <section class="content-section" id="payments">
           <div class="section-header">
             <h2><span data-i18n="panel_632e1c5839">Payments</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></h2>
-            <p data-i18n="panel_83c6ad5aef">Manage saved cards for assisted checkout. Payment methods share the credential vault configured in Passwords.</p>
+            <p data-i18n="panel_c6e98715b7">FSB fills checkout forms with credit cards from your 1Password, after you approve each fill.</p>
           </div>
 
           <div class="toggle-grid single" style="margin-bottom: 1.5rem;">
@@ -1664,155 +1630,32 @@
             </label>
           </div>
 
-          <div id="paymentAccessPanel" class="credential-vault-panel">
-            <div class="credential-vault-header">
-              <div>
-                <h3 data-i18n="panel_b45d64e4a3">Saved Payment Methods</h3>
-                <p id="paymentMethodsStatusText" data-i18n="panel_a92743920d">Checking payment method status...</p>
-              </div>
-              <button id="lockPaymentMethodsBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_bbc3d7eb41">Lock Payment Methods</button>
-            </div>
-
-            <div id="paymentMethodsBlocked" class="credential-vault-state" style="display: none;">
-              <p id="paymentMethodsBlockedText" class="credential-vault-helper" data-i18n="panel_7d1624ea92">Unlock the credential vault before managing saved payment methods.</p>
-              <button id="openPasswordsForPaymentsBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_24e06db48e">Open Passwords</button>
-            </div>
-
-            <div id="paymentMethodsUnlock" class="credential-vault-state" style="display: none;">
-              <div class="form-group">
-                <label data-i18n="panel_ad5f8e8263">Enter your vault PIN to unlock payment methods</label>
-                <div id="paymentMethodsPinUnlock"></div>
-              </div>
-              <p class="credential-vault-helper" data-i18n="panel_2035e1f48d">Saved cards use the same encrypted vault but require a separate unlock before checkout fills in this browser session.</p>
-              <button id="unlockPaymentMethodsBtn" class="save-btn primary" data-i18n="panel_186f818f5f">Unlock Saved Payment Methods</button>
-            </div>
-
-            <div id="paymentMethodsUnlocked" class="credential-vault-state" style="display: none;">
-              <p class="credential-vault-helper" data-i18n="panel_0ec4dc2534">Saved payment methods are unlocked for this browser session. FSB can prompt to fill a saved card on detected checkout pages, but it will never submit the final payment automatically.</p>
+          <div id="paymentMethodsBlocked" class="credential-vault-panel" style="display: none;">
+            <div class="credential-vault-state">
+              <p class="credential-vault-helper" data-i18n="panel_4875f94fbf">Connect 1Password in Passwords to use your cards.</p>
+              <button id="openPasswordsForPaymentsBtn" class="save-btn secondary" data-i18n="panel_24e06db48e">Open Passwords</button>
             </div>
           </div>
 
           <div id="paymentMethodsManager" style="display: none;">
-            <div id="paymentManagerDisabledNote" class="credential-vault-helper" style="display: none;" data-i18n="panel_5d38d8a7cf">
-              Saved Payment Methods is currently disabled. You can still manage stored cards here, but FSB will not offer them during checkout until you enable the feature.
-            </div>
-
             <div class="credentials-toolbar">
               <div class="credentials-search-wrapper">
                 <i class="fas fa-search"></i>
                 <input type="search" id="paymentMethodSearch" placeholder="Search cards, brands, or billing details..." class="form-input" data-i18n-attr="placeholder:copy_8371bee1a3">
               </div>
-              <button id="addPaymentMethodBtn" class="test-btn">
-                <i class="fas fa-credit-card"></i>
-                <span data-i18n="panel_82f87079c6">Add Card</span>
+              <button id="refreshPaymentMethodsBtn" class="test-btn">
+                <i class="fas fa-sync-alt"></i>
+                <span data-i18n="panel_0e91610117">Refresh</span>
               </button>
             </div>
 
             <div id="paymentMethodsList" class="payment-methods-list">
-              <!-- Dynamically populated -->
+              <!-- Populated from 1Password by JS -->
             </div>
 
             <div id="paymentMethodsEmpty" class="credentials-empty-state">
               <i class="fas fa-credit-card"></i>
-              <p data-i18n="panel_2fd67f06e0">No saved payment methods yet. Add a card here so FSB can offer it on checkout pages after you unlock payment access.</p>
-            </div>
-          </div>
-
-          <div id="paymentMethodModal" class="credential-modal hidden">
-            <div class="credential-modal-backdrop"></div>
-            <div class="credential-modal-content payment-method-modal-content">
-              <div class="credential-modal-header">
-                <h3 id="paymentMethodModalTitle" data-i18n="panel_b610b1ecca">Add Payment Method</h3>
-                <button class="credential-modal-close" id="paymentMethodModalClose">
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <div class="credential-modal-body">
-                <div class="form-group">
-                  <label for="paymentMethodNickname" data-i18n="panel_7cbcb92acd">Nickname (optional)</label>
-                  <input type="text" id="paymentMethodNickname" placeholder="Personal Visa" class="form-input">
-                  <div class="form-help" data-i18n="panel_85dfa9ba97">Shown in the card picker and saved-cards list.</div>
-                </div>
-                <div class="form-group">
-                  <label for="paymentMethodCardholderName" data-i18n="panel_d6bc26851d">Cardholder Name</label>
-                  <input type="text" id="paymentMethodCardholderName" placeholder="Name on card" class="form-input" autocomplete="cc-name" data-i18n-attr="placeholder:copy_18bf091ea7">
-                </div>
-                <div class="form-group">
-                  <label for="paymentMethodCardNumber"><span data-i18n="panel_4566e068a2">Card Number</span> <span id="paymentMethodCardBrand" class="payment-card-brand unknown" data-i18n="panel_b764cdc0ea">Unknown</span></label>
-                  <input type="text" id="paymentMethodCardNumber" placeholder="1234 5678 9012 3456" class="form-input" inputmode="numeric" autocomplete="cc-number">
-                  <div id="paymentMethodCardNumberHint" class="form-help" data-i18n="panel_25ec19a82f">Card brand is detected automatically as you type.</div>
-                </div>
-                <div class="payment-expiry-grid">
-                  <div class="form-group">
-                    <label for="paymentMethodExpiryMonth" data-i18n="panel_43533009b2">Expiry Month</label>
-                    <select id="paymentMethodExpiryMonth" class="form-select">
-                      <option value="" data-i18n="panel_310ca503ef">Month</option>
-                      <option value="01">01</option>
-                      <option value="02">02</option>
-                      <option value="03">03</option>
-                      <option value="04">04</option>
-                      <option value="05">05</option>
-                      <option value="06">06</option>
-                      <option value="07">07</option>
-                      <option value="08">08</option>
-                      <option value="09">09</option>
-                      <option value="10">10</option>
-                      <option value="11">11</option>
-                      <option value="12">12</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label for="paymentMethodExpiryYear" data-i18n="panel_ca7aaef8c5">Expiry Year</label>
-                    <input type="text" id="paymentMethodExpiryYear" placeholder="2029" class="form-input" inputmode="numeric" autocomplete="cc-exp-year">
-                  </div>
-                  <div class="form-group">
-                    <label for="paymentMethodCvv">CVV / CVC</label>
-                    <div class="input-with-button">
-                      <input type="password" id="paymentMethodCvv" placeholder="123" class="form-input" inputmode="numeric" autocomplete="cc-csc">
-                      <button type="button" class="input-btn" id="togglePaymentMethodCvv" title="Toggle visibility">
-                        <i class="fas fa-eye"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="paymentMethodBillingName" data-i18n="panel_8a944d3d0e">Billing Name</label>
-                  <input type="text" id="paymentMethodBillingName" placeholder="Billing profile name" class="form-input" data-i18n-attr="placeholder:copy_eb59dcee20">
-                </div>
-                <div class="form-group">
-                  <label for="paymentMethodAddressLine1" data-i18n="panel_1b77352e0b">Billing Address Line 1</label>
-                  <input type="text" id="paymentMethodAddressLine1" placeholder="123 Main St" class="form-input" autocomplete="billing address-line1">
-                </div>
-                <div class="form-group">
-                  <label for="paymentMethodAddressLine2" data-i18n="panel_ff2bc02380">Billing Address Line 2 (optional)</label>
-                  <input type="text" id="paymentMethodAddressLine2" placeholder="Apt, suite, unit" class="form-input" autocomplete="billing address-line2" data-i18n-attr="placeholder:copy_e151fee074">
-                </div>
-                <div class="payment-billing-grid">
-                  <div class="form-group">
-                    <label for="paymentMethodCity" data-i18n="panel_fc33f73246">City</label>
-                    <input type="text" id="paymentMethodCity" placeholder="Chicago" class="form-input" autocomplete="billing address-level2">
-                  </div>
-                  <div class="form-group">
-                    <label for="paymentMethodStateRegion" data-i18n="panel_9630a4b030">State / Region</label>
-                    <input type="text" id="paymentMethodStateRegion" placeholder="Illinois" class="form-input" autocomplete="billing address-level1">
-                  </div>
-                </div>
-                <div class="payment-billing-grid">
-                  <div class="form-group">
-                    <label for="paymentMethodPostalCode" data-i18n="panel_8198b202a8">Postal Code</label>
-                    <input type="text" id="paymentMethodPostalCode" placeholder="60601" class="form-input" autocomplete="billing postal-code">
-                  </div>
-                  <div class="form-group">
-                    <label for="paymentMethodCountry" data-i18n="panel_701d021d08">Country</label>
-                    <input type="text" id="paymentMethodCountry" placeholder="United States" class="form-input" autocomplete="billing country">
-                  </div>
-                </div>
-                <div class="form-help payment-method-security-note" data-i18n="panel_928895f662">CVV and billing profile data are stored encrypted inside your local vault. Review local device security before using this feature.</div>
-              </div>
-              <div class="credential-modal-footer">
-                <button class="save-btn secondary" id="paymentMethodModalCancel" data-i18n="panel_19766ed6cc">Cancel</button>
-                <button class="save-btn primary" id="paymentMethodModalSave" data-i18n="panel_39d561254a">Save Card</button>
-              </div>
+              <p data-i18n="panel_b9675cca57">No credit cards in the vaults FSB can use. Add or edit cards in 1Password.</p>
             </div>
           </div>
         </section>
