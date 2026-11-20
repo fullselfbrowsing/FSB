@@ -1,35 +1,35 @@
 {
   "/": {
-    "hash": "4bebe20762c0a85aed0eb8203711b5481594eceff6228a63072fd0f51e1ab7d5",
-    "lastmod": "2026-11-15"
+    "hash": "fe50bb132d1d017e778267f26a28e73038a4d0bd45b46c2b79300438db3f2267",
+    "lastmod": "2026-11-16"
   },
   "/about": {
-    "hash": "9939afcc1b38683b36be73366342f37683cdae1445271d95f5505d8538562e65",
+    "hash": "ec7ce0f50fe63fa47afbbf4a61c68ecd2d0cd6e4b2d67ec21052104541bfb760",
     "lastmod": "2026-11-15"
   },
   "/agents": {
-    "hash": "8c154eb1830c8c797c771adf7052fdf4d1a6cb2587b13e75b39e3330ab69094d",
+    "hash": "9a4523758ac1814ed3dea79f39f4bca03111ae3dfb9bd0b70c627e5349d5e6e3",
     "lastmod": "2026-11-15"
   },
   "/support": {
-    "hash": "ee7d7fb0ff64725a8adeb202df6a33a7715d2e06ba7208f9eed6a4307cba81bc",
+    "hash": "764d263b921bbc6a37c0a7dde8b8fba94f2ecbb3183c4fcaa20860adb9a57874",
     "lastmod": "2026-11-15"
   },
   "/privacy": {
-    "hash": "5d83013b6607fb8727eadb7e0aed859e35886ed9d510a234860591ab04e3f242",
+    "hash": "867c8f8b4d8a95d4af7184fe14146194eacf850b7cff41814d753ab5bc5c2798",
     "lastmod": "2026-11-15"
   },
   "/release-notes": {
-    "hash": "cf36791f6c5d7dca939a12968aa316eab44ba4e8b87b36b3bd50af79df90272c",
-    "lastmod": "2026-11-12"
+    "hash": "32b918845bf8f919080e83bbe69b8fb1990613c824b0d00556034c312756464b",
+    "lastmod": "2026-11-15"
   },
   "/lattice": {
     "hash": "87040694f4fb0670b49704149a073d5febdb378d37b31633ffc0c10afa7659e4",
     "lastmod": "2026-10-22"
   },
   "/concierge": {
-    "hash": "1b86672d33005728183ba4bcc36373fa385aa0b4a62e0137cfa7f396c5f98b68",
-    "lastmod": "2026-10-22"
+    "hash": "947c01e13de0e414ac28d70376c4204481ca783e428b199fdf42446d93fdb296",
+    "lastmod": "2026-11-15"
   },
   "/phantom-stream": {
     "hash": "fb0b815a2e8883a34e935e5b85b051ead9a1da16cbd22f48e0720643e4adceae",

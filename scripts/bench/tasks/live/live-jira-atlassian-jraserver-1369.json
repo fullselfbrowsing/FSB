@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "live-jira-atlassian-jraserver-1369",
+  "version": 1,
+  "set": "live",
+  "category": "reading",
+  "startUrl": "https://jira.atlassian.com/browse/JRASERVER-1369",
+  "instruction": "Open {startUrl} and report the issue's resolution.",
+  "timeBudgetMs": 180000,
+  "success": {
+    "all": [
+      { "kind": "finalUrl", "urlIncludes": "/browse/JRASERVER-1369" },
+      { "kind": "text", "includes": "JRASERVER-1369" }
+    ]
+  }
+}

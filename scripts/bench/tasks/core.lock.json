@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "note": "Core benchmark set frozen through Phase 71 (D-15). Changing any core task or fixture requires a version bump and a deliberately regenerated lock.",
+  "tasks": [
+    {
+      "id": "core-click-accordion-drilldown",
+      "version": 1,
+      "fixtureSha256": "63db2630f092705015178de23cd968cb8af00a5980aed8e618b4f3bb519029be"
+    },
+    {
+      "id": "core-click-checklist",
+      "version": 1,
+      "fixtureSha256": "8caa34348a9c81cd59f24a1e74c0c9be84e2da0d2d0c903d5f0c60c9b7977096"
+    },
+    {
+      "id": "core-click-confirm-modals",
+      "version": 1,
+      "fixtureSha256": "f2eee247178ac252afa2f4b98b2e62958223e1d51000a83d79c0e8592413ae8a"
+    },
+    {
+      "id": "core-click-custom-dropdowns",
+      "version": 1,
+      "fixtureSha256": "9750d903bcda7ebc8590309a3f70d391f2ec29801ac3ad5f226081cc287411d9"
+    },
+    {
+      "id": "core-click-kanban-moves",
+      "version": 1,
+      "fixtureSha256": "ebc4b855ddf0c5c1b7b99a4a275ea558b2681c774a55dc9df08c28a2971f62d3"
+    },
+    {
+      "id": "core-click-tabbed-toggles",
+      "version": 1,
+      "fixtureSha256": "11506cb758f8429918f923336ccfefe933e88778a47081c0abf2c1d2f179ab6c"
+    },
+    {
+      "id": "core-mixed-invoice-lookup",
+      "version": 1,
+      "fixtureSha256": "ffc7766698b42ff6ba8399ab9050a6d2aeef99016d8e83de24d2ac094ad4aab7"
+    },
+    {
+      "id": "core-mixed-paginate-find",
+      "version": 1,
+      "fixtureSha256": "e314d37d60b8b1864be11a380e1b4b02286ea572e1f7f894430ab88531081230"
+    },
+    {
+      "id": "core-mixed-search-detail",
+      "version": 1,
+      "fixtureSha256": "324700bcea96fccb46fe184a77fbef5338eb6af9f4e13833a706d25c1c24c8b1"
+    },
+    {
+      "id": "core-mixed-settings-change",
+      "version": 1,
+      "fixtureSha256": "badec467e7abf9fba57ee7395f9250aefec42f3c3e13449f2ae0be0ecfa5b6b2"
+    },
+    {
+      "id": "core-mixed-ticket-triage",
+      "version": 1,
+      "fixtureSha256": "22b31a541ad0e3bd050f3c93bbb22619638195bc8a9750cc685f7949e93d7d25"
+    },
+    {
+      "id": "core-mixed-wizard-submit",
+      "version": 1,
+      "fixtureSha256": "27764daec414c297e8914799bcd4cabd3c0c6111eac1f9080f256fbe21a31400"
+    }
+  ]
+}

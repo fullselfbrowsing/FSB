@@ -1,0 +1,23 @@
+{
+  "_fixture": "synthetic Claude result texts for the errorKind rules in scripts/bench/lib/host-stream.mjs (66-05 W-A); written by hand, not captured from a live run; no network",
+  "cases": [
+    { "name": "http-429", "isError": true, "text": "HTTP 429 Too Many Requests", "expected": "rate_limit" },
+    { "name": "rate-limit-exceeded", "isError": true, "text": "rate limit exceeded", "expected": "rate_limit" },
+    { "name": "status-colon-429", "isError": true, "text": "Request failed with status: 429", "expected": "rate_limit" },
+    { "name": "overloaded", "isError": true, "text": "API Error: 529 overloaded_error", "expected": "rate_limit" },
+    { "name": "usage-limit-reached", "isError": true, "text": "Claude AI usage limit reached", "expected": "usage_limit" },
+    { "name": "out-of-extra-usage", "isError": true, "text": "You are out of extra usage for this period", "expected": "usage_limit" },
+    { "name": "api-401-invalid-x-api-key", "isError": true, "text": "API Error: 401 authentication_error: invalid x-api-key", "expected": "auth" },
+    { "name": "invalid-api-key-login", "isError": true, "text": "Invalid API key · Please run /login", "expected": "auth" },
+    { "name": "http-403", "isError": true, "text": "HTTP 403 Forbidden", "expected": "auth" },
+    { "name": "not-logged-in", "isError": true, "text": "You are not logged in", "expected": "auth" },
+    { "name": "http-503", "isError": true, "text": "HTTP 503 Service Unavailable", "expected": "api_error" },
+    { "name": "api-error-500", "isError": true, "text": "API Error: 500 Internal server error", "expected": "api_error" },
+    { "name": "bare-500-ms-is-other", "isError": true, "text": "Step failed after 500 ms waiting for selector", "expected": "other" },
+    { "name": "bare-429-is-other", "isError": true, "text": "Clicked 429 rows before the table stopped loading", "expected": "other" },
+    { "name": "bare-401-is-other", "isError": true, "text": "Gave up after 401 retries of the same click", "expected": "other" },
+    { "name": "provider-word-is-other", "isError": true, "text": "The provider page did not load", "expected": "other" },
+    { "name": "success-mentioning-500-ms", "isError": false, "text": "Done in 500 ms", "expected": null },
+    { "name": "success-mentioning-a-limit", "isError": false, "text": "Saved; the usage limit banner was dismissed", "expected": null }
+  ]
+}

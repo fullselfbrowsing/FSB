@@ -440,19 +440,19 @@ async function adopt(options) {
       { timestamp: '2026-08-22T07:45:52.000Z', level: 'info', message: 'Side panel tab activation', data: { outcome: 'activated' } },
       { timestamp: '2026-08-22T07:45:53.000Z', level: 'info', message: 'Side panel auto-collapse', data: { outcome: 'kept_after_grace' } }
     ];
-    const writes = [];
+    let trustedLoads = 0;
     const context = vm.createContext({
       globalThis: null,
       console: { log() {}, warn() {}, error() {} },
       setTimeout, clearTimeout, setInterval, clearInterval, Date, Math, JSON, Promise, Set, Map, Array, Object, Number, String,
-      chrome: {
-        runtime: { id: 'ext' },
-        storage: {
-          local: {
-            get: async function() { return { automationLogs: stored }; },
-            set: async function(payload) { writes.push(payload); }
-          }
+      fsbTrustedLocalFeatureStore: {
+        async loadAutomationLogs() {
+          trustedLoads += 1;
+          return { ok: true, logs: stored };
         }
+      },
+      chrome: {
+        runtime: { id: 'ext' }
       }
     });
     context.globalThis = context;
@@ -464,11 +464,179 @@ async function adopt(options) {
       'loadLogs prepends the persisted tail and keeps the fresh worker entries');
     await logger.loadLogs();
     check(logger.logs.length === 3, 'loadLogs is idempotent (no duplicates on a second merge)');
+    check(trustedLoads === 2 && !Object.prototype.hasOwnProperty.call(context.chrome, 'storage'),
+      'loadLogs uses the background-owned trusted feature store without direct chrome.storage access');
     check(backgroundSource.includes('Promise.resolve(automationLogger.loadLogs()).catch(() => {});'),
       'background restores the previous worker log tail on wake');
     check(/var AUTOMATION_LOGS_PERSISTED_TAIL = (\d+);/.test(loggerSource)
       && Number(loggerSource.match(/var AUTOMATION_LOGS_PERSISTED_TAIL = (\d+);/)[1]) >= 200,
       'persisted tail is large enough to hold a short run');
+  }
+
+  // 6b. The real wake order: background calls loadLogs during top-level
+  // evaluation, before its trusted-store boot has published the store. A
+  // worker's sendMessage never reaches its own listener, so the load has to
+  // wait for the boot, and a persist must not replace the tail before the
+  // merge lands.
+  console.log('\n--- automation logger: wake load waits for the trusted-store boot ---');
+  {
+    const loggerSource = fs.readFileSync(path.resolve(__dirname, '../extension/utils/automation-logger.js'), 'utf8');
+    let storedTail = [
+      { timestamp: '2026-08-22T07:45:52.000Z', level: 'info', message: 'previous worker: run finished', data: {} }
+    ];
+    let sendMessageCalls = 0;
+    let finishBoot;
+    const store = {
+      async loadAutomationLogs() { return { ok: true, logs: storedTail.slice() }; },
+      async replaceAutomationLogs(logs) { storedTail = logs.slice(); return { ok: true }; }
+    };
+    const context = vm.createContext({
+      globalThis: null,
+      console: { log() {}, warn() {}, error() {} },
+      setTimeout, clearTimeout, setInterval, clearInterval, Date, Math, JSON, Promise, Set, Map, Array, Object, Number, String,
+      TextEncoder,
+      chrome: {
+        runtime: {
+          id: 'ext',
+          lastError: null,
+          sendMessage(_message, callback) {
+            sendMessageCalls += 1;
+            context.chrome.runtime.lastError = { message: 'Receiving end does not exist.' };
+            callback(undefined);
+            context.chrome.runtime.lastError = null;
+          }
+        }
+      }
+    });
+    context.globalThis = context;
+    context.fsbTrustedLocalBootPromise = new Promise((resolve) => { finishBoot = resolve; });
+    vm.runInContext(loggerSource, context);
+    const logger = context.automationLogger;
+    logger.logs = [{ timestamp: '2026-08-22T07:47:44.000Z', level: 'info', message: 'new worker: boot', data: {} }];
+
+    const wake = logger.loadLogs();
+    await Promise.resolve();
+    // The boot publishes the store before its promise settles (the corpus
+    // boundary still runs), and a debounced persist can fire in that window.
+    context.fsbTrustedLocalFeatureStore = store;
+    const earlyPersist = logger.persistLogs();
+    await new Promise((resolve) => setImmediate(resolve));
+    finishBoot(store);
+    await wake;
+    await earlyPersist;
+    check(sendMessageCalls === 0, 'the wake load waits for the boot instead of a sendMessage that cannot arrive');
+    check(logger.logs.map((entry) => entry.message).join('|') === 'previous worker: run finished|new worker: boot',
+      'the previous worker tail is merged on wake');
+    check(storedTail.map((entry) => entry.message).join('|') === 'previous worker: run finished|new worker: boot',
+      'a persist during the boot window keeps the previous worker tail');
+  }
+
+  // 6c. Session history calls made by the worker during the same boot window
+  // (list_sessions, get_session_detail, a save at run end, MCP retention)
+  // have the same problem: the sendMessage fallback cannot reach the worker,
+  // so each one has to wait for the boot and then use the published store.
+  console.log('\n--- automation logger: session calls wait for the trusted-store boot ---');
+  {
+    const loggerSource = fs.readFileSync(path.resolve(__dirname, '../extension/utils/automation-logger.js'), 'utf8');
+    let sendMessageCalls = 0;
+    let finishBoot;
+    const storeCalls = [];
+    const storedSession = {
+      id: 'session_boot', task: 'stored run', status: 'completed', mode: 'mcp-agent',
+      startTime: 1, endTime: 2, logs: [], actionHistory: []
+    };
+    const store = {
+      async listAutomationSessions() {
+        storeCalls.push('list');
+        return { ok: true, sessions: [storedSession] };
+      },
+      async loadAutomationSession(sessionId) {
+        storeCalls.push('load:' + sessionId);
+        return { ok: true, session: sessionId === 'session_boot' ? storedSession : null };
+      },
+      async loadAutomationDOMSnapshots(sessionId) {
+        storeCalls.push('snapshots:' + sessionId);
+        return { ok: true, snapshots: [{ origin: 'https://example.test', timestamp: 3, iteration: 1, elementCount: 4 }] };
+      },
+      async saveAutomationSession(sessionId) {
+        storeCalls.push('save:' + sessionId);
+        return { ok: true, evictedIds: [], prunedIds: [] };
+      },
+      async updateAutomationSessionOutcome(sessionId) {
+        storeCalls.push('outcome:' + sessionId);
+        return { ok: true };
+      },
+      async pruneMcpAutomationSessions(retentionDays) {
+        storeCalls.push('prune:' + retentionDays);
+        return { ok: true, removed: 1, ids: ['session_expired'] };
+      },
+      async deleteAutomationSession(sessionId) {
+        storeCalls.push('delete:' + sessionId);
+        return { ok: true };
+      },
+      async clearAutomationSessions() {
+        storeCalls.push('clear');
+        return { ok: true };
+      }
+    };
+    const context = vm.createContext({
+      globalThis: null,
+      console: { log() {}, warn() {}, error() {} },
+      setTimeout, clearTimeout, setInterval, clearInterval, Date, Math, JSON, Promise, Set, Map, Array, Object, Number, String,
+      TextEncoder,
+      chrome: {
+        runtime: {
+          id: 'ext',
+          lastError: null,
+          sendMessage(_message, callback) {
+            sendMessageCalls += 1;
+            context.chrome.runtime.lastError = { message: 'Receiving end does not exist.' };
+            callback(undefined);
+            context.chrome.runtime.lastError = null;
+          }
+        }
+      }
+    });
+    context.globalThis = context;
+    context.fsbTrustedLocalBootPromise = new Promise((resolve) => { finishBoot = resolve; });
+    vm.runInContext(loggerSource, context);
+    const logger = context.automationLogger;
+    logger.logs = [{
+      timestamp: '2026-08-22T07:47:44.000Z', level: 'info', message: 'run finished', data: { sessionId: 'session_new' }
+    }];
+
+    const listed = logger.listSessions();
+    const loaded = logger.loadSession('session_boot');
+    const snapshots = logger.getDOMSnapshots('session_boot');
+    const saved = logger.saveSession('session_new', { status: 'completed', mode: 'mcp-agent' });
+    const updated = logger.updateSessionOutcome('session_new', { status: 'completed', outcome: 'success' });
+    const pruned = logger.pruneMcpSessions(30);
+    const deleted = logger.deleteSession('session_boot');
+    const cleared = logger.clearAllSessions();
+    await new Promise((resolve) => setImmediate(resolve));
+    check(sendMessageCalls === 0, 'no session call falls back to a sendMessage the worker cannot receive');
+    context.fsbTrustedLocalFeatureStore = store;
+    finishBoot(store);
+    const [listResult, loadResult, snapshotResult, saveResult, updateResult, pruneResult, deleteResult, clearResult] =
+      await Promise.all([listed, loaded, snapshots, saved, updated, pruned, deleted, cleared]);
+    check(sendMessageCalls === 0, 'session calls made during the boot reach the published store, not sendMessage');
+    check(listResult.length === 1 && listResult[0].id === 'session_boot',
+      'listSessions during the boot returns the stored session');
+    check(!!loadResult && loadResult.id === 'session_boot' && loadResult.task === 'stored run',
+      'loadSession during the boot returns the stored session');
+    check(snapshotResult.length === 1 && snapshotResult[0].elementCount === 4,
+      'getDOMSnapshots during the boot returns the stored snapshots');
+    check(saveResult === true, 'saveSession during the boot is acknowledged by the store');
+    check(updateResult === true, 'updateSessionOutcome during the boot is acknowledged by the store');
+    check(pruneResult.removed === 1 && Array.from(pruneResult.ids).join(',') === 'session_expired',
+      'pruneMcpSessions during the boot returns the store removal');
+    check(deleteResult === true && clearResult === true,
+      'deleteSession and clearAllSessions during the boot are acknowledged by the store');
+    check(storeCalls.join('|') === [
+      'list', 'load:session_boot', 'snapshots:session_boot',
+      'load:session_new', 'save:session_new', 'outcome:session_new', 'prune:30',
+      'delete:session_boot', 'clear'
+    ].join('|'), 'every session call reaches the store once, in call order');
   }
 
   // -------------------------------------------------------------------------

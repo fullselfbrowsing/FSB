@@ -7,6 +7,7 @@ import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage, targetTabIdFromParams } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 import { TOOL_REGISTRY, jsonSchemaToZod } from './schema-bridge.js';
+import { mcpToolDescription, mcpParamDescriptions } from './descriptions.js';
 
 export const TRIGGER_TOOL_NAMES = [
   'trigger',
@@ -215,13 +216,13 @@ export function registerTriggerTools(
       throw new Error(`Missing trigger tool definition: ${toolName}`);
     }
 
-    const zodShape = jsonSchemaToZod(tool.inputSchema);
+    const zodShape = jsonSchemaToZod(tool.inputSchema, mcpParamDescriptions(tool.name));
     const messageType = TRIGGER_MESSAGE_TYPES[toolName];
     const timeout = TRIGGER_TIMEOUTS[toolName];
 
     server.tool(
       tool.name,
-      tool.description,
+      mcpToolDescription(tool.name, tool.description),
       zodShape,
       async (params: Record<string, unknown>, extra?: McpToolExtra) => {
         if (!bridge.isConnected) {

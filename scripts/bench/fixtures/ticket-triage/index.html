@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en" data-bench-app="ticket-triage">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operations tickets</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 1240px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td { background: #f3f6fc; }
+  tbody tr.active td { background: #eef3ff; }
+  .key { font: inherit; font-weight: 600; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+  td.nowrap { white-space: nowrap; }
+  .chip { display: inline-block; margin: 0 4px 2px 0; padding: 0 7px; border-radius: 999px; background: #eef0f4; font-size: 0.8rem; }
+  .state { display: inline-block; padding: 0 7px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+  .state.to-do { background: #eef0f4; }
+  .state.in-progress { background: #e5edff; color: #1d4ab4; }
+  .state.blocked { background: #fdecea; color: #b42318; }
+  .state.done { background: #e6f4ea; color: #1f7a3a; }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 12px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; }
+  .field-label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .combo { margin-bottom: 12px; }
+  .combo-box { display: flex; justify-content: space-between; align-items: center; min-width: 12rem; padding: 6px 10px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; cursor: pointer; }
+  .combo-box::after { content: "\25BE"; color: var(--muted); margin-left: 12px; }
+  .combo-list { margin-top: 4px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; box-shadow: 0 4px 12px rgba(28, 34, 48, 0.12); }
+  .combo-option { padding: 6px 10px; cursor: pointer; }
+  .combo-option:hover, .combo-option:focus { background: #eef3ff; outline: none; }
+  .combo-option[aria-selected="true"] { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Operations tickets</h1>
+  <div class="layout">
+    <section class="panel" aria-labelledby="list-heading">
+      <h2 id="list-heading">All tickets</h2>
+      <table id="tickets">
+        <thead>
+          <tr><th scope="col">Key</th><th scope="col">Summary</th><th scope="col">Labels</th><th scope="col">Reporter</th><th scope="col">Status</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+    <section id="detail" class="panel" aria-labelledby="detail-heading" hidden>
+      <h2 id="detail-heading" tabindex="-1"><span id="detail-key"></span>: <span id="detail-title"></span></h2>
+      <dl class="facts">
+        <dt>Labels</dt><dd id="detail-labels"></dd>
+        <dt>Reporter</dt><dd id="detail-reporter"></dd>
+      </dl>
+      <span class="field-label" id="status-label">Status</span>
+      <div class="combo" id="status-field">
+        <div class="combo-box" id="status-combo" role="combobox" tabindex="0" aria-label="Status" aria-haspopup="listbox" aria-expanded="false" aria-controls="status-listbox"><span class="combo-value" id="status-value"></span></div>
+        <div class="combo-list" id="status-listbox" role="listbox" aria-label="Status" hidden>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="To Do">To Do</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="In Progress">In Progress</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="Blocked">Blocked</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="Done">Done</div>
+        </div>
+      </div>
+      <button id="save" class="btn primary" type="button">Save</button>
+      <p id="save-error" class="error" role="alert" hidden></p>
+      <p id="save-status" class="status" role="status" hidden>Saved: <output data-bench-marker="ticket-status"></output></p>
+    </section>
+  </div>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const TICKETS = [
+      { key: 'OPS-214', title: 'Refund button returns an error for partial refunds', labels: ['billing', 'payments'], reporter: 'Priya Nair', status: 'To Do' },
+      { key: 'OPS-217', title: 'Dashboard charts render blank after login', labels: ['frontend'], reporter: 'Dana Kim', status: 'To Do' },
+      { key: 'OPS-221', title: 'Nightly backup job runs past its window', labels: ['infra'], reporter: 'Marco Rossi', status: 'In Progress' },
+      { key: 'OPS-226', title: 'Invoice PDF shows the wrong tax rate', labels: ['billing'], reporter: 'Dana Kim', status: 'To Do' },
+      { key: 'OPS-230', title: 'Rotate the staging database credentials', labels: ['infra', 'security'], reporter: 'Priya Nair', status: 'Blocked' },
+      { key: 'OPS-233', title: 'Duplicate charge after a card retry', labels: ['billing'], reporter: 'Dana Kim', status: 'Done' },
+      { key: 'OPS-238', title: 'Search ignores the date filter', labels: ['frontend', 'search'], reporter: 'Marco Rossi', status: 'To Do' },
+      { key: 'OPS-241', title: 'Update the on-call escalation policy', labels: ['ops'], reporter: 'Dana Kim', status: 'In Progress' },
+      { key: 'OPS-245', title: 'Proration credit missing on plan downgrade', labels: ['billing'], reporter: 'Sam Carter', status: 'In Progress' },
+      { key: 'OPS-249', title: 'Onboarding emails link to the staging site', labels: ['email'], reporter: 'Sam Carter', status: 'To Do' },
+    ];
+    const byKey = new Map(TICKETS.map((ticket) => [ticket.key, ticket]));
+    const tbody = document.querySelector('#tickets tbody');
+    const rows = new Map();
+    const detail = document.getElementById('detail');
+    const saveButton = document.getElementById('save');
+    const saveError = document.getElementById('save-error');
+    const saveStatus = document.getElementById('save-status');
+    let current = null;
+    let busy = false;
+
+    function stateBadge(status) {
+      const badge = document.createElement('span');
+      badge.className = `state ${status.toLowerCase().replace(/\s+/g, '-')}`;
+      badge.textContent = status;
+      return badge;
+    }
+
+    function cell(content, nowrap = false) {
+      const td = document.createElement('td');
+      if (nowrap) td.className = 'nowrap';
+      if (typeof content === 'string') td.textContent = content;
+      else td.append(...content);
+      return td;
+    }
+
+    for (const ticket of TICKETS) {
+      const row = document.createElement('tr');
+      row.dataset.key = ticket.key;
+      const keyButton = document.createElement('button');
+      keyButton.type = 'button';
+      keyButton.className = 'key';
+      keyButton.textContent = ticket.key;
+      const chips = ticket.labels.map((label) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = label;
+        return chip;
+      });
+      row.append(cell([keyButton], true), cell(ticket.title), cell(chips, true), cell(ticket.reporter, true), cell([stateBadge(ticket.status)], true));
+      row.addEventListener('click', () => openTicket(ticket.key));
+      tbody.append(row);
+      rows.set(ticket.key, row);
+    }
+
+    // Status dropdown: a div combobox with an inline listbox.
+    const combo = document.getElementById('status-field');
+    const box = document.getElementById('status-combo');
+    const list = document.getElementById('status-listbox');
+    const valueText = document.getElementById('status-value');
+    const options = [...list.querySelectorAll('[role="option"]')];
+    let comboValue = null;
+
+    function isOpen() {
+      return box.getAttribute('aria-expanded') === 'true';
+    }
+    function openList() {
+      list.hidden = false;
+      box.setAttribute('aria-expanded', 'true');
+      (options.find((option) => option.dataset.value === comboValue) || options[0]).focus();
+    }
+    function closeList(focusBox) {
+      list.hidden = true;
+      box.setAttribute('aria-expanded', 'false');
+      if (focusBox) box.focus();
+    }
+    function showValue(value) {
+      comboValue = value;
+      for (const option of options) option.setAttribute('aria-selected', String(option.dataset.value === value));
+      valueText.textContent = value;
+    }
+
+    onActivate(box, () => (isOpen() ? closeList(false) : openList()));
+    box.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (!isOpen()) openList();
+      } else if (event.key === 'Escape') {
+        closeList(false);
+      }
+    });
+    options.forEach((option, index) => {
+      onActivate(option, () => {
+        showValue(option.dataset.value);
+        closeList(true);
+      });
+      option.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          options[Math.min(index + 1, options.length - 1)].focus();
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          options[Math.max(index - 1, 0)].focus();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          closeList(true);
+        }
+      });
+    });
+    document.addEventListener('click', (event) => {
+      if (isOpen() && !combo.contains(event.target)) closeList(false);
+    });
+
+    function openTicket(key) {
+      const ticket = byKey.get(key);
+      if (!ticket) return;
+      current = ticket;
+      document.getElementById('detail-key').textContent = ticket.key;
+      document.getElementById('detail-title').textContent = ticket.title;
+      document.getElementById('detail-labels').textContent = ticket.labels.join(', ');
+      document.getElementById('detail-reporter').textContent = ticket.reporter;
+      showValue(ticket.status);
+      closeList(false);
+      saveError.hidden = true;
+      saveStatus.hidden = true;
+      for (const [rowKey, row] of rows) row.classList.toggle('active', rowKey === key);
+      detail.hidden = false;
+      document.getElementById('detail-heading').focus();
+    }
+
+    saveButton.addEventListener('click', async () => {
+      if (busy || !current) return;
+      const ticketId = current.key;
+      const status = comboValue;
+      busy = true;
+      saveButton.disabled = true;
+      saveError.hidden = true;
+      try {
+        await benchPost('update', { ticketId, status });
+        byKey.get(ticketId).status = status;
+        const statusCell = rows.get(ticketId).lastElementChild;
+        statusCell.replaceChildren(stateBadge(status));
+        setView({ view: 'saved', ticket: ticketId });
+        setMarker('ticket-status', `${ticketId}:${status}`);
+        saveStatus.hidden = false;
+      } catch {
+        saveError.textContent = 'The ticket could not be saved. Try again.';
+        saveError.hidden = false;
+      } finally {
+        busy = false;
+        saveButton.disabled = false;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

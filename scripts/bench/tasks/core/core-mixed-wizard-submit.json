@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-mixed-wizard-submit",
+  "version": 1,
+  "set": "core",
+  "category": "mixed",
+  "startPath": "/fixtures/wizard-submit/index.html",
+  "instruction": "Open {startUrl}. Complete the setup wizard for the account Acme Robotics on the Team plan with 12 seats and submit it.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/wizard-submit/submit", "count": 1, "jsonEquals": { "accountName": "Acme Robotics", "plan": "team", "seats": 12 } },
+      { "kind": "request", "method": "POST", "path": "/api/wizard-submit/submit", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/wizard-submit/index.html", "queryIncludes": { "view": "done" } },
+      { "kind": "marker", "name": "wizard-result", "equals": "Acme Robotics|team|12" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "wizard-submit/index.html"]
+}

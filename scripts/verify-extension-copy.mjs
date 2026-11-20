@@ -31,7 +31,11 @@ const SCOPE = [
   'extension/ui/unlock.js',
   'extension/ui/microphone-permission.html',
   'extension/ui/microphone-permission.js',
-  'extension/content/visual-feedback.js'
+  'extension/content/visual-feedback.js',
+  'extension/content/skopeo-shell.js',
+  'extension/content/skopeo-runtime.js',
+  'extension/content/skopeo-renderer-registry.js',
+  'extension/content/skopeo-adaptive-composer.js'
 ];
 
 const UNTRANSLATED = new Set([
@@ -81,7 +85,8 @@ function decodeJs(body) {
     .replace(/\\`/g, '`')
     .replace(/\\u2019/g, '’')
     .replace(/\\u00d7/gi, '×')
-    .replace(/\\u2026/g, '…');
+    .replace(/\\u2026/g, '…')
+    .replace(/\\u00b7/gi, '·');
 }
 
 const MARKUP = /<\/?[A-Za-z]/;
@@ -340,11 +345,44 @@ function markupCopy(item) {
 function isLog(source, index) {
   const before = source.slice(Math.max(0, index - 280), index);
   if (/(?:console|logger|automationLogger)\s*\.\s*(?:log|warn|error|debug|info)\s*\([^)]*$/.test(before)) return true;
+  // Thrown error messages are diagnostics, never shown in the UI.
+  if (/\bnew\s+[A-Za-z]*Error\s*\(\s*$/.test(before)) return true;
+  // The detail label of a Skopeo resource-ledger acquisition.
+  if (/\b_?acquire(?:Surface)?\s*\(\s*['"][A-Za-z]+['"]\s*,\s*[^,]+,\s*$/.test(before)) return true;
   if (/addLog\s*\(\s*['"`][^'"`]+['"`]\s*,\s*$/.test(before)) return true;
   if (/showDebugOutput\s*\(\s*$/.test(before)) return true;
   if (/_sendControl\s*\(/.test(before) && /\}\s*,\s*$/.test(before)) return true;
   return false;
 }
+
+// Composer strings that never reach the page as they are. The Skopeo shell
+// rebuilds the first group into its own keyed templates ("Open source for
+// $LABEL$", "Open actions for $NAME$", the destructive gate body ...), and it
+// never renders the second group (uncertain/unsupported fallbacks, the stale
+// confirmation label and the folder recovery line).
+const ASSEMBLED = new Map([
+  ['extension/content/skopeo-adaptive-composer.js', new Set([
+    'Open actions for',
+    'Skopeo can’t verify this',
+    'Verified actions and capability readiness for this',
+    'Skopeo found no ready capabilities for this',
+    'Open source for',
+    'Delivered to this Chrome user on',
+    'This action may remove service data.',
+    'Skopeo can’t verify this view.',
+    'The page was left unchanged. Open another view or turn off Skopeo.',
+    'Skopeo doesn’t support this app yet.',
+    'Nothing was added to the page. Turn off Skopeo or open a supported app.',
+    'This confirmation expired because the page context changed. Review the action again.',
+    'Reopen the folder or document and invoke Skopeo again.'
+  ])],
+  // UI-spec empty-state copy that the shell keeps in source but does not
+  // render yet (skopeo-accessibility checks the spec text is present).
+  ['extension/content/skopeo-shell.js', new Set([
+    'No page context available',
+    'Skopeo will stay in ambient mode and leave the page unchanged.'
+  ])]
+]);
 
 function loadEnglish() {
   const json = JSON.parse(readFileSync(join(ROOT, 'extension/_locales/en/messages.json'), 'utf8'));
@@ -385,6 +423,7 @@ export function findUncataloged(files, catalog) {
       if (!isProse(item.text)) continue;
       if (isLog(source, item.index)) continue;
       if (catalog.has(item.text)) continue;
+      if (ASSEMBLED.has(file) && ASSEMBLED.get(file).has(item.text.trim())) continue;
       misses.push({ file, line: lineAt(item.index), text: item.text, reason: 'uncataloged chrome' });
     }
   }

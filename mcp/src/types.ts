@@ -50,7 +50,9 @@ export type MCPMessageType =
   | 'agent:register'         // Phase 238: lazy-mint per-process agent_id
   | 'agent:release'          // Phase 238: handler only; server caller in Phase 241
   | 'agent:status'           // Phase 238: caller-self introspection
-  | 'system:client-inventory'; // Phase 57: additive installed MCP-client inventory
+  | 'system:client-inventory' // Phase 57: additive installed MCP-client inventory
+  | 'mcp:get-settings'  // Phase 66.1: settings tool read (queue-bypass)
+  | 'mcp:set-setting';  // Phase 66.1: settings tool single-key write
 
 // Messages FROM extension TO MCP server (responses)
 export interface MCPResponse {

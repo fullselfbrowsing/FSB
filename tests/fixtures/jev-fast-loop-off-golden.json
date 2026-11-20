@@ -1,0 +1,440 @@
+{
+  "about": "Phase 68 plan 06 (D-01): run A of the golden scenario (fast-path module not loaded, no session.fastMode), normalised by tests/fixtures/agent-loop-fast-harness.js rules N1-N4. Captured once from the unedited extension/ai/agent-loop.js before the fast-path seams were added; never regenerate it after the seams.",
+  "capturedFromAgentLoopSha256": "6fa3ab0c47c132e6fda669ef6bf9d23fd68773ff08f8d3b183d1e404dfc035d2",
+  "events": [
+    {
+      "type": "step",
+      "index": 1
+    },
+    {
+      "type": "dashboard"
+    },
+    {
+      "type": "status",
+      "tabId": 41,
+      "payload": {
+        "sessionId": "session_harness",
+        "phase": "thinking",
+        "taskName": "Open the wizard and finish it",
+        "taskSummary": null,
+        "iteration": 1,
+        "maxIterations": 20,
+        "statusText": "Step 1/20: …",
+        "animatedHighlights": true,
+        "progress": {
+          "mode": "indeterminate",
+          "label": "Planning",
+          "eta": null
+        }
+      }
+    },
+    {
+      "type": "provider",
+      "provider": "openai",
+      "requestBody": {
+        "model": "gpt-4.1-mini",
+        "messages": [
+          {
+            "role": "system",
+            "content": "sha256:e22be7cc020dc98a8cb1052ff5e87b250d3a474c4ecc654bee71e6144be8e22e:4615"
+          },
+          {
+            "role": "user",
+            "content": "Begin."
+          }
+        ],
+        "tools": {
+          "count": 57,
+          "sha256": "2065a1641ec6dac09f6b098ef344f16cf276281463b22b7824e83ceef7ac9fcd"
+        },
+        "temperature": 0,
+        "max_completion_tokens": 4096
+      }
+    },
+    {
+      "type": "content",
+      "tabId": 41,
+      "message": {
+        "action": "executeAction",
+        "tool": "click",
+        "params": {
+          "selector": "#start"
+        }
+      },
+      "options": null
+    },
+    {
+      "type": "status",
+      "tabId": 41,
+      "payload": {
+        "sessionId": "session_harness",
+        "phase": "acting",
+        "taskName": "Open the wizard and finish it",
+        "taskSummary": null,
+        "iteration": 1,
+        "maxIterations": 20,
+        "statusText": "Step 1/20: click",
+        "animatedHighlights": true
+      }
+    },
+    {
+      "type": "dashboard"
+    },
+    {
+      "type": "persist",
+      "status": "running"
+    },
+    {
+      "type": "schedule",
+      "delayMs": 100
+    },
+    {
+      "type": "step",
+      "index": 2
+    },
+    {
+      "type": "dashboard"
+    },
+    {
+      "type": "status",
+      "tabId": 41,
+      "payload": {
+        "sessionId": "session_harness",
+        "phase": "thinking",
+        "taskName": "Open the wizard and finish it",
+        "taskSummary": null,
+        "iteration": 2,
+        "maxIterations": 20,
+        "statusText": "Step 2/20: Scheduling next step",
+        "animatedHighlights": true,
+        "progress": {
+          "mode": "indeterminate",
+          "label": "Planning",
+          "eta": null
+        }
+      }
+    },
+    {
+      "type": "provider",
+      "provider": "openai",
+      "requestBody": {
+        "model": "gpt-4.1-mini",
+        "messages": [
+          {
+            "role": "system",
+            "content": "sha256:e22be7cc020dc98a8cb1052ff5e87b250d3a474c4ecc654bee71e6144be8e22e:4615"
+          },
+          {
+            "role": "user",
+            "content": "Begin."
+          },
+          {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                  "name": "click",
+                  "arguments": "{\"selector\":\"#start\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_1",
+            "name": "click",
+            "content": "{\"success\":true,\"hadEffect\":true,\"error\":null,\"navigationTriggered\":false,\"result\":{\"success\":true}}"
+          }
+        ],
+        "tools": {
+          "count": 57,
+          "sha256": "2065a1641ec6dac09f6b098ef344f16cf276281463b22b7824e83ceef7ac9fcd"
+        },
+        "temperature": 0,
+        "max_completion_tokens": 4096
+      }
+    },
+    {
+      "type": "content",
+      "tabId": 41,
+      "message": {
+        "action": "getMarkdownSnapshot",
+        "options": {
+          "charBudget": 12000,
+          "maxElements": 80
+        }
+      },
+      "options": {
+        "frameId": 0
+      }
+    },
+    {
+      "type": "status",
+      "tabId": 41,
+      "payload": {
+        "sessionId": "session_harness",
+        "phase": "acting",
+        "taskName": "Open the wizard and finish it",
+        "taskSummary": null,
+        "iteration": 2,
+        "maxIterations": 20,
+        "statusText": "Step 2/20: get page snapshot",
+        "animatedHighlights": true
+      }
+    },
+    {
+      "type": "dashboard"
+    },
+    {
+      "type": "persist",
+      "status": "running"
+    },
+    {
+      "type": "schedule",
+      "delayMs": 100
+    },
+    {
+      "type": "step",
+      "index": 3
+    },
+    {
+      "type": "dashboard"
+    },
+    {
+      "type": "status",
+      "tabId": 41,
+      "payload": {
+        "sessionId": "session_harness",
+        "phase": "thinking",
+        "taskName": "Open the wizard and finish it",
+        "taskSummary": null,
+        "iteration": 3,
+        "maxIterations": 20,
+        "statusText": "Step 3/20: Scheduling next step",
+        "animatedHighlights": true,
+        "progress": {
+          "mode": "indeterminate",
+          "label": "Planning",
+          "eta": null
+        }
+      }
+    },
+    {
+      "type": "provider",
+      "provider": "openai",
+      "requestBody": {
+        "model": "gpt-4.1-mini",
+        "messages": [
+          {
+            "role": "system",
+            "content": "sha256:e22be7cc020dc98a8cb1052ff5e87b250d3a474c4ecc654bee71e6144be8e22e:4615"
+          },
+          {
+            "role": "user",
+            "content": "Begin."
+          },
+          {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                  "name": "click",
+                  "arguments": "{\"selector\":\"#start\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_1",
+            "name": "click",
+            "content": "{\"success\":true,\"hadEffect\":true,\"error\":null,\"navigationTriggered\":false,\"result\":{\"success\":true}}"
+          },
+          {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_2",
+                "type": "function",
+                "function": {
+                  "name": "get_page_snapshot",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_2",
+            "name": "get_page_snapshot",
+            "content": "{\"success\":true,\"hadEffect\":false,\"error\":null,\"navigationTriggered\":false,\"result\":{\"snapshot\":\"# Wizard\\n- e1 button \\\"Next\\\"\\n- e2 checkbox \\\"Agree\\\"\",\"elementCount\":2}}"
+          }
+        ],
+        "tools": {
+          "count": 57,
+          "sha256": "2065a1641ec6dac09f6b098ef344f16cf276281463b22b7824e83ceef7ac9fcd"
+        },
+        "temperature": 0,
+        "max_completion_tokens": 4096
+      }
+    },
+    {
+      "type": "persist",
+      "status": "completed"
+    },
+    {
+      "type": "lifecycle",
+      "message": {
+        "action": "automationComplete",
+        "sessionId": "session_harness",
+        "tabId": 41,
+        "conversationId": null,
+        "historySessionId": "session_harness",
+        "result": "Wizard finished",
+        "partial": false,
+        "stopped": false,
+        "error": null,
+        "reason": "complete_task",
+        "outcome": "success",
+        "blocker": null,
+        "nextStep": null,
+        "outcomeDetails": {
+          "outcome": "success",
+          "reason": "complete_task",
+          "summary": "Wizard finished",
+          "blocker": null,
+          "nextStep": null,
+          "result": "Wizard finished",
+          "error": null
+        },
+        "task": "Open the wizard and finish it"
+      }
+    },
+    {
+      "type": "cleanup"
+    }
+  ],
+  "final": {
+    "status": "completed",
+    "outcome": "success",
+    "iterationCount": 3,
+    "messages": [
+      {
+        "role": "system",
+        "content": "sha256:e22be7cc020dc98a8cb1052ff5e87b250d3a474c4ecc654bee71e6144be8e22e:4615"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_1",
+            "type": "function",
+            "function": {
+              "name": "click",
+              "arguments": "{\"selector\":\"#start\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1",
+        "name": "click",
+        "content": "{\"success\":true,\"hadEffect\":true,\"error\":null,\"navigationTriggered\":false,\"result\":{\"success\":true}}"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_2",
+            "type": "function",
+            "function": {
+              "name": "get_page_snapshot",
+              "arguments": "{}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_2",
+        "name": "get_page_snapshot",
+        "content": "{\"success\":true,\"hadEffect\":false,\"error\":null,\"navigationTriggered\":false,\"result\":{\"snapshot\":\"# Wizard\\n- e1 button \\\"Next\\\"\\n- e2 checkbox \\\"Agree\\\"\",\"elementCount\":2}}"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_3",
+            "type": "function",
+            "function": {
+              "name": "complete_task",
+              "arguments": "{\"summary\":\"Wizard finished\"}"
+            }
+          }
+        ]
+      }
+    ],
+    "actionHistory": [
+      {
+        "tool": "click",
+        "params": {
+          "selector": "#start"
+        },
+        "result": {
+          "success": true,
+          "hadEffect": true,
+          "error": null
+        },
+        "timestamp": "<time>",
+        "iteration": 1,
+        "durationMs": "<time>"
+      },
+      {
+        "tool": "get_page_snapshot",
+        "params": {},
+        "result": {
+          "success": true,
+          "hadEffect": false,
+          "error": null
+        },
+        "timestamp": "<time>",
+        "iteration": 2,
+        "durationMs": "<time>"
+      }
+    ],
+    "toolCallLog": [
+      {
+        "iteration": 1,
+        "timestamp": "<time>",
+        "tool": "click",
+        "target": "#start",
+        "codeSnippet": null
+      },
+      {
+        "iteration": 2,
+        "timestamp": "<time>",
+        "tool": "get_page_snapshot",
+        "target": null,
+        "codeSnippet": null
+      },
+      {
+        "iteration": 3,
+        "timestamp": "<time>",
+        "tool": "complete_task",
+        "target": null,
+        "codeSnippet": null
+      }
+    ]
+  }
+}

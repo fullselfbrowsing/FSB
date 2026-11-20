@@ -78,4 +78,3 @@ None.
 _Fixed: 2026-07-12T22:16:46Z_
 _Fixer: the agent (gsd-code-fixer)_
 _Iteration: 1_
-

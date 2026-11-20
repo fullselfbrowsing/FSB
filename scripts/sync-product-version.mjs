@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compatBullet, compatFor, compatPairLine } from './lib/mcp-extension-compat.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(
@@ -48,6 +49,7 @@ const currentSurfaceTargets = Object.freeze([
   'mcp/src/install.ts',
   'mcp/src/platforms.ts',
   'showcase/about.html',
+  'showcase/dashboard.html',
   'showcase/angular/scripts/llms.source.md',
   'showcase/angular/scripts/llms-full.source.md',
   'showcase/angular/public/llms.txt',
@@ -279,7 +281,7 @@ function setMcpReadmeSurfaces(extensionVersion, mcpVersion) {
   changed.push(replaceExactly(
     'mcp/README.md',
     /^- \*\*(?:Unified product version|Compatibility):\*\* .*$/gmu,
-    `- **Compatibility:** \`fsb-mcp-server\` ${mcpVersion} requires FSB extension ${extensionVersion} or newer for \`mcp:task-status\`. Upgrade the extension and restart the MCP host together.`,
+    compatBullet(mcpVersion),
     'MCP README current compatibility summary',
   ));
   changed.push(replaceExactly(
@@ -291,7 +293,7 @@ function setMcpReadmeSurfaces(extensionVersion, mcpVersion) {
   changed.push(replaceExactly(
     'mcp/README.md',
     /^Compatibility for this release: .*$/gmu,
-    `Compatibility for this release: MCP ${mcpVersion} requires extension ${extensionVersion} or newer for the \`mcp:task-status\` route used by \`complete_task\`, \`partial_task\`, and \`fail_task\`. Existing \`0.10.0\` tool routes remain additive and unchanged.`,
+    compatPairLine(mcpVersion),
     'MCP README compatibility pair',
   ));
   changed.push(replaceExactly(
@@ -358,6 +360,12 @@ function setExtensionPublicSurfaces(version) {
     /FSB v\d+\.\d+\.\d+/gu,
     `FSB v${version}`,
     'legacy showcase current version',
+  ));
+  changed.push(replaceExactly(
+    'showcase/dashboard.html',
+    /FSB v\d+\.\d+\.\d+/gu,
+    `FSB v${version}`,
+    'legacy dashboard current version',
   ));
   changed.push(setLlmsExtensionSurfaces(version));
   return changed.some(Boolean);
@@ -548,11 +556,19 @@ function collectParityErrors() {
   if (new Set(mcpHeadings).size !== mcpHeadings.length) {
     errors.push('MCP README contains duplicate What\'s New release headings');
   }
-  contains(
-    'mcp/README.md',
-    `MCP ${mcpVersion} requires extension ${extensionVersion} or newer`,
-    'MCP README compatibility pair',
-  );
+  let compatMinimum = null;
+  try {
+    compatMinimum = compatFor(mcpVersion).minimum;
+  } catch (error) {
+    errors.push(`MCP README compatibility pair: ${error.message}`);
+  }
+  if (compatMinimum) {
+    contains(
+      'mcp/README.md',
+      `MCP ${mcpVersion} requires extension ${compatMinimum} or newer`,
+      'MCP README compatibility pair',
+    );
+  }
   contains('mcp/README.md', `### Releasing ${mcpVersion}`, 'MCP README release heading');
   contains(
     'mcp/README.md',

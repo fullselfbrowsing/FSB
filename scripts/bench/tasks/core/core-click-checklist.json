@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-click-checklist",
+  "version": 1,
+  "set": "core",
+  "category": "click-heavy",
+  "startPath": "/fixtures/checklist/index.html",
+  "instruction": "Open {startUrl}. Tick Alpha, Delta, Echo and Juliet, leave every other box unticked, then press Save.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/checklist/save", "count": 1, "jsonEquals": { "checked": ["alpha", "delta", "echo", "juliet"] } },
+      { "kind": "request", "method": "POST", "path": "/api/checklist/save", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/checklist/index.html", "queryIncludes": { "view": "saved" } },
+      { "kind": "marker", "name": "saved-count", "equals": "4" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "checklist/index.html"]
+}

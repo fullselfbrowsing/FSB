@@ -1,7 +1,7 @@
 # Phase 65: Codex Adapter — Research
 
-**Researched:** 2026-07-22  
-**Overall confidence:** HIGH for the pinned Codex 0.142.5 CLI, auth-status, JSONL, environment, and repository integration contracts; MEDIUM for managed-config isolation because 0.142.5 deliberately retains system/cloud/admin layers and therefore requires a fail-closed effective-roster attestation.  
+**Researched:** 2026-07-22
+**Overall confidence:** HIGH for the pinned Codex 0.142.5 CLI, auth-status, JSONL, environment, and repository integration contracts; MEDIUM for managed-config isolation because 0.142.5 deliberately retains system/cloud/admin layers and therefore requires a fail-closed effective-roster attestation.
 **Scope:** Planning research and deterministic validation design only. No paid/model-backed Codex task, live browser delegation, credential-file read, or genuine account-state capture was performed.
 
 <user_constraints>
@@ -429,8 +429,8 @@ Exactly these three rows remain unchecked and `human_needed`:
 
 ## Metadata
 
-**Research method:** accepted Phase 65 context + repository contract inspection + three parallel read-only backend/UI/validation scouts + official Codex manual + pinned 0.142.5 binary/source inspection.  
-**No external mutation:** no account change, login/logout, model call, browser task, or credential read.  
+**Research method:** accepted Phase 65 context + repository contract inspection + three parallel read-only backend/UI/validation scouts + official Codex manual + pinned 0.142.5 binary/source inspection.
+**No external mutation:** no account change, login/logout, model call, browser task, or credential read.
 **Planner handoff:** create security-threat blocks referencing T65-01 through T65-12; preserve the provider-neutral/atomic-exposure wave order; include exact automated commands and three manual UAT rows.
 
 ## Research Resolution

@@ -83,6 +83,19 @@ function check(cond, msg) {
   }
 }
 
+function settleWithin(promise, milliseconds) {
+  return new Promise(function(resolve) {
+    var timer = setTimeout(function() { resolve({ settled: false }); }, milliseconds);
+    Promise.resolve(promise).then(function(value) {
+      clearTimeout(timer);
+      resolve({ settled: true, value: value });
+    }, function(error) {
+      clearTimeout(timer);
+      resolve({ settled: true, error: error });
+    });
+  });
+}
+
 // ---- 1. Test-load the vendored globals + the modules under test. -----------
 vm.runInThisContext(fs.readFileSync(CFWORKER_PATH, 'utf8'));
 check(typeof globalThis.CfworkerJsonSchema === 'object' && globalThis.CfworkerJsonSchema !== null,
@@ -908,6 +921,23 @@ async function runPageReadWrapperCases(F) {
     if (priorOneNoteLocation === undefined) { delete globalThis.location; } else { globalThis.location = priorOneNoteLocation; }
     if (priorOneNoteLocalStorage === undefined) { delete globalThis.localStorage; } else { globalThis.localStorage = priorOneNoteLocalStorage; }
   }
+
+  var resolveLateExecution;
+  handle.chrome.scripting.executeScript = function() {
+    return new Promise(function(resolve) { resolveLateExecution = resolve; });
+  };
+  var pageReadController = new AbortController();
+  var nonCooperativeRead = F.executeBoundPageRead(req, 44, pageReadController.signal);
+  setTimeout(function() { pageReadController.abort('page-read-deadline'); }, 10);
+  var boundedPageRead = await settleWithin(nonCooperativeRead, 100);
+  check(boundedPageRead.settled === true && boundedPageRead.value &&
+    boundedPageRead.value.success === false &&
+    boundedPageRead.value.code === 'RECIPE_DOM_FALLBACK_PENDING',
+  'PAGE-READ: an aborted executeScript promise that ignores abort settles fail-quiet within the bound');
+  resolveLateExecution([{ result: { success: true, status: 200, data: { forbiddenLate: true } } }]);
+  await Promise.resolve();
+  check(!boundedPageRead.value || JSON.stringify(boundedPageRead.value).indexOf('forbiddenLate') === -1,
+    'PAGE-READ: a detached late executeScript result cannot alter the settled projection');
   handle.restore();
 
   const mismatchRecorder = [];

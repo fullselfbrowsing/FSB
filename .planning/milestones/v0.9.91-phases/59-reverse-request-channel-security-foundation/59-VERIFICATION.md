@@ -27,8 +27,8 @@ human_verification:
 
 **Phase goal:** Establish the authenticated, additive extension-to-daemon reverse-request transport and its permanent security gates before any agent process-spawn implementation exists.
 
-**Verified:** 2026-07-14T14:54:51Z  
-**Status:** `human_needed`  
+**Verified:** 2026-07-14T14:54:51Z
+**Status:** `human_needed`
 **Automated status:** `passed`
 
 ## Verdict
@@ -145,5 +145,5 @@ There is no automated, source, artifact, wiring, review, or phase-ordering gap b
 
 ---
 
-_Verified: 2026-07-14T14:54:51Z_  
+_Verified: 2026-07-14T14:54:51Z_
 _Verifier: independent gsd-verifier agent_

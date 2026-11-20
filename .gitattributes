@@ -3,3 +3,7 @@ graphify-out/**/manifest.json filter=lfs diff=lfs merge=lfs -text
 graphify-out/**/*.graphml filter=lfs diff=lfs merge=lfs -text
 graphify-out/**/*.svg filter=lfs diff=lfs merge=lfs -text
 graphify-out/**/graph.html filter=lfs diff=lfs merge=lfs -text
+
+# Phase 66 benchmark fixtures are hashed byte for byte by scripts/bench/tasks/core.lock.json;
+# never convert their line endings on checkout.
+scripts/bench/fixtures/** -text

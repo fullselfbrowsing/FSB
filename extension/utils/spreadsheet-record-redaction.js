@@ -243,6 +243,19 @@
     return out;
   }
 
+  // Per-call timing carries only integers, never sheet content. Keep a fresh
+  // copy when it matches the v1 contract (safe non-negative integer times,
+  // completedAt >= receivedAt, fsbMs recomputed); drop anything else.
+  function safeTiming(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) { return null; }
+    if (value.v !== 1) { return null; }
+    var receivedAt = value.receivedAt;
+    var completedAt = value.completedAt;
+    if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) { return null; }
+    if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) { return null; }
+    return { v: 1, receivedAt: receivedAt, completedAt: completedAt, fsbMs: completedAt - receivedAt };
+  }
+
   function baseFields(entry) {
     var out = {
       client: entry.client,
@@ -251,6 +264,8 @@
       tabId: Number.isFinite(entry.tabId) ? entry.tabId : null
     };
     if (typeof entry.dispatcher_route === 'string') { out.dispatcher_route = entry.dispatcher_route; }
+    var timing = safeTiming(entry.timing);
+    if (timing) { out.timing = timing; }
     return out;
   }
 

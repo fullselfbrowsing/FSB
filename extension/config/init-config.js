@@ -29,6 +29,7 @@ const defaultConfig = {
   elementCacheSize: 200,
   prioritizeViewport: true,
   animatedActionHighlights: true,
+  fsbJevFastModeEnabled: false, // Phase 68: autopilot fast mode, off by default
   showSidepanelProgress: false,
 
   // Credential Manager (Beta)

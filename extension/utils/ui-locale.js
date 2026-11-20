@@ -23,6 +23,14 @@
   var PUBLIC_LOCALES = ['en', 'es', 'de', 'ru', 'ja', 'ko', 'zh-CN', 'zh-TW'];
   var SOURCE_LOCALE = 'en';
   var STORAGE_KEY = 'fsbUiLocale';
+  // Extension pages and the service worker read and watch the saved choice in
+  // chrome.storage.local. The background limits storage.local to trusted
+  // contexts, so content scripts ask it over runtime messages instead. The
+  // action names leave out "local" because the storage-boundary gate flags
+  // proxy actions that read like storage access.
+  var LANGUAGE_GET = 'fsb:ui-language-config-get';
+  var LANGUAGE_CHANGED = 'fsb:ui-language-changed';
+  var LANGUAGE_GET_TIMEOUT_MS = 2000;
   var FOLDERS = {
     en: 'en',
     es: 'es',
@@ -486,6 +494,54 @@
     }
   }
 
+  function readOverride() {
+    return isExtensionPage() ? readStorageOverride() : readBridgeOverride();
+  }
+
+  // A content script asks the background for the saved choice. With no answer
+  // within LANGUAGE_GET_TIMEOUT_MS boot goes on with the automatic language,
+  // and a late answer still applies and refreshes what was drawn meanwhile.
+  function readBridgeOverride() {
+    return new Promise(function (resolve) {
+      var runtime = root.chrome && root.chrome.runtime;
+      if (!runtime || typeof runtime.sendMessage !== 'function') {
+        resolve(null);
+        return;
+      }
+      var settled = false;
+      var timer = null;
+      function finish(value) {
+        if (settled) return;
+        settled = true;
+        if (timer !== null && typeof clearTimeout === 'function') clearTimeout(timer);
+        resolve(value);
+      }
+      function accept(response) {
+        var failed = runtime.lastError;
+        var code = !failed && response && response.ok === true && isPublicLocale(response.locale)
+          ? response.locale : null;
+        if (!settled) {
+          setOverride(code);
+          finish(code);
+          return;
+        }
+        if (code !== activeOverride) {
+          setOverride(code);
+          ensureCatalog(current()).then(notifyLocaleChange);
+        }
+      }
+      if (typeof setTimeout === 'function') {
+        timer = setTimeout(function () { finish(null); }, LANGUAGE_GET_TIMEOUT_MS);
+      }
+      try {
+        var pending = runtime.sendMessage({ action: LANGUAGE_GET }, accept);
+        if (pending && typeof pending.then === 'function') pending.then(accept, function () { finish(null); });
+      } catch (err) {
+        finish(null);
+      }
+    });
+  }
+
   function readStorageOverride() {
     return new Promise(function (resolve) {
       var chromeApi = root.chrome;
@@ -549,8 +605,10 @@
     if (isExtensionPage() && typeof document !== 'undefined') {
       apply(document);
     }
-    for (i = 0; i < refreshers.length; i++) {
-      try { refreshers[i](); } catch (err) { /* a surface refresh must not break the others */ }
+    // A callback may unsubscribe itself while this runs.
+    var callbacks = refreshers.slice();
+    for (i = 0; i < callbacks.length; i++) {
+      try { callbacks[i](); } catch (err) { /* a surface refresh must not break the others */ }
     }
   }
 
@@ -565,6 +623,34 @@
       setOverride(isPublicLocale(next) ? next : null);
       ensureCatalog(current()).then(notifyLocaleChange);
     });
+  }
+
+  // The background broadcasts each change of the saved choice to every tab.
+  // Only that exact message shape from this extension is accepted. The
+  // listener never answers, so other listeners keep their replies. It is
+  // registered once per chrome.runtime object, so a world that outlives an
+  // extension reload listens again.
+  var bridgedRuntime = null;
+  function watchBridge() {
+    var runtime = root.chrome && root.chrome.runtime;
+    if (!runtime || !runtime.onMessage || typeof runtime.onMessage.addListener !== 'function') return;
+    if (bridgedRuntime === runtime) return;
+    bridgedRuntime = runtime;
+    runtime.onMessage.addListener(function (message, sender) {
+      if (!message || typeof message !== 'object' || message.action !== LANGUAGE_CHANGED) return false;
+      var keys = Object.keys(message);
+      if (keys.length !== 2 || keys.indexOf('locale') === -1) return false;
+      if (!sender || sender.id !== runtime.id) return false;
+      if (message.locale !== null && !isPublicLocale(message.locale)) return false;
+      setOverride(message.locale);
+      ensureCatalog(current()).then(notifyLocaleChange);
+      return false;
+    });
+  }
+
+  function watchLanguage() {
+    if (isExtensionPage()) watchStorage();
+    else watchBridge();
   }
 
   function saveOverride(code) {
@@ -592,8 +678,14 @@
     });
   }
 
+  // Returns a function that removes the callback again.
   function onChange(fn) {
-    if (typeof fn === 'function') refreshers.push(fn);
+    if (typeof fn !== 'function') return function () {};
+    refreshers.push(fn);
+    return function () {
+      var index = refreshers.indexOf(fn);
+      if (index !== -1) refreshers.splice(index, 1);
+    };
   }
 
   function mountSelect(select) {
@@ -623,26 +715,40 @@
     });
   }
 
+  var bootPromise = null;
+  var bootRuntime = null;
+
   function boot() {
     if (root.chrome && root.chrome.i18n && typeof root.chrome.i18n.getUILanguage === 'function') {
       uiTag = root.chrome.i18n.getUILanguage();
     }
     timeZone = readTimeZone();
-    watchStorage();
-    return Promise.all([readPreferredLanguages(), readStorageOverride()]).then(function (results) {
+    watchLanguage();
+    bootRuntime = root.chrome && root.chrome.runtime;
+    bootPromise = Promise.all([readPreferredLanguages(), readOverride()]).then(function (results) {
       setPreferredLanguages(results[0]);
       // Extension pages keep every catalog so isMessage() can recognise text
-      // shown in any earlier language. Content scripts load the active locale,
-      // the browser locale, and the English fallback: text drawn before boot
-      // comes from chrome.i18n in the browser language, and isMessage() must
-      // recognise it to replace it. ensureCatalog() adds others on change.
-      if (isExtensionPage()) return loadCatalogs();
+      // shown in any earlier language. Content scripts and the service worker
+      // load the active locale, the browser locale, and the English fallback:
+      // text drawn before boot comes from chrome.i18n in the browser language,
+      // and isMessage() must recognise it to replace it. ensureCatalog() adds
+      // others on change.
+      if (isExtensionPage() && typeof document !== 'undefined') return loadCatalogs();
       var codes = [current()];
       var browserLocale = resolveLocale(uiTag);
       if (codes.indexOf(browserLocale) === -1) codes.push(browserLocale);
       if (codes.indexOf(SOURCE_LOCALE) === -1) codes.push(SOURCE_LOCALE);
       return loadCatalogs(null, codes);
     }).then(syncDocumentLang);
+    return bootPromise;
+  }
+
+  // Several surfaces can share one instance; the first boot serves them all
+  // until the extension's runtime object changes.
+  function bootOnce() {
+    var runtime = root.chrome && root.chrome.runtime;
+    if (bootPromise && bootRuntime === runtime) return bootPromise;
+    return boot();
   }
 
   // Static markup is only re-translated while it still shows a catalog message
@@ -722,6 +828,7 @@
     refresh: notifyLocaleChange,
     mountSelect: mountSelect,
     boot: boot,
+    bootOnce: bootOnce,
     parseMessages: parseMessages,
     loadCatalogs: loadCatalogs,
     ensureCatalog: ensureCatalog

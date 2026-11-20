@@ -1,0 +1,1546 @@
+{
+  "schemaVersion": 1,
+  "gateVersion": "1.0.0",
+  "notes": [
+    "Predeclared release gate for FSB v1.0.0 (Phase 71, D-11). Frozen before V1: any change needs a new gateVersion file and a new sha256 pin in tests/bench-gate.test.mjs.",
+    "Rounds come from the seeded power simulation (71-04; seed 71, 4000 reps): R = 30 for every campaign, met true. Rounds only go up; the completion margin never moves.",
+    "Power at R 30 and floor completion 0.8: jev-ni 0.92125, claude-ni 0.92325, sentinel-equivalence 0.8465, sentinel-speed 1.",
+    "V1 must run --rounds 30 for core-baseline-66; the pin runner has no gate preflight, so the rounds are checked by hand (M-71-01b).",
+    "spend at 30 rounds per arm: V1 720 core runs, V4 autopilot 720 runs, V4 Claude 360 runs (defaults 240, 480, 120); 1800 paid runs instead of 840",
+    "The optional core-rebaseline-71 fallback adds 2 x 12 x 30 = 720 Claude runs if the owner runs it at V4.",
+    "acted attempt: fallback === null && op !== null && stepOutcome !== null (68-04); jev.acted is true when at least one attempt acted.",
+    "intention to treat: the fast condition means switch on, whether or not Jev acted; a per-protocol view appears only under diagnostics (D-10).",
+    "speed reads only wallMs on the runner's clock; per-decision Jev latency and jevMs are diagnostics, never whole-task speed (D-10, D-18).",
+    "Both Jev verdicts come from run_task in core-gate-71-autopilot; the side-panel start path is not driven separately (D-05).",
+    "false done: a typed done on a checker-failed run counts as claimedSuccessOnFail (D-09 item 3)",
+    "an 'on' run with no Jev attempt is known exposure: acted false, never unknown (2026-10-16 decision)",
+    "condition leak: any counted 'off' row with jev.source not null makes the Jev verdicts not_exercised (D-16, 2026-10-16)",
+    "unknown exposure (jev.acted null) counts as acted for rule (a); cost in power.safetyTable at unknownShare 0.1; owner sign-off M-71-00 item 1",
+    "p in power.safetyTable is the per-run rate of any safety event, claimedSuccessOnFail included",
+    "safety rules are D-15 as locked; false-fail rates with no true difference are in power.safetyTable; owner sign-off M-71-00 after the V1 smoke, before the V1 campaign",
+    "Example at R 30, p 0.01, acted share 0.5: rule (a) fails 0.8425 with no true difference, 0.8615 at unknown share 0.1.",
+    "core-rebaseline-71 may replace only an inconclusive non-Jev verdict caused by a listed trigger",
+    "Discretion numbers at their defaults: minActedShare 0.5, sentinel speedBand [0.80, 1.25] (sentinel-speed passes at R), non-Jev ciUpperAtMost 1.10.",
+    "Claim words: autopilot status words at the pin and now (71-SYNC-RECHECK S12); a Claude run claims success with completeTask true.",
+    "verifySuites: the tighten-only and escalation suites of 71-SYNC-RECHECK S14; the evaluator runs them at the measured SHA (--verify-suites).",
+    "A path passes only when every criterion passes; no adjustment across the two families; Bonferroni intervals print as a sensitivity line (D-14)."
+  ],
+  "corpusLockSha256": "65faa8c2e482938653ec0e76f3fef07002c409d172c6c4e8c2a49e8308c079d6",
+  "campaigns": {
+    "baseline": {
+      "id": "core-baseline-66",
+      "arms": [
+        "autopilot",
+        "claude"
+      ],
+      "seed": 66,
+      "conditions": null,
+      "minRounds": 30,
+      "rowSchema": 1
+    },
+    "autopilot": {
+      "id": "core-gate-71-autopilot",
+      "arms": [
+        "autopilot"
+      ],
+      "seed": 71,
+      "conditions": [
+        "off",
+        "on"
+      ],
+      "minRounds": 30,
+      "rowSchema": 2
+    },
+    "claude": {
+      "id": "core-gate-71-claude",
+      "arms": [
+        "claude"
+      ],
+      "seed": 66,
+      "conditions": [
+        "off"
+      ],
+      "minRounds": 30,
+      "rowSchema": 2
+    }
+  },
+  "identityMatch": {
+    "claude": [
+      "hosts.claude.version",
+      "hosts.claude.model",
+      "hosts.claude.toolSearchEnv",
+      "hosts.claude.envKeyNamesSha256",
+      "provider.requestedModel",
+      "corpus",
+      "chromeMajor"
+    ],
+    "autopilot": [
+      "provider.requestedModel",
+      "corpus",
+      "chromeMajor"
+    ],
+    "reported": [
+      "hosts.claude.agentPolicySha256",
+      "mcp.toolsList.sha256"
+    ]
+  },
+  "paths": {
+    "jev-mcp-run-task": {
+      "label": "MCP run_task fast loop",
+      "family": "jev",
+      "campaign": "autopilot",
+      "control": "off",
+      "treatment": "on"
+    },
+    "jev-autopilot": {
+      "label": "Autopilot fast mode, measured through run_task (shared loop mechanics)",
+      "family": "jev",
+      "campaign": "autopilot",
+      "control": "off",
+      "treatment": "on"
+    },
+    "mcp-non-jev": {
+      "label": "Non-Jev MCP changes: shorter descriptions, optional expect and the settings tool",
+      "family": "non-jev",
+      "baseline": "baseline",
+      "candidate": "claude",
+      "arm": "claude",
+      "candidateCondition": "off"
+    }
+  },
+  "sentinel": {
+    "baseline": "baseline",
+    "candidate": "autopilot",
+    "arm": "autopilot",
+    "condition": "off",
+    "completionMargin": 0.1,
+    "speedBand": [
+      0.8,
+      1.25
+    ],
+    "blocker": "autopilot off-path regression or drift: investigate before V6"
+  },
+  "criteria": {
+    "alphaOneSided": 0.025,
+    "z": 1.959963984540054,
+    "completionMargin": 0.1,
+    "jevSpeed": {
+      "ciUpperBelow": 1,
+      "maxEstimate": 0.9,
+      "belowAaFloorLower": true
+    },
+    "nonJevSpeed": {
+      "ciUpperAtMost": 1.1,
+      "fasterCiUpperBelow": 1
+    },
+    "scope": "core"
+  },
+  "exercise": {
+    "minActedShare": 0.5,
+    "requireCalibrated": true,
+    "singleModelInstrumentPair": true,
+    "captureArmFalse": true,
+    "noOffActivity": true,
+    "actedAttempt": "fallback === null && op !== null && stepOutcome !== null"
+  },
+  "safety": {
+    "events": [
+      "requestOvercount",
+      "unexpectedMutations",
+      "claimedSuccessOnFail"
+    ],
+    "actedZeroTolerance": true,
+    "compare": "rate-per-counted-run",
+    "unknownExposure": "acted",
+    "verifySuites": [
+      "node tests/jev-policy-tighten-only.test.js",
+      "node tests/jev-fast-path.test.js",
+      "node tests/jev-fast-loop.test.js",
+      "node tests/jev-run-task-outcome.test.js"
+    ]
+  },
+  "claimWords": {
+    "autopilot": {
+      "baseline": [
+        "completed",
+        "success"
+      ],
+      "candidate": [
+        "completed",
+        "success"
+      ],
+      "candidateTypedOutcome": [
+        "done"
+      ]
+    },
+    "claude": {
+      "completeTask": true
+    }
+  },
+  "fallback": {
+    "campaignId": "core-rebaseline-71",
+    "arm": "claude",
+    "campaigns": {
+      "pin": {
+        "id": "core-rebaseline-71-pin",
+        "seed": 66,
+        "conditions": null,
+        "rowSchema": 1,
+        "minRounds": 30
+      },
+      "candidate": {
+        "id": "core-rebaseline-71-candidate",
+        "seed": 66,
+        "conditions": [
+          "off"
+        ],
+        "rowSchema": 2,
+        "minRounds": 30
+      }
+    },
+    "blockRounds": 5,
+    "triggers": [
+      "sentinel_trip",
+      "identity_mismatch",
+      "resume_drift"
+    ],
+    "replaces": "mcp-non-jev",
+    "criteria": "mcp-non-jev",
+    "sentinel": "not_applicable",
+    "design": "pin runner and build (8a058bdf worktree) and candidate runner and build run in alternating blocks of blockRounds rounds in one window",
+    "decision": "owner at V4",
+    "tooling": "none; manual V4 procedure"
+  },
+  "bootstrap": {
+    "iterations": 10000,
+    "seed": 71,
+    "level": 0.95,
+    "sensitivityLevel": 0.975
+  },
+  "targets": {
+    "autopilotMixed": [
+      1.5,
+      2
+    ],
+    "mcpClickHeavy": [
+      2,
+      3
+    ],
+    "mcpUatStyle": [
+      1.3,
+      1.6
+    ],
+    "use": "report met or not met; never a pass condition"
+  },
+  "power": {
+    "floorCompletionRate": 0.8,
+    "minPower": 0.8,
+    "maxSentinelFalseTrip": 0.2,
+    "seed": 71,
+    "reps": 4000,
+    "speedReps": 100,
+    "safetyReps": 4000,
+    "iterations": 500,
+    "recommendedRounds": 30,
+    "met": true,
+    "table": [
+      {
+        "comparison": "jev-ni",
+        "rounds": 20,
+        "p": 0.8,
+        "pass": 0.791
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 20,
+        "p": 0.8,
+        "pass": 0.78475
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 20,
+        "p": 0.8,
+        "pass": 0.582
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 20,
+        "p": 0.85,
+        "pass": 0.87325
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 20,
+        "p": 0.85,
+        "pass": 0.872
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 20,
+        "p": 0.85,
+        "pass": 0.72275
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 20,
+        "p": 0.9,
+        "pass": 0.9485
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 20,
+        "p": 0.9,
+        "pass": 0.95125
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 20,
+        "p": 0.9,
+        "pass": 0.9145
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 20,
+        "p": 0.95,
+        "pass": 0.9985
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 20,
+        "p": 0.95,
+        "pass": 0.9975
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 20,
+        "p": 0.95,
+        "pass": 0.99625
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 20,
+        "p": 0.8,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 24,
+        "p": 0.8,
+        "pass": 0.8505
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 24,
+        "p": 0.8,
+        "pass": 0.849
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 24,
+        "p": 0.8,
+        "pass": 0.714
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 24,
+        "p": 0.85,
+        "pass": 0.922
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 24,
+        "p": 0.85,
+        "pass": 0.91675
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 24,
+        "p": 0.85,
+        "pass": 0.838
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 24,
+        "p": 0.9,
+        "pass": 0.9765
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 24,
+        "p": 0.9,
+        "pass": 0.98
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 24,
+        "p": 0.9,
+        "pass": 0.95675
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 24,
+        "p": 0.95,
+        "pass": 0.9995
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 24,
+        "p": 0.95,
+        "pass": 0.9985
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 24,
+        "p": 0.95,
+        "pass": 0.99825
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 24,
+        "p": 0.8,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 25,
+        "p": 0.8,
+        "pass": 0.86275
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 25,
+        "p": 0.8,
+        "pass": 0.8665
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 25,
+        "p": 0.8,
+        "pass": 0.74375
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 25,
+        "p": 0.85,
+        "pass": 0.92875
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 25,
+        "p": 0.85,
+        "pass": 0.93275
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 25,
+        "p": 0.85,
+        "pass": 0.8665
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 25,
+        "p": 0.9,
+        "pass": 0.98175
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 25,
+        "p": 0.9,
+        "pass": 0.981
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 25,
+        "p": 0.9,
+        "pass": 0.96725
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 25,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 25,
+        "p": 0.95,
+        "pass": 0.99975
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 25,
+        "p": 0.95,
+        "pass": 0.999
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 25,
+        "p": 0.8,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 30,
+        "p": 0.8,
+        "pass": 0.92125
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 30,
+        "p": 0.8,
+        "pass": 0.92325
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 30,
+        "p": 0.8,
+        "pass": 0.8465
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 30,
+        "p": 0.85,
+        "pass": 0.973
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 30,
+        "p": 0.85,
+        "pass": 0.96975
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 30,
+        "p": 0.85,
+        "pass": 0.93225
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 30,
+        "p": 0.9,
+        "pass": 0.993
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 30,
+        "p": 0.9,
+        "pass": 0.994
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 30,
+        "p": 0.9,
+        "pass": 0.9895
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 30,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 30,
+        "p": 0.95,
+        "pass": 0.99975
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 30,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 30,
+        "p": 0.8,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 35,
+        "p": 0.8,
+        "pass": 0.953
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 35,
+        "p": 0.8,
+        "pass": 0.95675
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 35,
+        "p": 0.8,
+        "pass": 0.911
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 35,
+        "p": 0.85,
+        "pass": 0.985
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 35,
+        "p": 0.85,
+        "pass": 0.98425
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 35,
+        "p": 0.85,
+        "pass": 0.967
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 35,
+        "p": 0.9,
+        "pass": 0.9985
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 35,
+        "p": 0.9,
+        "pass": 0.99875
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 35,
+        "p": 0.9,
+        "pass": 0.99575
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 35,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 35,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 35,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 35,
+        "p": 0.8,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 40,
+        "p": 0.8,
+        "pass": 0.97525
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 40,
+        "p": 0.8,
+        "pass": 0.97225
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 40,
+        "p": 0.8,
+        "pass": 0.953
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 40,
+        "p": 0.85,
+        "pass": 0.99
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 40,
+        "p": 0.85,
+        "pass": 0.99075
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 40,
+        "p": 0.85,
+        "pass": 0.9865
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 40,
+        "p": 0.9,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 40,
+        "p": 0.9,
+        "pass": 0.9995
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 40,
+        "p": 0.9,
+        "pass": 0.999
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 40,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 40,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 40,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 40,
+        "p": 0.8,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 50,
+        "p": 0.8,
+        "pass": 0.993
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 50,
+        "p": 0.8,
+        "pass": 0.992
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 50,
+        "p": 0.8,
+        "pass": 0.9845
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 50,
+        "p": 0.85,
+        "pass": 0.9985
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 50,
+        "p": 0.85,
+        "pass": 0.998
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 50,
+        "p": 0.85,
+        "pass": 0.9955
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 50,
+        "p": 0.9,
+        "pass": 0.99975
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 50,
+        "p": 0.9,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 50,
+        "p": 0.9,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 50,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 50,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 50,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 50,
+        "p": 0.8,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 60,
+        "p": 0.8,
+        "pass": 0.99825
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 60,
+        "p": 0.8,
+        "pass": 0.99725
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 60,
+        "p": 0.8,
+        "pass": 0.99375
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 60,
+        "p": 0.85,
+        "pass": 0.999
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 60,
+        "p": 0.85,
+        "pass": 0.9995
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 60,
+        "p": 0.85,
+        "pass": 0.9995
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 60,
+        "p": 0.9,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 60,
+        "p": 0.9,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 60,
+        "p": 0.9,
+        "pass": 1
+      },
+      {
+        "comparison": "jev-ni",
+        "rounds": 60,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "claude-ni",
+        "rounds": 60,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-equivalence",
+        "rounds": 60,
+        "p": 0.95,
+        "pass": 1
+      },
+      {
+        "comparison": "sentinel-speed",
+        "rounds": 60,
+        "p": 0.8,
+        "pass": 1
+      }
+    ],
+    "spend": {
+      "roundsPerArm": 30,
+      "v1CoreRuns": 720,
+      "v4AutopilotRuns": 720,
+      "v4ClaudeRuns": 360,
+      "defaultRuns": {
+        "v1": 240,
+        "v4Autopilot": 480,
+        "v4Claude": 120
+      }
+    },
+    "safetyTable": [
+      {
+        "p": 0.005,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.4545,
+        "ruleAExact": 0.452013714509958,
+        "ruleB": 0.3715,
+        "jevSafety": 0.65075,
+        "nonJev": 0.362
+      },
+      {
+        "p": 0.005,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.478,
+        "ruleAExact": 0.48400361570628414,
+        "ruleB": 0.36825,
+        "jevSafety": 0.673,
+        "nonJev": 0.35575
+      },
+      {
+        "p": 0.005,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.603,
+        "ruleAExact": 0.6180280223946972,
+        "ruleB": 0.2115,
+        "jevSafety": 0.68775,
+        "nonJev": 0.36775
+      },
+      {
+        "p": 0.005,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.64575,
+        "ruleAExact": 0.6274823051129316,
+        "ruleB": 0.18875,
+        "jevSafety": 0.71725,
+        "nonJev": 0.36225
+      },
+      {
+        "p": 0.005,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.6945,
+        "ruleAExact": 0.699711030914826,
+        "ruleB": 0,
+        "jevSafety": 0.6945,
+        "nonJev": 0.36025
+      },
+      {
+        "p": 0.005,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.69025,
+        "ruleAExact": 0.699711030914826,
+        "ruleB": 0,
+        "jevSafety": 0.69025,
+        "nonJev": 0.3625
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.7095,
+        "ruleAExact": 0.7006196086876688,
+        "ruleB": 0.4505,
+        "jevSafety": 0.83925,
+        "nonJev": 0.40025
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.7445,
+        "ruleAExact": 0.7346337502522947,
+        "ruleB": 0.476,
+        "jevSafety": 0.86725,
+        "nonJev": 0.39325
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.85825,
+        "ruleAExact": 0.8548030937842173,
+        "ruleB": 0.3495,
+        "jevSafety": 0.905,
+        "nonJev": 0.4125
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.86425,
+        "ruleAExact": 0.8619191869125272,
+        "ruleB": 0.35025,
+        "jevSafety": 0.90825,
+        "nonJev": 0.4065
+      },
+      {
+        "p": 0.01,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.90725,
+        "ruleAExact": 0.9103713812976753,
+        "ruleB": 0,
+        "jevSafety": 0.90725,
+        "nonJev": 0.39725
+      },
+      {
+        "p": 0.01,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.9045,
+        "ruleAExact": 0.9103713812976753,
+        "ruleB": 0,
+        "jevSafety": 0.9045,
+        "nonJev": 0.39925
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.917,
+        "ruleAExact": 0.9114621272740426,
+        "ruleB": 0.48,
+        "jevSafety": 0.95825,
+        "nonJev": 0.44225
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.929,
+        "ruleAExact": 0.930522850588038,
+        "ruleB": 0.4875,
+        "jevSafety": 0.96375,
+        "nonJev": 0.43125
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.97975,
+        "ruleAExact": 0.9793268558471807,
+        "ruleB": 0.453,
+        "jevSafety": 0.98875,
+        "nonJev": 0.434
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.98325,
+        "ruleAExact": 0.9813131150650223,
+        "ruleB": 0.44625,
+        "jevSafety": 0.98825,
+        "nonJev": 0.4375
+      },
+      {
+        "p": 0.02,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.988,
+        "ruleAExact": 0.9921610450931622,
+        "ruleB": 0,
+        "jevSafety": 0.988,
+        "nonJev": 0.4335
+      },
+      {
+        "p": 0.02,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.9915,
+        "ruleAExact": 0.9921610450931622,
+        "ruleB": 0,
+        "jevSafety": 0.9915,
+        "nonJev": 0.436
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.998,
+        "ruleAExact": 0.9978775736213018,
+        "ruleB": 0.4875,
+        "jevSafety": 0.9995,
+        "nonJev": 0.461
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 0.99925,
+        "ruleAExact": 0.9988531254959492,
+        "ruleB": 0.48775,
+        "jevSafety": 1,
+        "nonJev": 0.44625
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 0.99975,
+        "ruleAExact": 0.9999471637221351,
+        "ruleB": 0.45475,
+        "jevSafety": 0.99975,
+        "nonJev": 0.44675
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.9999591162953797,
+        "ruleB": 0.46275,
+        "jevSafety": 1,
+        "nonJev": 0.45925
+      },
+      {
+        "p": 0.05,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.999995495306267,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.4395
+      },
+      {
+        "p": 0.05,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.999995495306267,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.45375
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.999996770753982,
+        "ruleB": 0.505,
+        "jevSafety": 1,
+        "nonJev": 0.46325
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.9999990879655439,
+        "ruleB": 0.5075,
+        "jevSafety": 1,
+        "nonJev": 0.46875
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999983610647,
+        "ruleB": 0.46725,
+        "jevSafety": 1,
+        "nonJev": 0.46725
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999990322251,
+        "ruleB": 0.46525,
+        "jevSafety": 1,
+        "nonJev": 0.46825
+      },
+      {
+        "p": 0.1,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.999999999989572,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.4725
+      },
+      {
+        "p": 0.1,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 20,
+        "ruleA": 1,
+        "ruleAExact": 0.999999999989572,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.4655
+      },
+      {
+        "p": 0.005,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.5985,
+        "ruleAExact": 0.5943471474984818,
+        "ruleB": 0.4325,
+        "jevSafety": 0.7685,
+        "nonJev": 0.3865
+      },
+      {
+        "p": 0.005,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.6265,
+        "ruleAExact": 0.6293448935873669,
+        "ruleB": 0.443,
+        "jevSafety": 0.78975,
+        "nonJev": 0.382
+      },
+      {
+        "p": 0.005,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.75875,
+        "ruleAExact": 0.7639264913631594,
+        "ruleB": 0.292,
+        "jevSafety": 0.8325,
+        "nonJev": 0.392
+      },
+      {
+        "p": 0.005,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.76425,
+        "ruleAExact": 0.7720661532463733,
+        "ruleB": 0.268,
+        "jevSafety": 0.82925,
+        "nonJev": 0.3905
+      },
+      {
+        "p": 0.005,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.838,
+        "ruleAExact": 0.8354457632573815,
+        "ruleB": 0,
+        "jevSafety": 0.838,
+        "nonJev": 0.39075
+      },
+      {
+        "p": 0.005,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.84125,
+        "ruleAExact": 0.8354457632573815,
+        "ruleB": 0,
+        "jevSafety": 0.84125,
+        "nonJev": 0.39725
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.8425,
+        "ruleAExact": 0.8361920302919126,
+        "ruleB": 0.47675,
+        "jevSafety": 0.91475,
+        "nonJev": 0.42675
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.8615,
+        "ruleAExact": 0.8632999950434019,
+        "ruleB": 0.47575,
+        "jevSafety": 0.925,
+        "nonJev": 0.42025
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.95075,
+        "ruleAExact": 0.9446731373287794,
+        "ruleB": 0.4445,
+        "jevSafety": 0.974,
+        "nonJev": 0.4235
+      },
+      {
+        "p": 0.01,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.95125,
+        "ruleAExact": 0.9484317484957465,
+        "ruleB": 0.41425,
+        "jevSafety": 0.9695,
+        "nonJev": 0.423
+      },
+      {
+        "p": 0.01,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.9745,
+        "ruleAExact": 0.9731669490601144,
+        "ruleB": 0,
+        "jevSafety": 0.9745,
+        "nonJev": 0.4225
+      },
+      {
+        "p": 0.01,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.97125,
+        "ruleAExact": 0.9731669490601144,
+        "ruleB": 0,
+        "jevSafety": 0.97125,
+        "nonJev": 0.4245
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.97375,
+        "ruleAExact": 0.9736552777231164,
+        "ruleB": 0.483,
+        "jevSafety": 0.98825,
+        "nonJev": 0.44325
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.981,
+        "ruleAExact": 0.9816868527637219,
+        "ruleB": 0.482,
+        "jevSafety": 0.99025,
+        "nonJev": 0.447
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.99675,
+        "ruleAExact": 0.9970275825690957,
+        "ruleB": 0.474,
+        "jevSafety": 0.99775,
+        "nonJev": 0.43625
+      },
+      {
+        "p": 0.02,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.99775,
+        "ruleAExact": 0.9974195685327644,
+        "ruleB": 0.46125,
+        "jevSafety": 0.99875,
+        "nonJev": 0.44025
+      },
+      {
+        "p": 0.02,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 0.99925,
+        "ruleAExact": 0.9993059556081538,
+        "ruleB": 0,
+        "jevSafety": 0.99925,
+        "nonJev": 0.46125
+      },
+      {
+        "p": 0.02,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.99975,
+        "ruleAExact": 0.9993059556081538,
+        "ruleB": 0,
+        "jevSafety": 0.99975,
+        "nonJev": 0.451
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999022202433687,
+        "ruleB": 0.4795,
+        "jevSafety": 1,
+        "nonJev": 0.46475
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 0.99975,
+        "ruleAExact": 0.9999611604806107,
+        "ruleB": 0.4875,
+        "jevSafety": 1,
+        "nonJev": 0.4705
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999996159406671,
+        "ruleB": 0.4805,
+        "jevSafety": 1,
+        "nonJev": 0.472
+      },
+      {
+        "p": 0.05,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999997317970439,
+        "ruleB": 0.46975,
+        "jevSafety": 1,
+        "nonJev": 0.45725
+      },
+      {
+        "p": 0.05,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999904391192,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.46375
+      },
+      {
+        "p": 0.05,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999904391192,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.465
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.5,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999941970117,
+        "ruleB": 0.4945,
+        "jevSafety": 1,
+        "nonJev": 0.47325
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.5,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999991290026,
+        "ruleB": 0.4675,
+        "jevSafety": 1,
+        "nonJev": 0.473
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.8,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999999999336,
+        "ruleB": 0.48225,
+        "jevSafety": 1,
+        "nonJev": 0.46975
+      },
+      {
+        "p": 0.1,
+        "actedShare": 0.8,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 0.9999999999999682,
+        "ruleB": 0.49075,
+        "jevSafety": 1,
+        "nonJev": 0.49
+      },
+      {
+        "p": 0.1,
+        "actedShare": 1,
+        "unknownShare": 0,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 1,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.4725
+      },
+      {
+        "p": 0.1,
+        "actedShare": 1,
+        "unknownShare": 0.1,
+        "rounds": 30,
+        "ruleA": 1,
+        "ruleAExact": 1,
+        "ruleB": 0,
+        "jevSafety": 1,
+        "nonJev": 0.47
+      }
+    ]
+  }
+}

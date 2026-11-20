@@ -17,7 +17,7 @@
 
 *Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-70-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -43,7 +43,7 @@ Use this package when you want your AI client to drive the browser directly whil
 - `install --cline` writes `~/.cline/data/settings/cline_mcp_settings.json`, the settings file Cline's VS Code extension, JetBrains plugin, and CLI share. Earlier versions wrote a VS Code extension-storage file that current Cline ignores after its one-time import, so rerun the install if FSB never appeared in Cline.
 - Cline entries set `timeout: 1800` (seconds) so long `run_task` calls are not cut off by Cline's fixed 60-second request timeout.
 - Reinstalling keeps the `timeout`, `disabled`, and `autoApprove` settings Cline stores on the `fsb` entry.
-- `start_visual_session`, `end_visual_session`, and `back` are no longer registered, so the server lists 69 tools. Use `go_back` in place of `back`.
+- `start_visual_session`, `end_visual_session`, and `back` are no longer registered. Use `go_back` in place of `back`.
 - When `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, or `CLINE_DIR` points at a directory that does not exist yet, `install --cline` reports it instead of editing the legacy settings file. Reinstalling no longer rewrites a Cline or Continue config whose keys only changed order.
 - `install --antigravity` replaces `install --windsurf` and writes `~/.gemini/config/mcp_config.json`, falling back to `~/.gemini/antigravity/mcp_config.json` on older Antigravity releases. An empty config file is treated as an empty config.
 - Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
@@ -516,9 +516,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools
-
-`fsb-mcp-server` registers 69 tools.
+## Tools (70 Total)
 
 ### Autopilot (3)
 
@@ -578,6 +576,8 @@ Notes:
 | `partial_task` | Report useful work that an external blocker stopped short of the final step. |
 | `fail_task` | Report that the task cannot be completed, and why. |
 
+Each call closes the task's logical history recording through the `mcp:task-status` route, which needs FSB extension 0.9.92 or newer. Never put passwords, tokens, API keys or sensitive form values in a summary, blocker or reason.
+
 ### Developer / UAT (1)
 
 | Tool | Purpose |
@@ -620,9 +620,40 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 
 Vault responses expose metadata only. Passwords, full card numbers, and CVV values are resolved inside the extension and are not returned to the MCP client.
 
+### Settings (1)
+
+| Tool | Purpose |
+|------|---------|
+| `settings` | Read every FSB control-panel setting in one call, read one setting with its type and allowed values, or change one setting by key. |
+
+- No arguments returns every setting; `key` returns that setting with its type and allowed values; `key` and `value` change it. `value` is a string, and `true`/`false` and numbers are accepted.
+- API keys and other secrets are masked on read and refused on write. Endpoints that receive keys or page data are shown as origin only and are refused on write too; change them in the FSB Control Panel.
+- Every accepted change is logged for the operator with the key, the previous and new value and the MCP client label. Delegated agent runs can read settings but cannot change them.
+- `settings` arrives in fsb-mcp-server 0.12.0 and needs FSB extension 1.0.0. An older extension answers `SETTING_UNSUPPORTED`; update the extension or change the setting in the FSB Control Panel.
+
+### Same-call checks (`expect`)
+
+28 action tools take an optional `expect` object: `execute_js`, `click`, `right_click`, `double_click`, `click_at`, `double_click_at`, `click_and_hold`, `type_text`, `insert_text`, `press_enter`, `press_key`, `clear_input`, `select_option`, `check_box`, `set_attribute`, `drag_drop`, `drag`, `drag_variable_speed`, `drop_file`, `upload_file`, `select_text_range`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element`, `navigate`, `go_back`, `go_forward` and `refresh`. After the action, FSB watches the page for a bounded time and returns `expect_result` in the same response, so an observable effect needs no follow-up read.
+
+| Check | Holds when |
+|-------|------------|
+| `url_includes` | The tab URL contains the text. |
+| `title_includes` | The page title contains the text. |
+| `text_visible` / `text_gone` | The text is shown on the page / is no longer shown. |
+| `selector` with `state` | The element is `visible` (the default), `gone`, `checked` or `unchecked`. |
+| `selector` with `value` | The field's value equals the text exactly; sensitive or non-matching values are redacted in the result. |
+| `dialog_open` | A dialog is open (`true`) or not (`false`). |
+| `timeout_ms` | How long to watch: default 2000, at most 5000. |
+
+Give at least one check besides `timeout_ms`. `expect_result.status` is `verified` when every check holds, `unmet` when one does not, and `uncertain` when FSB could not tell; each check is listed with its own status. On `verified`, do not repeat the action. On `unmet` or `uncertain`, inspect the page before retrying. Without `expect`, every tool behaves and answers exactly as before.
+
+`expect` arrives in fsb-mcp-server 0.12.0 and needs FSB extension 1.0.0. With an older extension the action still runs, and `expect_result` comes back `uncertain` with reason `extension_unsupported`.
+
 ### Tool Count Contract
 
-The public count is intentionally based on registered MCP handlers, not every internal helper in the extension. The extension's canonical registry also contains task-lifecycle signals and internal context tools used by the browser runtime. The MCP README documents the tool surface an MCP client can call. `tests/mcp-version-parity.test.js` counts the tools the built server registers and fails when any published count disagrees.
+The documented count is the length of the registered `tools/list`: every tool an MCP client can call, including the three task-outcome tools (`complete_task`, `partial_task`, `fail_task`) and `settings`. Internal helpers in the extension's canonical registry that are not registered MCP tools are not counted. `tests/mcp-version-parity.test.js` checks the count, the category headings and the contents link against the built `tools/list`, and fails when any other published count (onboarding, the showcase pages and their translations, the `llms` files) disagrees, so the documented count cannot drift from the server.
+
+The documented count includes the tools added in fsb-mcp-server 0.12.0.
 
 ---
 

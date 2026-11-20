@@ -33,6 +33,7 @@
  * @param {number} [fields.timestamp] - Timestamp of the event.
  * @param {number} [fields.iteration] - Iteration number when this event occurred.
  * @param {number} [fields.durationMs] - Duration of the tool execution in ms.
+ *   A measured value (0 included) is kept; an absent one is null, never 0.
  * @returns {Object} A structured action event.
  */
 function createActionEvent(fields) {
@@ -48,7 +49,7 @@ function createActionEvent(fields) {
     },
     timestamp: f.timestamp || Date.now(),
     iteration: f.iteration || 0,
-    durationMs: f.durationMs || 0
+    durationMs: Number.isFinite(f.durationMs) ? f.durationMs : null
   };
 }
 

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-settings-change-02",
+  "provenance": "hand",
+  "task": {
+    "id": "core-mixed-settings-change",
+    "version": 1,
+    "fixtureSha256": "badec467e7abf9fba57ee7395f9250aefec42f3c3e13449f2ae0be0ecfa5b6b2"
+  },
+  "step": 2,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion", "risk"],
+    "goal": "Read the time zone shown on the profile card, set the digest time zone to the same zone, turn on the weekly digest, and save.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/settings-change/index.html",
+      "title": "Account settings",
+      "text": "Account settings\nProfile\nName: Jordan Lee\nRole: Operations lead\nLanguage: English (United States)\nTime zone: America/New_York (UTC-05:00)\nEmail digest\nDigest time zone\nAmerica/New_York (UTC-05:00)\nWeekly digest\nOn\nSave"
+    },
+    "elements": [
+      { "id": "e0", "role": "combobox", "label": "Digest time zone", "ops": ["select_option", "click"] },
+      { "id": "e1", "role": "switch", "label": "Weekly digest", "ops": ["check_box", "click"] },
+      { "id": "e2", "role": "button", "label": "Save", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "select_option", "targetId": "e0", "changed": true },
+      { "op": "check_box", "targetId": "e1", "changed": true }
+    ],
+    "offeredOps": ["click", "select_option", "check_box", "scroll"],
+    "proposedAction": { "op": "click", "targetId": "e2" }
+  },
+  "labels": {
+    "operation": "click",
+    "target": "e2",
+    "completion": false,
+    "stuck": null,
+    "risk": true
+  },
+  "note": "The form is filled (America/New_York, weekly digest On) but not saved. Save (e2) changes account settings, so the proposed click is risk-positive."
+}

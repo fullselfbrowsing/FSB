@@ -215,15 +215,11 @@ async function initTabConversationStore() {
     var activeTabId = null;
     try {
       var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs && tabs[0] && typeof tabs[0].id === 'number') activeTabId = tabs[0].id;
+      if (tabs && tabs[0] && typeof tabs[0].id === 'number'
+          && Number.isSafeInteger(tabs[0].id) && tabs[0].id > 0) {
+        activeTabId = tabs[0].id;
+      }
     } catch (_e) { /* swallow */ }
-
-    // QT-93i-02 -- cache active tab id at boot so the per-tab map and
-    // setRunningState/setIdleState/setErrorState can resolve "active tab"
-    // BEFORE chrome.tabs.onActivated fires for the first time.
-    if (activeTabId !== null) {
-      _activeTabIdSnapshot = activeTabId;
-    }
 
     tabConvEnvelope = await FSBSidepanelTabConvStore.migrateLegacyConversationKey(
       function (keys) { return chrome.storage.session.get(keys); },
@@ -272,8 +268,17 @@ async function initTabConversationStore() {
 // conversation render their transcript, and they render the SAME
 // transcript that a fresh sidepanel reopen on that tab would.
 async function swapToTabConversation(tabId) {
+  var expectedSurfaceGeneration = typeof _activeTabSurfaceSyncGeneration === 'number'
+    ? _activeTabSurfaceSyncGeneration
+    : null;
+  var surfaceIsCurrent = function() {
+    return expectedSurfaceGeneration === null
+      || (typeof _activeTabSurfaceSyncGeneration === 'number'
+        && expectedSurfaceGeneration === _activeTabSurfaceSyncGeneration);
+  };
   try {
     await _envelopeReadyPromise;
+    if (!surfaceIsCurrent()) return false;
     if (typeof FSBSidepanelTabConvStore === 'undefined') return false;
     if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return false;
     var nextConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
@@ -284,9 +289,11 @@ async function swapToTabConversation(tabId) {
           : (typeof chatMessages.innerHTML === 'undefined' || chatMessages.innerHTML.length === 0));
       if (nextConvId && surfaceIsEmpty) {
         try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* best-effort */ }
+        if (!surfaceIsCurrent()) return false;
       }
       return true;
     }
+    if (!surfaceIsCurrent()) return false;
     _delegationUiState.subscribed = false;
     conversationId = nextConvId; // may be null (D-17 lazy mint deferred)
     if (chatMessages && typeof chatMessages.innerHTML !== 'undefined') {
@@ -298,6 +305,7 @@ async function swapToTabConversation(tabId) {
     // null-convId / unminted-tab case where hydrate early-returns 0).
     if (nextConvId) {
       try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* swallow */ }
+      if (!surfaceIsCurrent()) return false;
     }
     return true;
   } catch (_e) {
@@ -376,9 +384,18 @@ async function ensureTabConversationForActiveTab(overwrite) {
 //      is bound to a conversation. This is what a freshly opened panel (or
 //      one Chrome re-created) relies on, since it has no in-memory run.
 async function _adoptTabIntoRunningDelegationConversation(tabId) {
+  var expectedSurfaceGeneration = typeof _activeTabSurfaceSyncGeneration === 'number'
+    ? _activeTabSurfaceSyncGeneration
+    : null;
+  var surfaceIsCurrent = function() {
+    return expectedSurfaceGeneration === null
+      || (typeof _activeTabSurfaceSyncGeneration === 'number'
+        && expectedSurfaceGeneration === _activeTabSurfaceSyncGeneration);
+  };
   try {
     if (!Number.isSafeInteger(tabId)) return false;
     await _envelopeReadyPromise;
+    if (!surfaceIsCurrent()) return false;
     if (typeof FSBSidepanelTabConvStore === 'undefined'
         || !FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return false;
     var existing = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
@@ -392,14 +409,16 @@ async function _adoptTabIntoRunningDelegationConversation(tabId) {
     }
     if (!runConversationId) {
       runConversationId = await _delegationConversationForOwnedTab(tabId);
+      if (!surfaceIsCurrent()) return false;
     }
     if (!runConversationId) return false;
 
+    if (!surfaceIsCurrent()) return false;
     FSBSidepanelTabConvStore.ensureTabConversation(
       tabConvEnvelope, tabId, function() { return runConversationId; }
     );
     await _persistEnvelope();
-    return true;
+    return surfaceIsCurrent();
   } catch (_error) {
     return false;
   }
@@ -3987,7 +4006,7 @@ async function syncActiveTabSurface(tabId, windowId) {
   // Invalidate delegation hydration as soon as a tab transition begins. The
   // replacement hydration later in this function will mint its own generation.
   _delegationHydrationGeneration += 1;
-  let incomingTabId = Number.isSafeInteger(tabId) ? tabId : null;
+  let incomingTabId = Number.isSafeInteger(tabId) && tabId > 0 ? tabId : null;
   try {
     if (incomingTabId === null) {
       const query = Number.isSafeInteger(windowId)
@@ -3995,11 +4014,12 @@ async function syncActiveTabSurface(tabId, windowId) {
         : { active: true, currentWindow: true };
       const tabs = await chrome.tabs.query(query);
       if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
-      incomingTabId = tabs && tabs[0] && Number.isSafeInteger(tabs[0].id)
+      incomingTabId = tabs && tabs[0] && Number.isSafeInteger(tabs[0].id) && tabs[0].id > 0
         ? tabs[0].id
         : null;
     }
 
+    const outgoingTabId = _activeTabIdSnapshot;
     if (incomingTabId === null) {
       if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
       _chatLockedByOwnerChip = false;
@@ -4010,14 +4030,19 @@ async function syncActiveTabSurface(tabId, windowId) {
       return true;
     }
 
-    const outgoingTabId = _activeTabIdSnapshot;
-    if (outgoingTabId !== incomingTabId) {
+    const tabChanged = outgoingTabId !== incomingTabId;
+    if (tabChanged) {
       try { _persistTabStatusIntent(outgoingTabId); } catch (_e) { /* best-effort */ }
     }
 
+    // This generation is the sole active-tab authority. Commit before any
+    // later await so every tab-scoped surface agrees on the selected tab.
+    if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+    _activeTabIdSnapshot = incomingTabId;
+
     const ownerState = await refreshActiveTabOwnership(incomingTabId, syncGeneration);
     if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
-    if (!ownerState || ownerState.verified !== true) return false;
+    if (!ownerState || ownerState.verified !== true || ownerState.tabId !== incomingTabId) return false;
 
     if (typeof _adoptTabIntoRunningDelegationConversation === 'function') {
       await _adoptTabIntoRunningDelegationConversation(incomingTabId);
@@ -4060,7 +4085,6 @@ async function syncActiveTabSurface(tabId, windowId) {
     }
     if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
 
-    _activeTabIdSnapshot = incomingTabId;
     try {
       var snap = _getTabRunningEntry(incomingTabId);
       if (snap.isRunning) setRunningState(incomingTabId, snap.sessionId || null);
@@ -4068,6 +4092,7 @@ async function syncActiveTabSurface(tabId, windowId) {
     } catch (_e) { /* best-effort */ }
     try { _restoreTabStatusIntent(incomingTabId); } catch (_e) { /* best-effort */ }
     try { await _hydrateDelegationForSelectedConversation(); } catch (_e) { /* best-effort */ }
+    if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
     return syncGeneration === _activeTabSurfaceSyncGeneration;
   } catch (error) {
     console.warn('[sidepanel] active-tab sync failed', error && error.message ? error.message : error);

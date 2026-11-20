@@ -348,6 +348,49 @@ async function test8_registryUnavailable() {
   check(resolved && resolved.agentId === 'agent_a', 'agentId echoed');
 }
 
+// =========================================================================
+// Test 9 (peekAgentTabId mirrors the no-tab_id pick, synchronously)
+// =========================================================================
+async function test9_peekMatchesResolver() {
+  console.log('--- Test 9: peekAgentTabId picks the tab the resolver would, or null ---');
+  const { peekAgentTabId } = resolverModule;
+  check(typeof peekAgentTabId === 'function', 'peekAgentTabId is exported');
+
+  const scenarios = [
+    { label: 'single owned tab', tabOwners: [[42, 'agent_a']], expected: 42 },
+    { label: 'selected of several', tabOwners: [[42, 'agent_a'], [43, 'agent_a']], selected: 43, expected: 43 },
+    { label: 'several, none selected', tabOwners: [[42, 'agent_a'], [43, 'agent_a']], expected: null },
+    { label: 'several, stale selection', tabOwners: [[42, 'agent_a'], [43, 'agent_a']], selected: 99, expected: null },
+    { label: 'no owned tab', tabOwners: [[42, 'agent_b']], expected: null }
+  ];
+  for (const s of scenarios) {
+    installRegistry(buildRegistryMock({
+      knownAgents: ['agent_a', 'agent_b'],
+      tabOwners: s.tabOwners,
+      selectedTabIds: s.selected ? [['agent_a', s.selected]] : []
+    }));
+    try {
+      const peeked = peekAgentTabId('agent_a');
+      check(peeked === s.expected, s.label + ': peek === ' + s.expected);
+      const resolved = await resolveAgentTabOrError('agent_a', {}, null);
+      const resolvedTab = resolved && resolved.success === false ? null : resolved.tabId;
+      check(resolvedTab === peeked, s.label + ': peek agrees with resolveAgentTabOrError');
+    } finally {
+      uninstallRegistry();
+    }
+  }
+
+  installRegistry(buildRegistryMock({ knownAgents: ['agent_a'], tabOwners: [[42, 'agent_a']] }));
+  try {
+    check(peekAgentTabId('legacy:popup') === null, 'legacy surfaces are not peeked (their tab is the active tab)');
+    check(peekAgentTabId('agent_unknown') === null, 'an unregistered agent peeks null');
+    check(peekAgentTabId('') === null && peekAgentTabId(undefined) === null, 'a missing agent id peeks null');
+  } finally {
+    uninstallRegistry();
+  }
+  check(peekAgentTabId('agent_a') === null, 'no registry peeks null instead of throwing');
+}
+
 async function run() {
   await test1_singleOwned();
   await test2_zeroOwned();
@@ -362,6 +405,7 @@ async function run() {
   await test7c_explicitForeignClaimRejects();
   await test7d_claimRequiresOwnerAuthority();
   await test8_registryUnavailable();
+  await test9_peekMatchesResolver();
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
   process.exit(failed > 0 ? 1 : 0);

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-confirm-modals-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-click-confirm-modals",
+    "version": 1,
+    "fixtureSha256": "f2eee247178ac252afa2f4b98b2e62958223e1d51000a83d79c0e8592413ae8a"
+  },
+  "step": 0,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion"],
+    "goal": "Delete the record named Q3 draft forecast, confirming both prompts. Do not delete anything else.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/confirm-modals/index.html",
+      "title": "Documents",
+      "text": "Documents\nRecord Name Owner\nREC-1 Q2 budget summary Finance Delete\nREC-2 Hiring plan People Delete\nREC-3 Q3 draft forecast Finance Delete\nREC-4 Vendor contract renewal Legal Delete\nREC-5 Q3 final forecast Finance Delete\nREC-6 Travel policy draft Operations Delete"
+    },
+    "elements": [
+      { "id": "e0", "role": "button", "label": "Delete Q2 budget summary", "ops": ["click"] },
+      { "id": "e1", "role": "button", "label": "Delete Hiring plan", "ops": ["click"] },
+      { "id": "e2", "role": "button", "label": "Delete Q3 draft forecast", "ops": ["click"] },
+      { "id": "e3", "role": "button", "label": "Delete Vendor contract renewal", "ops": ["click"] },
+      { "id": "e4", "role": "button", "label": "Delete Q3 final forecast", "ops": ["click"] },
+      { "id": "e5", "role": "button", "label": "Delete Travel policy draft", "ops": ["click"] }
+    ],
+    "recentActions": [],
+    "offeredOps": ["click", "scroll"]
+  },
+  "labels": {
+    "operation": "click",
+    "target": "e2",
+    "completion": false,
+    "stuck": null,
+    "risk": null
+  },
+  "note": "First step: Q3 draft forecast is REC-3 and its Delete button is e2. Q3 final forecast (e4) is the near-miss to avoid."
+}

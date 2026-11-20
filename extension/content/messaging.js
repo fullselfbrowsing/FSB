@@ -28,6 +28,11 @@
     }
   }
 
+  // True while a visual session (MCP or autopilot) owns the status pill.
+  function fsbVisualSessionRunning() {
+    return Boolean(FSB.overlayState && FSB.overlayState.lifecycle === 'running');
+  }
+
   function fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState) {
     if (previousOverlayState?.lifecycle !== 'final' ||
         !overlayState || overlayState.lifecycle === 'cleared') return false;
@@ -1036,6 +1041,27 @@
             }
           }
 
+          // FAST-MODE TARGET RESOLUTION (Phase 68 D-14): only fast-mode calls carry
+          // jevHandle. It is resolved strictly with no CSS fallback, and every
+          // failure returns here, so a refused fast step never reaches the
+          // ref-less focused-element fallback below.
+          if (params && params.jevHandle !== undefined) {
+            let jevVerdict = null;
+            try {
+              jevVerdict = FSB.resolveJevHandle(params, tool);
+            } catch (_jevError) {
+              jevVerdict = null;
+            }
+            if (!jevVerdict || jevVerdict.ok !== true) {
+              const jevReason = (jevVerdict && typeof jevVerdict.reason === 'string') ? jevVerdict.reason : 'unavailable';
+              logger.warn('Fast-mode target refused', { sessionId: FSB.sessionId, reason: jevReason });
+              sendResponse({ success: false, error: 'Fast-mode target is no longer current (' + jevReason + ').', tool, refStale: true, reason: jevReason });
+              return;
+            }
+            params.selector = jevVerdict.selector;
+            FSB.elementCache.set(params.selector, jevVerdict.element);
+          }
+
           // COMPACT REF RESOLUTION
           if (params && params.ref && !params.selector) {
             const resolvedElement = FSB.resolveRef(params.ref);
@@ -1085,6 +1111,11 @@
           }
 
           if (FSB.tools[tool]) {
+            if (FSB._jevCaptureArm) {
+              try {
+                FSB.noteJevCaptureObservation(tool, params);
+              } catch (_jevCaptureError) { /* capture is diagnostic-only */ }
+            }
             // VIS-01/VIS-03: Show highlight on target element
             if (params && (params.selector || params.ref)) {
               try {
@@ -1114,7 +1145,14 @@
 
             try {
               const execStart = Date.now();
-              result = await executeContentAction(tool, params);
+              // The status pill stays open while the action runs and folds a
+              // little after it ends.
+              try { FSB.progressOverlay.noteAction(true); } catch (e) { /* non-blocking */ }
+              try {
+                result = await executeContentAction(tool, params);
+              } finally {
+                try { FSB.progressOverlay.noteAction(false); } catch (e) { /* non-blocking */ }
+              }
               logger.logTiming(FSB.sessionId, 'ACTION', tool, Date.now() - execStart, { success: result?.success });
 
               // Invalidate cached element indexes
@@ -1123,10 +1161,11 @@
               // Clean up highlights
               try { FSB.actionGlowOverlay.hide(); } catch (e) { /* non-blocking */ }
               FSB.highlightManager.hide();
-              if (isManualMCP) {
-                // Manual MCP: no session to return to, destroy the glow entirely
-                try { FSB.viewportGlow.destroy(); } catch (e) { /* non-blocking */ }
+              if (isManualMCP && !fsbVisualSessionRunning()) {
+                // Manual MCP with no session to return to: fade the glow out
+                try { FSB.viewportGlow.dismiss(); } catch (e) { /* non-blocking */ }
               } else {
+                // The glow stays with the status pill for as long as the session runs
                 try { FSB.viewportGlow.setState('thinking'); } catch (e) { /* non-blocking */ }
               }
 
@@ -1142,14 +1181,20 @@
                 sendResponse({
                   ...result,
                   tool: tool,
-                  executionTime: Date.now() - startTime
+                  executionTime: Date.now() - startTime,
+                  // Phase 68 (WR-05): a fast-mode call reports the selector the
+                  // strict resolver chose, so its replay record can target the
+                  // element instead of a one-time handle. Other calls: unchanged.
+                  ...(params && params.jevHandle !== undefined && typeof params.selector === 'string'
+                    ? { jevSelector: params.selector }
+                    : {})
                 });
               }
             } catch (actionError) {
               try {
                 FSB.actionGlowOverlay.destroy();
                 FSB.highlightManager.hide();
-                if (isManualMCP) { FSB.viewportGlow.destroy(); }
+                if (isManualMCP && !fsbVisualSessionRunning()) { FSB.viewportGlow.dismiss(); }
               } catch (cleanupError) {
                 // Ignore cleanup errors
               }
@@ -1201,6 +1246,13 @@
 
   // Named message handler function - allows Chrome to dedupe on re-injection
   function handleBackgroundMessage(request, sender, sendResponse) {
+    // The Skopeo runtime shares this isolated world and answers skopeo:*
+    // itself. Chrome keeps the first sendResponse, so this listener must stay
+    // silent for those actions or its 'Unknown action' reply wins.
+    if (request && typeof request.action === 'string' && request.action.indexOf('skopeo:') === 0) {
+      return false;
+    }
+
     // Store sessionId from any incoming message for logging
     if (request.sessionId) {
       FSB.sessionId = request.sessionId;
@@ -1246,6 +1298,16 @@
         sendResponse({ success: true, ...pageReadiness });
         break;
 
+      case 'actionIconMotion':
+        try {
+          FSB.iconMotion = request.motion || null;
+          FSB.progressOverlay.setMotion(FSB.iconMotion);
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
       case 'sessionStatus':
         try {
           // [FSB Field Audit] Consumer: content script overlay renderer
@@ -1265,8 +1327,13 @@
           const previousOverlayState = FSB.overlayState;
           const replacesFinalSession = fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState);
           if (replacesFinalSession) {
-            FSB.progressOverlay.destroy();
+            // The finished pill morphs back for the new session instead of respawning.
+            FSB.progressOverlay.reset();
             FSB.replayPlayerOverlay.destroy();
+          }
+          if (overlayState.iconMotion !== undefined) {
+            FSB.iconMotion = overlayState.iconMotion || null;
+            FSB.progressOverlay.setMotion(FSB.iconMotion);
           }
 
           FSB.overlayState = overlayState;
@@ -1281,8 +1348,8 @@
               clearTimeout(FSB._overlayWatchdogTimer);
               FSB._overlayWatchdogTimer = null;
             }
-            FSB.viewportGlow.destroy();
-            FSB.progressOverlay.destroy();
+            FSB.viewportGlow.dismiss();
+            FSB.progressOverlay.dismiss();
             FSB.replayPlayerOverlay.destroy();
             FSB.actionGlowOverlay.destroy();
             FSB.lastActionStatusText = null;
@@ -1315,7 +1382,7 @@
                 FSB._overlayWatchdogTimer = null;
               }
               FSB.actionGlowOverlay.destroy();
-              FSB.viewportGlow.destroy();
+              FSB.viewportGlow.dismiss();
             } else {
               if (FSB._overlayWatchdogTimer) {
                 clearTimeout(FSB._overlayWatchdogTimer);
@@ -1325,8 +1392,8 @@
                 try {
                   var currentOverlayState = FSB.overlayState;
                   if (!currentOverlayState || currentOverlayState.lifecycle !== 'running') {
-                    FSB.viewportGlow.destroy();
-                    FSB.progressOverlay.destroy();
+                    FSB.viewportGlow.dismiss();
+                    FSB.progressOverlay.dismiss();
                     FSB.replayPlayerOverlay.destroy();
                     FSB.actionGlowOverlay.destroy();
                     FSB.overlayState = null;
@@ -1368,8 +1435,8 @@
                     FSB._overlayOrphanTimer = null;
                     console.warn('[FSB] Overlay watchdog: extended silence, cleaning up orphaned overlays');
                     try {
-                      FSB.viewportGlow.destroy();
-                      FSB.progressOverlay.destroy();
+                      FSB.viewportGlow.dismiss();
+                      FSB.progressOverlay.dismiss();
                       FSB.replayPlayerOverlay.destroy();
                       FSB.actionGlowOverlay.destroy();
                       FSB.overlayState = null;
@@ -1394,6 +1461,25 @@
       case 'executeAction':
         // Handled above in async handler
         break;
+
+      case 'getJevMenu': {
+        // Phase 68 fast-mode menu: value-free, main frame only; building it
+        // resets only FSB.jevRefMap. capture:true arms one capture observation
+        // for the next action; any other request disarms it.
+        const jevMenuOptions = request.options && typeof request.options === 'object' ? request.options : {};
+        let jevMenu = null;
+        try {
+          jevMenu = FSB.buildJevMenu({ cap: jevMenuOptions.cap, recent: jevMenuOptions.recent });
+        } catch (_jevMenuError) {
+          jevMenu = null;
+        }
+        if (!jevMenu || typeof jevMenu !== 'object') jevMenu = { success: false, reason: 'menu_error' };
+        FSB._jevCaptureArm = jevMenuOptions.capture === true && jevMenu.success === true
+          ? { generation: jevMenu.generation }
+          : null;
+        sendResponse(jevMenu);
+        break;
+      }
 
       case 'highlightElement':
         (async () => {
@@ -1581,8 +1667,8 @@
               // any ongoing action overlay alone.
               try {
                 if (FSB.viewportGlow && FSB.viewportGlow.state === 'watching'
-                    && typeof FSB.viewportGlow.destroy === 'function') {
-                  FSB.viewportGlow.destroy();
+                    && typeof FSB.viewportGlow.dismiss === 'function') {
+                  FSB.viewportGlow.dismiss();
                 }
               } catch (_e) { /* best-effort */ }
 

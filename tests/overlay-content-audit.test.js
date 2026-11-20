@@ -105,17 +105,13 @@ function makeElement(tag, opts) {
     set innerHTML(v) {
       this._innerHTML = String(v);
       const childClasses = [
-        'fsb-header','fsb-logo','fsb-title','fsb-client-badge','fsb-stop',
-        'fsb-task','fsb-summary',
-        'fsb-chip','fsb-chip-lock','fsb-chip-txt','fsb-chip-rdy',
-        'fsb-note','fsb-note-icon','fsb-note-text',
-        'fsb-step','fsb-step-number','fsb-step-text',
-        'fsb-log','fsb-log-line','fsb-log-line',
-        'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill'
+        'pl-body','pl-row','pl-mark','pl-wm','pl-div','pl-agent','pl-name','pl-gap','pl-ok','pl-time','pl-stop',
+        'pl-text','pl-out','pl-in','pl-count',
+        'pl-more','pl-meta','pl-tick','pl-who','pl-slug','pl-tag','pl-note',
+        'pl-track','pl-fill','pl-ping','pl-ring','pl-bead','pl-cap'
       ];
       this.children = childClasses.map(c => {
-        const tagName = c === 'fsb-logo' ? 'img' : 'span';
-        const ch = makeElement(tagName);
+        const ch = makeElement('span');
         ch.classList.add(c);
         ch.parentNode = this;
         return ch;
@@ -209,6 +205,13 @@ function walkAll(root, fn) {
 
 const overlayStateExports = loadOverlayStateModule();
 
+const MEASURED = {
+  'Continuing to payment': 136,
+  'Submitting checkout': 122,
+  'Filling in the delivery address from the saved profile': 331,
+  'Comparing jacket prices': 146
+};
+
 const documentElement = makeElement('html');
 const documentBody = makeElement('body');
 documentElement.appendChild(documentBody);
@@ -216,7 +219,18 @@ documentElement.appendChild(documentBody);
 const documentStub = {
   documentElement,
   body: documentBody,
-  createElement(tag) { return makeElement(tag); },
+  createElement(tag) {
+    const el = makeElement(tag);
+    // The pill measures its status line on a canvas. These are the widths
+    // Chrome's system-ui gives the spec boards' strings, so the spec sizes hold.
+    if (tag === 'canvas') {
+      el.getContext = () => ({
+        font: '',
+        measureText: (text) => ({ width: Object.prototype.hasOwnProperty.call(MEASURED, text) ? MEASURED[text] : text.length * 6.5 })
+      });
+    }
+    return el;
+  },
   addEventListener() {},
   removeEventListener() {}
 };
@@ -297,7 +311,7 @@ function buildOverlay() {
   overlay.host = makeElement('div');
   overlay.shadow = overlay.host.attachShadow({ mode: 'open' });
   const container = makeElement('div');
-  container.classList.add('fsb-overlay');
+  container.classList.add('pl-host');
   container.innerHTML = '<inflate/>';
   overlay.shadow.appendChild(container);
   overlay.container = container;
@@ -360,9 +374,9 @@ vm.runInContext(
 const shouldReplaceFinalOverlay = replacementPolicyContext.shouldReplaceFinalOverlay;
 assert(
   messagingSrc.includes('fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState)') &&
-    messagingSrc.indexOf('FSB.progressOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;') &&
+    messagingSrc.indexOf('FSB.progressOverlay.reset();') < messagingSrc.indexOf('FSB.overlayState = overlayState;') &&
     messagingSrc.indexOf('FSB.replayPlayerOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;'),
-  'an accepted replacement destroys both finalized overlay surfaces before rendering'
+  'an accepted replacement resets the finished pill and destroys the replay player before rendering'
 );
 assertEq(shouldReplaceFinalOverlay(
   { lifecycle: 'final', sessionToken: 'replay-token' },
@@ -385,7 +399,7 @@ assertEq(shouldReplaceFinalOverlay(
   { lifecycle: 'cleared', sessionToken: 'new-token' }
 ), false, 'explicit clears continue through the existing clear path');
 
-console.log('\n--- Test: final overlay fades after three seconds and then destroys its state ---');
+console.log('\n--- Test: a finished pill holds three seconds, then runs the exit and is removed ---');
 {
   const scheduled = [];
   const realSetTimeout = sandbox.setTimeout;
@@ -398,22 +412,63 @@ console.log('\n--- Test: final overlay fades after three seconds and then destro
   sandbox.clearTimeout = function(timer) {
     if (timer) timer.cleared = true;
   };
+  const live = (delay) => scheduled.find((timer) => timer.delay === delay && !timer.cleared);
 
   const o = buildOverlay();
   o.update(makeState({ lifecycle: 'final', result: 'success', detail: 'Replay complete' }));
-  const hideTimer = scheduled.find((timer) => timer.delay === 3000);
-  assert(!!hideTimer, 'final overlay schedules its three-second display window');
-  hideTimer.fn();
-  assert(o.container.classList.contains('hidden'), 'final overlay starts its fade after three seconds');
-  const destroyTimer = scheduled.find((timer) => timer.delay === 200);
-  assert(!!destroyTimer, 'final overlay schedules destruction after the fade');
-  destroyTimer.fn();
-  assertEq(o.host, null, 'final overlay host is destroyed after the fade');
-  assertEq(o.container, null, 'final overlay DOM references are cleared after the fade');
-  assertEq(o._frozen, false, 'final overlay frozen state resets after destruction');
+  assert(o.container.classList.contains('done'), 'a successful final state takes the done tone');
+  assertEq(o.container.querySelector('.pl-in').textContent, 'Done', 'a successful final state reads Done');
+  const hold = live(3000);
+  assert(!!hold, 'the finished pill schedules its three-second hold');
+  hold.fn();
+  assertEq(o._leaving, 1, 'after the hold the exit starts by folding the status');
+  assert(o.container.classList.contains('head'), 'the first exit beat folds to the top line');
+  const toSeed = live(300);
+  const lift = live(760);
+  const remove = live(1080);
+  assert(!!toSeed && !!lift && !!remove, 'the exit beats land at 300, 760 and 1080ms');
+  toSeed.fn();
+  assert(o.container.classList.contains('seed'), 'at 300ms the pill draws back to the seed');
+  lift.fn();
+  assert(o.container.classList.contains('gone'), 'at 760ms the seed lifts away');
+  remove.fn();
+  assertEq(o.host, null, 'at 1080ms the pill is removed');
+  assertEq(o.container, null, 'the removed pill drops its DOM references');
+  assertEq(o._frozen, false, 'the frozen state resets after removal');
 
   sandbox.setTimeout = realSetTimeout;
   sandbox.clearTimeout = realClearTimeout;
+}
+
+console.log('\n--- Test: a new call during the exit morphs the pill straight back ---');
+{
+  setNow(5000);
+  const o = buildOverlay();
+  o.update(makeState({ phase: 'acting', detail: 'Entering contact email' }));
+  o.dismiss();
+  assertEq(o._leaving, 1, 'dismiss() starts the exit');
+  o.update(makeState({ phase: 'acting', detail: 'Placing the order' }));
+  assertEq(o._leaving, 0, 'a running update cancels the exit');
+  assertEq(o._stage, 2, 'the pill returns to its full shape');
+  assert(!o.container.classList.contains('head') && !o.container.classList.contains('seed'), 'no fold or seed shape remains');
+  o.destroy();
+}
+
+console.log('\n--- Test: reset() lets a new session take over a finished pill ---');
+{
+  setNow(6000);
+  const o = buildOverlay();
+  o.update(makeState({ lifecycle: 'final', result: 'success', detail: 'Task completed' }));
+  assertEq(o._frozen, true, 'the finished pill is frozen');
+  o.update(makeState({ phase: 'acting', detail: 'Ignored while frozen' }));
+  assertEq(o.container.querySelector('.pl-in').textContent, 'Done', 'a frozen pill ignores further updates');
+  o.reset();
+  assertEq(o._frozen, false, 'reset() unfreezes the pill');
+  o.update(makeState({ phase: 'acting', detail: 'Continuing to payment' }));
+  assertEq(o.container.querySelector('.pl-in').textContent, 'Continuing to payment', 'the new session writes at once');
+  assertEq(o.container.querySelector('.pl-time').textContent, '0:00', 'the timer starts again');
+  assert(o.container.classList.contains('acting'), 'the new session takes its own tone');
+  o.destroy();
 }
 
 // ===========================================================================
@@ -429,11 +484,9 @@ console.log('\n--- Test: first update with planning phase + generic detail = sup
   // the gate's "generic" check covers 'Working' and the phaseLabel string. Pass 'Working'
   // to simulate the no-real-status-text condition.
   o.update(makeState({ phase: 'planning', detail: 'Working' }));
-  const stepTextEl = o.container.querySelector('.fsb-step-text');
-  assertEq(stepTextEl.textContent, '', 'thinking-class + elapsed=0 + generic detail -> empty .fsb-step-text');
-  // .fsb-task and .fsb-summary still write
-  const taskEl = o.container.querySelector('.fsb-task');
-  assertEq(taskEl.textContent, 'Task', '.fsb-task still written normally');
+  const stepTextEl = o.container.querySelector('.pl-in');
+  assertEq(stepTextEl.textContent, '', 'thinking-class + elapsed=0 + generic detail -> empty status line');
+  assert(o.container.classList.contains('head'), 'with no status the pill shows only its top line');
   o.destroy();
 }
 
@@ -442,7 +495,7 @@ console.log('\n--- Test: after 1100ms elapsed, planning phase no longer suppress
   setNow(20000);
   const o = buildOverlay();
   o.update(makeState({ phase: 'planning', detail: 'Working' }));
-  const stepTextEl = o.container.querySelector('.fsb-step-text');
+  const stepTextEl = o.container.querySelector('.pl-in');
   assertEq(stepTextEl.textContent, '', 'initial suppressed');
   // Advance mocked time past 1s
   advanceNow(1100);
@@ -458,7 +511,7 @@ console.log('\n--- Test: navigation phase NOT suppressed even at elapsed=0 ---')
   setNow(30000);
   const o = buildOverlay();
   o.update(makeState({ phase: 'navigation', detail: 'Loading https://example.com' }));
-  const stepTextEl = o.container.querySelector('.fsb-step-text');
+  const stepTextEl = o.container.querySelector('.pl-in');
   assertEq(stepTextEl.textContent, 'Loading https://example.com',
     'concrete action phase writes detail immediately regardless of elapsed');
   o.destroy();
@@ -469,7 +522,7 @@ console.log('\n--- Test: planning phase + REAL non-generic detail NOT suppressed
   setNow(40000);
   const o = buildOverlay();
   o.update(makeState({ phase: 'planning', detail: 'Reviewing search results' }));
-  const stepTextEl = o.container.querySelector('.fsb-step-text');
+  const stepTextEl = o.container.querySelector('.pl-in');
   assertEq(stepTextEl.textContent, 'Reviewing search results',
     'real status detail (not "Working" / phaseLabel) writes through even under thinking phase');
   o.destroy();
@@ -491,7 +544,7 @@ console.log('\n--- Test: legacy state.stepText path collapses multi-sentence to 
     stepText: 'Sentence one. Sentence two. Sentence three.',
     taskName: 'Legacy task'
   });
-  const stepTextEl = o.container.querySelector('.fsb-step-text');
+  const stepTextEl = o.container.querySelector('.pl-in');
   assert(stepTextEl.textContent === 'Sentence one.' || stepTextEl.textContent.indexOf('Sentence two') < 0,
     'legacy stepText collapses to first sentence; got: ' + JSON.stringify(stepTextEl.textContent));
   o.destroy();
@@ -504,7 +557,7 @@ console.log('\n--- Test: display.detail multi-sentence smoke (sanitized upstream
   // In real flow, buildOverlayDisplay() applies firstSentence upstream. Here we
   // simulate the already-sanitized payload arriving at update().
   o.update(makeState({ phase: 'navigation', detail: 'Sentence one.' }));
-  const stepTextEl = o.container.querySelector('.fsb-step-text');
+  const stepTextEl = o.container.querySelector('.pl-in');
   assertEq(stepTextEl.textContent, 'Sentence one.',
     'pre-sanitized display.detail flows through unchanged');
   o.destroy();
@@ -526,30 +579,30 @@ console.log('\n--- Test: ProgressOverlay shadow CSS has reduced-motion block cov
   assert(blocks.length >= 2,
     'at least 2 @media (prefers-reduced-motion: reduce) blocks present (ProgressOverlay + ActionGlowOverlay); got ' + blocks.length);
 
-  // The first block (ProgressOverlay) must contain ALL text-surface selectors,
-  // including the capability-call chip/note/log surfaces added alongside them.
+  // The first block (the status pill) turns off every transition and keyframe.
   const textSurfaces = [
-    '.fsb-task', '.fsb-summary', '.fsb-step-text', '.fsb-step-number', '.fsb-eta',
-    '.fsb-chip-txt', '.fsb-chip-rdy', '.fsb-note', '.fsb-log-line'
+    '.pl-host', '.pl-in', '.pl-out', '.pl-name', '.pl-agent', '.pl-text', '.pl-more', '.pl-time', '.pl-stop', '.pl-bead'
   ];
   const progressBlock = blocks[0] || '';
   textSurfaces.forEach(sel => {
     assert(progressBlock.indexOf(sel) >= 0,
-      'ProgressOverlay reduced-motion block contains ' + sel);
+      'status pill reduced-motion block contains ' + sel);
   });
   assert(progressBlock.indexOf('transition: none') >= 0,
-    'ProgressOverlay reduced-motion block uses transition: none');
+    'status pill reduced-motion block uses transition: none');
+  assert(progressBlock.indexOf('animation: none') >= 0,
+    'status pill reduced-motion block uses animation: none');
 }
 
-console.log('\n--- Test: .fsb-progress-fill.complete green-flash state preserved (no transition:none on .complete background) ---');
+console.log('\n--- Test: the done state keeps its green fill and ring (colour still changes under reduced motion) ---');
 {
-  // The .complete rule (background: #34D399) must remain outside transition:none
-  // restriction -- a single state change is allowed.
-  const completeRule = visualFeedbackSrc.match(/\.fsb-progress-fill\.complete\s*\{[^}]*background:\s*#34D399/);
-  assert(completeRule, '.fsb-progress-fill.complete still sets background: #34D399 (green-flash preserved)');
+  const completeRule = visualFeedbackSrc.match(/\.pl-host\.done \.pl-fill\s*\{[^}]*background:\s*#34d399/);
+  assert(completeRule, '.pl-host.done .pl-fill sets background: #34d399');
+  assert(/\.pl-host\.done\s*\{[^}]*--ring:\s*rgba\(52, 211, 153, 0\.55\)/.test(visualFeedbackSrc),
+    '.pl-host.done sets the green ring');
 }
 
-console.log('\n--- Test: green-flash completion under matchMedia(reduced-motion)=true STILL fires ---');
+console.log('\n--- Test: completion under matchMedia(reduced-motion)=true STILL turns green ---');
 {
   setMatchMedia(true);
   setNow(70000);
@@ -561,11 +614,8 @@ console.log('\n--- Test: green-flash completion under matchMedia(reduced-motion)
     detail: 'Task completed',
     progress: { mode: 'determinate', percent: 100, label: 'Done' }
   }));
-  const fillEl = o.container.querySelector('.fsb-progress-fill');
-  assert(fillEl.classList.contains('complete'),
-    'fill.complete class still set under reduced-motion');
-  assert(o.container.style.boxShadow && o.container.style.boxShadow.indexOf('52, 211, 153') >= 0,
-    'green box-shadow still applied under reduced-motion (got: ' + o.container.style.boxShadow + ')');
+  assert(o.container.classList.contains('done'), 'done tone still set under reduced-motion');
+  assert(o.container.classList.contains('track'), 'the filled track still shows under reduced-motion');
   o.destroy();
   setMatchMedia(false);
 }
@@ -594,7 +644,7 @@ console.log('\n--- Test: ActionGlowOverlay reduced-motion block still present (r
 // ---------------------------------------------------------------------------
 console.log('\n=== describe: capability/guarded visual states ===');
 
-console.log('\n--- Test: phase=calling + ready capability shows chip, no note, card.capability class ---');
+console.log('\n--- Test: phase=calling + ready capability opens the third row with slug and readiness ---');
 {
   setNow(80000);
   const o = buildOverlay();
@@ -610,22 +660,19 @@ console.log('\n--- Test: phase=calling + ready capability shows chip, no note, c
     },
     stoppable: true
   }));
-  assert(o.container.classList.contains('capability'), 'card root has .capability class');
-  assert(!o.container.classList.contains('guarded'), 'card root does NOT have .guarded class');
-  const chipEl = o.container.querySelector('.fsb-chip');
-  assert(chipEl.classList.contains('show'), '.fsb-chip has .show class');
-  assertEq(o.container.querySelector('.fsb-chip-txt').textContent, 'github.com · github.issues.list', 'chip text set');
-  assertEq(o.container.querySelector('.fsb-chip-rdy').textContent, 'T1 ready', 'chip readiness label set');
-  assert(o.container.querySelector('.fsb-chip-rdy').classList.contains('ready'), 'chip readiness pill has .ready class');
-  const noteEl = o.container.querySelector('.fsb-note');
-  assert(!noteEl.classList.contains('show'), '.fsb-note stays hidden when not guarded');
-  const stopEl = o.container.querySelector('.fsb-stop');
-  assert(!stopEl.classList.contains('hidden'), '.fsb-stop is visible when stoppable=true');
-  assert(o.container.querySelector('.fsb-step-number').classList.contains('calling'), 'step-number pill has .calling class');
+  assert(o.container.classList.contains('calling'), 'pill takes the calling tone');
+  assert(!o.container.classList.contains('guarded'), 'pill is NOT guarded');
+  assert(o.container.classList.contains('more') && o.container.classList.contains('k-cap'), 'the third row opens for the capability');
+  assertEq(o.container.querySelector('.pl-slug').textContent, 'github.com · github.issues.list', 'slug text set');
+  assertEq(o.container.querySelector('.pl-tag').textContent, 'T1 ready', 'readiness label set');
+  assert(o.container.querySelector('.pl-tag').classList.contains('ready'), 'readiness tag has .ready class');
+  assert(!o.container.classList.contains('k-guard'), 'no blocked note when not guarded');
+  assert(o.container.classList.contains('stoppable'), 'Stop shows when stoppable=true');
+  assertEq(o.container.style.width, '248px', 'a capability call takes the full 248px');
   o.destroy();
 }
 
-console.log('\n--- Test: phase=calling + guarded=true shows amber note, card.guarded class ---');
+console.log('\n--- Test: phase=calling + guarded=true shows the amber note ---');
 {
   setNow(90000);
   const o = buildOverlay();
@@ -641,31 +688,26 @@ console.log('\n--- Test: phase=calling + guarded=true shows amber note, card.gua
     },
     stoppable: false
   }));
-  assert(o.container.classList.contains('guarded'), 'card root has .guarded class');
-  assert(!o.container.classList.contains('capability'), 'guarded wins over .capability (mockup precedence)');
-  const noteEl = o.container.querySelector('.fsb-note');
-  assert(noteEl.classList.contains('show'), '.fsb-note has .show class when guarded with noteText');
-  assertEq(o.container.querySelector('.fsb-note-text').textContent,
+  assert(o.container.classList.contains('guarded'), 'pill takes the guarded tone');
+  assert(!o.container.classList.contains('calling'), 'guarded wins over calling (mockup precedence)');
+  assert(o.container.classList.contains('more') && o.container.classList.contains('k-guard'), 'the third row opens for the note');
+  assertEq(o.container.querySelector('.pl-note').textContent,
     'Blocked — nothing was created. Needs your approval to run write actions.', 'note text set');
-  assert(o.container.querySelector('.fsb-step-number').classList.contains('guarded'), 'step-number pill has .guarded class');
-  assert(o.container.querySelector('.fsb-progress-fill').classList.contains('guarded'), 'progress fill has .guarded class');
-  const stopEl = o.container.querySelector('.fsb-stop');
-  assert(stopEl.classList.contains('hidden'), '.fsb-stop stays hidden when stoppable=false');
+  assert(!o.container.classList.contains('stoppable'), 'Stop stays hidden when stoppable=false');
+  assertEq(o._foldTimer, null, 'a blocked pill stays open: no fold is armed');
   o.destroy();
 }
 
-console.log('\n--- Test: ordinary non-capability update leaves every new element hidden/inert (regression guard) ---');
+console.log('\n--- Test: ordinary non-capability update leaves every extra surface closed (regression guard) ---');
 {
   setNow(100000);
   const o = buildOverlay();
   o.update(makeState({ phase: 'acting', detail: 'Clicking submit' }));
-  assert(!o.container.classList.contains('capability'), 'ordinary update: no .capability class');
-  assert(!o.container.classList.contains('guarded'), 'ordinary update: no .guarded class');
-  assert(!o.container.querySelector('.fsb-chip').classList.contains('show'), 'ordinary update: .fsb-chip stays hidden');
-  assert(!o.container.querySelector('.fsb-note').classList.contains('show'), 'ordinary update: .fsb-note stays hidden');
-  assert(o.container.querySelector('.fsb-stop').classList.contains('hidden'), 'ordinary update: .fsb-stop stays hidden');
-  assert(!o.container.querySelector('.fsb-step-number').classList.contains('calling'), 'ordinary update: pill has no .calling class');
-  assert(!o.container.querySelector('.fsb-progress-fill').classList.contains('guarded'), 'ordinary update: fill has no .guarded class');
+  assert(o.container.classList.contains('acting'), 'ordinary acting update takes the acting tone');
+  assert(!o.container.classList.contains('calling'), 'ordinary update: no calling tone');
+  assert(!o.container.classList.contains('guarded'), 'ordinary update: no guarded tone');
+  assert(!o.container.classList.contains('more'), 'ordinary update: no third row');
+  assert(!o.container.classList.contains('stoppable'), 'ordinary update: Stop stays hidden');
   o.destroy();
 }
 
@@ -720,20 +762,18 @@ console.log('\n--- Test: replay status card uses normal presentation with Replay
   o.update(replayState);
   await sleep(500);
 
-  assertEq(o.container.querySelector('.fsb-client-badge').textContent, 'Replay',
-    'replay badge contains only the Replay label');
-  assert(o.container.querySelector('.fsb-stop').classList.contains('hidden'),
-    'replay card keeps the shared stop control hidden');
-  assertEq(o.container.querySelector('.fsb-step-number').textContent, 'Acting…',
-    'replay card uses the normal acting phase label instead of a step count');
-  assertEq(o.container.querySelector('.fsb-task').textContent, 'Replay: Safe demo',
-    'replay card retains the task title');
-  assertEq(o.container.querySelector('.fsb-step-text').textContent, 'Scrolling page',
-    'replay card retains the current action text');
-  assertEq(o.container.querySelector('.fsb-phase').textContent, '0:00',
-    'replay card retains the normal elapsed timer');
-  assertEq(o.container.querySelector('.fsb-progress-fill').style.transform, 'scaleX(0.4)',
-    'replay card retains determinate progress');
+  assertEq(o.container.querySelector('.pl-name').textContent, 'Replay',
+    'replay pill names Replay as the driver');
+  assert(!o.container.classList.contains('stoppable'),
+    'replay pill keeps the shared stop control hidden');
+  assertEq(o.container.querySelector('.pl-in').textContent, 'Scrolling page',
+    'replay pill shows the current action text');
+  assertEq(o.container.querySelector('.pl-time').textContent, '0:00',
+    'replay pill keeps the normal elapsed timer');
+  assertEq(o.container.querySelector('.pl-fill').style.transform, 'scaleX(0.4)',
+    'replay pill fills the track to its determinate progress');
+  assertEq(o.container.querySelector('.pl-count').textContent, '',
+    'a percent with no count label adds no count');
   o.destroy();
 }
 
@@ -751,10 +791,136 @@ console.log('\n--- Test: ordinary sessions retain agent identity and stop contro
   }));
   await sleep(500);
 
-  assertEq(o.container.querySelector('.fsb-client-badge').textContent, 'Codex / agent_abc123',
-    'ordinary session badge retains client and agent identity');
-  assert(!o.container.querySelector('.fsb-stop').classList.contains('hidden'),
+  assertEq(o.container.querySelector('.pl-name').textContent, 'Codex',
+    'the pill names the client');
+  assertEq(o.container.querySelector('.pl-who').textContent, 'agent_abc123',
+    'the agent id waits in the hover row');
+  assert(!o.container.classList.contains('more'), 'the hover row is closed until the pointer is over the pill');
+  const closedHeight = o.container.style.height;
+  o._pointerAt(50, 20);
+  assert(o.container.classList.contains('more') && o.container.classList.contains('k-who'),
+    'hover opens the agent id row');
+  assertEq(parseInt(o.container.style.height, 10), parseInt(closedHeight, 10) + 20, 'the agent id row adds 20px');
+  o._pointerAt(-1, -1);
+  assert(!o.container.classList.contains('more'), 'leaving the pill closes the agent id row');
+  assert(o.container.classList.contains('stoppable'),
     'ordinary stoppable session retains the stop control');
+  o.destroy();
+}
+
+console.log('\n--- Test: FSB autopilot carries no name ---');
+{
+  setNow(108000);
+  const o = buildOverlay();
+  o.update(makeState({ phase: 'acting', detail: 'Comparing jacket prices', clientLabel: 'Autopilot', stoppable: true }));
+  assert(o.container.classList.contains('anon'), 'the autopilot pill drops the name and divider');
+  assertEq(o.container.querySelector('.pl-name').textContent, '', 'no name is written');
+  // 12 + 32 + 10 (gap) + timer 0:00 (28) + Stop (26) + 14 = 122; the status is wider
+  assertEq(o.container.style.width, (146 + 6 + 26) + 'px', 'width follows the status');
+  o.destroy();
+}
+
+console.log('\n--- Test: shapes and sizes match the spec board ---');
+{
+  setNow(109000);
+  const o = buildOverlay();
+  o._stage = 0;
+  o.update(makeState({ phase: 'acting', detail: 'Continuing to payment', clientLabel: 'Claude' }));
+  assertEq(o.container.style.width + ' ' + o.container.style.height, '56px 36px', 'seed is 56 x 36');
+  o._stage = 1;
+  o._render();
+  assertEq(o.container.style.width + ' ' + o.container.style.height, '161px 36px', 'top line is 89 plus name and timer: 161 x 36');
+  o._stage = 2;
+  o._render();
+  assertEq(o.container.style.width + ' ' + o.container.style.height, '168px 58px', 'two lines are the status plus 26: 168 x 58');
+  o._folded = true;
+  o._render();
+  assertEq(o.container.style.width + ' ' + o.container.style.height, '161px 36px', 'folded is the top line');
+  assert(o.container.classList.contains('shrink'), 'folding uses the shrinking curve');
+  o.destroy();
+
+  const wrap = buildOverlay();
+  wrap.update(makeState({ phase: 'acting', detail: 'Filling in the delivery address from the saved profile', clientLabel: 'Claude' }));
+  assertEq(wrap.container.style.width + ' ' + wrap.container.style.height, '248px 75px', 'a long status wraps once at 248: 248 x 75');
+  wrap.destroy();
+
+  const cap = buildOverlay();
+  cap.update(makeState({ phase: 'calling', detail: 'Submitting checkout', clientLabel: 'Claude',
+    capability: { chipText: 'northwind.checkout.submit', readinessLabel: 'T1 ready', readinessClass: 'ready' } }));
+  assertEq(cap.container.style.width + ' ' + cap.container.style.height, '248px 78px', 'a capability row: 248 x 78');
+  cap.destroy();
+
+  const blocked = buildOverlay();
+  blocked.update(makeState({ phase: 'calling', guarded: true, detail: 'Submitting checkout', clientLabel: 'Claude',
+    capability: { chipText: 'northwind.checkout.submit', noteText: 'Blocked. This site needs your approval before FSB can act here.' } }));
+  assertEq(blocked.container.style.width + ' ' + blocked.container.style.height, '248px 96px', 'blocked is the tallest: 248 x 96');
+  blocked.destroy();
+
+  const done = buildOverlay();
+  done.update(makeState({ lifecycle: 'final', result: 'success', detail: 'Task completed', clientLabel: 'Claude' }));
+  // 161 for the top line plus the 20px tick
+  assertEq(done.container.style.width, '181px', 'done adds the 20px tick by the timer');
+  done.destroy();
+}
+
+console.log('\n--- Test: the status folds 2.6s after an action ends, and stays open while it runs ---');
+{
+  const scheduled = [];
+  const realSetTimeout = sandbox.setTimeout;
+  const realClearTimeout = sandbox.clearTimeout;
+  sandbox.setTimeout = function(fn, delay) { const t = { fn, delay, cleared: false }; scheduled.push(t); return t; };
+  sandbox.clearTimeout = function(t) { if (t) t.cleared = true; };
+  const live = (delay) => scheduled.filter((t) => t.delay === delay && !t.cleared);
+
+  setNow(110000);
+  const o = buildOverlay();
+  o.update(makeState({ phase: 'planning', detail: 'Continuing to payment', clientLabel: 'Claude' }));
+  assertEq(live(2600).length, 1, 'writing a status arms the 2.6s fold');
+  o.noteAction(true);
+  assertEq(live(2600).length, 0, 'an action running on the page holds the status open');
+  assert(o.container.classList.contains('acting'), 'the pill takes the acting tone while the action runs');
+  o.noteAction(false);
+  assert(o.container.classList.contains('thinking'), 'it returns to thinking when the action ends');
+  const fold = live(2600);
+  assertEq(fold.length, 1, 'the fold is armed again when the action ends');
+  fold[0].cleared = true; // spent
+  fold[0].fn();
+  assert(o.container.classList.contains('head'), 'the status folds away');
+  o.update(makeState({ phase: 'planning', detail: 'Entering contact email', clientLabel: 'Claude' }));
+  assert(!o.container.classList.contains('head'), 'a new status opens it again');
+  o.setMotion({ form: 'ring', startedAt: 1 });
+  assertEq(live(2600).length, 0, 'a capability call in flight holds the status open');
+  o.setMotion({ form: 'sweep', startedAt: 1 });
+  assertEq(live(2600).length, 1, 'the fold returns once the ring ends');
+  o.destroy();
+  assertEq(live(2600).length, 0, 'destroy() clears the fold timer');
+
+  sandbox.setTimeout = realSetTimeout;
+  sandbox.clearTimeout = realClearTimeout;
+}
+
+console.log('\n--- Test: a stopped trigger watch only drops the watching tone ---');
+{
+  setNow(111000);
+  const o = buildOverlay();
+  o.update({ lifecycle: 'running', phase: 'trigger-watch', mode: 'trigger-watch',
+    display: { title: 'FSB Trigger', subtitle: '', detail: 'Watching #price >= 250 (live)' },
+    progress: { mode: 'indeterminate', percent: null, label: 'Watching', eta: null } });
+  assert(o.container.classList.contains('watching'), 'a trigger caption takes the watching tone');
+  assertEq(o._foldDelay, 4000, 'a watch caption folds after 4s');
+  o.update({ lifecycle: 'cleared', phase: 'cleared', mode: 'trigger-watch', display: { title: '', subtitle: '', detail: '' }, progress: null });
+  assert(o.container.classList.contains('thinking') && !o.container.classList.contains('watching'), 'clearing the watch returns to thinking');
+  assertEq(o.container.querySelector('.pl-in').textContent, 'Watching #price >= 250 (live)', 'the pill itself stays up');
+  o.destroy();
+}
+
+console.log('\n--- Test: the watchdog degraded state is Waiting: grey and still ---');
+{
+  setNow(112000);
+  const o = buildOverlay();
+  o.update(Object.assign(makeState({ phase: 'planning', detail: 'Waiting for next automation update' }), { reconnecting: true }));
+  assert(o.container.classList.contains('waiting'), 'a degraded state takes the waiting tone');
+  assertEq(o._foldTimer, null, 'a waiting pill does not fold');
   o.destroy();
 }
 

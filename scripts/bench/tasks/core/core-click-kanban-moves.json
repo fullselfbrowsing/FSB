@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "core-click-kanban-moves",
+  "version": 1,
+  "set": "core",
+  "category": "click-heavy",
+  "startPath": "/fixtures/kanban-moves/index.html",
+  "instruction": "Open {startUrl}. Move Write release notes to Done, Fix login redirect to Doing, and Update dependencies to Done.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/kanban-moves/move", "count": 1, "jsonEquals": { "card": "Write release notes", "column": "done" } },
+      { "kind": "request", "method": "POST", "path": "/api/kanban-moves/move", "count": 1, "jsonEquals": { "card": "Fix login redirect", "column": "doing" } },
+      { "kind": "request", "method": "POST", "path": "/api/kanban-moves/move", "count": 1, "jsonEquals": { "card": "Update dependencies", "column": "done" } },
+      { "kind": "request", "method": "POST", "path": "/api/kanban-moves/move", "count": 3 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/kanban-moves/index.html" },
+      { "kind": "marker", "name": "column-done", "equals": "Set up CI|Update dependencies|Write release notes" },
+      { "kind": "marker", "name": "column-doing", "equals": "Fix login redirect|Review PR 42" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "kanban-moves/index.html"]
+}

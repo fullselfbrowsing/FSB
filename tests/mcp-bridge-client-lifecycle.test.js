@@ -238,6 +238,9 @@ function buildClientHarness(options = {}) {
   if (options.fsbActionIcon) {
     context.fsbActionIcon = options.fsbActionIcon;
   }
+  if (options.globals) {
+    Object.assign(context, options.globals);
+  }
   // Phase 225-01: optionally seed the in-process lifecycle bus before mcp-bridge-client.js
   // captures it. background.js installs this on globalThis in real Chrome.
   if (options.installLifecycleBus) {
@@ -706,6 +709,60 @@ function runIconActivityRouteClassificationCase() {
   client._noteIconActivity('mcp:capabilities-invoke', { tab_id: 7 });
   assertEqual(activities.length, beforeCapability,
     'capability invoke skips generic activity so it cannot leave a Sweep tail');
+}
+
+async function runIconClaimsTheAgentsTabCase() {
+  console.log('\n--- toolbar icon claims the tab the call lands on ---');
+
+  const notes = [];
+  const peeks = [];
+  const ticks = [];
+  const harness = buildClientHarness({
+    fsbActionIcon: {
+      noteActivity(tabId, activity) { notes.push([tabId, activity]); }
+    },
+    globals: {
+      peekAgentTabId(agentId) {
+        peeks.push(agentId);
+        return agentId === 'agent_a' ? 42 : null;
+      },
+      MCPVisualSessionLifecycleUtils: {
+        async recordVisualSessionTick(tabId, agentId) { ticks.push([tabId, agentId]); }
+      }
+    }
+  });
+  const client = harness.exports.mcpBridgeClient;
+
+  // Hosts omit tab_id when they own one tab. The claim must still be keyed to
+  // that tab: a 'global' claim animates the toolbar icon but never reaches
+  // the status pill, which reads its tab's own motion.
+  client._noteIconActivity('mcp:execute-action', { tool: 'scroll', agentId: 'agent_a', params: {} });
+  assertDeepEqual(notes[notes.length - 1], [42, 'sweep'],
+    'a call with no tab_id claims the agent\'s own tab');
+
+  client._noteIconActivity('mcp:execute-action', { tool: 'scroll', agentId: 'agent_a', params: { tab_id: 7 } });
+  assertDeepEqual(notes[notes.length - 1], [7, 'sweep'], 'an explicit tab_id still wins');
+
+  client._noteIconActivity('mcp:execute-action', { tool: 'scroll', agentId: 'agent_b', params: {} });
+  assertDeepEqual(notes[notes.length - 1], [null, 'sweep'],
+    'an agent with no resolvable tab falls back to the global claim');
+
+  // open_tab lands on a tab nobody could peek before it existed. The tick that
+  // raises its pill claims the new tab.
+  const before = notes.length;
+  await client._recordVisualSessionTickIfPresent(77, 'agent_a', {
+    tool: 'open_tab',
+    agentId: 'agent_a',
+    params: { url: 'https://example.com' },
+    visualSession: { visualReason: 'Opening', client: 'Claude' }
+  });
+  assertDeepEqual(ticks, [[77, 'agent_a']], 'the visual-session tick still records');
+  assertDeepEqual(notes.slice(before), [[77, 'sweep']],
+    'the tick claims the tab the call landed on, not the peeked tab');
+
+  const beforeNoSidecar = notes.length;
+  await client._recordVisualSessionTickIfPresent(78, 'agent_a', { tool: 'scroll', agentId: 'agent_a' });
+  assertEqual(notes.length, beforeNoSidecar, 'no visual session, no pill, no extra claim');
 }
 
 async function runCapabilityIconLifecycleCase() {
@@ -1932,6 +1989,7 @@ async function run() {
   await runVisualSessionRouteCase();
   await runTriggerMessageRouteCase();
   runIconActivityRouteClassificationCase();
+  await runIconClaimsTheAgentsTabCase();
   await runCapabilityIconLifecycleCase();
   runBackgroundArmingSourceCase();
   await runPairingConstructionCases();

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-ticket-triage-02",
+  "provenance": "hand",
+  "task": {
+    "id": "core-mixed-ticket-triage",
+    "version": 1,
+    "fixtureSha256": "22b31a541ad0e3bd050f3c93bbb22619638195bc8a9750cc685f7949e93d7d25"
+  },
+  "step": 2,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion", "risk"],
+    "goal": "Find the open ticket labelled billing that was reported by Dana, change its status to In Progress, and save it.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/ticket-triage/index.html",
+      "title": "Operations tickets",
+      "text": "Operations tickets\nOPS-226: Invoice PDF shows the wrong tax rate\nLabels\nbilling\nReporter\nDana Kim\nStatus\nTo Do\nTo Do\nIn Progress\nBlocked\nDone\nSave"
+    },
+    "elements": [
+      { "id": "e0", "role": "button", "label": "OPS-214", "ops": ["click"] },
+      { "id": "e1", "role": "button", "label": "OPS-217", "ops": ["click"] },
+      { "id": "e2", "role": "button", "label": "OPS-221", "ops": ["click"] },
+      { "id": "e3", "role": "button", "label": "OPS-226", "ops": ["click"] },
+      { "id": "e4", "role": "button", "label": "OPS-230", "ops": ["click"] },
+      { "id": "e5", "role": "button", "label": "OPS-233", "ops": ["click"] },
+      { "id": "e6", "role": "button", "label": "OPS-238", "ops": ["click"] },
+      { "id": "e7", "role": "button", "label": "OPS-241", "ops": ["click"] },
+      { "id": "e8", "role": "button", "label": "OPS-245", "ops": ["click"] },
+      { "id": "e9", "role": "button", "label": "OPS-249", "ops": ["click"] },
+      { "id": "e10", "role": "combobox", "label": "Status", "ops": ["click"] },
+      { "id": "e11", "role": "option", "label": "To Do", "ops": ["click"] },
+      { "id": "e12", "role": "option", "label": "In Progress", "ops": ["click"] },
+      { "id": "e13", "role": "option", "label": "Blocked", "ops": ["click"] },
+      { "id": "e14", "role": "option", "label": "Done", "ops": ["click"] },
+      { "id": "e15", "role": "button", "label": "Save", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "click", "targetId": "e3", "changed": true },
+      { "op": "click", "targetId": "e10", "changed": true }
+    ],
+    "offeredOps": ["click", "scroll"],
+    "proposedAction": { "op": "click", "targetId": "e12" }
+  },
+  "labels": {
+    "operation": "click",
+    "target": "e12",
+    "completion": false,
+    "stuck": null,
+    "risk": false
+  },
+  "note": "OPS-226 is open with the Status list expanded. Choosing In Progress (e12) only changes the unsaved form, so it is risk-negative; Save comes after."
+}

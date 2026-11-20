@@ -6,6 +6,7 @@ import type { MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
+import { mcpToolDescription, mcpParamDescription } from './descriptions.js';
 
 /**
  * Register autopilot tools: run_task, stop_task, get_task_status.
@@ -31,8 +32,8 @@ export function registerAutopilotTools(
   // run_task -- execute a natural language automation task
   server.tool(
     'run_task',
-    'IMPORTANT: Only use this tool if the user explicitly requests autopilot, asks to "run a task", or says "let FSB handle it". For all other browser tasks, use the manual tools (navigate, read_page, get_dom_snapshot, click, type_text, execute_js, etc.) to accomplish the task step by step -- they are more reliable and give you full control. This tool hands control to FSB\'s built-in AI which decides the steps autonomously. Returns a completion summary with success status and action log. Multi-agent contract: agent_id is FSB-issued and required (the server captures it via agent:register on first tool call -- callers do not provide it). The concurrency cap is configurable (default 8, range 1-64); the (N+1)th agent claim is rejected with AGENT_CAP_REACHED { cap, active }. Ownership enforcement: cross-agent calls reject with TAB_NOT_OWNED; incognito tabs reject with TAB_INCOGNITO_NOT_SUPPORTED; cross-window tabs reject with TAB_OUT_OF_SCOPE.',
-    { task: z.string().describe('Natural language description of the task to perform') },
+    mcpToolDescription('run_task'),
+    { task: z.string().describe(mcpParamDescription('run_task', 'task')) },
     async ({ task }, extra) => {
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });
@@ -215,7 +216,7 @@ export function registerAutopilotTools(
   // stop_task -- cancel the currently running automation
   server.tool(
     'stop_task',
-    'Cancel the currently running automation task. Returns confirmation of cancellation. When to use: when run_task is taking too long, heading in the wrong direction, or you need to regain manual control. Related: get_task_status (check progress before deciding to stop), run_task (the task being cancelled). Agent-scoped: only the calling agent\'s task is cancelled; cross-agent calls reject with TAB_NOT_OWNED.',
+    mcpToolDescription('stop_task'),
     {},
     async () => {
       if (!bridge.isConnected) {
@@ -235,7 +236,7 @@ export function registerAutopilotTools(
   // get_task_status -- check running task progress (read-only, bypasses queue)
   server.tool(
     'get_task_status',
-    'Check whether a task is currently running and its progress. Use to poll status when not receiving progress notifications. Returns percent complete, current phase, and ETA. Related: run_task (the task being monitored), stop_task (cancel if needed). Agent-scoped: returns the calling agent\'s task status only.',
+    mcpToolDescription('get_task_status'),
     {},
     async () => {
       if (!bridge.isConnected) {

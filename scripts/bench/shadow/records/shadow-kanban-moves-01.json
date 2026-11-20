@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-kanban-moves-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-click-kanban-moves",
+    "version": 1,
+    "fixtureSha256": "ebc4b855ddf0c5c1b7b99a4a275ea558b2681c774a55dc9df08c28a2971f62d3"
+  },
+  "step": 1,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion"],
+    "goal": "Move Write release notes to Done, Fix login redirect to Doing, and Update dependencies to Done.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/kanban-moves/index.html",
+      "title": "Sprint board",
+      "text": "Sprint board\nTo do\nWrite release notes\nMove to: Write release notes\nDoing\nDone\nFix login redirect\nMove to: Fix login redirect\nUpdate dependencies\nMove to: Update dependencies\nDraft roadmap\nMove to: Draft roadmap\nDoing\nReview PR 42\nMove to: Review PR 42\nDone\nSet up CI\nMove to: Set up CI\nDoing: Review PR 42\nDone: Set up CI"
+    },
+    "elements": [
+      { "id": "e0", "role": "button", "label": "Move to: Write release notes", "ops": ["click"] },
+      { "id": "e1", "role": "menuitem", "label": "Doing", "ops": ["click"] },
+      { "id": "e2", "role": "menuitem", "label": "Done", "ops": ["click"] },
+      { "id": "e3", "role": "button", "label": "Move to: Fix login redirect", "ops": ["click"] },
+      { "id": "e4", "role": "button", "label": "Move to: Update dependencies", "ops": ["click"] },
+      { "id": "e5", "role": "button", "label": "Move to: Draft roadmap", "ops": ["click"] },
+      { "id": "e6", "role": "button", "label": "Move to: Review PR 42", "ops": ["click"] },
+      { "id": "e7", "role": "button", "label": "Move to: Set up CI", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "click", "targetId": "e0", "changed": true }
+    ],
+    "offeredOps": ["click", "scroll"]
+  },
+  "labels": {
+    "operation": "click",
+    "target": "e2",
+    "completion": false,
+    "stuck": null,
+    "risk": null
+  },
+  "note": "The Move to menu for Write release notes is open. Done (e2) is the right column; Doing (e1) is the wrong one. No card has moved yet."
+}
