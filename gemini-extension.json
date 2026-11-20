@@ -1,0 +1,15 @@
+{
+  "name": "fsb",
+  "version": "0.11.6",
+  "description": "FSB (Full Self Browsing): drive your real, signed-in Chrome through MCP. DOM-first browser automation; needs the FSB Chrome extension.",
+  "mcpServers": {
+    "fsb": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "fsb-mcp-server"
+      ]
+    }
+  },
+  "contextFileName": "GEMINI.md"
+}

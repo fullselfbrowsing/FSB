@@ -10,7 +10,8 @@
  *
  *   - URLs visited
  *   - Focused-element identifiers (selector / elementId of last mutation)
- *   - Action-result outcome class (`${tool}:${ok|err}:${fx|nf}`)
+ *   - Action-result outcome class (`${tool}:${ok|err}:${fx|nf}`), plus, for a
+ *     successful action, what it put on the page or where it left the view
  *
  * If none of these three sets has grown in the last N iterations, the
  * detectStuck integration fires reasonCode=stuck_no_goal_progress.

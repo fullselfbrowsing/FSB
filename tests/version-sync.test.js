@@ -35,6 +35,7 @@ const mcpExclusiveTargets = [
   'mcp/src/version.ts',
   'mcp/native-host/runtime-integrity.json',
   'mcp/CHANGELOG.md',
+  'gemini-extension.json',
 ];
 
 function run(args, root = repositoryRoot) {

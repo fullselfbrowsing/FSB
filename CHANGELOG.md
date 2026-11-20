@@ -1,10 +1,30 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.95`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.96`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
 The independently published `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ## [Unreleased]
+
+## v0.9.96 — Autopilot Disabled-Control and Stuck-Detection Fixes, Gemini CLI and LM Studio Installs — 2026-11-15
+
+A hot patch for autopilot and MCP page actions. The extension, showcase, skill, documentation, and store metadata align at `0.9.96`. The independently versioned `fsb-mcp-server` advances to `0.11.6`, a security update to its bundled dependencies plus a clean shutdown when the MCP host closes stdout; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md). Thanks to Trace824 for the fixes in #158, #159, and #160, and to Adam13y for reporting #156 and #157. MCP tool schemas and bridge messages are unchanged.
+
+### Fixed
+
+- **Autopilot no longer pushes an action through a disabled control (#156).** `click_at` sent a trusted CDP click without looking at what was under the point and always reported success, so when `click` correctly refused a disabled button the model could fall back to `click_at`. It now checks the hit target first and returns `TARGET_DISABLED` for a disabled, `aria-disabled`, or `inert` control, including one disabled through an ancestor or a shadow host. An enabled control in the first `<legend>` of a disabled fieldset still works.
+- **`execute_js` cannot click, submit through, or re-enable a disabled control.** Native disabled buttons ignore trusted clicks and `element.click()`, but a script-dispatched click still fires, and a script could clear the `disabled` attribute. Scripts from autopilot and MCP now run through a guarded runner that drops the script's own clicks and submits aimed at a disabled control, refuses its attempts to re-enable one, and reports `TARGET_DISABLED`. Page code the script triggers is not checked, so a page that enables its own button still works: listeners for events the script dispatches, focus and blur, typing through `execCommand`, form reset, and custom-element callbacks. The system prompt also tells the model that a disabled control is the page blocking the action, not a quirk to route around.
+- **Text-targeted clicks respect disabled buttons.** Readiness checks reject the children of a disabled button and elements inside an `aria-disabled` ancestor, including on the fast path.
+- **Autopilot notices when it is stuck (#157).** Stuck detection (no page change, repeated actions, no goal progress, unchanged DOM) only ran when no hook pipeline was passed, and every real session passes one, so stuck runs went to the 100-iteration cap. The stuck-detection hook is now registered after each iteration, and each iteration's results carry the tool arguments. The repetition check compares every argument the tool declares except the overlay text, plus where a scroll left the page, and the goal-progress check counts a successful action as progress when it puts something new on the page (a URL, text, a file, a sheet chunk) or leaves the view somewhere new. Filling five different fields, visiting five pages, writing a sheet in chunks, uploading several files, or scrolling down a long page is therefore not mistaken for a loop, however long it runs, while repeating the same action, cycling between two actions, nudging a click to new coordinates, or scrolling at the end of a page still is. `scroll_at` now reports where its wheel tick left the view (the window, the scroll container under the pointer, and the URL, where map apps keep their zoom), so zooming a map or paging through an inner list counts as moving on.
+- **Snapshot refs work as selectors.** A ref such as `e12` from `get_page_snapshot`, passed as `selector`, is resolved as a ref instead of being queried as CSS, which always failed with "Element not found". This affected autopilot and every MCP client, because no tool schema offers a separate `ref` parameter.
+- **Fields inside a `<label>` appear in page snapshots.** The snapshot stopped at interactive elements, so a label wrapping its input or textarea hid the field. It now descends into interactive elements that contain other interactive elements.
+- **A page snapshot after `get_dom_snapshot` is no longer empty.** `get_dom_snapshot` stamps `data-fsb-id` on the page elements it reports, and FSB treated that attribute as a marker of its own UI, so later page snapshots and `read_page` dropped those elements.
+
+### Added
+
+- **Gemini CLI extension.** `gemini-extension.json` and `GEMINI.md` at the repository root let Gemini CLI users install FSB with `gemini extensions install https://github.com/fullselfbrowsing/FSB`. The extension runs `npx -y fsb-mcp-server` over stdio, and `npm run version:set:mcp` keeps its version in step with the MCP package.
+- **Add to LM Studio.** The README Quick Start carries LM Studio's one-click MCP install button (LM Studio 0.3.17 or newer).
+- Regression suites for these fixes: `tests/autopilot-disabled-and-stuck.test.js` in `npm test`, and `tests/autopilot-page-guards.test.mjs`, which reproduces the snapshot and disabled-control cases on the real content scripts in Chrome, in `pretest`.
 
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
