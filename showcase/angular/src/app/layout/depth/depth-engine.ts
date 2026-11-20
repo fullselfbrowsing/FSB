@@ -74,6 +74,29 @@ interface Ambient {
   o: number;
 }
 
+/* The swipe the wheel is in. `lean`: it has not chosen a plane yet. `inner`: it
+   scrolls the plane it is on. `eat`: it has had its plane, has reached the end of the
+   plane it scrolled, or lost the plane it was waiting for to a key, the rail or a
+   finger, and what is left of it is eaten. */
+interface Swipe {
+  mode: 'lean' | 'inner' | 'eat';
+  /** How far it has gone while leaning, signed. */
+  acc: number;
+  /** How far it has gone at a steady pace since it last moved the camera, signed. */
+  travel: number;
+  /** The shape of its deltas, each as big as it would be in one frame (FRAME_MS): the
+      highest, the lowest since then, and the run of rises. */
+  peak: number;
+  low: number;
+  run: number;
+  /** When an event of it last came late, held back by a busy page. */
+  heldAt: number;
+  /** The farthest it has gone in STEADY_MS. */
+  best: number;
+  /** Its recent deltas and when they came, for its pace (steadyNow()). */
+  log: { t: number; d: number }[];
+}
+
 /* Planes are scaled down to fit the window, which is the approved desktop look.
    On a wide window, text below MIN_SCALE_WIDE would stop being readable, so the
    plane scrolls inside itself instead.
@@ -94,10 +117,48 @@ const TICK_MS = 15;
 /* Marks the label that makes a phone without vibration tick (labelEntries() below). */
 const TAP_LABEL = 'data-depth-tick';
 
-/* After a swipe snaps to a plane, wheel events that still arrive this soon belong
-   to that swipe's momentum and are eaten. The snap itself comes 160ms after the
-   last event, so together this matches the 400ms pause that starts a new swipe. */
-const SWALLOW_MS = 240;
+/* The wheel and the trackpad. A swipe moves the camera one plane, and the camera
+   sets off as soon as the swipe has gone COMMIT_PX: it does not wait for a trackpad's
+   momentum to run out, and what is left of the swipe, momentum and all, is eaten.
+   Short of that the plane leans the swipe's way (LEAN of the way to the next one)
+   and springs back once the swipe stops. */
+const COMMIT_PX = 50;
+const LEAN = 0.08;
+/* Once the camera has set off, the next plane can be chosen this soon at the
+   earliest. A swipe that asks sooner still counts, and goes when the time is up. */
+const LOCK_MS = 400;
+/* A pause this long between wheel events ends a swipe. */
+const IDLE_MS = 160;
+/* Events that come back this soon after a swipe that was being eaten, and lower
+   than where it stopped, are its momentum arriving late. */
+const RESUME_MS = 400;
+/* A fresh push on a swipe's momentum: the deltas fall to a low, then climb for two
+   steps or more to RISE times that low plus RISE_PX. The noise in a momentum tail,
+   and the step from a swipe into its momentum, climb less than that. */
+const RISE = 2;
+const RISE_PX = 6;
+/* Momentum only slows down. Input that keeps its pace (a mouse wheel rolled on,
+   fingers dragging on the pad) is meant: over the last STEADY_MS it went at least
+   STEADY of the way it went over the STEADY_MS before, and at least STEADY_PX. Such
+   input moves on one plane for every PLANE of the window's height it travels. */
+const STEADY_MS = 300;
+const STEADY = 0.75;
+const STEADY_PX = 60;
+const PLANE = 0.75;
+/* A wheel event happened when its time stamp says, which a busy page does not delay.
+   A trackpad reports its travel a few times a frame, and the browser hands over once a
+   frame all that came during it, so a long frame brings a big delta and a short one a
+   small delta. Once the events come within QUICK_MS of each other, as a trackpad's do,
+   each is sized as it would be in one FRAME_MS frame, taking the time since the last as
+   no less than SAMPLE_MS, about how often a trackpad reports. One that comes HELD_MS
+   or more after the last was held back by a busy page, and brings several frames. */
+const FRAME_MS = 1000 / 60;
+const QUICK_MS = 25;
+const SAMPLE_MS = 8;
+const HELD_MS = 50;
+/* A pause in the wheel counts only if the page drew at least DREW frames through it.
+   If it drew fewer it was busy, and the swipe was still coming. */
+const DREW = 3;
 
 /* A finger that slides only a few pixels along the rail can still count as a tap,
    and the browser then clicks the entry it came down on. A click on the rail this
@@ -152,7 +213,6 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let widenT = 0;
   let lastTouch = -1e9;
   let gesturing = false;
-  let scrolled = false;
   let idle = 0;
   // The finger being followed; `onRail` if it came down on the rail, `onEntry` if on
   // one of its buttons rather than the space around them.
@@ -168,21 +228,25 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   // How tall each piece of on-demand content was at the last pass, to tell which
   // one is opening.
   const grownTo = new WeakMap<HTMLElement, number>();
-  let edgeT = 0;
-  let lastAbs = 0;
-  let steady = 0;
-  let swallow = false;
-  let swallowEnd = 0;
-  let lastEvt = 0;
-  // Shape of the current swipe's deltas: how far it peaked, whether it has ebbed
-  // (its momentum tail), and the run of rising or falling steps since.
-  let peak = 0;
-  let ebbed = false;
-  // A fresh swipe has landed on the momentum of the one that opened this gesture.
-  let carry = false;
-  let rising = 0;
-  let riseFrom = 0;
-  let falling = 0;
+  // The wheel: the swipe it is in; when its last event came, by its time stamp and by
+  // the clock as it was handled; how big that event was in one frame; how many frames
+  // had been drawn by then; and how many events in a row have come quickly. Then until
+  // when no plane is chosen. A plane chosen before then waits (`waitDir`, to go from
+  // `waitFrom`, asked for by the swipe `waitBy`) on a timer.
+  let swipe: Swipe | null = null;
+  let wheelAt = -1e9;
+  let wheelNow = -1e9;
+  let wheelD = 0;
+  let wheelF = 0;
+  let quick = 0;
+  let lockEnd = 0;
+  let waitDir = 0;
+  let waitFrom = 0;
+  let waitBy: Swipe | null = null;
+  let waitT = 0;
+  // The frames the page has drawn while the wheel is in use (count()).
+  let frames = 0;
+  let ticker = 0;
   const ambients: Ambient[] = Array.from(stage.querySelectorAll<HTMLElement>('[data-depth-ambient]')).map((el) => {
     const r = (el.getAttribute('data-depth-ambient') || '0,0').split(',');
     return { el, a: parseFloat(r[0]), b: parseFloat(r[1]), o: -1 };
@@ -887,18 +951,11 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     target = anchor;
     kick();
   }
-  // Ends a gesture on a plane. After a pause the stragglers that follow are eaten;
-  // when a fresh swipe is what ended it, that swipe is new input and goes through.
-  function settle(eat = true): void {
+  // Ends a swipe of a finger on a plane: the next one if it got a tenth of the way.
+  function settle(): void {
     gesturing = false;
-    carry = false;
-    swallow = eat;
-    if (eat) swallowEnd = win.performance.now() + SWALLOW_MS;
     const delta = target - anchor;
     go(Math.abs(delta) < 0.1 ? anchor : anchor + (delta > 0 ? 1 : -1));
-  }
-  function onIdle(): void {
-    if (gesturing) settle();
   }
   // Jump straight to the plane holding an element, for #fragment links.
   function reveal(el: HTMLElement): void {
@@ -932,99 +989,199 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const t = e.target as Element | null;
     return !!(t && t.closest && t.closest('[data-depth-own]'));
   };
-  function onWheel(e: WheelEvent): void {
-    if (e.ctrlKey || (e.metaKey && owns(e))) return;
-    const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? stage!.clientHeight : 1);
-    if (Math.abs(e.deltaX) > Math.abs(dy)) return;
-    win.clearTimeout(idle);
-    idle = win.setTimeout(onIdle, 160);
-    const ad = Math.abs(dy);
-    const prev = lastAbs;
-    const now = win.performance.now();
-    const gap = now - lastEvt;
-    lastAbs = ad;
-    lastEvt = now;
-    // One physical swipe is a push plus its momentum tail: the deltas climb, then
-    // only ebb. A new push follows a pause, makes them jump, or (a fresh swipe landing
-    // on a tail that is still running) makes them climb again after they have ebbed.
-    // A slow drag whose speed wavers climbs again after ebbing too, so that shape
-    // alone never moves a plane: see where the gesture rolls over below.
-    if (ad < prev) {
-      falling++;
-      rising = 0;
-    } else if (ad > prev) {
-      if (!rising) riseFrom = prev;
-      rising++;
-      falling = 0;
-    }
-    if (falling >= 3 || ad <= peak * 0.4) ebbed = true;
-    const fresh = gap >= 400 || ad > prev * 1.5 + 4 || (ebbed && rising >= 2 && ad - riseFrom >= 2);
-    const cont = !fresh;
-    if (fresh) {
-      // Only a swipe that follows an ebbed one counts as landing on an open gesture:
-      // a push that jumps while it is still building is the same swipe.
-      if (gesturing && ebbed) carry = true;
-      peak = ad;
-      ebbed = false;
-      falling = 0;
-      rising = 0;
-      scrolled = false;
-      edgeT = 0;
-      steady = 0;
-      swallow = false;
-    } else peak = Math.max(peak, ad);
-    // The last swipe's momentum can keep its gesture open, and a gesture never goes
-    // past one plane. Once a fresh swipe has landed on it, the gesture rolls over when
-    // the camera reaches that plane, and the swipe carries on from there (to the next
-    // plane, or scrolling inside this one). Momentum alone stays where it stopped, and
-    // a drag moves one plane for each plane of travel however its speed wavers.
-    if (carry && gesturing && Math.abs(target - anchor) >= 0.999) settle(false);
+  // When the input behind a wheel event happened: its time stamp, unless that is on
+  // some other clock.
+  function stampOf(e: Event, now: number): number {
+    const t = e.timeStamp;
+    return t > now - 60000 && t <= now + 1 ? t : now;
+  }
+  // Counts the frames the page draws, until a second after the last wheel event.
+  function count(): void {
+    frames++;
+    ticker = win.performance.now() - wheelNow < 1000 ? win.requestAnimationFrame(count) : 0;
+  }
+  // A new swipe, whose first event came at `t` and was `d` in one frame: it scrolls the
+  // plane it is on while that can go its way, and otherwise leans toward the next plane.
+  function begin(dy: number, d: number, t: number): void {
+    const s: Swipe = { mode: 'lean', acc: 0, travel: 0, peak: d, low: d, run: 0, heldAt: -1e9, best: 0, log: [{ t, d: Math.abs(dy) }] };
+    swipe = s;
     const L = layers[Math.round(target)];
-    // The rest of the swipe that just changed planes is eaten, so it cannot scroll or
-    // skip the next one. Only its stragglers, though: they arrive right after the snap
-    // and keep decaying. Anything later, or growing again, is new input, so a wheel
-    // rolled on or a fresh swipe is never held for more than a moment.
-    if (swallow && !gesturing) {
-      if (cont && now < swallowEnd && ad <= prev + 1) {
-        e.preventDefault();
-        return;
+    if (flows(L) && canScroll(L, dy)) {
+      // Scrolling the plane it is on: a plane still waiting to be chosen stays put, and
+      // the camera stops leaning toward it.
+      s.mode = 'inner';
+      unwait();
+      if (gesturing) {
+        gesturing = false;
+        go(anchor);
       }
-      swallow = false;
-      scrolled = false;
-      edgeT = 0;
-      steady = 0;
-    }
-    if (!gesturing && flows(L)) {
-      if (canScroll(L, dy)) {
-        scrolled = true;
-        edgeT = 0;
-        steady = 0;
-        e.preventDefault();
-        scrollBy(L, dy);
-        return;
-      }
-      // Reached the edge inside this swipe: hold while it runs out, so reading to the
-      // end never flings you past it. A new push carries on to the next plane, and so
-      // does a steady one held for a moment (a mouse wheel rolled on, a deliberate drag).
-      if (scrolled) {
-        if (!edgeT) edgeT = now;
-        steady = ad >= prev * 0.97 ? steady + 1 : 0;
-        if (!(now - edgeT > 600 && steady >= 3)) {
-          e.preventDefault();
-          return;
-        }
-        scrolled = false;
-        edgeT = 0;
-        steady = 0;
-      }
-    }
-    e.preventDefault();
+      scrollBy(L, dy);
+    } else leanBy(s, dy);
+  }
+  function leanBy(s: Swipe, dy: number): void {
+    // Momentum still coming after the camera was moved under a waiting plane is eaten.
+    if (waitDir && anchor !== waitFrom) overtaken();
+    if (s.mode !== 'lean') return;
+    s.acc += dy;
     if (!gesturing) {
       gesturing = true;
       anchor = Math.round(target);
     }
-    target = clamp(target + dy / (stage!.clientHeight * 0.75), Math.max(-0.15, anchor - 1), Math.min(N - 0.85, anchor + 1));
+    target = clamp(anchor + clamp(s.acc / COMMIT_PX, -1, 1) * LEAN, -LEAN, N - 1 + LEAN);
     kick();
+    if (Math.abs(s.acc) >= COMMIT_PX) choose(s.acc > 0 ? 1 : -1);
+    // Turned back before it went far enough: a plane still waiting the other way stays put.
+    else if (waitDir && Math.sign(s.acc) !== waitDir) unwait();
+  }
+  function unwait(): void {
+    win.clearTimeout(waitT);
+    waitDir = 0;
+    waitBy = null;
+  }
+  // Something else (a key, the rail, a finger) has moved the camera since the waiting
+  // plane was asked for: that plane is dropped, and the rest of the swipe that asked for
+  // it is eaten rather than leaned on from wherever the camera is now.
+  function overtaken(): void {
+    const s = waitBy;
+    unwait();
+    gesturing = false;
+    if (s && s === swipe) {
+      s.mode = 'eat';
+      s.acc = 0;
+      s.travel = 0;
+    }
+  }
+  // Sends the camera one plane on, and eats what is left of the swipe. Too soon after
+  // the last plane, it waits.
+  function choose(dir: number): void {
+    unwait();
+    const now = win.performance.now();
+    if (now < lockEnd) {
+      waitDir = dir;
+      waitFrom = anchor;
+      waitBy = swipe;
+      waitT = win.setTimeout(() => {
+        if (!alive || !waitDir) return;
+        if (anchor !== waitFrom) overtaken();
+        else choose(waitDir);
+      }, lockEnd - now + 1);
+      return;
+    }
+    gesturing = false;
+    const from = anchor;
+    go(anchor + dir);
+    if (anchor !== from) lockEnd = now + LOCK_MS;
+    if (swipe) {
+      swipe.mode = 'eat';
+      swipe.acc = 0;
+      swipe.travel = 0;
+    }
+  }
+  // Whether the swipe keeps its pace, as momentum never does: momentum only slows, so it
+  // soon falls short of the swipe's best. Just after a held event the pace cannot be
+  // told, since all that event's travel lands at one moment.
+  function steadyNow(s: Swipe, t: number): boolean {
+    let recent = 0;
+    let before = 0;
+    for (const x of s.log) {
+      if (t - x.t < STEADY_MS) recent += x.d;
+      else before += x.d;
+    }
+    s.best = Math.max(s.best, recent);
+    if (t - s.heldAt < 2 * STEADY_MS) return false;
+    return before > 0 && recent >= STEADY_PX && recent >= before * STEADY && recent >= s.best * STEADY;
+  }
+  function onIdle(): void {
+    const s = swipe;
+    if (!s) return;
+    // The page has drawn next to nothing since the last event: it was busy, not idle.
+    if (frames - wheelF < DREW && win.performance.now() - wheelNow < 1000) {
+      idle = win.setTimeout(onIdle, IDLE_MS);
+      return;
+    }
+    if (s.mode === 'lean' && !waitDir) {
+      // Stopped short of the next plane: back to this one.
+      swipe = null;
+      gesturing = false;
+      go(anchor);
+    } else if (s.mode === 'inner') swipe = null;
+  }
+  function onWheel(e: WheelEvent): void {
+    if (e.ctrlKey || (e.metaKey && owns(e))) return;
+    const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? stage!.clientHeight : 1);
+    if (Math.abs(e.deltaX) > Math.abs(dy)) return;
+    e.preventDefault();
+    const ad = Math.abs(dy);
+    // The events a trackpad sends as fingers land and lift move nothing, and would
+    // only make the next one look like a jump.
+    if (!ad) return;
+    const now = win.performance.now();
+    const t = stampOf(e, now);
+    const gap = t - wheelAt;
+    const drew = frames - wheelF;
+    const prev = wheelD;
+    wheelAt = t;
+    wheelNow = now;
+    wheelF = frames;
+    if (!ticker) ticker = win.requestAnimationFrame(count);
+    win.clearTimeout(idle);
+    idle = win.setTimeout(onIdle, IDLE_MS);
+    let s = swipe;
+    // The page drew next to nothing since the last event: it was busy, and this one was
+    // held back.
+    const stalled = gap < 1000 && drew < DREW;
+    // How big the event would be in one frame, once the events come as a trackpad's
+    // do. A mouse wheel's notches come further apart, and count as they are.
+    if (gap < QUICK_MS) quick++;
+    else if (!stalled) quick = 0;
+    const d = quick >= 2 ? (ad * FRAME_MS) / Math.max(gap, SAMPLE_MS) : ad;
+    if (s && quick >= 2 && gap >= HELD_MS) s.heldAt = t;
+    wheelD = d;
+    // A pause ends the swipe, unless the page was busy through it, or what comes after
+    // it is that swipe's momentum, arriving late and slower.
+    if (s && gap >= IDLE_MS && !stalled && !(s.mode === 'eat' && gap < RESUME_MS && d < prev)) s = swipe = null;
+    if (!s) {
+      begin(dy, d, t);
+      return;
+    }
+    s.log.push({ t, d: ad });
+    while (t - s.log[0].t >= 2 * STEADY_MS) s.log.shift();
+    // One physical swipe is a push and then its momentum: the deltas climb, then only
+    // ebb. A new push on that momentum climbs out of the ebb well past where it was.
+    s.run = d > prev ? s.run + 1 : 0;
+    const fresh = s.run >= 2 && s.low < s.peak * 0.7 && d >= s.low * RISE + RISE_PX;
+    if (d > s.peak) s.peak = s.low = d;
+    else if (d < s.low) s.low = d;
+    if (s.mode === 'lean') {
+      leanBy(s, dy);
+      return;
+    }
+    if (fresh) {
+      begin(dy, d, t);
+      return;
+    }
+    const L = layers[Math.round(target)];
+    if (s.mode === 'inner') {
+      if (canScroll(L, dy)) scrollBy(L, dy);
+      // Reached the end of the plane: hold while the swipe runs out, so reading to the
+      // end never flings you past it.
+      else {
+        s.mode = 'eat';
+        s.travel = 0;
+      }
+      return;
+    }
+    // Eaten, unless it keeps its pace once the camera is there: then it scrolls the
+    // plane, or moves on a plane for each plane of travel.
+    const steady = steadyNow(s, t);
+    if (now < lockEnd || !steady) return;
+    if (flows(L) && canScroll(L, dy)) {
+      s.mode = 'inner';
+      scrollBy(L, dy);
+      return;
+    }
+    s.travel += dy;
+    if (Math.abs(s.travel) >= stage!.clientHeight * PLANE) choose(s.travel > 0 ? 1 : -1);
   }
   function onKey(e: KeyboardEvent): void {
     const tg = e.target as HTMLElement | null;
@@ -1290,7 +1447,9 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       win.clearTimeout(rescanT);
       win.clearTimeout(widenT);
       win.clearTimeout(idle);
+      win.clearTimeout(waitT);
       win.cancelAnimationFrame(raf);
+      win.cancelAnimationFrame(ticker);
       mo?.disconnect();
       win.removeEventListener('load', rescan);
       cueEl?.style.removeProperty('--cue');
