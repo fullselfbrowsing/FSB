@@ -901,6 +901,25 @@ describe('createDepthEngine', () => {
       expect(h.style.filter).toBe('');
     }, 10000);
 
+    // A swipe asks for the next plane before the lock is over, and waits. The rail then
+    // takes the camera further on while that swipe's momentum is still coming, and runs
+    // past the end of the lock: the camera stays where the rail put it.
+    it('drops a plane still waiting once the rail has moved the camera', async () => {
+      build([120, 120, 120, 120, 120]);
+      await pause(300);
+      wheel(120);
+      await pause(170);
+      wheel(120);
+      await pause(30);
+      engine!.go(3);
+      const tail: number[] = [];
+      for (let d = 14; d >= 1; d *= 0.9) tail.push(Math.round(d));
+      await burst(tail);
+      await pause(500);
+      expect(seen[seen.length - 1]).toBe(3);
+      expect(seen).not.toContain(4);
+    }, 10000);
+
     it('still eats the momentum of the swipe that changed planes', async () => {
       build([120, 120, 120]);
       wheel(120);

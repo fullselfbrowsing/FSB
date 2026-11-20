@@ -75,8 +75,9 @@ interface Ambient {
 }
 
 /* The swipe the wheel is in. `lean`: it has not chosen a plane yet. `inner`: it
-   scrolls the plane it is on. `eat`: it has had its plane, or has reached the end of
-   the plane it scrolled, and what is left of it is eaten. */
+   scrolls the plane it is on. `eat`: it has had its plane, has reached the end of the
+   plane it scrolled, or lost the plane it was waiting for to a key, the rail or a
+   finger, and what is left of it is eaten. */
 interface Swipe {
   mode: 'lean' | 'inner' | 'eat';
   /** How far it has gone while leaning, signed. */
@@ -231,7 +232,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   // the clock as it was handled; how big that event was in one frame; how many frames
   // had been drawn by then; and how many events in a row have come quickly. Then until
   // when no plane is chosen. A plane chosen before then waits (`waitDir`, to go from
-  // `waitFrom`) on a timer.
+  // `waitFrom`, asked for by the swipe `waitBy`) on a timer.
   let swipe: Swipe | null = null;
   let wheelAt = -1e9;
   let wheelNow = -1e9;
@@ -241,6 +242,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let lockEnd = 0;
   let waitDir = 0;
   let waitFrom = 0;
+  let waitBy: Swipe | null = null;
   let waitT = 0;
   // The frames the page has drawn while the wheel is in use (count()).
   let frames = 0;
@@ -1017,6 +1019,9 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     } else leanBy(s, dy);
   }
   function leanBy(s: Swipe, dy: number): void {
+    // Momentum still coming after the camera was moved under a waiting plane is eaten.
+    if (waitDir && anchor !== waitFrom) overtaken();
+    if (s.mode !== 'lean') return;
     s.acc += dy;
     if (!gesturing) {
       gesturing = true;
@@ -1031,6 +1036,20 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   function unwait(): void {
     win.clearTimeout(waitT);
     waitDir = 0;
+    waitBy = null;
+  }
+  // Something else (a key, the rail, a finger) has moved the camera since the waiting
+  // plane was asked for: that plane is dropped, and the rest of the swipe that asked for
+  // it is eaten rather than leaned on from wherever the camera is now.
+  function overtaken(): void {
+    const s = waitBy;
+    unwait();
+    gesturing = false;
+    if (s && s === swipe) {
+      s.mode = 'eat';
+      s.acc = 0;
+      s.travel = 0;
+    }
   }
   // Sends the camera one plane on, and eats what is left of the swipe. Too soon after
   // the last plane, it waits.
@@ -1040,13 +1059,11 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     if (now < lockEnd) {
       waitDir = dir;
       waitFrom = anchor;
+      waitBy = swipe;
       waitT = win.setTimeout(() => {
-        const d = waitDir;
-        waitDir = 0;
-        if (!alive || !d) return;
-        // Something else (a key, the rail, a finger) has moved the camera meanwhile.
-        if (anchor !== waitFrom) gesturing = false;
-        else choose(d);
+        if (!alive || !waitDir) return;
+        if (anchor !== waitFrom) overtaken();
+        else choose(waitDir);
       }, lockEnd - now + 1);
       return;
     }
