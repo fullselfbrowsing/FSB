@@ -436,8 +436,11 @@
     return loadCatalogs(null, [code]);
   }
 
+  // Safari serves extension pages from safari-web-extension:. Taken for a
+  // content script there, a page kept its markup in the old language after the
+  // picker changed it.
   function isExtensionPage() {
-    return typeof location !== 'undefined' && location.protocol === 'chrome-extension:';
+    return typeof location !== 'undefined' && /^(chrome|safari-web|moz)-extension:$/.test(location.protocol);
   }
 
   function navigatorLanguages() {

@@ -1,5 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { WebSocketBridge } from '../bridge.js';
+import type { AgentScope } from '../agent-scope.js';
+import { sendBrowserMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 
 function formatResourceResponse(
@@ -27,9 +29,23 @@ function formatResourceResponse(
  * Register all MCP resources that expose FSB's data to AI agents.
  * Each resource checks bridge connectivity before attempting a read.
  */
-export function registerResources(server: McpServer, bridge: WebSocketBridge): void {
+export function registerResources(
+  server: McpServer,
+  bridge: WebSocketBridge,
+  agentScope?: AgentScope,
+): void {
   const notConnectedText =
     'Extension not connected. The FSB Chrome extension must be running and connected to the local FSB MCP bridge.';
+
+  // A resource describes the browser its session is in. With several browsers
+  // on one hub, a read that named none would be handed whichever is the
+  // default, which need not be the one the session's tools are driving.
+  const read = (
+    message: Parameters<WebSocketBridge['sendAndWait']>[0],
+    options: { timeout: number },
+  ): Promise<Record<string, unknown>> => (agentScope
+    ? sendBrowserMessage(bridge, agentScope, message, options)
+    : bridge.sendAndWait(message, options));
 
   // 1. Current Page DOM
   server.registerResource(
@@ -48,7 +64,7 @@ export function registerResources(server: McpServer, bridge: WebSocketBridge): v
         };
       }
 
-      const result = await bridge.sendAndWait(
+      const result = await read(
         { type: 'mcp:get-dom', payload: { maxElements: 2000, prioritizeViewport: true } },
         { timeout: 10_000 },
       );
@@ -74,7 +90,7 @@ export function registerResources(server: McpServer, bridge: WebSocketBridge): v
         };
       }
 
-      const result = await bridge.sendAndWait(
+      const result = await read(
         { type: 'mcp:get-tabs', payload: {} },
         { timeout: 10_000 },
       );
@@ -100,7 +116,7 @@ export function registerResources(server: McpServer, bridge: WebSocketBridge): v
         };
       }
 
-      const result = await bridge.sendAndWait(
+      const result = await read(
         { type: 'mcp:get-site-guides', payload: {} },
         { timeout: 10_000 },
       );
@@ -126,7 +142,7 @@ export function registerResources(server: McpServer, bridge: WebSocketBridge): v
         };
       }
 
-      const result = await bridge.sendAndWait(
+      const result = await read(
         { type: 'mcp:get-memory', payload: {} },
         { timeout: 10_000 },
       );
@@ -152,7 +168,7 @@ export function registerResources(server: McpServer, bridge: WebSocketBridge): v
         };
       }
 
-      const result = await bridge.sendAndWait(
+      const result = await read(
         { type: 'mcp:get-config', payload: {} },
         { timeout: 10_000 },
       );

@@ -49,7 +49,7 @@ export function createRuntime(options: RuntimeOptions = {}): FSBRuntime {
   registerVaultTools(server, bridge, queue, agentScope);
   registerCapabilityTools(server, bridge, queue, agentScope);
   registerAutopilotTools(server, bridge, queue, agentScope);
-  registerResources(server, bridge);
+  registerResources(server, bridge, agentScope);
   registerPrompts(server);
 
   return { server, bridge, queue, agentScope };
