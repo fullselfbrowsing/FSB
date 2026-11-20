@@ -112,6 +112,7 @@ function makeSdk(items, options = {}) {
               throw kind === 'rate' ? new RateLimitExceededError('slow down') : new DesktopSessionExpiredError('session expired');
             }
             if (options.failCreateTitle && params.title === options.failCreateTitle) throw new Error('create failed');
+            if (typeof options.onCreate === 'function') options.onCreate(params);
             calls.created.push(params.title);
             return { ...params, id: `new${calls.create.length}` };
           },
@@ -423,6 +424,25 @@ async function run() {
     const importBroker = new OnePasswordBroker({ loadSdk: async () => limited.sdk, configPath, env: {} });
     await rejects(importBroker.importLegacy({ logins: legacyLogins, cards: [] }), 'onepassword_rate_limited');
     assert.deepEqual(limited.calls.created, []);
+  });
+  await check('a slow import stops starting items at its time limit so the reply arrives in time', async () => {
+    let clock = 1_000_000;
+    // Each save takes 25s: saves start at 0s, 25s, and 50s; at 75s the limit has passed.
+    const slow = makeSdk([], { onCreate: () => { clock += 25_000; } });
+    const importBroker = new OnePasswordBroker({ loadSdk: async () => slow.sdk, configPath, env: {}, now: () => clock });
+    const result = await importBroker.importLegacy({ logins: legacyLogins, cards: [legacyCard] });
+    assert.deepEqual(slow.calls.created, ['a.test', 'b.test', 'c.test'], 'nothing starts after the limit');
+    assert.deepEqual(result.importedLoginDomains, ['a.test', 'b.test', 'c.test']);
+    assert.deepEqual(result.stopped, { code: 'onepassword_import_time_limit', notAttempted: { logins: 1, cards: 1 } });
+  });
+  await check('the time limit also covers the cards', async () => {
+    let clock = 1_000_000;
+    const slow = makeSdk([], { onCreate: () => { clock += 25_000; } });
+    const importBroker = new OnePasswordBroker({ loadSdk: async () => slow.sdk, configPath, env: {}, now: () => clock });
+    const result = await importBroker.importLegacy({ logins: legacyLogins.slice(0, 2), cards: [legacyCard, legacyCard] });
+    assert.equal(slow.calls.created.length, 3, 'two logins and one card fit inside the limit');
+    assert.deepEqual(result.importedCardIndexes, [0]);
+    assert.deepEqual(result.stopped, { code: 'onepassword_import_time_limit', notAttempted: { logins: 0, cards: 1 } });
   });
 
   console.log('\n--- sessions, limits, and error hygiene ---');

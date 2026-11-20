@@ -41,6 +41,10 @@ const OVERVIEW_CACHE_TTL_MS = 30_000;
 const GET_ALL_CHUNK = 25;
 const MAX_LISTED_ITEMS = 500;
 const MAX_IMPORT_ENTRIES = 1000;
+// The extension waits at most 120s for one import request (its bridge cap).
+// No new item is started after this, so the reply, and with it the list of
+// what was saved, always arrives before the extension gives up.
+const IMPORT_TIME_LIMIT_MS = 60_000;
 const MAX_FIELD_LENGTH = 4096;
 
 // ---------------------------------------------------------------------------
@@ -201,11 +205,12 @@ export interface LegacyImportResult {
   importedLoginDomains: string[];
   importedCardIndexes: number[];
   /**
-   * Set when 1Password ended the import partway (rate limit or expired
-   * session). Entries not reached were never sent and stay in the old vault.
+   * Set when the import ended partway (rate limit, expired session, or the
+   * request's time limit). Entries not reached were never sent and stay in
+   * the old vault.
    */
   stopped: {
-    code: 'onepassword_rate_limited' | 'onepassword_auth_failed';
+    code: 'onepassword_rate_limited' | 'onepassword_auth_failed' | 'onepassword_import_time_limit';
     notAttempted: { logins: number; cards: number };
   } | null;
 }
@@ -857,6 +862,11 @@ export class OnePasswordBroker {
   async importLegacy(input: { logins?: unknown; cards?: unknown }): Promise<LegacyImportResult> {
     const logins = Array.isArray(input.logins) ? input.logins.slice(0, MAX_IMPORT_ENTRIES) : [];
     const cards = Array.isArray(input.cards) ? input.cards.slice(0, MAX_IMPORT_ENTRIES) : [];
+    // Measured from the request, not the callback: a sign-in wait counts too,
+    // since the extension's timer is already running. A session-expiry retry
+    // keeps the same start.
+    const startedAt = this.now();
+    const outOfTime = (): boolean => this.now() - startedAt >= IMPORT_TIME_LIMIT_MS;
     return this.withClient(async (client, config) => {
       const vaultId = this.requireSaveVault(config);
       const result: LegacyImportResult = {
@@ -888,6 +898,13 @@ export class OnePasswordBroker {
       };
 
       for (let index = 0; index < logins.length; index += 1) {
+        if (outOfTime()) {
+          result.stopped = {
+            code: 'onepassword_import_time_limit',
+            notAttempted: { logins: logins.length - index, cards: cards.length },
+          };
+          break;
+        }
         const record = logins[index] as LegacyLoginRecord;
         const target = parseHostTarget(record?.domain);
         if (!target || (!record.username && !record.password)) {
@@ -912,6 +929,13 @@ export class OnePasswordBroker {
         }
       }
       for (let index = 0; !result.stopped && index < cards.length; index += 1) {
+        if (outOfTime()) {
+          result.stopped = {
+            code: 'onepassword_import_time_limit',
+            notAttempted: { logins: 0, cards: cards.length - index },
+          };
+          break;
+        }
         const record = cards[index] as LegacyCardRecord;
         const digits = clip(record?.cardNumber, 32).replace(/\D/g, '');
         if (!digits) {

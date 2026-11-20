@@ -4,7 +4,8 @@
 // Checks that only the page origin is sent, fills land only on that origin
 // (scheme, host, and port), fill results carry no secrets, cards are read only
 // after a trusted approval for the same merchant, the autopilot refuses to
-// guess between logins, and transport failures map to actionable codes.
+// guess between logins, the old vault moves in batches that are erased only
+// once 1Password confirms them, and transport failures map to actionable codes.
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -345,6 +346,183 @@ async function run() {
       assert.equal(env.calls[0].options.itemId, 'v:b');
       assert.equal(result.success, true);
       assert.equal(result.result.candidates, undefined);
+    });
+  }
+
+  const background = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+
+  console.log('\n--- autopilot auto-login ---');
+  {
+    const hookStart = background.indexOf('// LOGIN DETECTION HOOK');
+    const hookEnd = background.indexOf('// END LOGIN DETECTION HOOK', hookStart);
+    assert.ok(hookStart > 0 && hookEnd > hookStart, 'login detection hook found in background.js');
+    const hook = background.slice(hookStart, hookEnd);
+    await check('auto-login asks for a unique match instead of typing the newest login', () => {
+      assert.match(hook, /onePassword\.resolveLogin\(currentUrl, \{ requireUnique: true \}\)/);
+      assert.equal((hook.match(/\.resolveLogin\(/g) || []).length, 1, 'no second, unguarded lookup');
+    });
+    await check('several matching logins go to the prompt, which does not offer to save another', () => {
+      assert.match(hook, /const savedCred = lookup && lookup\.ok \? lookup\.login : null;/);
+      assert.match(hook, /lookup\.errorCode === 'credential_not_found'\) \{\s*const opStatus/);
+    });
+  }
+
+  console.log('\n--- moving the old vault ---');
+  {
+    const helpersStart = background.indexOf('function fsbOnePasswordClient() {');
+    const helpersEnd = background.indexOf('async function fsbHandleOnePasswordUiAction(');
+    assert.ok(helpersStart > 0 && helpersEnd > helpersStart, '1Password helpers found in background.js');
+    const helpers = background.slice(helpersStart, helpersEnd);
+
+    const legacy = (loginCount, cardCount) => ({
+      success: true,
+      logins: Array.from({ length: loginCount }, (_, i) => ({
+        storageKey: `cred_l${i}.test`, domain: `l${i}.test`, username: 'u', password: `pw${i}`,
+      })),
+      cards: Array.from({ length: cardCount }, (_, i) => ({
+        storageKey: `payment_method_c${i}`, cardNumber: `41111111111111${String(i).padStart(2, '0')}`, cvv: '737',
+      })),
+      unreadable: 0,
+    });
+    const saveAll = ({ logins, cards }) => ({
+      ok: true,
+      result: {
+        logins: { imported: logins.length, failed: 0 },
+        cards: { imported: cards.length, failed: 0 },
+        importedLoginDomains: logins.map((entry) => entry.domain),
+        importedCardIndexes: cards.map((_, i) => i),
+        stopped: null,
+      },
+    });
+    const runImport = async ({ vault, answer = saveAll, signIn = { ok: true, vaults: [] }, clockStep = 0 }) => {
+      const events = [];
+      const batches = [];
+      let clock = 5_000_000;
+      const context = {
+        console,
+        Date: { now: () => clock },
+        fsbOnePassword: {
+          async listVaults() {
+            events.push('sign-in');
+            return signIn;
+          },
+          async importLegacy(logins, cards) {
+            const batch = JSON.parse(JSON.stringify({ logins, cards }));
+            batches.push(batch);
+            events.push(`import ${logins.length}+${cards.length}`);
+            const response = answer(batch, batches.length);
+            clock += clockStep;
+            return response;
+          },
+        },
+        secureConfig: {
+          async readLegacyVault() { return vault; },
+          async purgeLegacyVault(keys) {
+            events.push(`purge ${keys.join(',')}`);
+            return { success: true };
+          },
+          async getLegacyVaultSummary() { return { present: true }; },
+        },
+      };
+      const api = vm.runInNewContext(`${helpers}\n({ fsbImportLegacyVault })`, context, { filename: 'background.js' });
+      const result = await api.fsbImportLegacyVault('123456');
+      return { result: JSON.parse(JSON.stringify(result)), events, batches };
+    };
+    const kinds = (events) => events.map((event) => event.split(' ')[0]);
+    const loginKeys = (from, to) => Array.from({ length: to - from }, (_, i) => `cred_l${from + i}.test`);
+
+    await check('the old vault moves in batches of 10, each erased as soon as 1Password confirms it', async () => {
+      const { result, events, batches } = await runImport({ vault: legacy(23, 4) });
+      assert.deepEqual(kinds(events), ['sign-in', 'import', 'purge', 'import', 'purge', 'import', 'purge']);
+      assert.deepEqual(batches.map((batch) => [batch.logins.length, batch.cards.length]), [[10, 0], [10, 0], [3, 4]]);
+      assert.ok(batches.every((batch) => [...batch.logins, ...batch.cards].every((entry) => !('storageKey' in entry))),
+        'storage keys stay in the worker');
+      assert.equal(events[2], `purge ${loginKeys(0, 10).join(',')}`);
+      assert.equal(events[6], `purge ${[...loginKeys(20, 23), 'payment_method_c0', 'payment_method_c1', 'payment_method_c2', 'payment_method_c3'].join(',')}`,
+        'card indexes are read against their own batch');
+      assert.equal(result.success, true);
+      assert.deepEqual(result.imported, { logins: 23, cards: 4 });
+      assert.deepEqual(result.notAttempted, { logins: 0, cards: 0 });
+    });
+    await check('a batch that never answers keeps that batch and everything after it', async () => {
+      const { result, events } = await runImport({
+        vault: legacy(23, 4),
+        answer: (batch, call) => (call === 2
+          ? { ok: false, errorCode: 'onepassword_timeout', error: '1Password did not answer in time.' }
+          : saveAll(batch)),
+      });
+      assert.equal(result.success, true);
+      assert.deepEqual(result.imported, { logins: 10, cards: 0 });
+      assert.deepEqual(result.notAttempted, { logins: 13, cards: 4 });
+      assert.deepEqual(kinds(events), ['sign-in', 'import', 'purge', 'import'], 'nothing unconfirmed is erased and no batch follows');
+    });
+    await check('a first batch that fails reports the failure and erases nothing', async () => {
+      const { result, events } = await runImport({
+        vault: legacy(5, 0),
+        answer: () => ({ ok: false, errorCode: 'onepassword_rate_limited', error: '1Password rate limit reached. Try again shortly.' }),
+      });
+      assert.equal(result.success, false);
+      assert.equal(result.errorCode, 'onepassword_rate_limited');
+      assert.ok(!kinds(events).includes('purge'));
+    });
+    await check('1Password stopping partway erases only what it saved, then stops', async () => {
+      const { result, events } = await runImport({
+        vault: legacy(23, 4),
+        answer: (batch, call) => {
+          if (call !== 2) return saveAll(batch);
+          return {
+            ok: true,
+            result: {
+              logins: { imported: 6, failed: 0 },
+              cards: { imported: 0, failed: 0 },
+              importedLoginDomains: batch.logins.slice(0, 6).map((entry) => entry.domain),
+              importedCardIndexes: [],
+              stopped: { code: 'onepassword_rate_limited', notAttempted: { logins: 4, cards: 0 } },
+            },
+          };
+        },
+      });
+      assert.equal(result.success, true);
+      assert.deepEqual(result.imported, { logins: 16, cards: 0 });
+      assert.deepEqual(result.notAttempted, { logins: 7, cards: 4 }, 'four from the stopped batch, the three after it, and every card');
+      assert.deepEqual(kinds(events), ['sign-in', 'import', 'purge', 'import', 'purge']);
+      assert.equal(events[4], `purge ${loginKeys(10, 16).join(',')}`);
+    });
+    await check('nothing is sent until 1Password has signed in', async () => {
+      const { result, batches } = await runImport({
+        vault: legacy(3, 1),
+        signIn: { ok: false, errorCode: 'onepassword_timeout', error: 'Approve FSB in 1Password.' },
+      });
+      assert.equal(result.success, false);
+      assert.equal(result.errorCode, 'onepassword_timeout');
+      assert.equal(batches.length, 0);
+    });
+    await check('one click starts no new batch after its time budget', async () => {
+      // 70s per batch: batches start at 0s and 70s; at 140s the 120s budget has passed.
+      const { result, batches } = await runImport({ vault: legacy(35, 0), clockStep: 70_000 });
+      assert.equal(batches.length, 2);
+      assert.equal(result.success, true);
+      assert.deepEqual(result.imported, { logins: 20, cards: 0 });
+      assert.deepEqual(result.notAttempted, { logins: 15, cards: 0 });
+    });
+    await check('a stop before anything was moved is reported as a failure', async () => {
+      const { result, events } = await runImport({
+        vault: legacy(4, 0),
+        answer: () => ({
+          ok: true,
+          result: {
+            logins: { imported: 0, failed: 0 },
+            cards: { imported: 0, failed: 0 },
+            importedLoginDomains: [],
+            importedCardIndexes: [],
+            stopped: { code: 'onepassword_import_time_limit', notAttempted: { logins: 4, cards: 0 } },
+          },
+        }),
+      });
+      assert.equal(result.success, false);
+      assert.equal(result.errorCode, 'onepassword_import_time_limit');
+      assert.match(result.error, /before anything was moved/);
+      assert.ok(!kinds(events).includes('purge'));
     });
   }
 

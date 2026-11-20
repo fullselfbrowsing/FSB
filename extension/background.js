@@ -14846,6 +14846,20 @@ async function fsbLegacyVaultSummary() {
   }
 }
 
+// The move goes to 1Password in small batches, and each batch is erased from
+// the old vault as soon as 1Password confirms it. A reply that never arrives
+// (a timeout, or a worker or server restart) then leaves at most one batch
+// unaccounted for, instead of the whole vault being created again next time.
+const FSB_LEGACY_IMPORT_BATCH = 10;
+// No new batch starts after this, so one click stays well inside the service
+// worker's per-request limit. Whatever is left moves on the next click.
+const FSB_LEGACY_IMPORT_CALL_BUDGET_MS = 120000;
+
+function fsbLegacyCount(value, max) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.min(max, Math.floor(count))) : 0;
+}
+
 // Move the old FSB vault into 1Password, then erase exactly the entries
 // 1Password confirmed it saved. Decrypted values stay in this worker.
 async function fsbImportLegacyVault(pin) {
@@ -14856,27 +14870,68 @@ async function fsbImportLegacyVault(pin) {
     return { success: false, errorCode: (read && read.errorCode) || 'legacy_read_failed', error: (read && read.error) || 'Could not read the old FSB vault' };
   }
   if (read.logins.length === 0 && read.cards.length === 0) {
-    return { success: true, imported: { logins: 0, cards: 0 }, failed: { logins: 0, cards: 0 }, unreadable: read.unreadable, legacy: await fsbLegacyVaultSummary() };
+    return { success: true, imported: { logins: 0, cards: 0 }, failed: { logins: 0, cards: 0 }, notAttempted: { logins: 0, cards: 0 }, unreadable: read.unreadable, legacy: await fsbLegacyVaultSummary() };
   }
-  const logins = read.logins.map(({ storageKey, ...rest }) => rest);
-  const cards = read.cards.map(({ storageKey, ...rest }) => rest);
-  const response = await op.importLegacy(logins, cards);
-  if (!response || !response.ok) return fsbOnePasswordFailure(response, 'Import to 1Password failed');
-  const result = response.result || {};
-  const importedDomains = new Set(Array.isArray(result.importedLoginDomains) ? result.importedLoginDomains : []);
-  const importedKeys = read.logins.filter((login) => importedDomains.has(login.domain)).map((login) => login.storageKey);
-  for (const index of Array.isArray(result.importedCardIndexes) ? result.importedCardIndexes : []) {
-    if (read.cards[index]) importedKeys.push(read.cards[index].storageKey);
+
+  // Sign in before anything is written, so a 1Password approval prompt waits
+  // here and not inside a batch that has a deadline.
+  const ready = await op.listVaults();
+  if (!ready || !ready.ok) return fsbOnePasswordFailure(ready, 'Could not reach 1Password');
+
+  const imported = { logins: 0, cards: 0 };
+  const failed = { logins: 0, cards: 0 };
+  // Entries inside a batch that 1Password ended early, never sent.
+  const unreached = { logins: 0, cards: 0 };
+  const deadline = Date.now() + FSB_LEGACY_IMPORT_CALL_BUDGET_MS;
+  let nextLogin = 0;
+  let nextCard = 0;
+
+  while ((nextLogin < read.logins.length || nextCard < read.cards.length) && Date.now() < deadline) {
+    const loginBatch = read.logins.slice(nextLogin, nextLogin + FSB_LEGACY_IMPORT_BATCH);
+    const cardBatch = read.cards.slice(nextCard, nextCard + FSB_LEGACY_IMPORT_BATCH - loginBatch.length);
+    const response = await op.importLegacy(
+      loginBatch.map(({ storageKey, ...rest }) => rest),
+      cardBatch.map(({ storageKey, ...rest }) => rest)
+    );
+    if (!response || !response.ok) {
+      // Nothing in this batch is confirmed, so none of it is erased.
+      if (imported.logins + imported.cards === 0) return fsbOnePasswordFailure(response, 'Import to 1Password failed');
+      break;
+    }
+    const result = response.result || {};
+    const importedDomains = new Set(Array.isArray(result.importedLoginDomains) ? result.importedLoginDomains : []);
+    const confirmedKeys = loginBatch.filter((login) => importedDomains.has(login.domain)).map((login) => login.storageKey);
+    for (const index of Array.isArray(result.importedCardIndexes) ? result.importedCardIndexes : []) {
+      if (cardBatch[index]) confirmedKeys.push(cardBatch[index].storageKey);
+    }
+    if (confirmedKeys.length > 0) await secureConfig.purgeLegacyVault(confirmedKeys);
+    imported.logins += fsbLegacyCount(result.logins?.imported, loginBatch.length);
+    imported.cards += fsbLegacyCount(result.cards?.imported, cardBatch.length);
+    failed.logins += fsbLegacyCount(result.logins?.failed, loginBatch.length);
+    failed.cards += fsbLegacyCount(result.cards?.failed, cardBatch.length);
+    nextLogin += loginBatch.length;
+    nextCard += cardBatch.length;
+    if (result.stopped) {
+      // 1Password ended this batch early (rate limit, expired session, or the
+      // server's time limit). What it never reached stays for the next attempt.
+      const left = result.stopped.notAttempted || {};
+      unreached.logins = fsbLegacyCount(left.logins, loginBatch.length);
+      unreached.cards = fsbLegacyCount(left.cards, cardBatch.length);
+      if (imported.logins + imported.cards === 0) {
+        return fsbOnePasswordFailure({ errorCode: result.stopped.code }, '1Password stopped before anything was moved. Try again.');
+      }
+      break;
+    }
   }
-  await secureConfig.purgeLegacyVault(importedKeys);
-  // 1Password can end the import partway (rate limit, expired session). The
-  // entries it never reached stay in the old vault for the next attempt.
-  const notAttempted = result.stopped && result.stopped.notAttempted ? result.stopped.notAttempted : {};
+
   return {
     success: true,
-    imported: { logins: result.logins?.imported || 0, cards: result.cards?.imported || 0 },
-    failed: { logins: result.logins?.failed || 0, cards: result.cards?.failed || 0 },
-    notAttempted: { logins: Number(notAttempted.logins) || 0, cards: Number(notAttempted.cards) || 0 },
+    imported,
+    failed,
+    notAttempted: {
+      logins: read.logins.length - nextLogin + unreached.logins,
+      cards: read.cards.length - nextCard + unreached.cards
+    },
     unreadable: read.unreadable,
     legacy: await fsbLegacyVaultSummary()
   };
@@ -17072,11 +17127,20 @@ async function startAutomationLoop(sessionId) {
       // Track that we've handled login for this URL to avoid repeated prompts
       if (!session._loginHandledForUrl) session._loginHandledForUrl = [];
 
-      // Look the site up in 1Password (only the vaults the user allowed)
+      // Look the site up in 1Password (only the vaults the user allowed).
+      // Like fill_credential, this never guesses between several matching
+      // logins (personal and work, say): it gets multiple_credentials, and the
+      // user is asked below instead of the newest login being submitted.
       const onePassword = fsbOnePasswordClient();
-      const lookup = onePassword ? await onePassword.resolveLogin(currentUrl) : null;
+      const lookup = onePassword ? await onePassword.resolveLogin(currentUrl, { requireUnique: true }) : null;
       const savedCred = lookup && lookup.ok ? lookup.login : null;
-      if (lookup && !lookup.ok && lookup.errorCode !== 'credential_not_found') {
+      if (lookup && !lookup.ok && lookup.errorCode === 'multiple_credentials') {
+        automationLogger.info('Several 1Password logins match this site; asking the user instead of choosing one', {
+          sessionId,
+          domain: loginDomain,
+          candidates: Array.isArray(lookup.candidates) ? lookup.candidates.length : 0
+        });
+      } else if (lookup && !lookup.ok && lookup.errorCode !== 'credential_not_found') {
         automationLogger.info('1Password lookup unavailable on login page', { sessionId, domain: loginDomain, errorCode: lookup.errorCode });
       }
 
