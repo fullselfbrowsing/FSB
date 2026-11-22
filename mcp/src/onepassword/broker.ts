@@ -552,6 +552,25 @@ export class OnePasswordBroker {
       : `service:${(config.auth.token || '').slice(-12)}`;
     if (this.client && this.clientKey === key) return this.client;
 
+    // Stored before the first await, so requests that arrive while the SDK
+    // loads or the user approves FSB share this one sign-in instead of each
+    // opening their own (two approval prompts in the desktop app).
+    const pending = this.connect(config.auth);
+    this.clientKey = key;
+    this.client = pending;
+    try {
+      return await pending;
+    } catch (error) {
+      // A newer sign-in may have replaced this one; leave that in place.
+      if (this.client === pending) {
+        this.client = null;
+        this.clientKey = null;
+      }
+      throw error;
+    }
+  }
+
+  private async connect(auth: NonNullable<OnePasswordConfig['auth']>): Promise<SdkClient> {
     if (!this.sdk) {
       try {
         this.sdk = await this.loadSdk();
@@ -561,24 +580,17 @@ export class OnePasswordBroker {
       }
     }
     const sdk = this.sdk;
-    const auth = config.auth.kind === 'desktop'
-      ? new sdk.DesktopAuth(config.auth.accountName)
-      : config.auth.token;
-    this.clientKey = key;
-    this.client = sdk.createClient({
-      auth,
-      integrationName: INTEGRATION_NAME,
-      integrationVersion: `v${FSB_MCP_VERSION}`,
-    });
     try {
-      const client = await this.client;
+      const client = await sdk.createClient({
+        auth: auth.kind === 'desktop' ? new sdk.DesktopAuth(auth.accountName) : auth.token,
+        integrationName: INTEGRATION_NAME,
+        integrationVersion: `v${FSB_MCP_VERSION}`,
+      });
       this.connection = 'connected';
       this.lastError = null;
       return client;
     } catch (error) {
-      this.client = null;
-      this.clientKey = null;
-      const message = describeSignInFailure(config.auth.kind, sanitizeSdkMessage(error));
+      const message = describeSignInFailure(auth.kind, sanitizeSdkMessage(error));
       this.noteError('onepassword_auth_failed', message);
       throw new BrokerError('onepassword_auth_failed', `1Password sign-in failed: ${message}`);
     }

@@ -81,6 +81,116 @@ function makeEnv({ tabUrls = ['https://example.com/login?next=/home'], responses
   return { api: context.fsbOnePassword, requests, runtimeSent, deliver, listeners };
 }
 
+// The service worker loads mcp-bridge-client.js, which declares the client as
+// a top-level const, before this file. Such a binding is shared by name across
+// importScripts files but is never a property of self, so this loads both
+// scripts into one context the same way instead of placing a fake on self.
+async function statusThroughDeclaredBridge() {
+  const requests = [];
+  const context = vm.createContext({
+    chrome: { runtime: { id: EXT_ID, onMessage: { addListener() {}, removeListener() {} } } },
+    URL,
+    console,
+    setTimeout: (fn, ms) => setTimeout(fn, ms >= 1000 ? ms : 0),
+    clearTimeout,
+    Promise,
+    recordBridgeRequest: (method, payload) => {
+      requests.push({ method, payload });
+      return { ok: true, status: { configured: true } };
+    },
+  });
+  context.self = context;
+  vm.runInContext(`
+    const mcpBridgeClient = {
+      isConnected: true,
+      async sendExtRequest(method, payload) { return recordBridgeRequest(method, payload); },
+    };
+    function armMcpBridge() {}
+  `, context, { filename: 'mcp-bridge-client.js' });
+  vm.runInContext(source, context, { filename: 'onepassword-client.js' });
+  return { result: await context.fsbOnePassword.status(), requests, onSelf: context.mcpBridgeClient };
+}
+
+// --- content-script fill (extension/content/actions.js) --------------------
+// Runs fillCredentialFields and its helpers from the real file against a small
+// fake DOM: elements with parents, attributes, labels, visibility, and a value
+// setter on the input prototype.
+
+const actionsSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'content', 'actions.js'), 'utf8');
+const fillStart = actionsSource.indexOf('  const OTP_FIELD_PATTERN');
+const fillEnd = actionsSource.indexOf('  tools.fillPaymentFields = ');
+assert.ok(fillStart > 0 && fillEnd > fillStart, 'actions.js credential fill block not found');
+const fillSource = actionsSource.slice(fillStart, fillEnd);
+
+class FakeElement {
+  constructor(attrs = {}, parent = null, tagName = 'div') {
+    this.attrs = { ...attrs };
+    this.parentElement = parent;
+    this.tagName = tagName;
+    this.visible = true;
+  }
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attrs, name) ? String(this.attrs[name]) : null;
+  }
+  contains(other) {
+    for (let node = other; node; node = node.parentElement) if (node === this) return true;
+    return false;
+  }
+  // Tag names and [role="group"] only, which is all the fill code asks for.
+  closest(selectors) {
+    const wanted = selectors.split(',').map((entry) => entry.trim());
+    for (let node = this; node; node = node.parentElement) {
+      if (wanted.some((sel) => (sel === '[role="group"]' ? node.getAttribute('role') === 'group' : node.tagName === sel))) {
+        return node;
+      }
+    }
+    return null;
+  }
+  get offsetParent() { return this.visible ? (this.parentElement || {}) : null; }
+}
+
+function makeFillDom() {
+  class HTMLInputElement extends FakeElement {
+    get value() { return this._value || ''; }
+    set value(next) { this._value = String(next); }
+    get type() { return (this.getAttribute('type') || 'text').toLowerCase(); }
+    get name() { return this.getAttribute('name') || ''; }
+    get id() { return this.getAttribute('id') || ''; }
+    get labels() { return this.labelText ? [{ textContent: this.labelText }] : []; }
+    focus() {}
+    dispatchEvent() { return true; }
+  }
+  class HTMLTextAreaElement extends HTMLInputElement {}
+  const documentElement = new FakeElement({}, null, 'html');
+  const body = new FakeElement({}, documentElement, 'body');
+  const form = new FakeElement({}, body, 'form');
+  const inputs = [];
+  const input = (attrs, parent = form, extra = {}) => {
+    const element = Object.assign(new HTMLInputElement(attrs, parent, 'input'), extra);
+    inputs.push(element);
+    return element;
+  };
+  const tools = {};
+  const context = {
+    tools,
+    window: { location: { origin: 'https://example.com' } },
+    document: { body, documentElement, querySelectorAll: () => inputs.slice() },
+    HTMLInputElement,
+    HTMLTextAreaElement,
+    Event: class Event { constructor(type) { this.type = type; } },
+    FSB: {
+      inferElementPurpose(element) {
+        if (element.type === 'password') return { role: 'credential-input', intent: 'password' };
+        if (element.purpose === 'username') return { role: 'credential-input', intent: 'username' };
+        return null;
+      },
+    },
+  };
+  vm.runInNewContext(fillSource, context, { filename: 'actions.js' });
+  const fill = (params) => tools.fillCredentialFields({ expectedOrigin: 'https://example.com', ...params });
+  return { form, input, fill, wrapper: (parent = form) => new FakeElement({}, parent) };
+}
+
 const trusted = { id: EXT_ID, url: `chrome-extension://${EXT_ID}/ui/sidepanel.html` };
 const login = { id: 'v:a', title: 'Example', username: 'alice', password: 'hunter2', oneTimeCode: '123456', match: 'exact' };
 const card = {
@@ -526,7 +636,56 @@ async function run() {
     });
   }
 
+  console.log('\n--- content-script fill ---');
+  await check('a password box labelled "Passcode" gets the password when there is no code', async () => {
+    const dom = makeFillDom();
+    const user = dom.input({ type: 'email', name: 'email' }, dom.form, { purpose: 'username' });
+    const pass = dom.input({ type: 'password', name: 'passcode' }, dom.form, { labelText: 'Passcode' });
+    const result = await dom.fill({ username: 'alice', password: 'hunter2' });
+    assert.equal(result.success, true);
+    assert.deepEqual([...result.filled], ['username', 'password']);
+    assert.equal(user.value, 'alice');
+    assert.equal(pass.value, 'hunter2');
+  });
+  await check('autocomplete="current-password" keeps a "Security code" box a password box', async () => {
+    const dom = makeFillDom();
+    const pass = dom.input({ type: 'password', name: 'security_code', autocomplete: 'current-password' });
+    const result = await dom.fill({ password: 'hunter2', oneTimeCode: '123456' });
+    assert.equal(result.success, true);
+    assert.equal(pass.value, 'hunter2', 'the code never goes into the password box');
+    assert.equal(result.fieldsFound.oneTimeCode, false);
+  });
+  await check('an autocomplete="one-time-code" field gets the code', async () => {
+    const dom = makeFillDom();
+    const code = dom.input({ type: 'text', name: 'code', autocomplete: 'one-time-code' });
+    const result = await dom.fill({ oneTimeCode: '123456' });
+    assert.deepEqual([...result.filled], ['one-time-code']);
+    assert.equal(code.value, '123456');
+  });
+  await check('split code boxes that each sit in their own wrapper get the code', async () => {
+    const dom = makeFillDom();
+    const group = dom.wrapper();
+    const boxes = Array.from({ length: 6 }, () => dom.input({ type: 'text', maxlength: '1' }, dom.wrapper(group)));
+    const result = await dom.fill({ oneTimeCode: '123456' });
+    assert.deepEqual([...result.filled], ['one-time-code']);
+    assert.equal(boxes.map((box) => box.value).join(''), '123456');
+  });
+  await check('split code boxes that are siblings get the code', async () => {
+    const dom = makeFillDom();
+    const group = dom.wrapper();
+    const boxes = Array.from({ length: 6 }, () => dom.input({ type: 'tel', maxlength: '1' }, group));
+    const result = await dom.fill({ oneTimeCode: '654321' });
+    assert.deepEqual([...result.filled], ['one-time-code']);
+    assert.equal(boxes.map((box) => box.value).join(''), '654321');
+  });
+
   console.log('\n--- transport ---');
+  await check('the bridge client is found the way the service worker declares it', async () => {
+    const { result, requests, onSelf } = await statusThroughDeclaredBridge();
+    assert.equal(onSelf, undefined, 'a top-level const is not a property of self');
+    assert.equal(result.ok, true, `expected the bridge to answer, got ${result.errorCode}`);
+    assert.deepEqual(requests.map((entry) => entry.method), ['onepassword.status']);
+  });
   await check('no local server reports how to install it', async () => {
     const env = makeEnv({ connected: false });
     const result = await env.api.status();

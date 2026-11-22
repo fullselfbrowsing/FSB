@@ -453,6 +453,39 @@ async function run() {
     assert.ok(logins.length > 0);
     assert.equal(expiring.calls.createClient.length, 2, 'client was rebuilt after expiry');
   });
+  // The settings page lists vaults and logins at once on a cold server; with
+  // the desktop app each extra sign-in is another approval prompt.
+  const slowLoad = (sdk) => async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return sdk;
+  };
+  await check('requests that arrive during the first sign-in share it', async () => {
+    const shared = makeSdk(items);
+    const cold = new OnePasswordBroker({ loadSdk: slowLoad(shared.sdk), configPath, env: {} });
+    const [vaults, logins] = await Promise.all([cold.listVaults(), cold.listLogins()]);
+    assert.ok(vaults.length > 0 && logins.length > 0);
+    assert.equal(shared.calls.createClient.length, 1, 'one sign-in for both requests');
+    assert.equal(cold.status().connection, 'connected');
+  });
+  await check('a declined first sign-in fails every waiting request, and the next one asks again', async () => {
+    const flaky = makeSdk(items);
+    const createClient = flaky.sdk.createClient;
+    let declineNext = true;
+    flaky.sdk.createClient = async (config) => {
+      if (!declineNext) return createClient(config);
+      declineNext = false;
+      flaky.calls.createClient.push(config);
+      throw new Error('declined in the 1Password app');
+    };
+    const cold = new OnePasswordBroker({ loadSdk: slowLoad(flaky.sdk), configPath, env: {} });
+    await Promise.all([
+      rejects(cold.listVaults(), 'onepassword_auth_failed'),
+      rejects(cold.listLogins(), 'onepassword_auth_failed'),
+    ]);
+    assert.equal(flaky.calls.createClient.length, 1, 'one approval request, not two');
+    assert.ok((await cold.listLogins()).length > 0);
+    assert.equal(flaky.calls.createClient.length, 2, 'the next request signs in again');
+  });
   await check('rate limits surface as their own code', async () => {
     const limited = new OnePasswordBroker({ loadSdk: async () => makeSdk(items, { rateLimited: true }).sdk, configPath, env: {} });
     await rejects(limited.listLogins(), 'onepassword_rate_limited');

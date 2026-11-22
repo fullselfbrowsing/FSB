@@ -5982,12 +5982,28 @@ const tools = {
     const autocomplete = (input.getAttribute('autocomplete') || '').toLowerCase();
     if (autocomplete.includes('one-time-code')) return true;
     if (autocomplete.startsWith('cc-')) return false;
+    // A page that marks the field as its password is believed over its label
+    // ("Passcode", "Security code").
+    if (autocomplete.includes('current-password') || autocomplete.includes('new-password')) return false;
     const descriptor = [
       input.name, input.id, input.getAttribute('placeholder'),
       input.getAttribute('aria-label'), input.getAttribute('data-testid'),
       input.labels && input.labels[0] ? input.labels[0].textContent : ''
     ].filter(Boolean).join(' ');
     return OTP_FIELD_PATTERN.test(descriptor) && !OTP_EXCLUDE_PATTERN.test(descriptor);
+  }
+
+  // Nearest ancestor holding every box, a few levels up at most. Boxes may be
+  // siblings or each sit in its own wrapper element.
+  const SPLIT_CODE_MAX_DEPTH = 4;
+  function splitCodeContainer(group) {
+    let node = group[0].parentElement;
+    for (let depth = 0; node && depth < SPLIT_CODE_MAX_DEPTH; depth += 1) {
+      if (node === document.body || node === document.documentElement) return null;
+      if (group.every((input) => node.contains(input))) return node;
+      node = node.parentElement;
+    }
+    return null;
   }
 
   // Split code boxes: several visible, adjacent maxlength=1 inputs.
@@ -5997,8 +6013,7 @@ const tools = {
     if (singles.length < length) return null;
     for (let start = 0; start + length <= singles.length; start += 1) {
       const group = singles.slice(start, start + length);
-      const parent = group[0].closest('form, fieldset, [role="group"], div');
-      if (parent && group.every((input) => parent.contains(input))) return group;
+      if (splitCodeContainer(group)) return group;
     }
     return null;
   }
@@ -6021,7 +6036,9 @@ const tools = {
 
     for (const input of inputs) {
       if (!input.offsetParent && input.type !== 'password') continue; // skip invisible (except password which may be in visible form)
-      if (!codeField && input.offsetParent && isOneTimeCodeInput(input)) {
+      // Only with a code to fill: otherwise a password box labelled
+      // "Passcode" would be set aside and never get the password.
+      if (oneTimeCode && !codeField && input.offsetParent && isOneTimeCodeInput(input)) {
         codeField = input;
         continue;
       }

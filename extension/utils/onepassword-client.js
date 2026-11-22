@@ -41,8 +41,16 @@
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
+  // mcp-bridge-client.js declares the client as a top-level const. Scripts
+  // loaded with importScripts share that name, but a const never becomes a
+  // property of self, so it is looked up by name first.
+  function bridgeClient() {
+    if (typeof mcpBridgeClient !== 'undefined' && mcpBridgeClient) return mcpBridgeClient;
+    return root.mcpBridgeClient || null;
+  }
+
   async function ensureBridge() {
-    var client = root.mcpBridgeClient;
+    var client = bridgeClient();
     if (!client || typeof client.sendExtRequest !== 'function') return false;
     if (client.isConnected === true) return true;
     if (typeof root.armMcpBridge === 'function') root.armMcpBridge('onepassword');
@@ -72,7 +80,7 @@
   async function request(method, payload, timeout) {
     if (!(await ensureBridge())) return offline();
     try {
-      var response = await root.mcpBridgeClient.sendExtRequest(METHOD_PREFIX + method, payload || {}, { timeout: timeout });
+      var response = await bridgeClient().sendExtRequest(METHOD_PREFIX + method, payload || {}, { timeout: timeout });
       if (!response || typeof response !== 'object') {
         return failure('onepassword_request_failed', 'Empty response from the FSB local server');
       }
