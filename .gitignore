@@ -75,6 +75,12 @@ graphify-out/**/cache/
 graphify-out/.graphify_python
 graphify-out/.graphify_root
 graphify-out/.graphify_uncached.txt
+# rebuild fingerprint (holds this checkout's absolute path), the hub-derived
+# fallback community names graphify regenerates on every rebuild, and the
+# community analysis derived from graph.json (6+ MB, not LFS-routed).
+graphify-out/.graphify_build_state.json
+graphify-out/.graphify_labels.pending.json
+graphify-out/.graphify_analysis.json
 
 # local secrets directory
 .secrets/
