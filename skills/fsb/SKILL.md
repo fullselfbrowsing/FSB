@@ -58,7 +58,7 @@ Never pass `agent_id` (the server mints it). Use `go_back` instead of `execute_j
 
 ## Vault and credentials
 
-Logins, one-time codes, and cards come from the user's 1Password and resolve INSIDE FSB via `fill_credential` and `use_payment_method`. Never put secrets in chat, prompts, logs, or tool args. See `references/vault-boundary.md`.
+Logins, one-time codes, and cards come from the user's 1Password and resolve INSIDE FSB via `fill_credential` and `use_payment_method`. Never put secrets in chat, prompts, logs, or tool args. If 1Password is not connected, ask the user to press Log in to 1Password on FSB's Vault page; 1Password may ask them to approve FSB again after 10 idle minutes, a lock, or a local-server restart. See `references/vault-boundary.md`.
 
 ## References (load on demand)
 
