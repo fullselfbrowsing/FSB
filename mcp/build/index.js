@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+import { fileURLToPath } from 'node:url';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createRuntime } from './runtime.js';
 import { collectBridgeDiagnostics, formatDiagnosticLayerLabel, getLocalHttpEndpoint, waitForExtensionConnection, watchBridgeDiagnostics, } from './diagnostics.js';
 import { WebSocketBridge } from './bridge.js';
 import { startServeDelegation } from './agent-providers/serve-delegation.js';
 import { DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, FSB_EXTENSION_BRIDGE_URL, FSB_MCP_VERSION, } from './version.js';
-import { getSetupSections, runInstall, runUninstall } from './install.js';
+import { getSetupSections, runInstall, runUninstall, startNativeHostAutoRefresh, } from './install.js';
 import { createProductionNativeHostCliOperations, inspectProductionNativeHost, } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
 import { shutdownWhenStdinEnds } from './stdin-shutdown.js';
@@ -307,6 +308,13 @@ async function runStdioServer() {
     const runtime = createRuntime();
     const transport = new StdioServerTransport();
     await runtime.server.connect(transport);
+    // Keep an installed local helper current. The check runs in a detached
+    // process that writes nothing to this server's stdio, and it starts on the
+    // next turn of the event loop so an initialize request already waiting on
+    // stdin is answered first.
+    setImmediate(() => {
+        startNativeHostAutoRefresh({ entryPath: fileURLToPath(import.meta.url) });
+    });
     try {
         await runtime.bridge.connect();
         void pushMcpClientInventory(runtime.bridge);

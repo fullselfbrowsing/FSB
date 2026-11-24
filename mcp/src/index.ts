@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { fileURLToPath } from 'node:url';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createRuntime } from './runtime.js';
 import {
@@ -17,7 +18,12 @@ import {
   FSB_EXTENSION_BRIDGE_URL,
   FSB_MCP_VERSION,
 } from './version.js';
-import { getSetupSections, runInstall, runUninstall } from './install.js';
+import {
+  getSetupSections,
+  runInstall,
+  runUninstall,
+  startNativeHostAutoRefresh,
+} from './install.js';
 import {
   createProductionNativeHostCliOperations,
   inspectProductionNativeHost,
@@ -396,6 +402,14 @@ async function runStdioServer(): Promise<void> {
   const runtime = createRuntime();
   const transport = new StdioServerTransport();
   await runtime.server.connect(transport);
+
+  // Keep an installed local helper current. The check runs in a detached
+  // process that writes nothing to this server's stdio, and it starts on the
+  // next turn of the event loop so an initialize request already waiting on
+  // stdin is answered first.
+  setImmediate(() => {
+    startNativeHostAutoRefresh({ entryPath: fileURLToPath(import.meta.url) });
+  });
 
   try {
     await runtime.bridge.connect();

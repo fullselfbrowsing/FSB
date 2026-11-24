@@ -1,12 +1,15 @@
 import { readFile, writeFile, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { execSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import stripJsonComments from 'strip-json-comments';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { getServerEntry } from './platforms.js';
+import { PLATFORMS, getPlatformTargetCandidates, getServerEntry } from './platforms.js';
 import type { ConfigFormat, MergeStrategy, PlatformConfig } from './platforms.js';
+import { FSB_SERVER_NAME } from './version.js';
 
 /** Result of an install or remove operation */
 export interface ConfigResult {
@@ -363,4 +366,182 @@ export async function removeFromConfig(
       message: 'Failed to remove from ' + platform.displayName + ': ' + (err as Error).message,
     };
   }
+}
+
+/**
+ * Whether a client config file's text holds an FSB server entry. Throws when
+ * the text does not parse, so callers can tell "no entry" from "unreadable".
+ * @param raw - Raw file content
+ * @param platform - Format, root key and merge strategy of the client
+ * @param serverName - Server name key, 'fsb' unless a test says otherwise
+ * @returns True when the entry is present
+ */
+export function hasFsbEntry(
+  raw: string,
+  platform: Pick<PlatformConfig, 'format' | 'serverMapKey' | 'mergeStrategy'>,
+  serverName: string = FSB_SERVER_NAME,
+): boolean {
+  if (!platform.serverMapKey) return false;
+  const data: unknown = parseByFormat(raw, platform.format);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  return hasExistingEntry(
+    data as Record<string, unknown>,
+    platform.serverMapKey,
+    serverName,
+    platform.mergeStrategy,
+  );
+}
+
+/** A client that may still start FSB. */
+export interface FsbClientFinding {
+  platformKey: string;
+  label: string;
+  /** The file that was read, or null when the Claude Code CLI answered. */
+  path: string | null;
+  /** `unreadable` means the file exists but could not be read or parsed. */
+  state: 'configured' | 'unreadable';
+}
+
+export interface FsbConfigurationScan {
+  /** True when any client has an FSB entry or a config that could not be read. */
+  configured: boolean;
+  findings: FsbClientFinding[];
+  /** Clients FSB only prints setup steps for; nothing on disk can be checked. */
+  unchecked: string[];
+}
+
+export interface FsbConfigurationScanOptions {
+  environment?: Readonly<Record<string, string | undefined>>;
+  /**
+   * Asks the Claude Code CLI when its config file is missing: true when FSB
+   * is configured, false when it is not, null when the answer is unclear.
+   */
+  probeClaudeCode?: () => boolean | null;
+}
+
+type ReadOutcome =
+  | { kind: 'absent' }
+  | { kind: 'text'; text: string }
+  | { kind: 'unreadable' };
+
+async function readConfigText(pathname: string): Promise<ReadOutcome> {
+  try {
+    return { kind: 'text', text: await readFile(pathname, 'utf-8') };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return { kind: 'absent' };
+    return { kind: 'unreadable' };
+  }
+}
+
+function claudeCodeConfigPath(
+  homeDirectory: string,
+  environment: Readonly<Record<string, string | undefined>>,
+): string {
+  const configDir = environment.CLAUDE_CONFIG_DIR?.trim();
+  return join(configDir || homeDirectory, '.claude.json');
+}
+
+function hasClaudeCodeEntry(raw: string, serverName: string): boolean {
+  const data: unknown = JSON.parse(raw);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const hasServer = (scope: unknown): boolean => {
+    if (!scope || typeof scope !== 'object' || Array.isArray(scope)) return false;
+    const servers = (scope as Record<string, unknown>).mcpServers;
+    return Boolean(servers)
+      && typeof servers === 'object'
+      && !Array.isArray(servers)
+      && (servers as Record<string, unknown>)[serverName] !== undefined;
+  };
+  if (hasServer(data)) return true;
+  const projects = (data as Record<string, unknown>).projects;
+  if (!projects || typeof projects !== 'object' || Array.isArray(projects)) return false;
+  return Object.values(projects as Record<string, unknown>).some(hasServer);
+}
+
+function probeClaudeCodeCli(): boolean | null {
+  try {
+    execSync('claude mcp get ' + FSB_SERVER_NAME, { stdio: 'pipe', encoding: 'utf-8', timeout: 15_000 });
+    return true;
+  } catch (err) {
+    const failure = err as { status?: number | null; stdout?: string; stderr?: string };
+    const output = String(failure.stdout ?? '') + String(failure.stderr ?? '');
+    if (/No MCP server found/i.test(output)) return false;
+    // No Claude Code CLI on this machine, so it cannot be starting FSB.
+    if (failure.status === 127 || /command not found|is not recognized as an internal or external command/i.test(output)) {
+      return false;
+    }
+    return null;
+  }
+}
+
+/**
+ * Looks for FSB in every client config FSB knows how to write: each file
+ * candidate of each file-based client, plus Claude Code's own config (user
+ * and per-project servers). A config that exists but cannot be read or
+ * parsed counts as still using FSB. Instructions-only clients are listed as
+ * unchecked because their setups live outside any file FSB can read.
+ * @param options - Environment and Claude Code probe overrides
+ * @returns What was found
+ */
+export async function isFsbConfiguredAnywhere(
+  options: FsbConfigurationScanOptions = {},
+): Promise<FsbConfigurationScan> {
+  const environment = options.environment ?? process.env;
+  const homeDirectory = homedir();
+  const findings: FsbClientFinding[] = [];
+  const unchecked: string[] = [];
+  const seen = new Set<string>();
+
+  for (const [key, platform] of Object.entries(PLATFORMS)) {
+    if (platform.installMode === 'instructions') {
+      unchecked.push(platform.displayName);
+      continue;
+    }
+    if (platform.installMode === 'cli') {
+      const configPath = claudeCodeConfigPath(homeDirectory, environment);
+      const read = await readConfigText(configPath);
+      if (read.kind === 'text') {
+        let state: FsbClientFinding['state'] | null;
+        try {
+          state = hasClaudeCodeEntry(read.text, FSB_SERVER_NAME) ? 'configured' : null;
+        } catch {
+          state = 'unreadable';
+        }
+        if (state) findings.push({ platformKey: key, label: platform.displayName, path: configPath, state });
+      } else if (read.kind === 'unreadable') {
+        findings.push({ platformKey: key, label: platform.displayName, path: configPath, state: 'unreadable' });
+      } else {
+        const answer = (options.probeClaudeCode ?? probeClaudeCodeCli)();
+        if (answer !== false) {
+          findings.push({
+            platformKey: key,
+            label: platform.displayName,
+            path: null,
+            state: answer === true ? 'configured' : 'unreadable',
+          });
+        }
+      }
+      continue;
+    }
+    for (const candidate of getPlatformTargetCandidates(key, platform)) {
+      if (seen.has(candidate.configPath)) continue;
+      seen.add(candidate.configPath);
+      const read = await readConfigText(candidate.configPath);
+      if (read.kind === 'absent') continue;
+      let state: FsbClientFinding['state'] | null = 'unreadable';
+      if (read.kind === 'text') {
+        try {
+          state = hasFsbEntry(read.text, platform) ? 'configured' : null;
+        } catch {
+          state = 'unreadable';
+        }
+      }
+      if (state) {
+        findings.push({ platformKey: key, label: candidate.targetLabel, path: candidate.configPath, state });
+      }
+    }
+  }
+
+  return { configured: findings.length > 0, findings, unchecked };
 }

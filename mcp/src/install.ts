@@ -1,23 +1,37 @@
 import { PLATFORMS, resolvePlatformTarget, getEntryForPlatform, CLINE_TIMEOUT_SECONDS } from './platforms.js';
 import type { PlatformConfig, PlatformTarget } from './platforms.js';
-import { installToConfig, removeFromConfig, serializeByFormat } from './config-writer.js';
-import type { ConfigResult } from './config-writer.js';
+import {
+  installToConfig,
+  isFsbConfiguredAnywhere,
+  removeFromConfig,
+  serializeByFormat,
+} from './config-writer.js';
+import type { ConfigResult, FsbClientFinding, FsbConfigurationScan } from './config-writer.js';
 import { FSB_MCP_VERSION, FSB_SERVER_NAME } from './version.js';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
+import type { ChildProcess, SpawnOptions } from 'node:child_process';
+import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { dirname, isAbsolute, join } from 'node:path';
 import {
   isNativeHostExtensionId,
 } from './native-host/constants.js';
 import {
+  compareNativeHostVersions,
   installNativeHost,
   uninstallNativeHost,
 } from './native-host-install/index.js';
-import { isNativeHostBrowser } from './native-host-install/browser.js';
+import { NATIVE_HOST_BROWSERS, isNativeHostBrowser } from './native-host-install/browser.js';
 import { resolveNativeHostPlatformLayout } from './native-host-install/platform.js';
 import type {
+  NativeHostBrowser,
+  NativeHostEnsureOperations,
+  NativeHostEnsureRequest,
+  NativeHostEnsureResult,
   NativeHostInstallRequest,
   NativeHostInstallResult,
   NativeHostInstallTransactionDependencies,
+  NativeHostUninstallAllResult,
   NativeHostUninstallRequest,
   NativeHostUninstallResult,
 } from './native-host-install/types.js';
@@ -25,9 +39,29 @@ import type {
 /** CLI flags parsed from argv */
 export type InstallFlags = Record<string, boolean | string>;
 
-export interface NativeHostCliOperations {
+/**
+ * What the CLI needs from the native-host layer: the explicit single-browser
+ * install and uninstall, plus the ensure, uninstall-all and opt-out operations
+ * that client install and uninstall run on the user's behalf.
+ */
+export interface NativeHostCliOperations extends NativeHostEnsureOperations {
   install(request: NativeHostInstallRequest): Promise<NativeHostInstallResult>;
   uninstall(request?: NativeHostUninstallRequest): Promise<NativeHostUninstallResult>;
+}
+
+/**
+ * The facts client uninstall reads before it removes the helper. Injectable
+ * so tests never read the real home directory.
+ */
+export interface NativeHostUninstallChecks {
+  /** Every client config FSB can read, after this run's removals. */
+  scanClients(): Promise<FsbConfigurationScan>;
+  /**
+   * Names under ~/.fsb/agent-providers, where a configured delegation
+   * provider keeps its private profile. Null when the directory exists but
+   * cannot be read.
+   */
+  delegationProviders(): Promise<readonly string[] | null>;
 }
 
 /** Matched platform for file-based install/uninstall */
@@ -55,6 +89,8 @@ const NATIVE_HOST_UNINSTALL_USAGE =
   'Usage: fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>]';
 const NATIVE_HOST_REFUSAL_REASONS = new Set([
   'boundary-changed',
+  'daemon-busy',
+  'daemon-unidentified',
   'foreign-state',
   'install-failed',
   'invalid-materialized-package',
@@ -62,6 +98,7 @@ const NATIVE_HOST_REFUSAL_REASONS = new Set([
   'invalid-request',
   'invalid-source-package',
   'invalid-state',
+  'locked',
   'network-attempted',
   'ownership-mismatch',
   'pack-failed',
@@ -72,18 +109,35 @@ const NATIVE_HOST_REFUSAL_REASONS = new Set([
   'registry-key-cleanup-failed',
   'registry-key-not-exact',
   'registry-shadow',
+  'runtime-not-exact',
   'runtime-remove-failed',
   'split-state',
   'stable-root-not-absent',
   'stage-failed',
+  'stop-request-failed',
+  'swap-failed',
   'tarball-integrity-mismatch',
   'unavailable',
   'unsupported-architecture',
   'version-mismatch',
 ]);
+const HELPER_LABEL = "FSB's local helper (native messaging host)";
+const DOCTOR_HINT = 'Run npx -y fsb-mcp-server@latest doctor for details.';
+const NATIVE_HOST_BROWSER_LABELS: Readonly<Record<NativeHostBrowser, string>> = Object.freeze({
+  chrome: 'Chrome',
+  edge: 'Edge',
+  brave: 'Brave',
+  chromium: 'Chromium',
+});
+const BOUNDED_VERSION_PATTERN = /^\d{1,9}\.\d{1,9}\.\d{1,9}(?:-[0-9A-Za-z.-]{1,64})?$/u;
+const BOUNDED_REASON_PATTERN = /^[a-z][a-z0-9-]{0,63}$/u;
+const PROVIDER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
+// Client install flags that leave a run "bare": with only these, install sets
+// up the helper and then prints the usage.
+const BARE_INSTALL_FLAGS = new Set(['dry-run', 'no-native-host', 'extension-id']);
 
-function expectedNativeHostLocation(): string {
-  if (!['darwin', 'linux', 'win32'].includes(process.platform)) return 'Unavailable';
+function defaultNativeHostLayout(): ReturnType<typeof resolveNativeHostPlatformLayout> | null {
+  if (!['darwin', 'linux', 'win32'].includes(process.platform)) return null;
   try {
     return resolveNativeHostPlatformLayout({
       platform: process.platform as 'darwin' | 'linux' | 'win32',
@@ -91,13 +145,43 @@ function expectedNativeHostLocation(): string {
       ...(process.platform === 'win32'
         ? { localAppData: process.env.LOCALAPPDATA }
         : {}),
-    }).manifestPath;
+    });
   } catch {
-    return 'Unavailable';
+    return null;
   }
 }
 
+function expectedNativeHostLocation(): string {
+  return defaultNativeHostLayout()?.manifestPath ?? 'Unavailable';
+}
+
+/** Where the helper's own files live, shared by every browser registration. */
+function expectedNativeHostRoot(): string {
+  return defaultNativeHostLayout()?.stableRoot ?? 'Unavailable';
+}
+
+// Compositions that only know the single-browser transactions answer the
+// ensure and uninstall-all operations as unavailable and keep no opt-out.
+const unavailableEnsureOperations: NativeHostEnsureOperations = Object.freeze({
+  ensure: async (): Promise<NativeHostEnsureResult> => Object.freeze({
+    outcome: 'unavailable',
+    reason: 'unavailable',
+    browsers: [],
+    addedBrowsers: [],
+    stableRoot: '',
+  }),
+  uninstallAll: async (): Promise<NativeHostUninstallAllResult> => Object.freeze({
+    outcome: 'unavailable',
+    reason: 'unavailable',
+    removedBrowsers: [],
+  }),
+  readOptOut: () => null,
+  writeOptOut: () => undefined,
+  clearOptOut: () => undefined,
+});
+
 const unavailableNativeHostCliOperations: NativeHostCliOperations = Object.freeze({
+  ...unavailableEnsureOperations,
   install: async (): Promise<NativeHostInstallResult> => Object.freeze({
     status: 'refused',
     reason: 'unavailable',
@@ -118,6 +202,7 @@ export function createNativeHostCliOperations(
   dependencies: NativeHostInstallTransactionDependencies,
 ): NativeHostCliOperations {
   return Object.freeze({
+    ...unavailableEnsureOperations,
     install: (request: NativeHostInstallRequest) => installNativeHost(request, dependencies),
     uninstall: (request: NativeHostUninstallRequest = {}) => {
       const browser = request.browser ?? 'chrome';
@@ -200,6 +285,15 @@ function nativeUninstallRequest(flags: InstallFlags): NativeHostUninstallRequest
   return Object.freeze({ browser: browser as NativeHostUninstallRequest['browser'] });
 }
 
+// `install --native-host --ensure [--quiet]` is the refresh a stdio server
+// starts in the background. It takes no other flag.
+function nativeEnsureFlags(flags: InstallFlags): Readonly<{ quiet: boolean }> | null {
+  const values = exactNativeFlags(flags, ['native-host', 'ensure', 'quiet']);
+  if (!values || values['native-host'] !== true || values.ensure !== true) return null;
+  if (Object.hasOwn(values, 'quiet') && values.quiet !== true) return null;
+  return Object.freeze({ quiet: values.quiet === true });
+}
+
 function rejectNativeUsage(usage: string): void {
   console.error(usage);
   process.exitCode = 1;
@@ -270,7 +364,11 @@ function exactNativeReceipt(value: unknown): Readonly<Record<string, unknown>> |
   }
 }
 
-function printNativeInstallResult(result: unknown): void {
+function boundedVersion(value: unknown): string | null {
+  return typeof value === 'string' && BOUNDED_VERSION_PATTERN.test(value) ? value : null;
+}
+
+function printNativeInstallResult(result: unknown, updatedFrom: string | null = null): void {
   const receipt = exactNativeReceipt(result);
   if (!receipt) {
     printNativeHostRefusal('unavailable', 'Unavailable');
@@ -290,9 +388,14 @@ function printNativeInstallResult(result: unknown): void {
     printNativeHostRefusal('unavailable', location);
     return;
   }
-  console.log(receipt.status === 'installed'
-    ? 'Native messaging host installed.'
-    : 'Native messaging host is already installed.');
+  const version = boundedVersion(receipt.packageVersion);
+  if (updatedFrom && version) {
+    console.log(`Native messaging host updated from ${updatedFrom} to ${version}.`);
+  } else {
+    console.log(receipt.status === 'installed'
+      ? 'Native messaging host installed.'
+      : 'Native messaging host is already installed.');
+  }
   console.log(`Expected location: ${location}`);
   console.log(`Allowed origin: ${origin}`);
 }
@@ -323,6 +426,382 @@ function printNativeUninstallResult(result: unknown): void {
     console.log('Removed: 0');
   }
   console.log(`Expected location: ${location}`);
+}
+
+function plainRecord(value: unknown): Readonly<Record<string, unknown>> | null {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const fields: Record<string, unknown> = Object.create(null);
+    for (const key of Reflect.ownKeys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (typeof key !== 'string' || !descriptor || !Object.hasOwn(descriptor, 'value')) return null;
+      fields[key] = descriptor.value;
+    }
+    return fields;
+  } catch {
+    return null;
+  }
+}
+
+function boundedReason(value: unknown): string {
+  return typeof value === 'string' && BOUNDED_REASON_PATTERN.test(value) ? value : 'unavailable';
+}
+
+function browserNames(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const names = NATIVE_HOST_BROWSERS
+    .filter((browser) => value.includes(browser))
+    .map((browser) => NATIVE_HOST_BROWSER_LABELS[browser]);
+  return names.length > 0 ? names.join(', ') : null;
+}
+
+function forBrowsers(value: unknown): string {
+  const names = browserNames(value);
+  return names ? ' for ' + names : '';
+}
+
+/**
+ * One line for an ensure result. Successes go to stdout; anything that left
+ * the helper missing or stale goes to stderr as a warning. Neither changes
+ * the exit code.
+ */
+function printHelperEnsureResult(value: unknown): void {
+  const result = plainRecord(value);
+  const reason = boundedReason(result?.reason);
+  switch (result?.outcome) {
+    case 'installed':
+      console.log('\u2713 Installed ' + HELPER_LABEL + forBrowsers(result.browsers));
+      return;
+    case 'refreshed': {
+      const version = boundedVersion(result.version);
+      console.log('\u2713 Updated ' + HELPER_LABEL + (version ? ' to ' + version : '') + forBrowsers(result.browsers));
+      return;
+    }
+    case 'registered':
+      console.log('\u2713 Registered ' + HELPER_LABEL + forBrowsers(result.addedBrowsers));
+      return;
+    case 'current':
+      console.log('\u25CB ' + HELPER_LABEL + ' is already installed' + forBrowsers(result.browsers)
+        + (result.reason === 'installed-newer' ? ' (a newer version than this package)' : ''));
+      return;
+    case 'skipped-absent':
+    case 'skipped-opt-out':
+      console.log('\u25CB ' + HELPER_LABEL + ' was not changed: ' + reason);
+      return;
+    case 'deferred':
+      console.error('\u26A0 ' + HELPER_LABEL + ' was not updated: ' + reason
+        + '. Run npx -y fsb-mcp-server@latest install --native-host to retry.');
+      return;
+    default:
+      console.error('\u26A0 ' + HELPER_LABEL + ' was not changed: ' + reason + '. ' + DOCTOR_HINT);
+  }
+}
+
+function printNativeUninstallAllResult(value: unknown): void {
+  const result = plainRecord(value);
+  if (result?.outcome === 'removed') {
+    console.log('Native messaging host removed.');
+    console.log('Removed registrations: ' + (browserNames(result.removedBrowsers) ?? 'none'));
+    console.log(`Expected location: ${boundedNativeLocation(expectedNativeHostRoot())}`);
+    return;
+  }
+  if (result?.outcome === 'absent') {
+    console.log('Native messaging host is not installed.');
+    console.log('Removed registrations: none');
+    console.log(`Expected location: ${boundedNativeLocation(expectedNativeHostRoot())}`);
+    return;
+  }
+  printNativeHostRefusal(result?.reason, expectedNativeHostRoot());
+}
+
+/** The background refresh: one quiet pass that never installs. */
+async function runNativeEnsure(quiet: boolean, operations: NativeHostCliOperations): Promise<void> {
+  let result: unknown = null;
+  try {
+    result = await operations.ensure(Object.freeze({
+      mode: 'refresh-only',
+      browsers: 'auto',
+      provenance: 'auto',
+    }));
+  } catch {
+    result = null;
+  }
+  if (!quiet) printHelperEnsureResult(result);
+}
+
+/**
+ * `install --native-host`: the explicit install and repair path. It withdraws
+ * an earlier opt-out, and when this package owns an older helper it refreshes
+ * that helper in place instead of refusing. A newer helper is never replaced.
+ */
+async function runExplicitNativeInstall(
+  request: NativeHostInstallRequest,
+  operations: NativeHostCliOperations,
+): Promise<void> {
+  try {
+    operations.clearOptOut();
+  } catch {
+    // The install transaction withdraws the opt-out again under its lock.
+  }
+  let first: unknown;
+  try {
+    first = await operations.install(request);
+  } catch {
+    printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+    return;
+  }
+  const receipt = exactNativeReceipt(first);
+  const installedVersion = receipt?.status === 'refused' && receipt.reason === 'version-mismatch'
+    ? boundedVersion(receipt.packageVersion)
+    : null;
+  const order = installedVersion ? compareNativeHostVersions(installedVersion, FSB_MCP_VERSION) : null;
+  if (!receipt || !installedVersion || order === null || order >= 0) {
+    printNativeInstallResult(first);
+    return;
+  }
+  const ensureRequest: NativeHostEnsureRequest = Object.freeze({
+    mode: 'install',
+    browsers: Object.freeze([request.browser ?? 'chrome']) as NativeHostBrowser[],
+    ...(request.extensionId ? { extensionId: request.extensionId } : {}),
+    provenance: 'explicit',
+  });
+  let ensured: Readonly<Record<string, unknown>> | null = null;
+  try {
+    ensured = plainRecord(await operations.ensure(ensureRequest));
+  } catch {
+    ensured = null;
+  }
+  const outcome = ensured?.outcome;
+  if (outcome !== 'refreshed' && outcome !== 'registered' && outcome !== 'current') {
+    printNativeHostRefusal(ensured?.reason, receipt.location);
+    return;
+  }
+  let second: unknown;
+  try {
+    second = await operations.install(request);
+  } catch {
+    printNativeHostRefusal('unavailable', receipt.location);
+    return;
+  }
+  printNativeInstallResult(second, outcome === 'refreshed' ? installedVersion : null);
+}
+
+/** The helper step every client install ends with. */
+async function runInstallHelperStep(
+  flags: InstallFlags,
+  operations: NativeHostCliOperations,
+): Promise<void> {
+  if (flags['dry-run'] === true) {
+    console.log('[DRY RUN] ' + HELPER_LABEL);
+    if (flags['no-native-host'] === true) {
+      console.log('  Would skip it and pause its automatic refresh (--no-native-host)');
+      return;
+    }
+    console.log('  Would install or refresh it for each browser with FSB installed (Chrome when none is found)');
+    console.log('  Files: ' + boundedNativeLocation(expectedNativeHostRoot()));
+    return;
+  }
+  if (flags['no-native-host'] === true) {
+    try {
+      operations.writeOptOut('install-no-native-host');
+    } catch {
+      // A refresh still only updates a helper that is already installed.
+    }
+    console.log('\u25CB Skipped ' + HELPER_LABEL
+      + ' (--no-native-host). It is not set up or refreshed until you run install without that flag.');
+    return;
+  }
+  const extensionId = flags['extension-id'];
+  if (
+    extensionId !== undefined
+    && (typeof extensionId !== 'string' || !isNativeHostExtensionId(extensionId))
+  ) {
+    console.error('\u26A0 ' + HELPER_LABEL + ' was not set up: --extension-id must be the 32 lowercase'
+      + ' a-p characters shown on the browser\'s extensions page.');
+    return;
+  }
+  try {
+    operations.clearOptOut();
+  } catch {
+    // The ensure transaction withdraws the opt-out again under its lock.
+  }
+  let result: unknown = null;
+  try {
+    result = await operations.ensure(Object.freeze({
+      mode: 'install',
+      browsers: 'auto',
+      ...(typeof extensionId === 'string' ? { extensionId } : {}),
+      provenance: 'auto',
+    }));
+  } catch {
+    result = null;
+  }
+  printHelperEnsureResult(result);
+}
+
+function describeFindings(findings: readonly FsbClientFinding[]): string {
+  const labels: string[] = [];
+  for (const finding of findings) {
+    const label = finding.state === 'unreadable'
+      ? finding.label + ' (config could not be read)'
+      : finding.label;
+    if (!labels.includes(label)) labels.push(label);
+  }
+  return labels.join(', ');
+}
+
+async function configuredDelegationProviders(homeDirectory: string): Promise<readonly string[] | null> {
+  try {
+    return (await readdir(join(homeDirectory, '.fsb', 'agent-providers')))
+      .filter((name) => !name.startsWith('.'))
+      .sort();
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    return code === 'ENOENT' || code === 'ENOTDIR' ? [] : null;
+  }
+}
+
+const productionUninstallChecks: NativeHostUninstallChecks = Object.freeze({
+  scanClients: () => isFsbConfiguredAnywhere(),
+  delegationProviders: () => configuredDelegationProviders(homedir()),
+});
+
+/**
+ * The helper step client uninstall ends with. The helper goes only when no
+ * client config still names FSB (skipped for --all), no delegation provider
+ * is configured, and `install` rather than `install --native-host` set it up.
+ * `--all` also pauses the automatic refresh, whatever happens to the helper.
+ */
+async function runUninstallHelperStep(
+  flags: InstallFlags,
+  isAll: boolean,
+  operations: NativeHostCliOperations,
+  checks: NativeHostUninstallChecks,
+): Promise<void> {
+  if (flags['dry-run'] === true) {
+    console.log('[DRY RUN] ' + HELPER_LABEL);
+    console.log(isAll
+      ? '  Would remove it if install set it up and no delegation provider is configured, and pause its automatic refresh'
+      : '  Would remove it if install set it up, no other client uses FSB, and no delegation provider is configured');
+    return;
+  }
+  if (isAll) {
+    try {
+      operations.writeOptOut('uninstall-all');
+    } catch {
+      // A refresh still only updates a helper that is already installed.
+    }
+  }
+  const reasons: string[] = [];
+  let unchecked: readonly string[] = [];
+  if (!isAll) {
+    let scan: FsbConfigurationScan | null = null;
+    try {
+      scan = await checks.scanClients();
+    } catch {
+      scan = null;
+    }
+    if (!scan) {
+      reasons.push('the other client configs could not be checked');
+    } else {
+      unchecked = Array.isArray(scan.unchecked) ? scan.unchecked : [];
+      if (scan.configured) {
+        reasons.push('FSB is still configured in ' + (describeFindings(scan.findings ?? []) || 'another client'));
+      }
+    }
+  }
+  let providers: readonly string[] | null = null;
+  try {
+    providers = await checks.delegationProviders();
+  } catch {
+    providers = null;
+  }
+  if (providers === null) {
+    reasons.push('~/.fsb/agent-providers could not be read');
+  } else if (providers.length > 0) {
+    const names = providers.filter((name) => PROVIDER_NAME_PATTERN.test(name));
+    reasons.push('a delegation provider is configured in ~/.fsb/agent-providers'
+      + (names.length > 0 ? ' (' + names.join(', ') + ')' : ''));
+  }
+  if (reasons.length > 0) {
+    console.log('\u25CB ' + HELPER_LABEL + ' was not removed: ' + reasons.join('; '));
+    return;
+  }
+  let result: Readonly<Record<string, unknown>> | null = null;
+  try {
+    result = plainRecord(await operations.uninstallAll(Object.freeze({ onlyProvenance: 'auto' })));
+  } catch {
+    result = null;
+  }
+  switch (result?.outcome) {
+    case 'removed': {
+      const names = browserNames(result.removedBrowsers);
+      console.log('\u2713 Removed ' + HELPER_LABEL + (names ? ' from ' + names : ''));
+      if (unchecked.length > 0) {
+        console.log('  Not checked, because they are set up by hand: ' + unchecked.join(', '));
+      }
+      return;
+    }
+    case 'absent':
+      return;
+    case 'kept':
+      console.log('\u25CB Kept ' + HELPER_LABEL + ': install --native-host set it up. Remove it with'
+        + ' npx -y fsb-mcp-server@latest uninstall --native-host');
+      return;
+    default:
+      console.error('\u26A0 ' + HELPER_LABEL + ' was not removed: ' + boundedReason(result?.reason) + '. ' + DOCTOR_HINT);
+  }
+}
+
+/** What a stdio server needs to start the background helper refresh. */
+export interface NativeHostAutoRefreshOptions {
+  /** Absolute path of the running build/index.js. */
+  entryPath: string;
+  environment?: Readonly<Record<string, string | undefined>>;
+  execPath?: string;
+  spawnChild?: (
+    command: string,
+    args: string[],
+    options: SpawnOptions,
+  ) => Pick<ChildProcess, 'on' | 'unref'>;
+}
+
+/**
+ * True when the package root (the directory above build/) sits inside a
+ * node_modules directory, as it does for npx, global and project installs.
+ * A source checkout, or the helper's own staged copy, is never under one.
+ */
+function runsFromInstalledPackage(entryPath: string): boolean {
+  if (typeof entryPath !== 'string' || !isAbsolute(entryPath)) return false;
+  return dirname(dirname(entryPath)).split(/[\\/]+/u).includes('node_modules');
+}
+
+/**
+ * Starts `install --native-host --ensure --quiet` in a detached process that
+ * outlives the client, writes nothing to this server's stdio, and only
+ * refreshes a helper that is already installed. Skipped when
+ * FSB_NATIVE_HOST_AUTO=0 or when the server runs from a source checkout, so a
+ * development build never replaces the real helper.
+ * @returns True when the refresh process was started
+ */
+export function startNativeHostAutoRefresh(options: NativeHostAutoRefreshOptions): boolean {
+  const environment = options.environment ?? process.env;
+  if (environment.FSB_NATIVE_HOST_AUTO === '0') return false;
+  if (!runsFromInstalledPackage(options.entryPath)) return false;
+  try {
+    const child = (options.spawnChild ?? spawn)(
+      options.execPath ?? process.execPath,
+      [options.entryPath, 'install', '--native-host', '--ensure', '--quiet'],
+      { detached: true, stdio: 'ignore', windowsHide: true },
+    );
+    // A spawn failure must never reach the server as an unhandled error.
+    child.on('error', () => undefined);
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getClaudeCodeInstallCommand(): string {
@@ -889,6 +1368,8 @@ function printInstallUsage(): void {
   console.log('  --all               Install to all detected platforms');
   console.log('  --list              Show all platforms with detection status');
   console.log('  --dry-run           Preview changes without modifying files');
+  console.log('  --no-native-host    Write only the client config; skip FSB\'s local helper');
+  console.log('  --extension-id <id> Extension ID the local helper allows (unpacked builds)');
 }
 
 /**
@@ -973,6 +1454,8 @@ function getTargetPlatform(target: PlatformTarget): PlatformConfig {
  * Install FSB into one or more platform config files.
  * Iterates matched platforms, resolves config paths, and calls installToConfig.
  * Platform-specific entry shapes are handled by getEntryForPlatform().
+ * Every run that writes a client config, and a bare `install`, then sets up
+ * or refreshes FSB's local helper once (skipped with --no-native-host).
  *
  * @param flags - Parsed CLI flags (platform keys mapped to boolean)
  */
@@ -981,16 +1464,21 @@ export async function runInstall(
   nativeHostOperations: NativeHostCliOperations = unavailableNativeHostCliOperations,
 ): Promise<void> {
   if (nativeHostTargetRequested(flags)) {
+    if (flags && typeof flags === 'object' && Object.hasOwn(flags, 'ensure')) {
+      const ensureFlags = nativeEnsureFlags(flags);
+      if (!ensureFlags) {
+        rejectNativeUsage(NATIVE_HOST_INSTALL_USAGE);
+        return;
+      }
+      await runNativeEnsure(ensureFlags.quiet, nativeHostOperations);
+      return;
+    }
     const request = nativeInstallRequest(flags);
     if (!request) {
       rejectNativeUsage(NATIVE_HOST_INSTALL_USAGE);
       return;
     }
-    try {
-      printNativeInstallResult(await nativeHostOperations.install(request));
-    } catch {
-      printNativeHostRefusal('unavailable', expectedNativeHostLocation());
-    }
+    await runExplicitNativeInstall(request, nativeHostOperations);
     return;
   }
 
@@ -1039,6 +1527,12 @@ export async function runInstall(
   const matched: MatchedPlatform[] = getMatchedPlatforms(flags);
 
   if (matched.length === 0 && !flags['claude-code'] && instructionsPlatforms.length === 0) {
+    // A bare install sets up the helper, then shows how to add a client. A
+    // mistyped or retired client flag only shows the usage.
+    if (Object.keys(flags).every((key) => BARE_INSTALL_FLAGS.has(key))) {
+      await runInstallHelperStep(flags, nativeHostOperations);
+      console.log('');
+    }
     printInstallUsage();
     return;
   }
@@ -1095,6 +1589,11 @@ export async function runInstall(
     console.log('');
     console.log(verb + ' ' + successCount + ' of ' + Object.keys(PLATFORMS).length + ' platforms');
   }
+
+  // Runs that only print setup steps write no config, so they leave the helper alone.
+  if (matched.length > 0 || flags['claude-code'] === true) {
+    await runInstallHelperStep(flags, nativeHostOperations);
+  }
 }
 
 /**
@@ -1102,12 +1601,14 @@ export async function runInstall(
  * Claude Code uses CLI delegation via execSync (UNINST-05).
  * File-based platforms use removeFromConfig.
  * Instructions-only platforms print manual removal guidance.
+ * Afterwards FSB's local helper is removed when nothing needs it any more.
  *
  * @param flags - Parsed CLI flags (platform keys mapped to boolean)
  */
 export async function runUninstall(
   flags: InstallFlags,
   nativeHostOperations: NativeHostCliOperations = unavailableNativeHostCliOperations,
+  uninstallChecks: NativeHostUninstallChecks = productionUninstallChecks,
 ): Promise<void> {
   if (nativeHostTargetRequested(flags)) {
     const request = nativeUninstallRequest(flags);
@@ -1115,10 +1616,26 @@ export async function runUninstall(
       rejectNativeUsage(NATIVE_HOST_UNINSTALL_USAGE);
       return;
     }
+    if (request.browser) {
+      // One browser's registration; the helper's files go with the last one.
+      try {
+        printNativeUninstallResult(await nativeHostOperations.uninstall(request));
+      } catch {
+        printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+      }
+      return;
+    }
+    // Every registration and the helper's files, however they were installed.
+    // The opt-out is written first, so no automatic refresh races the removal.
     try {
-      printNativeUninstallResult(await nativeHostOperations.uninstall(request));
+      nativeHostOperations.writeOptOut('uninstall-native-host');
     } catch {
-      printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+      // A refresh never recreates a helper that is gone.
+    }
+    try {
+      printNativeUninstallAllResult(await nativeHostOperations.uninstallAll(Object.freeze({})));
+    } catch {
+      printNativeHostRefusal('unavailable', expectedNativeHostRoot());
     }
     return;
   }
@@ -1217,5 +1734,9 @@ export async function runUninstall(
     const verb: string = flags['dry-run'] === true ? 'Would remove from' : 'Removed from';
     console.log('');
     console.log(verb + ' ' + successCount + ' of ' + Object.keys(PLATFORMS).length + ' platforms');
+  }
+
+  if (matched.length > 0 || flags['claude-code'] === true) {
+    await runUninstallHelperStep(flags, isAll, nativeHostOperations, uninstallChecks);
   }
 }
