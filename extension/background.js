@@ -15021,13 +15021,14 @@ async function fsbHandleOnePasswordUiAction(request) {
 }
 
 // Several 1Password logins matched an autopilot login page: the side panel
-// offers them by id, title and username only.
+// offers them by id, title, username, and the vault that holds each.
 function fsbLoginCandidates(lookup) {
   if (!lookup || lookup.errorCode !== 'multiple_credentials' || !Array.isArray(lookup.candidates)) return [];
   return lookup.candidates.slice(0, 10).map((candidate) => ({
     id: String(candidate && candidate.id || ''),
     title: String(candidate && candidate.title || ''),
-    username: String(candidate && candidate.username || '')
+    username: String(candidate && candidate.username || ''),
+    vault: String(candidate && candidate.vault || '')
   })).filter((candidate) => candidate.id);
 }
 

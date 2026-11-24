@@ -33,7 +33,15 @@ export function multipleCredentialsResult(
   const candidates = (Array.isArray(result.candidates) ? result.candidates : [])
     .map((entry) => {
       const record = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
-      return { id: text(record.id), title: text(record.title), username: text(record.username) };
+      const candidate: { id: string; title: string; username: string; vault?: string } = {
+        id: text(record.id),
+        title: text(record.title),
+        username: text(record.username),
+      };
+      // Which vault holds it, when 1Password named one: two copies of a login
+      // in different vaults otherwise look the same.
+      if (text(record.vault)) candidate.vault = text(record.vault);
+      return candidate;
     })
     .filter((candidate) => candidate.id)
     .slice(0, MAX_CANDIDATES);

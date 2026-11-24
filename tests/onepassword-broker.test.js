@@ -322,6 +322,7 @@ async function run() {
     const error = await rejects(broker.resolveLogin({ url: 'https://example.com', requireUnique: true }), 'multiple_credentials');
     const candidates = error.details.candidates;
     assert.deepEqual(candidates.map((candidate) => candidate.id).sort(), ['vaultA:loginA', 'vaultA:loginA2']);
+    assert.ok(candidates.every((candidate) => candidate.vault === 'FSB'), 'each candidate names its vault');
     assert.ok(!JSON.stringify(candidates).includes('pw-'), 'candidates carry no passwords');
   });
   await check('one exact-host login is not ambiguous next to site-level matches', async () => {
@@ -692,6 +693,19 @@ async function run() {
     const login = await all.resolveLogin({ url: 'https://bank.test', itemId: 'vaultB:loginPrivate' });
     assert.equal(login.password, 'pw-bank');
     assert.equal((await all.resolveCard({ itemId: 'vaultB:cardB' })).last4, '1111');
+  });
+  await check('copies of one login in two vaults are told apart by vault name', async () => {
+    const twin = makeSdk([
+      loginItem('vaultA', 'shared1', { title: 'Netflix', url: 'https://netflix.com', username: 'a@b.com', password: 'pw-shared' }),
+      loginItem('vaultB', 'mine1', { title: 'Netflix', url: 'https://netflix.com', username: 'a@b.com', password: 'pw-mine' }),
+    ], { vaults: scopedVaults });
+    const twins = new OnePasswordBroker({ loadSdk: async () => twin.sdk, configPath: tempConfigPath(), env: {}, ipcLibraryPresent: () => true });
+    await twins.configure({ authKind: 'desktop', accountName: 'me' });
+    const error = await rejects(twins.resolveLogin({ url: 'https://netflix.com', requireUnique: true }), 'multiple_credentials');
+    assert.deepEqual(error.details.candidates.map(({ id, vault }) => ({ id, vault })).sort((a, b) => a.id.localeCompare(b.id)), [
+      { id: 'vaultA:shared1', vault: 'Shared' },
+      { id: 'vaultB:mine1', vault: 'Personal' },
+    ]);
   });
   await check('the vault list is reused for a short while, not fetched for every lookup', async () => {
     let clock = 5_000_000;

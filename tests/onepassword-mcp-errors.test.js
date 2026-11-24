@@ -114,6 +114,24 @@ async function run() {
     const out = multipleCredentialsResult({ success: false, errorCode: 'multiple_credentials', error: 'Several 1Password logins match example.com.', candidates: [{ id: 'v:1', title: 'A', username: 'a' }] });
     assert.match(out.content[0].text, /Detected: Several 1Password logins match this site/);
   });
+  check('candidates keep the vault that holds each login', () => {
+    const out = multipleCredentialsResult({
+      success: false,
+      errorCode: 'multiple_credentials',
+      error: 'Several 1Password logins match netflix.com.',
+      candidates: [
+        { id: 'vP:x', title: 'Netflix', username: 'a@b.com', vault: 'Personal' },
+        { id: 'vS:y', title: 'Netflix', username: 'a@b.com', vault: 'Shared' },
+        { id: 'vW:z', title: 'Netflix', username: 'a@b.com', vault: '' },
+      ],
+    });
+    const text = out.content[0].text;
+    assert.deepEqual(JSON.parse(text.slice(text.indexOf('{'))).candidates, [
+      { id: 'vP:x', title: 'Netflix', username: 'a@b.com', vault: 'Personal' },
+      { id: 'vS:y', title: 'Netflix', username: 'a@b.com', vault: 'Shared' },
+      { id: 'vW:z', title: 'Netflix', username: 'a@b.com' },
+    ]);
+  });
   check('a typed login result is passed through with no values', () => {
     const out = mapFSBError({ success: true, site: 'example.com', by: 'you', filled: ['username', 'password'], savedTo1Password: true });
     assert.equal(out.isError, undefined);

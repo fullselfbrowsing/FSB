@@ -271,6 +271,24 @@ async function run() {
     assert.equal(result.errorCode, 'multiple_credentials');
     assert.deepEqual(JSON.parse(JSON.stringify(result.candidates)), [{ id: 'v:a', title: 'A', username: 'a' }]);
   });
+  await check('candidates name the vault that holds each, so copies in two vaults can be told apart', async () => {
+    const env = makeEnv({
+      responses: {
+        'onepassword.resolve-login': {
+          ok: false, errorCode: 'multiple_credentials', error: 'pick one',
+          candidates: [
+            { id: 'vP:x', title: 'Netflix', username: 'a@b.com', vault: 'Personal', password: 'leak' },
+            { id: 'vS:y', title: 'Netflix', username: 'a@b.com', vault: 'Shared' },
+          ],
+        },
+      },
+    });
+    const result = await env.api.fillLoginInTab(7, { requireUnique: true }, async () => assert.fail('must not fill'));
+    assert.deepEqual(JSON.parse(JSON.stringify(result.candidates)), [
+      { id: 'vP:x', title: 'Netflix', username: 'a@b.com', vault: 'Personal' },
+      { id: 'vS:y', title: 'Netflix', username: 'a@b.com', vault: 'Shared' },
+    ]);
+  });
   for (const [label, moved] of [
     ['another site', 'https://evil.test/login'],
     ['http on the same host', 'http://example.com/login'],
@@ -872,6 +890,25 @@ async function run() {
     await api.fsbHandleOnePasswordUiAction({ action: 'onePasswordStatus', pair: true });
     await api.fsbHandleOnePasswordUiAction({ action: 'onePasswordStatus' });
     assert.deepEqual(JSON.parse(JSON.stringify(seen)), [{ pair: false }, { pair: true }, { pair: true }]);
+  });
+  await check('the autopilot account picker gets each login\'s vault', () => {
+    const start = background.indexOf('function fsbLoginCandidates(lookup) {');
+    const end = background.indexOf('\n}\n', start) + 3;
+    assert.ok(start > 0 && end > start, 'fsbLoginCandidates found in background.js');
+    const fsbLoginCandidates = vm.runInNewContext(`${background.slice(start, end)}\nfsbLoginCandidates`);
+    const picked = fsbLoginCandidates({
+      errorCode: 'multiple_credentials',
+      candidates: [
+        { id: 'vP:x', title: 'Netflix', username: 'a@b.com', vault: 'Personal', password: 'leak' },
+        { id: 'vS:y', title: 'Netflix', username: 'a@b.com', vault: 'Shared' },
+      ],
+    });
+    assert.deepEqual(JSON.parse(JSON.stringify(picked)), [
+      { id: 'vP:x', title: 'Netflix', username: 'a@b.com', vault: 'Personal' },
+      { id: 'vS:y', title: 'Netflix', username: 'a@b.com', vault: 'Shared' },
+    ]);
+    const sidepanel = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ui', 'sidepanel.js'), 'utf8');
+    assert.ok(sidepanel.includes("escapeHtml([c.username, c.vault].filter(Boolean).join(' · '))"), 'the picker shows the vault next to the username');
   });
   await check('an older local server is reported as outdated', async () => {
     const error = Object.assign(new Error('No extension request handler is available'), { code: 'agent_provider_offline' });

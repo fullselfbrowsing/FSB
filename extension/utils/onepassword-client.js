@@ -280,11 +280,14 @@
     if (result && typeof result.reason === 'string') out.reason = result.reason;
     if (result && Array.isArray(result.candidates)) {
       out.candidates = result.candidates.map(function (candidate) {
-        return {
+        var described = {
           id: String(candidate && candidate.id || ''),
           title: String(candidate && candidate.title || ''),
           username: String(candidate && candidate.username || '')
         };
+        // The vault tells apart copies of one login kept in two vaults.
+        if (candidate && typeof candidate.vault === 'string' && candidate.vault) described.vault = candidate.vault;
+        return described;
       });
     }
     return out;

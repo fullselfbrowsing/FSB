@@ -1109,7 +1109,9 @@ export class OnePasswordBroker {
       // number of logins that merely share the registrable domain.
       const topTier = candidates.filter((entry) => entry.match === candidates[0].match);
       if (!requested && input.requireUnique && topTier.length > 1) {
-        const described: Array<{ id: string; title: string; username: string }> = [];
+        // The vault name tells apart copies of one login kept in two vaults
+        // (a Personal and a Shared "Netflix" with the same username).
+        const described: Array<{ id: string; title: string; username: string; vault: string }> = [];
         for (const vaultId of new Set(topTier.map((entry) => entry.vaultId))) {
           const ids = topTier.filter((entry) => entry.vaultId === vaultId).map((entry) => entry.overview.id);
           for (const item of await this.getMany(client, vaultId, ids.slice(0, 10))) {
@@ -1117,6 +1119,7 @@ export class OnePasswordBroker {
               id: makeItemRef(vaultId, item.id),
               title: clip(item.title, 200),
               username: extractLoginFields(item).username.slice(0, 320),
+              vault: this.vaultTitles.get(vaultId) ?? '',
             });
           }
         }

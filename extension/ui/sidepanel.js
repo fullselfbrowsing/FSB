@@ -6171,8 +6171,9 @@ function vpChips(fields) {
 }
 
 // A login page in an autopilot run. Several matching 1Password logins: pick
-// one (nothing to type). Nothing saved: type it once, and save it to
-// 1Password when FSB has a vault for new logins.
+// one (nothing to type), each named with its username and vault. Nothing
+// saved: type it once, and save it to 1Password when FSB has a vault for new
+// logins.
 function showLoginPrompt(domain, fields, canSave, candidates) {
   const existing = document.getElementById('login-prompt');
   if (existing) existing.remove();
@@ -6199,7 +6200,7 @@ function showLoginPrompt(domain, fields, canSave, candidates) {
       <div style="margin-top: 6px;">${options.map((c, i) => `
         <button type="button" class="sp-opt${i === 0 ? ' on' : ''}" aria-pressed="${i === 0 ? 'true' : 'false'}" data-index="${i}">
           <span class="fv-tile">${escapeHtml((String(c.title || c.username || '?').trim()[0] || '?').toUpperCase())}</span>
-          <span class="t"><b>${escapeHtml(c.title || '')}</b><span>${escapeHtml(c.username || '')}</span></span>
+          <span class="t"><b>${escapeHtml(c.title || '')}</b><span>${escapeHtml([c.username, c.vault].filter(Boolean).join(' · '))}</span></span>
           <span class="sp-radio"></span>
         </button>`).join('')}</div>
       <div class="sp-acts">
