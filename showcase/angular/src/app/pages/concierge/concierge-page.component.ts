@@ -350,4 +350,10 @@ export class ConciergePageComponent implements OnInit, AfterViewInit, OnDestroy 
       }
     }
   }
+
+  // Declared last, below every $localize call, so the line numbers messages.xlf pins do not move.
+  readonly appVersion = APP_VERSION;
 }
+
+// Imported here, below every $localize call, so the line numbers messages.xlf pins do not move.
+import { APP_VERSION } from '../../core/seo/version';
