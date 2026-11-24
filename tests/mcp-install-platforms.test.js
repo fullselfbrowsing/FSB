@@ -30,10 +30,17 @@ const EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk';
 const DEVELOPMENT_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
 const CLINE_ENV_KEYS = ['CLINE_DIR', 'CLINE_DATA_DIR', 'CLINE_MCP_SETTINGS_PATH'];
 
+// On Windows the registry cannot be pointed at a temporary profile, so the
+// sections that run a real helper install write HKCU. They run there only on
+// a CI runner, whose profile is thrown away.
+const PRODUCTION_HELPER_RUNS = process.platform !== 'win32' || process.env.GITHUB_ACTIONS === 'true';
+
 function runCli(args, fixture, options = {}) {
   const env = {
     ...process.env,
     HOME: fixture.home,
+    // Node's homedir() reads USERPROFILE on Windows, never HOME.
+    USERPROFILE: fixture.home,
     APPDATA: fixture.appData,
     LOCALAPPDATA: fixture.localAppData,
     ...(options.env ?? {}),
@@ -629,211 +636,216 @@ function run() {
     );
   });
 
-  console.log('\n--- native target isolation ---');
-  withTempHome('mcp-native-target-isolation', (fixture) => {
-    const helpResult = runCli(['--help'], fixture);
-    const helpOutput = `${helpResult.stdout}${helpResult.stderr}`;
-    const installResult = runCli(['install', '--native-host', '--dry-run'], fixture);
-    const installOutput = `${installResult.stdout}${installResult.stderr}`;
-    const uninstallResult = runCli(
-      ['uninstall', '--native-host', '--codex', '--dry-run'],
-      fixture,
-    );
-    const uninstallOutput = `${uninstallResult.stdout}${uninstallResult.stderr}`;
-
-    assertEqual(helpResult.status, 0, 'help with native syntax exits cleanly');
-    assertIncludes(
-      helpOutput,
-      'fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <id>] Install the selected browser native messaging host',
-      'help names the exact optional native install syntax',
-    );
-    assertIncludes(
-      helpOutput,
-      'fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>] Remove the selected browser native messaging host',
-      'help names the exact native uninstall syntax',
-    );
-    assertIncludes(
-      helpOutput,
-      'fsb-mcp-server install             Install FSB to an MCP client config (21 platforms)',
-      'help preserves the legacy install line byte-for-byte',
-    );
-    assertIncludes(
-      helpOutput,
-      'fsb-mcp-server uninstall           Remove FSB from an MCP client config',
-      'help preserves the legacy uninstall line byte-for-byte',
-    );
-
-    assertEqual(installResult.status, 1, 'native install rejects legacy dry-run mixing');
-    assertIncludes(
-      installOutput,
-      'fsb-mcp-server install --native-host',
-      'native install mixing prints only the stable native usage',
-    );
-    assertEqual(uninstallResult.status, 1, 'native uninstall rejects client/dry-run mixing');
-    assertIncludes(
-      uninstallOutput,
-      'fsb-mcp-server uninstall --native-host',
-      'native uninstall mixing prints only the stable native usage',
-    );
-    assert(
-      !fs.existsSync(path.join(fixture.home, '.fsb', 'native-host')),
-      'invalid native syntax creates no owned runtime',
-    );
-    assert(
-      !fs.existsSync(path.join(
-        fixture.home,
-        '.config',
-        'google-chrome',
-        'NativeMessagingHosts',
-      )),
-      'invalid native syntax creates no Chrome registration directory',
-    );
-
-    const missingDoctor = runProductionDoctor(fixture);
-    assertEqual(missingDoctor?.nativeHost?.reason, 'not_installed',
-      'production doctor derives the missing state from real local facts');
-    assertEqual(missingDoctor?.nativeHost?.installState, 'not_installed',
-      'production doctor reports a fully absent native host as not installed');
-    assert(!fs.existsSync(path.join(fixture.home, '.fsb', 'native-host')),
-      'missing-state production inspection performs zero runtime mutation');
-
-    const productionInstall = runCli(['install', '--native-host'], fixture);
-    const productionInstallOutput = `${productionInstall.stdout}${productionInstall.stderr}`;
-    assertEqual(
-      productionInstall.status,
-      0,
-      'direct production CLI installs without inherited npm_execpath',
-    );
-    assertIncludes(
-      productionInstallOutput,
-      'Native messaging host installed.',
-      'production CLI reports the bounded real install receipt',
-    );
-    const stableRoot = path.join(fixture.home, '.fsb', 'native-host');
-    const manifestPath = process.platform === 'darwin'
-      ? path.join(
-        fixture.home,
-        'Library',
-        'Application Support',
-        'Google',
-        'Chrome',
-        'NativeMessagingHosts',
-        'io.github.fullselfbrowsing.fsb_native_host.json',
-      )
-      : path.join(
-        fixture.home,
-        '.config',
-        'google-chrome',
-        'NativeMessagingHosts',
-        'io.github.fullselfbrowsing.fsb_native_host.json',
-    );
-    assert(fs.existsSync(stableRoot), 'production composition publishes the stable owned runtime');
-    assert(fs.existsSync(manifestPath), 'production composition publishes the Chrome manifest');
-    if (fs.existsSync(manifestPath)) {
-      const exactManifest = readText(manifestPath);
-      const offlineDoctor = runProductionDoctor(fixture);
-      assertEqual(offlineDoctor?.nativeHost?.reason, 'daemon_offline',
-        'production doctor reuses the exact daemon health classifier');
-      assertEqual(offlineDoctor?.nativeHost?.installState, 'installed',
-        'an exact install remains installed while its daemon is offline');
-      assertEqual(readText(manifestPath), exactManifest,
-        'installed-state production inspection performs zero registration mutation');
-
-      const mismatchedManifest = JSON.parse(exactManifest);
-      mismatchedManifest.allowed_origins = [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`];
-      fs.writeFileSync(manifestPath, `${JSON.stringify(mismatchedManifest)}\n`, 'utf8');
-      const mismatchDoctor = runProductionDoctor(fixture);
-      assertEqual(mismatchDoctor?.nativeHost?.reason, 'allowlist_mismatch',
-        'production doctor distinguishes a structurally valid allowlist mismatch');
-      fs.writeFileSync(manifestPath, exactManifest, 'utf8');
-
-      const launcherPath = path.join(stableRoot, 'bin', 'fsb-native-host-launcher.mjs');
-      const exactLauncher = fs.readFileSync(launcherPath);
-      fs.appendFileSync(launcherPath, '\n// corrupt fixture\n');
-      const corruptDoctor = runProductionDoctor(fixture);
-      assertEqual(corruptDoctor?.nativeHost?.reason, 'runtime_invalid',
-        'production doctor rejects a corrupt owned runtime before daemon facts');
-      fs.writeFileSync(launcherPath, exactLauncher);
-
-      const healthChild = startReadyHealthFixture(fixture);
-      try {
-        const readyDoctor = runProductionDoctor(fixture);
-        assertEqual(readyDoctor?.nativeHost?.reason, 'ok',
-          'production doctor reports ready only from exact install and health facts');
-        assertEqual(readyDoctor?.nativeHost?.daemon, 'reachable',
-          'production doctor maps the exact loopback health contract to reachable');
-      } finally {
-        healthChild.kill('SIGTERM');
-      }
-    }
-
-    const idempotentInstall = runCli(['install', '--native-host'], fixture);
-    assertEqual(
-      idempotentInstall.status,
-      0,
-      'direct production native install is idempotent without inherited npm_execpath',
-    );
-    assertIncludes(
-      `${idempotentInstall.stdout}${idempotentInstall.stderr}`,
-      'Native messaging host is already installed.',
-      'production composition reuses its persisted exact ownership receipt',
-    );
-
-    const productionUninstall = runCli(['uninstall', '--native-host'], fixture);
-    assertEqual(
-      productionUninstall.status,
-      0,
-      'direct production CLI uninstalls without inherited npm_execpath',
-    );
-    assertIncludes(
-      `${productionUninstall.stdout}${productionUninstall.stderr}`,
-      'Native messaging host removed.',
-      'production CLI reports the bounded real uninstall receipt',
-    );
-    assert(!fs.existsSync(stableRoot), 'production uninstall removes only the exact owned runtime');
-    assert(!fs.existsSync(manifestPath), 'production uninstall removes the exact Chrome manifest');
-
-    const duplicateId = runCli([
-      'install',
-      '--native-host',
-      '--extension-id', DEVELOPMENT_EXTENSION_ID,
-      '--extension-id', EXTENSION_ID,
-    ], fixture);
-    const duplicateTarget = runCli([
-      'uninstall',
-      '--native-host',
-      '--native-host',
-    ], fixture);
-    const extraInlineValue = runCli([
-      'install',
-      '--native-host',
-      `--extension-id=${DEVELOPMENT_EXTENSION_ID}=extra`,
-    ], fixture);
-    const extraPositional = runCli([
-      'install',
-      'unexpected-positional',
-      '--native-host',
-    ], fixture);
-    const unknownShort = runCli([
-      'install',
-      '-x',
-      '--native-host',
-    ], fixture);
-    for (const [result, label] of [
-      [duplicateId, 'duplicate extension id'],
-      [duplicateTarget, 'duplicate native target'],
-      [extraInlineValue, 'extra inline extension-id value'],
-      [extraPositional, 'extra positional'],
-      [unknownShort, 'unknown short flag'],
-    ]) {
-      assertEqual(result.status, 1, `${label} is rejected before native mutation`);
-      assertIncludes(
-        `${result.stdout}${result.stderr}`,
-        'Usage: fsb-mcp-server',
-        `${label} prints stable bounded usage`,
+  if (!PRODUCTION_HELPER_RUNS) {
+    console.log('\n--- native target isolation ---');
+    console.log('  SKIP: a real helper install on Windows writes HKCU; it runs only on CI');
+  } else {
+    console.log('\n--- native target isolation ---');
+    withTempHome('mcp-native-target-isolation', (fixture) => {
+      const helpResult = runCli(['--help'], fixture);
+      const helpOutput = `${helpResult.stdout}${helpResult.stderr}`;
+      const installResult = runCli(['install', '--native-host', '--dry-run'], fixture);
+      const installOutput = `${installResult.stdout}${installResult.stderr}`;
+      const uninstallResult = runCli(
+        ['uninstall', '--native-host', '--codex', '--dry-run'],
+        fixture,
       );
-    }
-  });
+      const uninstallOutput = `${uninstallResult.stdout}${uninstallResult.stderr}`;
+
+      assertEqual(helpResult.status, 0, 'help with native syntax exits cleanly');
+      assertIncludes(
+        helpOutput,
+        'fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <id>] Install the selected browser native messaging host',
+        'help names the exact optional native install syntax',
+      );
+      assertIncludes(
+        helpOutput,
+        'fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>] Remove the selected browser native messaging host',
+        'help names the exact native uninstall syntax',
+      );
+      assertIncludes(
+        helpOutput,
+        'fsb-mcp-server install             Install FSB to an MCP client config (21 platforms)',
+        'help preserves the legacy install line byte-for-byte',
+      );
+      assertIncludes(
+        helpOutput,
+        'fsb-mcp-server uninstall           Remove FSB from an MCP client config',
+        'help preserves the legacy uninstall line byte-for-byte',
+      );
+
+      assertEqual(installResult.status, 1, 'native install rejects legacy dry-run mixing');
+      assertIncludes(
+        installOutput,
+        'fsb-mcp-server install --native-host',
+        'native install mixing prints only the stable native usage',
+      );
+      assertEqual(uninstallResult.status, 1, 'native uninstall rejects client/dry-run mixing');
+      assertIncludes(
+        uninstallOutput,
+        'fsb-mcp-server uninstall --native-host',
+        'native uninstall mixing prints only the stable native usage',
+      );
+      assert(
+        !fs.existsSync(path.join(fixture.home, '.fsb', 'native-host')),
+        'invalid native syntax creates no owned runtime',
+      );
+      assert(
+        !fs.existsSync(path.join(
+          fixture.home,
+          '.config',
+          'google-chrome',
+          'NativeMessagingHosts',
+        )),
+        'invalid native syntax creates no Chrome registration directory',
+      );
+
+      const missingDoctor = runProductionDoctor(fixture);
+      assertEqual(missingDoctor?.nativeHost?.reason, 'not_installed',
+        'production doctor derives the missing state from real local facts');
+      assertEqual(missingDoctor?.nativeHost?.installState, 'not_installed',
+        'production doctor reports a fully absent native host as not installed');
+      assert(!fs.existsSync(path.join(fixture.home, '.fsb', 'native-host')),
+        'missing-state production inspection performs zero runtime mutation');
+
+      const productionInstall = runCli(['install', '--native-host'], fixture);
+      const productionInstallOutput = `${productionInstall.stdout}${productionInstall.stderr}`;
+      assertEqual(
+        productionInstall.status,
+        0,
+        'direct production CLI installs without inherited npm_execpath',
+      );
+      assertIncludes(
+        productionInstallOutput,
+        'Native messaging host installed.',
+        'production CLI reports the bounded real install receipt',
+      );
+      const stableRoot = path.join(fixture.home, '.fsb', 'native-host');
+      const manifestPath = process.platform === 'darwin'
+        ? path.join(
+          fixture.home,
+          'Library',
+          'Application Support',
+          'Google',
+          'Chrome',
+          'NativeMessagingHosts',
+          'io.github.fullselfbrowsing.fsb_native_host.json',
+        )
+        : path.join(
+          fixture.home,
+          '.config',
+          'google-chrome',
+          'NativeMessagingHosts',
+          'io.github.fullselfbrowsing.fsb_native_host.json',
+      );
+      assert(fs.existsSync(stableRoot), 'production composition publishes the stable owned runtime');
+      assert(fs.existsSync(manifestPath), 'production composition publishes the Chrome manifest');
+      if (fs.existsSync(manifestPath)) {
+        const exactManifest = readText(manifestPath);
+        const offlineDoctor = runProductionDoctor(fixture);
+        assertEqual(offlineDoctor?.nativeHost?.reason, 'daemon_offline',
+          'production doctor reuses the exact daemon health classifier');
+        assertEqual(offlineDoctor?.nativeHost?.installState, 'installed',
+          'an exact install remains installed while its daemon is offline');
+        assertEqual(readText(manifestPath), exactManifest,
+          'installed-state production inspection performs zero registration mutation');
+
+        const mismatchedManifest = JSON.parse(exactManifest);
+        mismatchedManifest.allowed_origins = [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`];
+        fs.writeFileSync(manifestPath, `${JSON.stringify(mismatchedManifest)}\n`, 'utf8');
+        const mismatchDoctor = runProductionDoctor(fixture);
+        assertEqual(mismatchDoctor?.nativeHost?.reason, 'allowlist_mismatch',
+          'production doctor distinguishes a structurally valid allowlist mismatch');
+        fs.writeFileSync(manifestPath, exactManifest, 'utf8');
+
+        const launcherPath = path.join(stableRoot, 'bin', 'fsb-native-host-launcher.mjs');
+        const exactLauncher = fs.readFileSync(launcherPath);
+        fs.appendFileSync(launcherPath, '\n// corrupt fixture\n');
+        const corruptDoctor = runProductionDoctor(fixture);
+        assertEqual(corruptDoctor?.nativeHost?.reason, 'runtime_invalid',
+          'production doctor rejects a corrupt owned runtime before daemon facts');
+        fs.writeFileSync(launcherPath, exactLauncher);
+
+        const healthChild = startReadyHealthFixture(fixture);
+        try {
+          const readyDoctor = runProductionDoctor(fixture);
+          assertEqual(readyDoctor?.nativeHost?.reason, 'ok',
+            'production doctor reports ready only from exact install and health facts');
+          assertEqual(readyDoctor?.nativeHost?.daemon, 'reachable',
+            'production doctor maps the exact loopback health contract to reachable');
+        } finally {
+          healthChild.kill('SIGTERM');
+        }
+      }
+
+      const idempotentInstall = runCli(['install', '--native-host'], fixture);
+      assertEqual(
+        idempotentInstall.status,
+        0,
+        'direct production native install is idempotent without inherited npm_execpath',
+      );
+      assertIncludes(
+        `${idempotentInstall.stdout}${idempotentInstall.stderr}`,
+        'Native messaging host is already installed.',
+        'production composition reuses its persisted exact ownership receipt',
+      );
+
+      const productionUninstall = runCli(['uninstall', '--native-host'], fixture);
+      assertEqual(
+        productionUninstall.status,
+        0,
+        'direct production CLI uninstalls without inherited npm_execpath',
+      );
+      assertIncludes(
+        `${productionUninstall.stdout}${productionUninstall.stderr}`,
+        'Native messaging host removed.',
+        'production CLI reports the bounded real uninstall receipt',
+      );
+      assert(!fs.existsSync(stableRoot), 'production uninstall removes only the exact owned runtime');
+      assert(!fs.existsSync(manifestPath), 'production uninstall removes the exact Chrome manifest');
+
+      const duplicateId = runCli([
+        'install',
+        '--native-host',
+        '--extension-id', DEVELOPMENT_EXTENSION_ID,
+        '--extension-id', EXTENSION_ID,
+      ], fixture);
+      const duplicateTarget = runCli([
+        'uninstall',
+        '--native-host',
+        '--native-host',
+      ], fixture);
+      const extraInlineValue = runCli([
+        'install',
+        '--native-host',
+        `--extension-id=${DEVELOPMENT_EXTENSION_ID}=extra`,
+      ], fixture);
+      const extraPositional = runCli([
+        'install',
+        'unexpected-positional',
+        '--native-host',
+      ], fixture);
+      const unknownShort = runCli([
+        'install',
+        '-x',
+        '--native-host',
+      ], fixture);
+      for (const [result, label] of [
+        [duplicateId, 'duplicate extension id'],
+        [duplicateTarget, 'duplicate native target'],
+        [extraInlineValue, 'extra inline extension-id value'],
+        [extraPositional, 'extra positional'],
+        [unknownShort, 'unknown short flag'],
+      ]) {
+        assertEqual(result.status, 1, `${label} is rejected before native mutation`);
+        assertIncludes(
+          `${result.stdout}${result.stderr}`,
+          'Usage: fsb-mcp-server',
+          `${label} prints stable bounded usage`,
+        );
+      }
+    });
+  }
 
   if (process.platform !== 'win32') {
     console.log('\n--- native cross-browser split state ---');
@@ -1059,60 +1071,65 @@ function run() {
     });
   }
 
-  console.log('\n--- native npm CLI provenance ---');
-  withTempHome('mcp-native-hostile-npm-cli', (fixture) => {
-    const sentinelPath = path.join(fixture.root, 'untrusted-npm-ran.txt');
-    const untrustedNpmCli = path.join(fixture.root, 'untrusted', 'npm', 'bin', 'npm-cli.js');
-    writeText(
-      untrustedNpmCli,
-      `require('node:fs').writeFileSync(${JSON.stringify(sentinelPath)}, 'executed');\n`,
-    );
+  if (!PRODUCTION_HELPER_RUNS) {
+    console.log('\n--- native npm CLI provenance ---');
+    console.log('  SKIP: a real helper install on Windows writes HKCU; it runs only on CI');
+  } else {
+    console.log('\n--- native npm CLI provenance ---');
+    withTempHome('mcp-native-hostile-npm-cli', (fixture) => {
+      const sentinelPath = path.join(fixture.root, 'untrusted-npm-ran.txt');
+      const untrustedNpmCli = path.join(fixture.root, 'untrusted', 'npm', 'bin', 'npm-cli.js');
+      writeText(
+        untrustedNpmCli,
+        `require('node:fs').writeFileSync(${JSON.stringify(sentinelPath)}, 'executed');\n`,
+      );
 
-    const installResult = runCli(['install', '--native-host'], fixture, {
-      env: { npm_execpath: untrustedNpmCli },
-    });
-    assertEqual(
-      installResult.status,
-      0,
-      'production install ignores an out-of-provenance absolute npm CLI candidate',
-    );
-    assert(
-      !fs.existsSync(sentinelPath),
-      'production install never executes an out-of-provenance npm CLI candidate',
-    );
+      const installResult = runCli(['install', '--native-host'], fixture, {
+        env: { npm_execpath: untrustedNpmCli },
+      });
+      assertEqual(
+        installResult.status,
+        0,
+        'production install ignores an out-of-provenance absolute npm CLI candidate',
+      );
+      assert(
+        !fs.existsSync(sentinelPath),
+        'production install never executes an out-of-provenance npm CLI candidate',
+      );
 
-    const uninstallResult = runCli(['uninstall', '--native-host'], fixture, {
-      env: { npm_execpath: untrustedNpmCli },
+      const uninstallResult = runCli(['uninstall', '--native-host'], fixture, {
+        env: { npm_execpath: untrustedNpmCli },
+      });
+      assertEqual(
+        uninstallResult.status,
+        0,
+        'production uninstall has no npm CLI resolution or materialization dependency',
+      );
+      assert(
+        !fs.existsSync(sentinelPath),
+        'production uninstall never executes an inherited npm CLI candidate',
+      );
     });
-    assertEqual(
-      uninstallResult.status,
-      0,
-      'production uninstall has no npm CLI resolution or materialization dependency',
-    );
-    assert(
-      !fs.existsSync(sentinelPath),
-      'production uninstall never executes an inherited npm CLI candidate',
-    );
-  });
 
-  withTempHome('mcp-native-invalid-npm-cli', (fixture) => {
-    const installResult = runCli(['install', '--native-host'], fixture, {
-      env: { npm_execpath: path.join(fixture.root, 'not-npm.js') },
+    withTempHome('mcp-native-invalid-npm-cli', (fixture) => {
+      const installResult = runCli(['install', '--native-host'], fixture, {
+        env: { npm_execpath: path.join(fixture.root, 'not-npm.js') },
+      });
+      assertEqual(
+        installResult.status,
+        0,
+        'production install resolves a trusted npm CLI when the inherited candidate is invalid',
+      );
+      const uninstallResult = runCli(['uninstall', '--native-host'], fixture, {
+        env: { npm_execpath: path.join(fixture.root, 'not-npm.js') },
+      });
+      assertEqual(
+        uninstallResult.status,
+        0,
+        'production uninstall remains available when the inherited npm candidate is invalid',
+      );
     });
-    assertEqual(
-      installResult.status,
-      0,
-      'production install resolves a trusted npm CLI when the inherited candidate is invalid',
-    );
-    const uninstallResult = runCli(['uninstall', '--native-host'], fixture, {
-      env: { npm_execpath: path.join(fixture.root, 'not-npm.js') },
-    });
-    assertEqual(
-      uninstallResult.status,
-      0,
-      'production uninstall remains available when the inherited npm candidate is invalid',
-    );
-  });
+  }
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
