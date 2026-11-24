@@ -86,7 +86,7 @@ function createHarness(initialStore, options) {
     window: { addEventListener() {} },
     navigator: {},
     console,
-    Date: { now: () => now },
+    Date: opts.realDate ? Date : { now: () => now },
     setTimeout(fn, delay) {
       const timer = { id: nextTimerId++, fn, delay, cleared: false };
       timers.push(timer);
@@ -106,6 +106,10 @@ function createHarness(initialStore, options) {
   const testFooter = `
     globalThis.__ONBOARDING_AGENT_PROVIDER_TEST__ = {
       state,
+      els,
+      handlers,
+      bindInteractions,
+      renderStepper,
       copyCommand,
       persistCopyClick,
       flushCopyWrites: function () { return copyClickMutationTail; },
@@ -313,6 +317,96 @@ function createHarness(initialStore, options) {
     await harness.api.flushCopyWrites();
     assert.strictEqual(harness.calls.set, 0, 'failed read does not attempt a malformed write');
     assert.strictEqual(renderCount, 1, 'swallowed storage rejection adds no render');
+  }
+
+  console.log('--- rail ticks follow the live key state after an in-place reset ---');
+  {
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+    // Drives the real bound handlers; a render redraws only the rail, so its markup can be read back.
+    function railHarness() {
+      const harness = createHarness({}, { realDate: true });
+      const { api } = harness;
+      const nodes = { innerHTML: '' };
+      Object.assign(api.els, {
+        nodes,
+        stepLabel: { textContent: '' },
+        trackFill: { style: {} },
+        screen: { querySelector: () => null }
+      });
+      api.setRender(() => api.renderStepper());
+      api.bindInteractions();
+      const handler = (selector, eventName) => {
+        const entry = api.handlers.find((item) => item.selector === selector && item.eventName === eventName);
+        assert(entry, selector + ' ' + eventName + ' is bound');
+        return entry.handler;
+      };
+      // The rail button for a step, as currently drawn.
+      const tick = (step) => {
+        const tag = (nodes.innerHTML.match(new RegExp('<button [^>]*data-step="' + step + '"[^>]*>')) || [])[0];
+        assert(tag, step + ' has a rail tick');
+        return {
+          disabled: /\sdisabled(?=[\s>])/.test(tag),
+          aria: (tag.match(/aria-label="([^"]*)"/) || [])[1],
+          dataset: { step }
+        };
+      };
+      return { harness, api, handler, tick, press: handler('.fsb-depth-go[data-step]', 'click') };
+    }
+
+    // BYOK: a validated key has moved on to Pin; the rail goes back to API Key and the key is edited.
+    {
+      const { harness, api, handler, tick, press } = railHarness();
+      Object.assign(api.state, { path: 'byok', provider: 'xai', apiKey: 'xai-good', keyStatus: 'valid', screen: 'pin' });
+      api.renderStepper();
+      press({}, tick('apikey'));
+      assert.strictEqual(api.state.screen, 'apikey', 'the back tick returns to API Key');
+      const staleDone = tick('done');
+      assert.strictEqual(staleDone.disabled, false, 'with a valid key the Done tick is open');
+
+      handler('#obKeyInput', 'input')({ target: { value: 'xai-good1' } });
+      assert.strictEqual(api.state.keyStatus, 'idle', 'one keystroke resets the key status in place');
+      assert.strictEqual(tick('done').disabled, true, 'the in-place reset closes the Done tick');
+      assert.strictEqual(tick('done').aria, 'Done, not reached yet', 'the Done tick says it is not reached');
+      assert.strictEqual(tick('pin').disabled, true, 'the in-place reset closes the Pin tick');
+      assert.strictEqual(tick('provider').disabled, false, 'the back tick to Provider stays open');
+      assert.strictEqual(tick('provider').aria, 'Back to Provider', 'the back tick keeps its label');
+
+      // A tick drawn before the edit still reads as enabled; the press must ask the live state.
+      press({}, staleDone);
+      await flush();
+      assert.strictEqual(api.state.screen, 'apikey', 'a stale Done tick does not leave an unvalidated key');
+      assert.strictEqual(harness.store.fsbOnboardingCompleted, undefined, 'a stale Done tick does not finish onboarding');
+      assert.strictEqual(harness.calls.set, 0, 'a stale Done tick writes nothing');
+
+      press({}, tick('provider'));
+      assert.strictEqual(api.state.screen, 'provider', 'back ticks still go back');
+      assert.strictEqual(tick('pin').disabled, true, 'a forward jump from Provider stops at the unanswered key');
+      press({}, tick('apikey'));
+      assert.strictEqual(api.state.screen, 'apikey', 'a forward tick reaches the step that needs an answer');
+
+      api.state.keyStatus = 'valid';
+      api.renderStepper();
+      press({}, tick('done'));
+      await flush();
+      assert.strictEqual(api.state.screen, 'done', 'once the key validates again the Done tick finishes');
+      assert.strictEqual(harness.store.fsbOnboardingCompleted, true, 'finishing records completion');
+      assert.strictEqual(harness.store.fsbOnboardingSkipped, false, 'a rail finish is not a skip');
+    }
+
+    // LM Studio: choosing another model resets the status in place the same way.
+    {
+      const { harness, api, handler, tick, press } = railHarness();
+      Object.assign(api.state, { path: 'byok', provider: 'lmstudio', lmstudioModel: 'model-a', keyStatus: 'valid', screen: 'apikey' });
+      api.renderStepper();
+      const staleDone = tick('done');
+      assert.strictEqual(staleDone.disabled, false, 'a validated LM Studio model opens the Done tick');
+      handler('#obLocalModelSelect', 'change')({ target: { value: 'model-b' } });
+      assert.strictEqual(tick('done').disabled, true, 'a new model closes the Done tick');
+      press({}, staleDone);
+      await flush();
+      assert.strictEqual(api.state.screen, 'apikey', 'a stale Done tick does not skip the new model check');
+      assert.strictEqual(harness.calls.set, 0, 'a stale Done tick writes nothing after a model change');
+    }
   }
 
   console.log('PASS onboarding-agent-provider-clicks.test.js');

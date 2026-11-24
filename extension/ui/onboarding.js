@@ -329,6 +329,20 @@
     return ahead;
   }
 
+  // Where a rail press on this step may go, read from the live state: 'back' to an earlier
+  // step on the route, 'forward' to a later one Next would reach, or '' when it may not go.
+  // The rail draws itself from this and a press asks it again, so the two never disagree,
+  // even when a key edit has reset the status in place without a render.
+  function railMove(step, r = route()) {
+    const here = r.indexOf(state.screen);
+    const currentIndex = Math.max(0, here);
+    const index = r.indexOf(step);
+    if (index < 0 || !STEPS.includes(step)) return '';
+    if (index < currentIndex) return 'back';
+    if (index > currentIndex && reachableAhead(r, here).has(step)) return 'forward';
+    return '';
+  }
+
   function stepBy(dir) {
     if (dir > 0) goNext();
     else goBack();
@@ -420,12 +434,12 @@
       els.cueText.textContent = state.nudge
         || (state.screen === 'welcome' ? ob('entry_cue_begin', 'Begin') : stepLabel(state.screen));
     }
-    const ahead = reachableAhead(r, r.indexOf(state.screen));
     const html = r.map((step, index) => {
       const done = index < currentIndex;
       const current = index === currentIndex;
-      const back = done && STEPS.includes(step);
-      const forward = !done && !current && ahead.has(step);
+      const move = railMove(step, r);
+      const back = move === 'back';
+      const forward = move === 'forward';
       const reachable = back || forward;
       const label = stepLabel(step);
       const cls = done ? ' is-done' : current ? ' is-active' : '';
@@ -870,8 +884,9 @@
       if (state.screen === 'apikey') continueFromKey();
       else goNext();
     });
+    // Ask the live state, not the button's disabled flag, which can be out of date.
     bind('.fsb-depth-go[data-step]', 'click', (event, button) => {
-      if (!button.disabled) goTo(button.dataset.step);
+      if (railMove(button.dataset.step)) goTo(button.dataset.step);
     });
 
     bind('#obGetStarted', 'click', goNext);
@@ -934,6 +949,7 @@
       const nextButton = planes.apikey && planes.apikey.el.querySelector('[data-nav="next"]');
       if (nextButton) nextButton.disabled = !state.lmstudioModel;
       if (planes.apikey) planes.apikey.html = '';
+      renderStepper();
     });
     bind('#obRevealKey', 'click', () => { state.revealed = !state.revealed; render(); });
     bind('#obPasteKey', 'click', pasteFromClipboard);
@@ -1031,12 +1047,15 @@
   }
 
   // In-place status reset for the key/URL inputs, so a keystroke never re-renders.
-  // Only the status icon, message and the field's recoil/accept state depend on it.
+  // Only the status icon, message and the field's recoil/accept state depend on it,
+  // plus the rail: a key that is no longer valid closes the ticks past this step.
   // The plane's cached markup no longer matches, so the next render patches it in full.
   function resetKeyStatusIdle() {
     state.keyStatus = 'idle';
     state.keyMessage = '';
     if (planes.apikey) planes.apikey.html = '';
+    // The stepper never touches a plane or the focus, so the caret stays in the field.
+    renderStepper();
     const provider = currentProvider();
     const field = els.screen.querySelector('.ob3-field');
     const icon = els.screen.querySelector('.ob-status');
