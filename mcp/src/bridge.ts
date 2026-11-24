@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import WebSocket from 'ws';
@@ -27,7 +27,9 @@ import {
   readBridgeAuthState,
 } from './bridge-auth.js';
 import { logBridgeEvent } from './bridge-events.js';
+import { probeDaemonHealth } from './daemon-health.js';
 import { makeExtError, parseExtFrame } from './ext-protocol.js';
+import { NATIVE_HOST_HEALTH_TIMEOUT_MS } from './native-host/constants.js';
 
 interface PendingRequest {
   resolve: (value: MCPResponse) => void;
@@ -54,6 +56,89 @@ interface ActiveExtRequest {
 interface ActiveRelayedExtRequest {
   hubSocket: WebSocket;
   abortController: AbortController;
+}
+
+/**
+ * Which process should own the hub port when the long-lived local service is
+ * running.
+ *
+ * That service (`fsb-mcp-server serve`, which the browser starts through the
+ * native host and which listens on 7226) outlives the MCP clients that come
+ * and go, so the extension's requests are best answered there. A stdio server
+ * therefore gives way to it: it joins as a relay instead of binding the hub
+ * port while the service is up, and when it does hold the port it hands it
+ * over once the service asks and nothing is in flight.
+ */
+export interface DaemonHandoffOptions {
+  /**
+   * Port of the service's loopback /health endpoint. Set it on a bridge that
+   * should give way to the service. Left unset, the bridge competes for the
+   * hub port as it always has and refuses every takeover request.
+   */
+  daemonHealthPort?: number | null;
+  /**
+   * This bridge belongs to the service itself. It takes the port without
+   * promotion jitter, and once claimHub() has been called it asks any hub it
+   * relays through to hand the port over.
+   */
+  daemon?: boolean;
+  /** How long a /health check may take before the service counts as down. */
+  daemonProbeTimeoutMs?: number;
+  /** How often a hub that has agreed to hand over re-checks whether it is idle. */
+  hubHandoffPollMs?: number;
+  /** How long a hub waits for the service to bind after releasing the port. */
+  hubHandoffTimeoutMs?: number;
+}
+
+export type WebSocketBridgeOptions = BridgeOptions & DaemonHandoffOptions;
+
+/**
+ * Hub-side progress of a handover to the service.
+ *   verifying -- the request's proof matched; checking that it really came
+ *                from the process serving the service's /health.
+ *   waiting   -- agreed; waiting for this hub to be idle.
+ *   released  -- the listening socket is closed and the service was told to
+ *                bind. Every accepted socket is still open and served here.
+ *   draining  -- the service holds the port; waiting to be idle once more
+ *                before closing the sockets so everyone moves across.
+ */
+interface HubHandoff {
+  successorId: string;
+  socket: WsWebSocket;
+  phase: 'verifying' | 'waiting' | 'released' | 'draining';
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+// Relays are not authenticated -- relay:hello carries only an instance id --
+// so a takeover request proves its sender can read the bridge pairing secret
+// in ~/.fsb/bridge-auth.json (owner-only, the same file the extension's
+// pairing code comes from). The proof is an HMAC over the hub's and the
+// relay's instance ids and a fresh nonce, keyed with that secret, so it cannot
+// be replayed against another hub or on behalf of another relay. The hub also
+// confirms the requester is the relay the service's own /health reports.
+const HUB_HANDOFF_PROOF_CONTEXT = 'fsb-relay-yield-to-daemon-v1';
+const HUB_HANDOFF_NONCE_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+const HUB_HANDOFF_PROOF_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const DEFAULT_HUB_HANDOFF_POLL_MS = 100;
+const DEFAULT_HUB_HANDOFF_TIMEOUT_MS = 5_000;
+// A relay that was told which process takes over reconnects this soon; the
+// new hub is already listening by the time the old one closes its sockets.
+const HUB_HANDOFF_RECONNECT_MS = 50;
+// How many promotions in a row may be skipped because the service looks up
+// without any hub being reachable. Past that the bridge binds the port itself,
+// so a service that is up but not taking the port cannot leave nobody as hub.
+const DAEMON_DEFERRAL_LIMIT = 3;
+const DAEMON_DEFERRAL_RECONNECT_MS = 250;
+
+function hubHandoffProof(
+  sessionSecret: string,
+  hubInstanceId: string,
+  relayInstanceId: string,
+  nonce: string,
+): string {
+  return createHmac('sha256', Buffer.from(sessionSecret, 'base64url'))
+    .update(`${HUB_HANDOFF_PROOF_CONTEXT}\n${hubInstanceId}\n${relayInstanceId}\n${nonce}`)
+    .digest('base64url');
 }
 
 // The three error messages this file's disconnect paths reject in-flight
@@ -153,7 +238,26 @@ export class WebSocketBridge {
   private lastDisconnectReason: string | null = null;
   private extensionAttachment: ExtensionAttachmentState | null = null;
 
-  constructor(options: BridgeOptions = {}) {
+  // Handing the hub port to the long-lived local service
+  private daemonHealthPort: number | null;
+  private isDaemon: boolean;
+  private daemonProbeTimeoutMs: number;
+  private hubHandoffPollMs: number;
+  private hubHandoffTimeoutMs: number;
+  private hubHandoff: HubHandoff | null = null;
+  private hubClaimed = false;
+  private takeoverInFlight = false;
+  private daemonDeferrals = 0;
+  // The hub socket that announced it is handing over to another relay; when
+  // it closes this relay reconnects instead of competing for the port.
+  private handoffNoticeSocket: WebSocket | null = null;
+  // After this process took the hub over, its old relay socket stays open
+  // only to finish what was already sent through it.
+  private retiredHubConnection: WebSocket | null = null;
+  private retiredHubSockets = new WeakSet<WebSocket>();
+  private retiredRequestIds = new Set<string>();
+
+  constructor(options: WebSocketBridgeOptions = {}) {
     this.port = options.port ?? 7225;
     this.host = options.host ?? '127.0.0.1';
     if (!WebSocketBridge.isLoopbackBindHost(this.host)) {
@@ -183,6 +287,16 @@ export class WebSocketBridge {
     if (options.capabilities?.includes('agent-spawn') && !this.handleExtRequest) {
       console.error(`[FSB Bridge ${this.instanceId}] Ignoring agent-spawn capability without a handler`);
     }
+    this.isDaemon = options.daemon === true;
+    this.daemonHealthPort = !this.isDaemon
+      && Number.isInteger(options.daemonHealthPort)
+      && (options.daemonHealthPort as number) > 0
+      && (options.daemonHealthPort as number) <= 65_535
+      ? options.daemonHealthPort as number
+      : null;
+    this.daemonProbeTimeoutMs = options.daemonProbeTimeoutMs ?? NATIVE_HOST_HEALTH_TIMEOUT_MS;
+    this.hubHandoffPollMs = options.hubHandoffPollMs ?? DEFAULT_HUB_HANDOFF_POLL_MS;
+    this.hubHandoffTimeoutMs = options.hubHandoffTimeoutMs ?? DEFAULT_HUB_HANDOFF_TIMEOUT_MS;
   }
 
   private static isLoopbackBindHost(host: string): boolean {
@@ -196,8 +310,30 @@ export class WebSocketBridge {
   /**
    * Try to start as hub (WebSocket server on port 7225).
    * If the port is taken, fall back to relay mode (connect as client).
+   *
+   * A bridge that gives way to the local service first checks whether that
+   * service is up and ready; if it is, the service either holds the hub port
+   * or is about to take it, so this bridge joins as a relay without binding.
    */
   async connect(): Promise<void> {
+    if (await this._daemonIsReady()) {
+      console.error(`[FSB Bridge ${this.instanceId}] Local FSB service is running; joining its hub as a relay`);
+      try {
+        await this._startAsRelay({ promoteIfUnreachable: false });
+        return;
+      } catch {
+        // The service answered but no hub took the connection. Drop the
+        // failed socket and compete for the port the ordinary way.
+        const stale = this.hubConnection;
+        this.hubConnection = null;
+        try {
+          stale?.terminate();
+        } catch {
+          // Already closed.
+        }
+        console.error(`[FSB Bridge ${this.instanceId}] No hub answered as a relay; competing for port ${this.port}`);
+      }
+    }
     try {
       await this._startAsHub();
     } catch (err: unknown) {
@@ -236,6 +372,12 @@ export class WebSocketBridge {
         this.hubConnection = null;
       }
     }
+    if (this.retiredHubConnection) {
+      this.retiredHubConnection.close();
+      this.retiredHubConnection = null;
+    }
+    this.retiredRequestIds.clear();
+    this.handoffNoticeSocket = null;
 
     // Phase 239 plan 03 -- IMPORTANT: do NOT change the rejection of pendingRequests
     // on disconnect (lines below). The MCP server's run_task tool catches
@@ -337,6 +479,20 @@ export class WebSocketBridge {
       && this.relayActiveExtRequests.size === 0
       && this.messageOrigin.size === 0
       && this.pendingRequests.size === 0;
+  }
+
+  /**
+   * Called by the long-lived local service once it is ready to answer the
+   * extension. From then on, whenever this bridge is attached to a hub as a
+   * relay, it asks that hub to hand the port over. A hub that predates the
+   * request, or that is not set up to give way, simply keeps the port.
+   */
+  claimHub(): void {
+    if (!this.isDaemon) return;
+    this.hubClaimed = true;
+    if (this.mode === 'relay' && this.hubConnected && this.hubConnection) {
+      this._requestHubHandoff(this.hubConnection);
+    }
   }
 
   get topology(): BridgeTopologyState {
@@ -501,6 +657,7 @@ export class WebSocketBridge {
 
   /** Close every socket and server this process holds as hub. */
   private _closeHubSockets(): void {
+    this._clearHubHandoff();
     for (const [id, ws] of this.relayClients) {
       ws.close();
       this.relayClients.delete(id);
@@ -1031,6 +1188,7 @@ export class WebSocketBridge {
         this.relayCapabilities.delete(clientId);
         this._settleRoutesForRelay(clientId);
       }
+      if (this.hubHandoff?.socket === ws) this._onHandoffSuccessorClosed(this.hubHandoff);
 
       // Clean up messageOrigin entries for this client
       for (const [msgId, origin] of this.messageOrigin) {
@@ -1408,6 +1566,13 @@ export class WebSocketBridge {
       return;
     }
 
+    // Relay control frames are for the hub alone and are never passed on to
+    // the extension, including ones this version does not know.
+    if (typeof parsed.type === 'string' && parsed.type.startsWith('relay:')) {
+      this._handleRelayControlFrame(clientId, parsed);
+      return;
+    }
+
     if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
       const frame = parseExtFrame(parsed);
       if (frame?.type !== 'ext:event' && frame?.type !== 'ext:response') {
@@ -1469,7 +1634,14 @@ export class WebSocketBridge {
     this.connected = this.relayExtensionConnected;
   }
 
-  private _startAsRelay(): Promise<void> {
+  /**
+   * Connect to the hub as a relay. With promoteIfUnreachable false, a
+   * connection that never completes its handshake leaves the next step to the
+   * caller instead of competing for the port from its close handler.
+   */
+  private _startAsRelay(
+    { promoteIfUnreachable = true }: { promoteIfUnreachable?: boolean } = {},
+  ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.intentionalClose = false;
       this.mode = 'relay';
@@ -1478,6 +1650,7 @@ export class WebSocketBridge {
       this.relayExtensionConnected = false;
       this.connected = false;
 
+      let welcomed = false;
       let handshakeSettled = false;
       let handshakeTimer: ReturnType<typeof setTimeout> | null = null;
       const settleResolve = (): void => {
@@ -1532,12 +1705,22 @@ export class WebSocketBridge {
           return;
         }
 
+        // Once this process has taken the hub over, the old hub only finishes
+        // what was already sent through it; its view of the topology is stale.
+        if (this.retiredHubSockets.has(hubSocket)) {
+          this._handleRetiredHubMessage(hubSocket, parsed);
+          return;
+        }
+
         // Handle welcome handshake
         if (parsed.type === 'relay:welcome') {
           this._applyRelayState(parsed as unknown as RelayWelcome);
           this.reconnectDelay = 0;
+          this.daemonDeferrals = 0;
+          welcomed = true;
           console.error(`[FSB Bridge ${this.instanceId}] Relay mode: handshake complete, ready`);
           settleResolve();
+          if (this.hubClaimed) this._requestHubHandoff(hubSocket);
           return;
         }
 
@@ -1546,10 +1729,15 @@ export class WebSocketBridge {
           return;
         }
 
+        if (typeof parsed.type === 'string' && parsed.type.startsWith('relay:')) {
+          this._handleHubControlFrame(hubSocket, parsed);
+          return;
+        }
+
         if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
           const frame = parseExtFrame(parsed);
           if (frame?.type === 'ext:request') {
-            this._handleRelayedExtRequest(frame);
+            this._handleRelayedExtRequest(frame, hubSocket);
           } else if (
             frame?.type === 'ext:response'
             && frame.error?.code === 'bridge_topology_changed'
@@ -1573,7 +1761,16 @@ export class WebSocketBridge {
         for (const [id, route] of [...this.relayActiveExtRequests]) {
           if (route.hubSocket === hubSocket) this._abortRelayedExtRequest(id, hubSocket);
         }
+        if (this.retiredHubSockets.has(hubSocket)) {
+          if (this.retiredHubConnection === hubSocket) this._forgetRetiredHubConnection();
+          return;
+        }
+        const handedOff = this.handoffNoticeSocket === hubSocket;
+        if (handedOff) this.handoffNoticeSocket = null;
         if (this.hubConnection === hubSocket) this.hubConnection = null;
+        // A socket left behind once this process became hub, or once it opened
+        // a newer connection, says nothing about the current topology.
+        if (this.mode === 'hub' || this.hubConnection !== null) return;
         this.hubConnected = false;
         this.activeHubInstanceId = null;
         this.relayExtensionConnected = false;
@@ -1590,7 +1787,13 @@ export class WebSocketBridge {
         }
         this.progressListeners.clear();
 
-        if (!this.intentionalClose) {
+        if (this.intentionalClose) return;
+        if (handedOff) {
+          // The hub said which process takes over, and that process was
+          // already listening before this socket closed, so join it rather
+          // than race for the port.
+          this._scheduleRelayReconnect(HUB_HANDOFF_RECONNECT_MS);
+        } else if (welcomed || promoteIfUnreachable) {
           // Try to promote to hub or reconnect as relay
           this._attemptPromotion();
         }
@@ -1603,9 +1806,8 @@ export class WebSocketBridge {
     });
   }
 
-  private _handleRelayedExtRequest(request: ExtRequest): void {
-    const hubSocket = this.hubConnection;
-    if (!hubSocket || hubSocket.readyState !== WebSocket.OPEN) return;
+  private _handleRelayedExtRequest(request: ExtRequest, hubSocket: WebSocket): void {
+    if (hubSocket.readyState !== WebSocket.OPEN) return;
     if (this.relayActiveExtRequests.has(request.id)) {
       hubSocket.send(JSON.stringify(makeExtError(
         request.id,
@@ -1718,17 +1920,25 @@ export class WebSocketBridge {
   private async _attemptPromotion(): Promise<void> {
     // The jitter below means two overlapping callers would both wake up and
     // race to bind the same port, and the loser's failure path schedules yet
-    // another attempt.
-    if (this.intentionalClose || this.promotionInFlight) return;
+    // another attempt. A takeover already binding the port counts as one.
+    if (this.intentionalClose || this.promotionInFlight || this.takeoverInFlight) return;
     this.promotionInFlight = true;
 
     try {
-      // Random jitter to avoid thundering herd
-      const jitter = Math.floor(Math.random() * this.promotionJitterMs);
+      // Random jitter to avoid thundering herd. The local service skips it:
+      // it should be the one that ends up holding the port.
+      const jitter = this.isDaemon ? 0 : Math.floor(Math.random() * this.promotionJitterMs);
       console.error(`[FSB Bridge ${this.instanceId}] Attempting promotion in ${jitter}ms`);
 
       await new Promise(r => setTimeout(r, jitter));
 
+      if (this.intentionalClose) return;
+
+      if (await this._shouldLeavePortToDaemon()) {
+        console.error(`[FSB Bridge ${this.instanceId}] Local FSB service is running; leaving port ${this.port} to it`);
+        this._scheduleRelayReconnect(DAEMON_DEFERRAL_RECONNECT_MS);
+        return;
+      }
       if (this.intentionalClose) return;
 
       try {
@@ -1737,6 +1947,7 @@ export class WebSocketBridge {
         this.activeHubInstanceId = this.instanceId;
         this.relayExtensionConnected = false;
         this.relayCount = 0;
+        this.daemonDeferrals = 0;
         console.error(`[FSB Bridge ${this.instanceId}] Promoted to hub mode`);
       } catch (err: unknown) {
         if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
@@ -1752,17 +1963,28 @@ export class WebSocketBridge {
     }
   }
 
-  private _scheduleRelayReconnect(): void {
+  /**
+   * Reconnect as a relay after a delay. Without an explicit delay the wait
+   * backs off from 2s; an explicit one is used as given and leaves that
+   * backoff alone.
+   */
+  private _scheduleRelayReconnect(delayMs?: number): void {
     if (this.intentionalClose) return;
     if (this.reconnectTimer) return;
 
-    if (this.reconnectDelay === 0) {
-      this.reconnectDelay = Math.min(2_000, this.maxReconnectDelayMs);
+    let delay: number;
+    if (delayMs !== undefined) {
+      delay = delayMs;
     } else {
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelayMs);
+      if (this.reconnectDelay === 0) {
+        this.reconnectDelay = Math.min(2_000, this.maxReconnectDelayMs);
+      } else {
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelayMs);
+      }
+      delay = this.reconnectDelay;
     }
 
-    console.error(`[FSB Bridge ${this.instanceId}] Relay reconnect in ${this.reconnectDelay}ms`);
+    console.error(`[FSB Bridge ${this.instanceId}] Relay reconnect in ${delay}ms`);
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
       if (this.intentionalClose) return;
@@ -1772,6 +1994,382 @@ export class WebSocketBridge {
         // Failed to connect as relay, maybe try promotion again
         this._attemptPromotion();
       }
-    }, this.reconnectDelay);
+    }, delay);
+  }
+
+  // --------------------------------------------------------------------------
+  // Handing the hub port to the long-lived local service
+  // --------------------------------------------------------------------------
+
+  /** True when this bridge gives way to the local service and it reports ready. */
+  private async _daemonIsReady(): Promise<boolean> {
+    if (this.isDaemon || this.daemonHealthPort === null) return false;
+    const health = await probeDaemonHealth(this.daemonHealthPort, this.daemonProbeTimeoutMs);
+    return health?.serveReady === true;
+  }
+
+  /**
+   * Whether a promotion should leave the port to the local service, which
+   * binds without jitter. Bounded by DAEMON_DEFERRAL_LIMIT so that a service
+   * which is up but never takes the port cannot leave the bridge without a hub.
+   */
+  private async _shouldLeavePortToDaemon(): Promise<boolean> {
+    if (this.daemonDeferrals >= DAEMON_DEFERRAL_LIMIT) return false;
+    if (!(await this._daemonIsReady())) return false;
+    this.daemonDeferrals += 1;
+    return true;
+  }
+
+  /**
+   * Relay side: ask the hub for the port. The frame deliberately has no id. A
+   * hub from before this request passes frames it does not know on to the
+   * extension, which drops anything without an id, or answers with an id-less
+   * error when no extension is attached, which a relay ignores. Either way an
+   * old hub keeps the port and nothing else changes.
+   */
+  private _requestHubHandoff(hubSocket: WebSocket): void {
+    if (!this.isDaemon || hubSocket.readyState !== WebSocket.OPEN) return;
+    const hubInstanceId = this.activeHubInstanceId;
+    if (!hubInstanceId) return;
+    const state = readBridgeAuthState();
+    if (!state) {
+      console.error(`[FSB Bridge ${this.instanceId}] No bridge pairing secret; staying a relay of hub ${hubInstanceId}`);
+      return;
+    }
+    const nonce = randomBytes(16).toString('base64url');
+    hubSocket.send(JSON.stringify({
+      type: 'relay:yield-to-daemon',
+      nonce,
+      proof: hubHandoffProof(state.sessionSecret, hubInstanceId, this.instanceId, nonce),
+    }));
+    console.error(`[FSB Bridge ${this.instanceId}] Asked hub ${hubInstanceId} to hand the port over`);
+  }
+
+  /** Relay side: control frames from the hub. Unknown ones are ignored. */
+  private _handleHubControlFrame(hubSocket: WebSocket, frame: Record<string, unknown>): void {
+    if (this.hubConnection !== hubSocket) return;
+    switch (frame.type) {
+      case 'relay:yield-accepted':
+        console.error(`[FSB Bridge ${this.instanceId}] Hub agreed to hand the port over once idle`);
+        return;
+      case 'relay:yield-refused': {
+        const reason = typeof frame.reason === 'string' && /^[a-z_]{1,64}$/.test(frame.reason)
+          ? frame.reason
+          : 'unspecified';
+        console.error(`[FSB Bridge ${this.instanceId}] Hub kept the port (${reason})`);
+        return;
+      }
+      case 'relay:hub-released':
+        if (this.isDaemon && this.hubClaimed) void this._takeOverHub(hubSocket);
+        return;
+      case 'relay:handoff':
+        if (frame.successorInstanceId !== this.instanceId) this.handoffNoticeSocket = hubSocket;
+        return;
+      default:
+        return;
+    }
+  }
+
+  /**
+   * Relay side, local service only: the hub has closed its listening socket
+   * for this process. Bind the port, then tell the old hub, which keeps the
+   * extension and the other relays until it is idle and then sends them here.
+   * The old socket stays open meanwhile so that anything already sent through
+   * it -- in either direction -- still completes.
+   */
+  private async _takeOverHub(hubSocket: WebSocket): Promise<void> {
+    if (this.takeoverInFlight || this.mode !== 'relay' || this.hubConnection !== hubSocket) return;
+    this.takeoverInFlight = true;
+    let bound = false;
+    try {
+      await this._startAsHub();
+      bound = true;
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code ?? 'unknown';
+      console.error(`[FSB Bridge ${this.instanceId}] Could not take the hub port over (${code})`);
+    } finally {
+      this.takeoverInFlight = false;
+    }
+
+    if (!bound) {
+      if (hubSocket.readyState === WebSocket.OPEN && this.hubConnection === hubSocket) {
+        // _startAsHub clears this on a failed bind; the old hub is still here.
+        this.hubConnected = true;
+        hubSocket.send(JSON.stringify({ type: 'relay:hub-bind-failed' }));
+      } else if (this.hubConnection === null && this.mode === 'relay') {
+        // The old hub went away while the bind was failing.
+        void this._attemptPromotion();
+      }
+      return;
+    }
+
+    if (this.intentionalClose) {
+      this._closeHubServers();
+      this.mode = 'disconnected';
+      return;
+    }
+
+    this.retiredHubSockets.add(hubSocket);
+    this.retiredHubConnection = hubSocket;
+    this.retiredRequestIds = new Set(this.pendingRequests.keys());
+    if (this.hubConnection === hubSocket) this.hubConnection = null;
+    // No extension is attached to this hub yet; it moves here once the old
+    // hub closes its socket.
+    this.connected = false;
+    this.lastExtensionHeartbeatAt = null;
+    this.extensionAttachment = null;
+    this.extensionHeartbeatCount = 0;
+    this.reconnectDelay = 0;
+    this.daemonDeferrals = 0;
+    logBridgeEvent({ event: 'hub_taken_over', instanceId: this.instanceId });
+    console.error(`[FSB Bridge ${this.instanceId}] Took the hub port over`);
+    if (hubSocket.readyState === WebSocket.OPEN) {
+      hubSocket.send(JSON.stringify({ type: 'relay:hub-bound', hubInstanceId: this.instanceId }));
+    } else {
+      this._forgetRetiredHubConnection();
+    }
+  }
+
+  /** Relay side: a frame on the old hub's socket after this process took over. */
+  private _handleRetiredHubMessage(hubSocket: WebSocket, parsed: Record<string, unknown>): void {
+    if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
+      const frame = parseExtFrame(parsed);
+      if (frame?.type === 'ext:request') {
+        this._handleRelayedExtRequest(frame, hubSocket);
+      } else if (frame?.type === 'ext:response' && frame.error?.code === 'bridge_topology_changed') {
+        this._abortRelayedExtRequest(frame.id, hubSocket);
+      }
+      return;
+    }
+    if (typeof parsed.type === 'string' && parsed.type.startsWith('relay:')) return;
+    const response = parsed as unknown as MCPResponse;
+    if (typeof response.id !== 'string' || !this.retiredRequestIds.has(response.id)) return;
+    if (response.type !== 'mcp:progress') this.retiredRequestIds.delete(response.id);
+    this._handleRelayResponse(response);
+  }
+
+  /** The old hub's socket is gone; whatever was still waiting on it has failed. */
+  private _forgetRetiredHubConnection(): void {
+    this.retiredHubConnection = null;
+    for (const id of this.retiredRequestIds) {
+      const pending = this.pendingRequests.get(id);
+      if (!pending) continue;
+      clearTimeout(pending.timeout);
+      this.pendingRequests.delete(id);
+      this.progressListeners.delete(id);
+      pending.reject(new Error('Lost connection to hub'));
+    }
+    this.retiredRequestIds.clear();
+  }
+
+  /** Hub side: control frames from a relay. */
+  private _handleRelayControlFrame(clientId: string, frame: Record<string, unknown>): void {
+    const ws = this.relayClients.get(clientId);
+    if (!ws) return;
+    const handoff = this.hubHandoff;
+    switch (frame.type) {
+      case 'relay:yield-to-daemon':
+        this._handleHubYieldRequest(clientId, ws, frame);
+        return;
+      case 'relay:hub-bound':
+        if (handoff?.socket === ws && handoff.phase === 'released') {
+          if (handoff.timer) clearTimeout(handoff.timer);
+          handoff.timer = null;
+          handoff.phase = 'draining';
+          this._advanceHubHandoff(handoff);
+        }
+        return;
+      case 'relay:hub-bind-failed':
+        if (handoff?.socket === ws && handoff.phase === 'released') {
+          this._abortHubHandoff(handoff, 'bind_failed');
+        }
+        return;
+      default:
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped unknown relay control frame from ${clientId}`);
+    }
+  }
+
+  /**
+   * Hub side: the local service asks for the port. It is handed over only
+   * when this hub was set up to give way, the proof matches the bridge pairing
+   * secret, and the service's own /health names the asking relay as its
+   * bridge, attached to this hub.
+   */
+  private _handleHubYieldRequest(
+    clientId: string,
+    ws: WsWebSocket,
+    frame: Record<string, unknown>,
+  ): void {
+    const refuse = (reason: string): void => {
+      logBridgeEvent({ event: 'hub_yield_refused', instanceId: this.instanceId, reason });
+      console.error(`[FSB Bridge ${this.instanceId}] Keeping the hub port; request from ${clientId} refused (${reason})`);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'relay:yield-refused', reason }));
+      }
+    };
+
+    if (this.mode !== 'hub' || this.isDaemon || this.daemonHealthPort === null) {
+      refuse('not_offered');
+      return;
+    }
+    if (this.hubHandoff) {
+      if (this.hubHandoff.socket !== ws) refuse('handoff_in_progress');
+      return;
+    }
+    const keys = Object.keys(frame).sort();
+    const { nonce, proof } = frame;
+    if (
+      keys.length !== 3
+      || keys[0] !== 'nonce'
+      || keys[1] !== 'proof'
+      || keys[2] !== 'type'
+      || typeof nonce !== 'string'
+      || !HUB_HANDOFF_NONCE_PATTERN.test(nonce)
+      || typeof proof !== 'string'
+      || !HUB_HANDOFF_PROOF_PATTERN.test(proof)
+    ) {
+      refuse('invalid_request');
+      return;
+    }
+    const state = readBridgeAuthState();
+    if (!state) {
+      refuse('pairing_unavailable');
+      return;
+    }
+    const expected = Buffer.from(hubHandoffProof(state.sessionSecret, this.instanceId, clientId, nonce), 'utf8');
+    const candidate = Buffer.from(proof, 'utf8');
+    if (expected.length !== candidate.length || !timingSafeEqual(expected, candidate)) {
+      refuse('proof_mismatch');
+      return;
+    }
+
+    const handoff: HubHandoff = { successorId: clientId, socket: ws, phase: 'verifying', timer: null };
+    this.hubHandoff = handoff;
+    void this._confirmDaemonRelay(clientId).then((confirmed) => {
+      if (this.hubHandoff !== handoff) return;
+      if (!confirmed) {
+        this.hubHandoff = null;
+        refuse('daemon_unconfirmed');
+        return;
+      }
+      handoff.phase = 'waiting';
+      logBridgeEvent({ event: 'hub_yield_accepted', instanceId: this.instanceId });
+      console.error(`[FSB Bridge ${this.instanceId}] Local FSB service ${clientId} asked for the hub port; handing over once idle`);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'relay:yield-accepted', hubInstanceId: this.instanceId }));
+      }
+      this._advanceHubHandoff(handoff);
+    });
+  }
+
+  private async _confirmDaemonRelay(clientId: string): Promise<boolean> {
+    if (this.daemonHealthPort === null) return false;
+    const health = await probeDaemonHealth(this.daemonHealthPort, this.daemonProbeTimeoutMs);
+    return health !== null
+      && health.serveReady
+      && health.bridgeInstanceId === clientId
+      && health.bridgeMode === 'relay'
+      && health.activeHubInstanceId === this.instanceId;
+  }
+
+  /** Hub side: move the handover on once nothing is in flight. */
+  private _advanceHubHandoff(handoff: HubHandoff): void {
+    if (this.hubHandoff !== handoff || this.mode !== 'hub') return;
+    if (!this.isIdle()) {
+      const timer = setTimeout(() => {
+        handoff.timer = null;
+        this._advanceHubHandoff(handoff);
+      }, this.hubHandoffPollMs);
+      timer.unref?.();
+      handoff.timer = timer;
+      return;
+    }
+    if (handoff.phase === 'waiting') this._releaseHubPort(handoff);
+    else if (handoff.phase === 'draining') this._finishHubHandoff(handoff);
+  }
+
+  /**
+   * Hub side: free the port for the local service. Only the listening socket
+   * closes. The extension and every relay stay connected and served here, so
+   * nothing is cut short, and no other relay can take the port first: their
+   * sockets close only after the service is already listening.
+   */
+  private _releaseHubPort(handoff: HubHandoff): void {
+    if (handoff.socket.readyState !== WebSocket.OPEN) {
+      this._clearHubHandoff();
+      return;
+    }
+    handoff.phase = 'released';
+    try {
+      this.httpServer?.close();
+    } catch {
+      // Already closed.
+    }
+    handoff.socket.send(JSON.stringify({ type: 'relay:hub-released', hubInstanceId: this.instanceId }));
+    const timer = setTimeout(() => {
+      handoff.timer = null;
+      this._abortHubHandoff(handoff, 'bind_timeout');
+    }, this.hubHandoffTimeoutMs);
+    timer.unref?.();
+    handoff.timer = timer;
+  }
+
+  /**
+   * Hub side: the service never bound the port. Listen again; if something
+   * else took the port meanwhile, the listener's error handler drops every
+   * socket and competes for it the usual way.
+   */
+  private _abortHubHandoff(handoff: HubHandoff, reason: string): void {
+    if (this.hubHandoff !== handoff) return;
+    this._clearHubHandoff();
+    logBridgeEvent({ event: 'hub_yield_failed', instanceId: this.instanceId, reason });
+    console.error(`[FSB Bridge ${this.instanceId}] Hub handover to ${handoff.successorId} failed (${reason}); keeping the port`);
+    const server = this.httpServer;
+    if (this.mode !== 'hub' || !server || server.listening) return;
+    try {
+      server.listen(this.port, this.host);
+    } catch {
+      this._abandonHub('hub_server_error');
+      void this._attemptPromotion();
+    }
+  }
+
+  /** Hub side: the service holds the port and this hub is idle; send everyone there. */
+  private _finishHubHandoff(handoff: HubHandoff): void {
+    this._clearHubHandoff();
+    const notice = JSON.stringify({
+      type: 'relay:handoff',
+      hubInstanceId: this.instanceId,
+      successorInstanceId: handoff.successorId,
+    });
+    for (const [, ws] of this.relayClients) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(notice);
+    }
+    logBridgeEvent({ event: 'hub_yielded', instanceId: this.instanceId });
+    console.error(`[FSB Bridge ${this.instanceId}] Handed the hub over to ${handoff.successorId}; rejoining as a relay`);
+    this._abandonHub('hub_handed_off');
+    // The new hub is already listening. If it cannot be reached after all,
+    // the failed connection's close handler competes for the port as usual.
+    void this._startAsRelay().catch(() => undefined);
+  }
+
+  /** Hub side: the relay that asked for the port disconnected. */
+  private _onHandoffSuccessorClosed(handoff: HubHandoff): void {
+    if (this.hubHandoff !== handoff) return;
+    if (handoff.phase === 'released') {
+      this._abortHubHandoff(handoff, 'successor_lost');
+    } else if (handoff.phase !== 'draining') {
+      // Still verifying or waiting: nothing has changed yet. Once draining,
+      // the service already holds the port, so the handover carries on.
+      this._clearHubHandoff();
+    }
+  }
+
+  private _clearHubHandoff(): void {
+    const handoff = this.hubHandoff;
+    if (!handoff) return;
+    this.hubHandoff = null;
+    if (handoff.timer) clearTimeout(handoff.timer);
+    handoff.timer = null;
   }
 }

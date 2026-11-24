@@ -305,7 +305,12 @@ function printSetup() {
     console.log(lines.join('\n'));
 }
 async function runStdioServer() {
-    const runtime = createRuntime();
+    // A stdio server lives only as long as its MCP client, so it gives way to
+    // the long-lived local service on DEFAULT_HTTP_PORT: it joins that
+    // service's hub as a relay, and hands the hub port over when asked.
+    const runtime = createRuntime({
+        bridge: new WebSocketBridge({ daemonHealthPort: DEFAULT_HTTP_PORT }),
+    });
     const transport = new StdioServerTransport();
     await runtime.server.connect(transport);
     // Keep an installed local helper current. The check runs in a detached

@@ -11,12 +11,11 @@ import {
 import { resolveNativeHostPlatformLayout } from '../native-host-install/platform.js';
 import type {
   BridgeMode,
-  BridgeOptions,
   BridgeTopologyState,
   ExtEvent,
   ExtRequestHandler,
 } from '../types.js';
-import { WebSocketBridge } from '../bridge.js';
+import { WebSocketBridge, type WebSocketBridgeOptions } from '../bridge.js';
 import { startHttpServer, validateHttpBindHost } from '../http.js';
 import { pushMcpClientInventory } from '../client-inventory.js';
 import { TaskQueue } from '../queue.js';
@@ -62,6 +61,8 @@ export interface ServeDelegationBridge {
   connect(): Promise<void>;
   disconnect(): void;
   isIdle(): boolean;
+  /** Ask for the hub port once ready; a bridge without it never asks. */
+  claimHub?(): void;
   readonly currentMode: BridgeMode;
   readonly topology: BridgeTopologyState;
 }
@@ -107,7 +108,7 @@ export interface ServeStopRequest {
 }
 
 export interface ServeDelegationDependencies {
-  readonly createBridge?: (options: BridgeOptions) => ServeDelegationBridge;
+  readonly createBridge?: (options: WebSocketBridgeOptions) => ServeDelegationBridge;
   readonly createQueue?: () => unknown;
   readonly startHttp?: (options: {
     host: string;
@@ -717,9 +718,13 @@ export async function startServeDelegation(
     }
     return supervisor.handleExtRequest(request, emit, context);
   };
+  // This process is the long-lived local service: extension requests are
+  // best answered here rather than by stdio servers that come and go, so its
+  // bridge claims the hub port from a stdio hub once serve is ready.
   const bridge = dependencies.createBridge({
     capabilities: ['agent-spawn'],
     handleExtRequest,
+    daemon: true,
   });
   const queue = dependencies.createQueue();
 
@@ -747,6 +752,15 @@ export async function startServeDelegation(
   } catch {
     await closeStartupResources(supervisor, httpServer, bridge);
     throw new ServeDelegationStartupError();
+  }
+
+  // Ready to answer the extension, so ask a stdio hub (if one holds the port)
+  // to hand it over. Best effort: a hub that refuses or predates the request
+  // keeps the port and this process stays a relay.
+  try {
+    if (typeof bridge.claimHub === 'function') bridge.claimHub();
+  } catch {
+    // Staying a relay is a working state.
   }
 
   const readySupervisor = supervisor;
