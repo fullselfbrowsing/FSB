@@ -5,8 +5,9 @@ FSB has no password vault of its own. Logins and credit cards come from the user
 ## The rule
 
 1. Logins are entered through `fill_credential` ONLY. The model passes nothing secret: FSB picks the 1Password login whose saved website matches the tab's real URL. If several logins match, the call fails and returns the candidates (id, title, username); call again with `credential_id` set to one of those ids, or to an id from `list_credentials`.
+   - If nothing is saved for the site, FSB asks the user on the page to type a login in an FSB frame the page cannot read, and optionally save it to 1Password. The call waits up to 2 minutes; a success reports `by: "you"` and `savedTo1Password`, never the values. If the user declines, the call fails with `credential_not_provided`.
 2. One-time (TOTP) codes use the same tool. When the page shows a two-factor code field and the 1Password item has a one-time password, `fill_credential` fills the current code. Call it again on the code page after submitting the password.
-3. Credit cards are entered through `use_payment_method` ONLY, with a `payment_method_id` from `list_payment_methods`. FSB asks the user to approve the card (brand, last 4, merchant site from the tab URL) before it reads the card from 1Password and fills it. It never submits the payment.
+3. Credit cards are entered through `use_payment_method` ONLY, with a `payment_method_id` from `list_payment_methods`. Ask the user in the conversation first, naming the card (title, brand, last 4) and the merchant: FSB shows no prompt of its own over MCP. FSB fills only https pages, and only while the tab stays on the site it was on. It never submits the payment.
 4. No secrets in chat. The model MUST NOT echo a credential value, MUST NOT include one in tool args, MUST NOT log one in narration.
 5. `requires.env: []` is mandatory in `SKILL.md` frontmatter. The skill holds no secrets and no provider env vars. 1Password access is configured once in FSB (Passwords settings or `npx fsb-mcp-server onepassword`), not in the agent host.
 
@@ -37,6 +38,7 @@ The values are never returned to the MCP client, the agent host, or the model.
 
 ```
 [BAD]  Ask the user to paste a password or code into chat.
+[GOOD] Call fill_credential: with nothing saved, FSB asks the user on the page.
 [GOOD] Ask the user to save the login in 1Password, then call fill_credential.
 ```
 
@@ -48,7 +50,8 @@ The values are never returned to the MCP client, the agent host, or the model.
 
 ## When a fill fails
 
-- No 1Password login is saved for the site: report it and ask the user to add one in 1Password. Do not type credentials yourself.
+- No 1Password login is saved for the site: `fill_credential` already asks the user on the page. If it still fails with `credential_not_found` (FSB could not show the sheet there), ask the user to add a login in 1Password. Do not type credentials yourself.
+- `credential_not_provided`: the user declined or did not answer the on-page sheet. Do not call `fill_credential` again on your own; ask the user how they want to continue.
 - 1Password is not connected, or the vault list is empty: ask the user to connect 1Password in FSB's Passwords settings.
 - The call timed out on first use: the user may need to approve FSB in the 1Password app. Ask them to check, then retry once.
 

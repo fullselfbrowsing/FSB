@@ -1246,6 +1246,21 @@
         sendResponse({ success: true, ...pageReadiness });
         break;
 
+      // 1Password status pill and the typed-login sheet (vault-pill.js). Only
+      // the top frame draws it.
+      case 'vaultPill':
+        if (window !== window.top || !FSB.vaultPill) {
+          sendResponse({ success: false, shown: false });
+          break;
+        }
+        try {
+          const pillResult = FSB.vaultPill.apply(request.state);
+          sendResponse({ success: true, shown: !!(pillResult && pillResult.shown) });
+        } catch (pillError) {
+          sendResponse({ success: false, shown: false });
+        }
+        break;
+
       case 'sessionStatus':
         try {
           // [FSB Field Audit] Consumer: content script overlay renderer

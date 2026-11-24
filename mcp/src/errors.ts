@@ -55,7 +55,16 @@ const LAYER_LABELS = {
   pageNavigation: 'Page navigation',
   visualSession: 'Visual session contract',
   sessionLookup: 'Session lookup',
+  vault: '1Password',
+  vaultFill: '1Password fill refused',
 } as const;
+
+// Error codes from the 1Password tools (fill_credential, use_payment_method,
+// list_credentials, list_payment_methods). Each gets its own guidance, so an
+// agent never reads one as a page problem and retries. None of them ever
+// carries a secret value.
+const VAULT_ERROR_CODE = /^(onepassword_[a-z_]+|credential_[a-z_]+|payment_[a-z_]+|card_[a-z_]+|page_changed|merchant_changed|invalid_request)$/;
+const NEVER_IN_CHAT = 'Never ask for a password, one-time code or card number in chat, and never type one with type_text.';
 
 const CODE_ONLY_ERROR_KEYS = new Set([
   'NO_OWNED_TAB',
@@ -148,6 +157,9 @@ function resolveErrorKey(
   // guard suppresses the duplicate "Raw error:" line. INV-01: no MCP tool schema
   // is touched -- this is only the error passthrough regex.
   if (explicitCode && /^(TRIGGER_.+|RECIPE_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UNAVAILABLE|REFRESH_POLL_INTERVAL_TOO_LOW)$/.test(explicitCode)) {
+    return explicitCode;
+  }
+  if (explicitCode && VAULT_ERROR_CODE.test(explicitCode)) {
     return explicitCode;
   }
 
@@ -398,6 +410,99 @@ function buildLayeredDetail(
           ? fsbResult.recoveryHint
           : 'Use list_sessions to see historical sessions, or get_task_status to check for an active session.',
       };
+    case 'credential_not_found':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'No 1Password login is saved for this site.',
+        nextAction: `Tell the user. They can save a login for this site in 1Password, then you call fill_credential again. ${NEVER_IN_CHAT}`,
+      };
+    case 'credential_not_provided':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'The user did not sign in; nothing was filled.',
+        nextAction: `Do not call fill_credential again on your own. Ask the user how they want to continue, for example by signing in on the page themselves. ${NEVER_IN_CHAT}`,
+      };
+    case 'credential_needs_https':
+      return {
+        detected: LAYER_LABELS.vaultFill,
+        why: errorMsg || 'The login is saved for the https site, and this page is plain http.',
+        nextAction: `Do not retry on this page. Tell the user the sign-in page is not https. ${NEVER_IN_CHAT}`,
+      };
+    case 'credential_domain_mismatch':
+      return {
+        detected: LAYER_LABELS.vaultFill,
+        why: errorMsg || 'That login is not saved for the site in the tab.',
+        nextAction: 'Call list_credentials and pass the credential_id of a login saved for this site, or call fill_credential without one.',
+      };
+    case 'payment_not_approved':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'The card fill was not approved.',
+        nextAction: `Do not retry the fill. Tell the user the card was not filled and ask how they want to continue. ${NEVER_IN_CHAT}`,
+      };
+    case 'payment_method_not_found':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'That card is not in the vaults FSB may use.',
+        nextAction: 'Call list_payment_methods and pass one of its ids.',
+      };
+    case 'card_requires_https':
+      return {
+        detected: LAYER_LABELS.vaultFill,
+        why: errorMsg || 'Cards are filled only on https pages.',
+        nextAction: 'Do not retry on this page. Tell the user the checkout is not on https.',
+      };
+    case 'page_changed':
+    case 'merchant_changed':
+      return {
+        detected: LAYER_LABELS.vaultFill,
+        why: errorMsg || 'The tab moved to another site before the fill; nothing was filled.',
+        nextAction: 'Check the page with read_page. Call the tool again only if the tab is on the site the user meant.',
+      };
+    case 'onepassword_timeout':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || '1Password did not answer in time.',
+        nextAction: 'The 1Password app may be asking the user to approve FSB. Ask them to check it, then retry once.',
+      };
+    case 'onepassword_bridge_offline':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'FSB cannot reach its local server, which holds the 1Password connection.',
+        nextAction: 'Ask the user to install or start the FSB local server (npx fsb-mcp-server install --native-host). Do not retry until they have.',
+      };
+    case 'onepassword_bridge_unpaired':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'FSB is not paired with its local server.',
+        nextAction: 'Ask the user to open FSB settings so FSB pairs with the local server, then retry once.',
+      };
+    case 'onepassword_server_outdated':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'The FSB local server is too old for 1Password.',
+        nextAction: 'Ask the user to update fsb-mcp-server, then retry.',
+      };
+    case 'onepassword_rate_limited':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || '1Password is rate limiting requests.',
+        nextAction: 'Wait a minute before the next 1Password call.',
+      };
+    case 'onepassword_not_configured':
+    case 'onepassword_no_vaults':
+    case 'onepassword_save_vault_missing':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || '1Password is not set up in FSB yet.',
+        nextAction: 'Ask the user to connect 1Password in FSB settings and allow at least one vault. Do not retry until they have.',
+      };
+    case 'onepassword_auth_failed':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || '1Password did not let FSB sign in.',
+        nextAction: 'Ask the user to unlock 1Password or approve FSB in the 1Password app, then retry once.',
+      };
     case 'no_active_tab':
       return {
         detected: LAYER_LABELS.pageNavigation,
@@ -405,6 +510,13 @@ function buildLayeredDetail(
         nextAction: `Use ${formatRecoveryToolList(validRecoveryTools)} to open or switch to a normal website tab, then retry.`,
       };
     default:
+      if (VAULT_ERROR_CODE.test(errorKey)) {
+        return {
+          detected: LAYER_LABELS.vault,
+          why: errorMsg || `Tool returned error code: ${errorKey}.`,
+          nextAction: `Tell the user what happened and ask how to continue; do not retry in a loop. ${NEVER_IN_CHAT}`,
+        };
+      }
       return {
         detected: LAYER_LABELS.pageNavigation,
         why: errorMsg
@@ -469,6 +581,11 @@ export function mapFSBError(
     `Next action: ${detail.nextAction}`,
   ].join('\n');
   text = appendRawError(text, errorMsg, errorKey);
+  if (VAULT_ERROR_CODE.test(errorKey)) {
+    const tail: Record<string, unknown> = { errorCode: errorKey };
+    if (typeof fsbResult?.reason === 'string') tail.reason = fsbResult.reason;
+    text = `${text}\n\n${JSON.stringify(tail)}`;
+  }
 
   // Log to stderr for MCP server-side debugging
   console.error(`[FSB MCP] Tool error: key=${errorKey} raw="${errorMsg}"`);

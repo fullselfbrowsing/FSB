@@ -4822,5 +4822,579 @@
   },
   "copy_264681c742": {
     "message": "Сохранить в 1Password"
+  },
+  "entry_vault_checking": {
+    "message": "Проверяем 1Password"
+  },
+  "entry_vault_signing_1p": {
+    "message": "Входим с данными из 1Password"
+  },
+  "entry_vault_filled_1p": {
+    "message": "Заполнено из 1Password"
+  },
+  "entry_vault_signing_typed": {
+    "message": "Выполняем вход"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "введено вами · не отправлено в $CLIENT$",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "введено вами · не отправлено агенту"
+  },
+  "entry_vault_filled_saved": {
+    "message": "Заполнено · сохранено в 1Password"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "Заполнено · не сохранено"
+  },
+  "entry_vault_cancelled": {
+    "message": "Отменено · ничего не заполнено"
+  },
+  "entry_vault_page_changed": {
+    "message": "Страница изменилась · ничего не заполнено"
+  },
+  "entry_vault_several": {
+    "message": "Подходящих данных для входа: $COUNT$ · $CLIENT$ спросит вас",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "Подходящих данных для входа: $COUNT$ · агент спросит вас",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "Логин"
+  },
+  "entry_vault_chip_password": {
+    "message": "Пароль"
+  },
+  "entry_vault_chip_code": {
+    "message": "Код"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "Войти"
+  },
+  "entry_vault_sheet_user": {
+    "message": "Эл. почта или логин"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "Скрыть пароль"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "Не сохраняется · сейф для новых данных для входа не выбран"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "Пауза"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· нажмите, чтобы продолжить ввод"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "Частично закрыто страницей"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "Использовать 1Password"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "Добавьте в 1Password"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "Сохраните данные для входа на этот сайт в 1Password и продолжите."
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "Ввести здесь"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "Для этого сайта пока ничего не сохранено."
+  },
+  "entry_vault_approve": {
+    "message": "Разрешите FSB в 1Password"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "ждём вас"
+  },
+  "entry_vault_entering_code": {
+    "message": "Вводим код"
+  },
+  "entry_vault_one_time_code": {
+    "message": "одноразовый код"
+  },
+  "entry_vault_not_https": {
+    "message": "Не заполнено · страница не https"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "Не заполнено · для карт нужен https"
+  },
+  "entry_vault_locked": {
+    "message": "1Password заблокирован"
+  },
+  "entry_vault_unlock": {
+    "message": "разблокируйте, чтобы продолжить"
+  },
+  "entry_vault_unreachable": {
+    "message": "Нет связи с 1Password"
+  },
+  "entry_vault_filling_card": {
+    "message": "Заполняем карту"
+  },
+  "entry_vault_card_filled": {
+    "message": "Карта заполнена · проверьте и оплатите"
+  },
+  "entry_vault_chip_number": {
+    "message": "Номер"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "Срок"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "CVC-код"
+  },
+  "entry_vault_chip_name": {
+    "message": "Имя"
+  },
+  "copy_e86c3bc142": {
+    "message": "Какой аккаунт?"
+  },
+  "copy_02451a3272": {
+    "message": "Войти как $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "Ввести вручную"
+  },
+  "copy_bfd402b2f6": {
+    "message": "Войти"
+  },
+  "copy_2a347f1933": {
+    "message": "Эл. почта или логин"
+  },
+  "copy_50eb1b1291": {
+    "message": "Вход выполнен с данными из 1Password"
+  },
+  "copy_edfed2d184": {
+    "message": "Вход на $DOMAIN$ выполнен",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "Сохранено в 1Password"
+  },
+  "copy_22b3467c1b": {
+    "message": "Не сохранено"
+  },
+  "copy_8a56b97150": {
+    "message": "Вход пропущен"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB продолжит без входа."
+  },
+  "copy_735479c991": {
+    "message": "Карта заполнена на $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$. Проверьте и оплатите.",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "Вы отказались от заполнения карты"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "Из 1Password ничего не прочитано."
+  },
+  "copy_db8bc38f4b": {
+    "message": "Время на заполнение карты истекло"
+  },
+  "copy_58723d2bab": {
+    "message": "Заполнить карту?"
+  },
+  "copy_a2d285b352": {
+    "message": "Отклонить"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "Заполнить карту"
+  },
+  "copy_2a48c44dfa": {
+    "message": "На $DOMAIN$ не заполнено",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "Страница не https."
+  },
+  "copy_5decaf89b7": {
+    "message": "Страница изменилась, ничего не заполнено"
+  },
+  "copy_b41f042ed0": {
+    "message": "Вкладка перешла на другой сайт."
+  },
+  "copy_99955bb437": {
+    "message": "1Password не подключён"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB пока не может входить на сайты и заполнять карты."
+  },
+  "copy_5cbafe67aa": {
+    "message": "Открыть настройки сейфа"
+  },
+  "copy_270e420dd3": {
+    "message": "эта страница"
+  },
+  "panel_5d55c415e3": {
+    "message": "Сейф"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB входит на сайты и заполняет оплату данными из вашего 1Password. Сам FSB не хранит пароли и карты."
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB заполняет формы оплаты картами из вашего 1Password."
+  },
+  "panel_a47c107d93": {
+    "message": "Токен хранится на этом компьютере в ~/.fsb/onepassword.json. Расширение никогда его не получает."
+  },
+  "panel_79761fb441": {
+    "message": "Использовать сервисный аккаунт"
+  },
+  "panel_caf0111717": {
+    "message": "Локальный сервер"
+  },
+  "panel_101f4d9537": {
+    "message": "Этот браузер"
+  },
+  "panel_87bdac40eb": {
+    "message": "Расширение FSB"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "Доступ"
+  },
+  "panel_22894e363f": {
+    "message": "Сейфы, доступные FSB"
+  },
+  "panel_5e05243ee1": {
+    "message": "Надёжнее всего сейф, который использует только FSB."
+  },
+  "panel_07ce99bab0": {
+    "message": "Правила входа"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "Берутся из каждой записи 1Password"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "Только на сайтах, сохранённых в данных для входа."
+  },
+  "panel_374082363f": {
+    "message": "Никогда с https на http."
+  },
+  "panel_059151ea45": {
+    "message": "Заполнение карт"
+  },
+  "panel_42e70101ec": {
+    "message": "Агент сначала спросит вас"
+  },
+  "panel_949603eecc": {
+    "message": "По MCP — в приложении агента. В автопилоте — на боковой панели."
+  },
+  "panel_33e5a068d8": {
+    "message": "Только на страницах https."
+  },
+  "panel_e8cb2edbc4": {
+    "message": "Что видят агенты"
+  },
+  "panel_107fa062ba": {
+    "message": "По MCP и в автопилоте"
+  },
+  "panel_c53616b513": {
+    "message": "Названия, логины, сайты, последние четыре цифры."
+  },
+  "panel_ed87d52230": {
+    "message": "Никогда — пароль, код или номер карты."
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "Записи"
+  },
+  "panel_f5b53d4968": {
+    "message": "После подключения"
+  },
+  "panel_543eb6e59b": {
+    "message": "Данные для входа"
+  },
+  "panel_a52fcbbc33": {
+    "message": "Карты"
+  },
+  "panel_3304ef1777": {
+    "message": "Поиск по названиям, логинам и сайтам"
+  },
+  "panel_5a80aae52c": {
+    "message": "Только чтение. Изменяйте данные для входа в 1Password."
+  },
+  "panel_547ca35987": {
+    "message": "Читается из 1Password только при заполнении, для сайта во вкладке."
+  },
+  "panel_2fdf0b746a": {
+    "message": "Данные для входа и карты появятся здесь, когда вы выберете хотя бы один сейф."
+  },
+  "panel_10c5739b95": {
+    "message": "Ждём подтверждения"
+  },
+  "panel_a424e33d90": {
+    "message": "Заблокирован"
+  },
+  "panel_5ad99230df": {
+    "message": "Недоступен"
+  },
+  "panel_dce083a2c4": {
+    "message": "Отклонено"
+  },
+  "panel_67a926f700": {
+    "message": "Не найден"
+  },
+  "panel_1d09faf925": {
+    "message": "Нужно обновить"
+  },
+  "panel_53f15ea2f2": {
+    "message": "Не сопряжено"
+  },
+  "panel_a06130a5a2": {
+    "message": "Слишком много запросов"
+  },
+  "panel_9f760ab207": {
+    "message": "Ждём вас"
+  },
+  "panel_8985693566": {
+    "message": "Ещё не подключено"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "Подключение к $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_009008e0d7": {
+    "message": "Подключено через приложение 1Password · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "Подключено через сервисный аккаунт"
+  },
+  "panel_4435385a73": {
+    "message": "Локальный сервер FSB не запущен"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "Приложение 1Password не найдено"
+  },
+  "panel_9d094cbe0c": {
+    "message": "Обновите локальный сервер"
+  },
+  "panel_b0545ee348": {
+    "message": "Сопрячь заново"
+  },
+  "panel_a904382fc7": {
+    "message": "Помедленнее"
+  },
+  "panel_12e12023d2": {
+    "message": "Не удалось связаться с 1Password"
+  },
+  "panel_a5ae6c601d": {
+    "message": "Разрешите FSB в приложении 1Password."
+  },
+  "panel_f83ab4c57f": {
+    "message": "Выберите сейфы, которые может читать FSB."
+  },
+  "panel_e5f973beb3": {
+    "message": "Всё остаётся на этом компьютере."
+  },
+  "panel_b33cf191b9": {
+    "message": "Настроено в терминале. При отключении сохранённый токен удаляется, поэтому FSB сначала спросит."
+  },
+  "panel_8ba387915f": {
+    "message": "Разблокируйте 1Password, чтобы продолжить. Настройки сохранены."
+  },
+  "panel_041a40019f": {
+    "message": "Установите локальный сервер FSB и повторите попытку."
+  },
+  "panel_40647b20fa": {
+    "message": "Пока вы не разрешите, FSB ничего не прочитает. Повторите попытку и разрешите FSB в 1Password."
+  },
+  "panel_942c783692": {
+    "message": "Установите его, войдите и включите Настройки > Разработчик > Интеграция с другими приложениями."
+  },
+  "panel_0233589be3": {
+    "message": "Этот fsb-mcp-server слишком старый для 1Password или не может загрузить SDK."
+  },
+  "panel_01ddad80a6": {
+    "message": "Сервер работает, но больше не доверяет этому браузеру. Повторное сопряжение это исправит."
+  },
+  "panel_1c3eb3d073": {
+    "message": "Слишком много запросов за короткое время. С вашим аккаунтом всё в порядке. Повторите через минуту."
+  },
+  "panel_89857dc659": {
+    "message": "1Password спрашивает, можно ли FSB им пользоваться. FSB ждёт до 75 секунд."
+  },
+  "panel_979a9a05cd": {
+    "message": "приложение"
+  },
+  "panel_69ce0728e7": {
+    "message": "спрашивает вас"
+  },
+  "panel_14493f5f54": {
+    "message": "заблокирован"
+  },
+  "panel_d7da083898": {
+    "message": "сервисный аккаунт"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password, затем локальный сервер FSB, затем этот браузер"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password, затем локальный сервер, недоступный этому браузеру"
+  },
+  "panel_845f928640": {
+    "message": "Личный"
+  },
+  "panel_535c99f759": {
+    "message": "Только FSB"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "Общий"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "Ваш личный сейф. Все записи ($COUNT$) станут доступны агентам.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "Общий с другими людьми. Все записи ($COUNT$) станут доступны агентам.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "Все записи этого сейфа ($COUNT$) станут доступны агентам.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "Весь сайт"
+  },
+  "panel_b20197643c": {
+    "message": "Точный домен"
+  },
+  "panel_8b8c047cc1": {
+    "message": "$COUNT$ для этого сайта",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "Одноразовый код"
+  },
+  "panel_c68b5649c4": {
+    "message": "адрес для счёта сохранён"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "адрес для счёта не сохранён"
+  },
+  "panel_fdee246866": {
+    "message": "Переносится пакетами по 10. Каждый пакет удаляется из FSB, когда 1Password подтвердит его."
+  },
+  "panel_72fe828489": {
+    "message": "Перенесено в 1Password. Данные для входа: $LOGINS$. Карты: $CARDS$. Старый сейф удалён.",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "Остановлено на полпути: перенесено $MOVED$, оставлено в FSB $KEPT$.",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "Отключить 1Password? FSB забудет свои настройки 1Password."
+  },
+  "panel_91fa9fd3cf": {
+    "message": "Отключить 1Password? FSB забудет свои настройки 1Password и удалит сохранённый токен сервисного аккаунта. Для повторного подключения снова понадобится терминал."
   }
 }

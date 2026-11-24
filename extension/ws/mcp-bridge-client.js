@@ -3175,11 +3175,43 @@ class MCPBridgeClient {
     }
     const params = (payload && payload.params) || payload || {};
     const itemId = typeof params.credentialId === 'string' ? params.credentialId : undefined;
+    const tabId = resolved.tabId;
+    const client = await this._visualClientLabel(tabId);
+    // With nothing saved for the site, the user may type a login on the page
+    // (askUser). The agent never sees what they type.
     return onePassword.fillLoginInTab(
-      resolved.tabId,
-      { itemId, requireUnique: true },
-      (tabId, message) => this._sendToContentScript(tabId, message),
+      tabId,
+      { itemId, requireUnique: true, askUser: true, client },
+      (target, message) => this._sendToContentScript(target, message),
+      this._vaultPillHooks(tabId, client),
     );
+  }
+
+  // The MCP client's display name for the tab ("Claude", "Codex", ...), as the
+  // visual session recorded it. Credential tools carry no client of their own.
+  async _visualClientLabel(tabId) {
+    try {
+      const key = 'mcpVisualSession:' + tabId;
+      const stored = chrome.storage && chrome.storage.session ? await chrome.storage.session.get(key) : null;
+      const entry = stored && stored[key];
+      return entry && typeof entry.client === 'string' ? entry.client : '';
+    } catch (_e) {
+      return '';
+    }
+  }
+
+  // Status pill updates for 1Password work on the tab, plus the toolbar key
+  // badge while the page asks the user to type a login.
+  _vaultPillHooks(tabId, client) {
+    const icon = globalThis.fsbActionIcon;
+    return {
+      status: async (state) => {
+        const asking = !!state && state.phase === 'ask';
+        if (icon && typeof icon.setAsking === 'function') icon.setAsking(tabId, asking);
+        const reply = await this._sendToContentScript(tabId, { action: 'vaultPill', state: { ...state, client } });
+        return reply && typeof reply === 'object' ? reply : null;
+      }
+    };
   }
 
   async _handleListPayments() {
@@ -3208,10 +3240,16 @@ class MCPBridgeClient {
     if (resolved.success === false) {
       return resolved;
     }
+    // Over MCP the agent asks the user in its own app before this call, so
+    // FSB shows status only (confirm: 'agent'); autopilot keeps the side panel.
+    const tabId = resolved.tabId;
+    const client = await this._visualClientLabel(tabId);
     return onePassword.fillCardInTab(
-      resolved.tabId,
+      tabId,
       String(paymentMethodId),
-      (tabId, message) => this._sendToContentScript(tabId, message),
+      (target, message) => this._sendToContentScript(target, message),
+      { confirm: 'agent' },
+      this._vaultPillHooks(tabId, client),
     );
   }
 }

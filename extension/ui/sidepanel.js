@@ -5584,13 +5584,6 @@ function removeLoginPrompt() {
   }
 }
 
-function removePaymentPrompt() {
-  const existing = document.getElementById('payment-prompt');
-  if (existing) {
-    existing.remove();
-  }
-}
-
 function getLatestThreadSessionRecord(sessionIndex, sessionStorage, threadHistorySessionId) {
   if (!threadHistorySessionId) return null;
 
@@ -6065,13 +6058,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (currentStatusMessage) {
           updateStatusMessage('Login page detected...');
         }
-        showLoginPrompt(request.domain, request.fields, request.canSave === true);
+        showLoginPrompt(request.domain, request.fields, request.canSave === true, request.candidates);
         sendResponse({ received: true });
       }
       return;
 
     case 'paymentFillConfirmation':
       showPaymentFillConfirmation(request);
+      // Tells the worker the prompt is on screen; without this answer it
+      // settles at once instead of waiting out the 2 minutes.
+      sendResponse({ shown: true });
+      return;
+
+    case 'vaultResultRow':
+      addVaultRow(request.row);
       break;
 
     case 'sessionStateEvent': {
@@ -6136,367 +6136,306 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Show inline login prompt in the chat
-function showLoginPrompt(domain, fields, canSave) {
-  // Prevent duplicate prompts if rapid loginDetected messages arrive
+// ---- 1Password prompts and result rows (autopilot) -------------------------
+// Design: the "FSB 1Password vault" handoff, SidePanel board. Every element
+// carries .vp (the design tokens in sidepanel.css). Rows and prompts show
+// metadata only: titles, usernames, sites, card brand and last 4.
+const VP_SVG = {
+  lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"></rect><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"></path></svg>',
+  eye: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="2.8"></circle></svg>',
+  ok: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"></path></svg>',
+  skip: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>',
+  card: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2.5"></rect><path d="M3 10.5h18M7 15h3"></path></svg>',
+  err: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg>',
+  warn: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 15.5H3z"></path><path d="M12 10v4.2M12 17h.01"></path></svg>',
+  moved: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"></path></svg>',
+  key: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"></rect><circle cx="12" cy="12" r="4.2"></circle></svg>',
+  clock: '<svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>'
+};
+
+function vpChip(field) {
+  if (field === 'username') return spHtml('Username');
+  if (field === 'password') return spHtml('Password');
+  if (field === 'one-time-code') return spHtml('Code');
+  return '';
+}
+
+function vpChips(fields) {
+  const seen = {};
+  const chips = (Array.isArray(fields) ? fields : []).map(vpChip).filter((chip) => {
+    if (!chip || seen[chip]) return false;
+    seen[chip] = true;
+    return true;
+  });
+  return chips.length ? `<div class="sp-chips">${chips.map((chip) => `<span class="fv-chip ok">${chip}</span>`).join('')}</div>` : '';
+}
+
+// A login page in an autopilot run. Several matching 1Password logins: pick
+// one (nothing to type). Nothing saved: type it once, and save it to
+// 1Password when FSB has a vault for new logins.
+function showLoginPrompt(domain, fields, canSave, candidates) {
   const existing = document.getElementById('login-prompt');
   if (existing) existing.remove();
 
-  // Complete any active status message
-  if (currentStatusMessage) {
-    completeStatusMessage('Login required', 'system');
-  }
-
   const container = document.createElement('div');
-  container.className = 'message login-prompt new';
+  container.className = 'vp sp-card fv-in';
   container.id = 'login-prompt';
-
-  const fieldLabel = (fields && fields.usernameType === 'email') ? 'Email' : 'Username / Email';
-
-  // Escape domain for safe HTML insertion
-  const safeDomain = domain ? escapeAttr(domain) : spHtml('this site');
-  // Saving goes to 1Password, and only when FSB has a vault to save into.
+  const safeDomain = domain ? escapeHtml(domain) : spHtml('this site');
   const allowSave = canSave === true;
-
-  container.innerHTML = `
-    <div class="login-prompt-header">
-      <i class="fas fa-lock"></i>
-      <span>${spHtml('Login Required')}</span>
-    </div>
-    <div class="login-prompt-domain">${safeDomain}</div>
-    <div class="login-prompt-subtext">${allowSave
-      ? spHtml('Enter your credentials to sign in. FSB can save them to 1Password for next time.')
-      : spHtml('Enter your credentials to sign in. FSB uses them once and does not store them.')}</div>
-    <div class="login-prompt-form">
-      <div class="login-prompt-field">
-        <label>${spHtml(fieldLabel)}</label>
-        <input type="text" id="loginPromptUsername" ${spAttr(fieldLabel, 'placeholder')} autocomplete="username">
-      </div>
-      <div class="login-prompt-field">
-        <label>${spHtml('Password')}</label>
-        <div class="login-prompt-password-wrapper">
-          <input type="password" id="loginPromptPassword" ${spAttr('Password', 'placeholder')} autocomplete="current-password">
-          <button type="button" class="login-prompt-eye" id="loginPromptTogglePw">
-            <i class="fas fa-eye"></i>
-          </button>
-        </div>
-      </div>
-      ${allowSave ? `<label class="login-prompt-save-label">
-        <input type="checkbox" id="loginPromptSave" checked>
-        <span>${spHtml('Save to 1Password')}</span>
-      </label>` : ''}
-      <div class="login-prompt-actions">
-        <button class="login-prompt-btn primary" id="loginPromptSubmit">${spHtml('Sign In')}</button>
-        <button class="login-prompt-btn ghost" id="loginPromptSkip">${spHtml('Skip')}</button>
-      </div>
-    </div>
-  `;
-
+  const options = Array.isArray(candidates) ? candidates.filter((c) => c && typeof c.id === 'string' && c.id) : [];
+  let chosen = options[0] || null;
   chatMessages.appendChild(container);
-  scrollToBottom();
 
-  // Remove 'new' class after animation
-  setTimeout(() => container.classList.remove('new'), 400);
-
-  // Focus username field
-  setTimeout(() => {
-    const usernameInput = document.getElementById('loginPromptUsername');
-    if (usernameInput) usernameInput.focus();
-  }, 100);
-
-  // Toggle password visibility
-  const toggleBtn = document.getElementById('loginPromptTogglePw');
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-      const pwField = document.getElementById('loginPromptPassword');
-      if (pwField) {
-        const isPassword = pwField.type === 'password';
-        pwField.type = isPassword ? 'text' : 'password';
-        const icon = toggleBtn.querySelector('i');
-        if (icon) icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
-      }
-    });
+  function chooseLabel() {
+    const button = document.getElementById('loginPromptChoose');
+    if (!button || !chosen) return;
+    button.innerHTML = `<span>${spHtml('Sign in as $NAME$', { name: chosen.username || chosen.title || '' })}</span>`;
   }
 
-  // Sign In button
-  const submitBtn = document.getElementById('loginPromptSubmit');
-  if (submitBtn) {
-    submitBtn.addEventListener('click', () => {
-      const username = document.getElementById('loginPromptUsername')?.value?.trim();
-      const password = document.getElementById('loginPromptPassword')?.value;
-      const save = allowSave && (document.getElementById('loginPromptSave')?.checked ?? false);
-
-      if (!username && !password) {
-        return;
-      }
-
-      // Send credentials to background
-      chrome.runtime.sendMessage({
-        action: 'loginFormSubmitted',
-        sessionId: currentSessionId,
-        domain: domain,
-        credentials: { username, password },
-        save: save
-      });
-
-      // Remove prompt from chat
-      container.remove();
-
-      // Add system message
-      addMessage('Signing in...', 'system');
-      addStatusMessage('Signing in...');
-    });
-  }
-
-  // Skip button
-  const skipBtn = document.getElementById('loginPromptSkip');
-  if (skipBtn) {
-    skipBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({
-        action: 'loginSkipped',
-        sessionId: currentSessionId
-      });
-
-      // Remove prompt
-      container.remove();
-      addMessage('Login skipped. Continuing automation...', 'system');
-      addStatusMessage('Continuing...');
-    });
-  }
-
-  // Handle Enter key in password field
-  const pwField = document.getElementById('loginPromptPassword');
-  if (pwField) {
-    pwField.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submitBtn?.click();
-      }
-    });
-  }
-}
-
-function showPaymentPrompt(domain, paymentPrompt) {
-  removePaymentPrompt();
-
-  const methods = Array.isArray(paymentPrompt?.methods) ? paymentPrompt.methods : [];
-  const available = paymentPrompt?.available === true && methods.length > 0;
-  const state = paymentPrompt?.state || (available ? 'available' : 'unavailable');
-  const container = document.createElement('div');
-  container.className = 'message payment-prompt new';
-  container.id = 'payment-prompt';
-
-  const safeDomain = domain ? escapeHtml(domain) : spHtml('this checkout');
-  const headerText = spHtml('Checkout Detected');
-  const sentDetail = paymentPrompt?.detail || paymentPrompt?.blockedReason;
-  const detailText = sentDetail ? escapeHtml(sentDetail) : spHtml('Saved payment methods are not available for this checkout.');
-  const stateLabelMap = {
-    no_saved_methods: 'No saved cards',
-    feature_disabled: 'Payments disabled',
-    vault_not_configured: 'Vault setup required',
-    vault_locked: 'Vault locked',
-    payment_locked: 'Payment access locked'
-  };
-  const stateLabel = spHtml(stateLabelMap[state] || 'Saved payments unavailable');
-  const primaryAction = paymentPrompt?.primaryAction || '';
-  const primaryActionLabel = paymentPrompt?.primaryActionLabel ? escapeHtml(paymentPrompt.primaryActionLabel) : spHtml('Open Payments');
-
-  if (!available) {
+  function renderChooser() {
     container.innerHTML = `
-      <div class="login-prompt-header">
-        <i class="fas fa-credit-card"></i>
-        <span>${headerText}</span>
-      </div>
-      <div class="login-prompt-domain">${safeDomain}</div>
-      <div class="payment-prompt-state">${stateLabel}</div>
-      <div class="login-prompt-subtext">${detailText}</div>
-      <div class="login-prompt-actions">
-        ${primaryAction ? `<button class="login-prompt-btn primary" id="paymentPromptPrimaryAction">${primaryActionLabel}</button>` : ''}
-        <button class="login-prompt-btn ghost" id="paymentPromptDismiss">${spHtml('Dismiss')}</button>
-      </div>
-    `;
-
-    chatMessages.appendChild(container);
-    scrollToBottom();
-    setTimeout(() => container.classList.remove('new'), 400);
-
-    const dismissBtn = document.getElementById('paymentPromptDismiss');
-    if (dismissBtn) {
-      dismissBtn.addEventListener('click', () => {
+      <p class="sp-t">${spHtml('Which account?')}</p>
+      <p class="sp-loc">${VP_SVG.lock}<span>${safeDomain}</span></p>
+      <div style="margin-top: 6px;">${options.map((c, i) => `
+        <button type="button" class="sp-opt${i === 0 ? ' on' : ''}" aria-pressed="${i === 0 ? 'true' : 'false'}" data-index="${i}">
+          <span class="fv-tile">${escapeHtml((String(c.title || c.username || '?').trim()[0] || '?').toUpperCase())}</span>
+          <span class="t"><b>${escapeHtml(c.title || '')}</b><span>${escapeHtml(c.username || '')}</span></span>
+          <span class="sp-radio"></span>
+        </button>`).join('')}</div>
+      <div class="sp-acts">
+        <button type="button" class="fv-btn primary tall" id="loginPromptChoose"><span>${spHtml('Sign in as $NAME$', { name: chosen.username || chosen.title || '' })}</span></button>
+        <button type="button" class="fv-btn quiet" id="loginPromptTypeInstead">${spHtml('Type it instead')}</button>
+      </div>`;
+    container.querySelectorAll('.sp-opt').forEach((option) => {
+      option.addEventListener('click', () => {
+        chosen = options[Number(option.dataset.index)] || chosen;
+        container.querySelectorAll('.sp-opt').forEach((other) => {
+          const on = other === option;
+          other.classList.toggle('on', on);
+          other.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        chooseLabel();
+      });
+    });
+    const chooseBtn = document.getElementById('loginPromptChoose');
+    if (chooseBtn) {
+      chooseBtn.addEventListener('click', () => {
+        if (!chosen) return;
+        chrome.runtime.sendMessage({ action: 'loginAccountChosen', sessionId: currentSessionId, itemId: chosen.id });
         container.remove();
+        addStatusMessage('Signing in...');
+      });
+    }
+    const typeBtn = document.getElementById('loginPromptTypeInstead');
+    if (typeBtn) typeBtn.addEventListener('click', renderTyping);
+  }
+
+  function renderTyping() {
+    container.innerHTML = `
+      <p class="sp-t">${spHtml('Sign in')}</p>
+      <p class="sp-loc">${VP_SVG.lock}<span>${safeDomain}</span></p>
+      <div class="sp-field first"><div class="box"><input type="text" id="loginPromptUsername" ${spAttr('Email or username', 'placeholder')} autocomplete="username"></div></div>
+      <div class="sp-field"><div class="box"><input type="password" id="loginPromptPassword" ${spAttr('Password', 'placeholder')} autocomplete="current-password"><button type="button" class="fv-icon-btn" id="loginPromptTogglePw" ${spAttr('Show password', 'aria-label')}>${VP_SVG.eye}</button></div></div>
+      ${allowSave ? `<div class="sp-save"><span>${spHtml('Save to 1Password')}</span><button type="button" class="fv-switch on" id="loginPromptSave" aria-pressed="true" ${spAttr('Save to 1Password', 'aria-label')}></button></div>` : ''}
+      <div class="sp-acts row">
+        <button type="button" class="fv-btn ghost tall" id="loginPromptSkip">${spHtml('Skip')}</button>
+        <button type="button" class="fv-btn primary tall" id="loginPromptSubmit">${spHtml('Sign in')}</button>
+      </div>`;
+
+    setTimeout(() => {
+      const usernameInput = document.getElementById('loginPromptUsername');
+      if (usernameInput) usernameInput.focus();
+    }, 100);
+
+    const toggleBtn = document.getElementById('loginPromptTogglePw');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const pwField = document.getElementById('loginPromptPassword');
+        if (pwField) pwField.type = pwField.type === 'password' ? 'text' : 'password';
       });
     }
 
-    const primaryActionBtn = document.getElementById('paymentPromptPrimaryAction');
-    if (primaryActionBtn) {
-      primaryActionBtn.addEventListener('click', () => {
-        if (primaryAction === 'open_payments_section') {
-          openControlPanelSection('payments');
-        } else if (primaryAction === 'open_passwords_section') {
-          openControlPanelSection('passwords');
+    const saveSwitch = document.getElementById('loginPromptSave');
+    if (saveSwitch) {
+      saveSwitch.addEventListener('click', () => {
+        const on = !saveSwitch.classList.contains('on');
+        saveSwitch.classList.toggle('on', on);
+        saveSwitch.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
+    const submitBtn = document.getElementById('loginPromptSubmit');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', () => {
+        const username = document.getElementById('loginPromptUsername')?.value?.trim();
+        const password = document.getElementById('loginPromptPassword')?.value;
+        const saveNode = document.getElementById('loginPromptSave');
+        const save = allowSave && !!(saveNode && saveNode.classList.contains('on'));
+        if (!username && !password) return;
+        chrome.runtime.sendMessage({
+          action: 'loginFormSubmitted',
+          sessionId: currentSessionId,
+          domain: domain,
+          credentials: { username, password },
+          save: save
+        });
+        container.remove();
+        addStatusMessage('Signing in...');
+      });
+    }
+
+    const skipBtn = document.getElementById('loginPromptSkip');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'loginSkipped', sessionId: currentSessionId });
+        container.remove();
+        addVaultRow({ outcome: 'skipped' });
+        addStatusMessage('Continuing...');
+      });
+    }
+
+    const pwField = document.getElementById('loginPromptPassword');
+    if (pwField) {
+      pwField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitBtn?.click();
         }
       });
     }
-    return;
   }
 
-  const methodOptions = methods.map((method, index) => {
-    const brandLabelMap = {
-      visa: 'Visa',
-      mastercard: 'Mastercard',
-      amex: 'AmEx',
-      discover: 'Discover',
-      diners: 'Diners',
-      jcb: 'JCB'
-    };
-    const knownBrand = brandLabelMap[method.cardBrand];
-    const brandLabel = knownBrand ? escapeHtml(knownBrand) : spHtml('Unknown');
-    const title = method.nickname
-      ? escapeHtml(method.nickname)
-      : spHtml('$BRAND$ ending in $LAST$', { brand: knownBrand || { english: 'Unknown' }, last: method.last4 || '****' });
-    const expiry = method.expiryMonth && method.expiryYearLast2
-      ? ' | ' + spHtml('Exp $MONTH$/$YEAR$', { month: method.expiryMonth, year: method.expiryYearLast2 })
-      : '';
-    const subtitle = escapeHtml(method.maskedNumber || '****') + expiry;
-    const billing = method.billingSummary ? escapeHtml(method.billingSummary) : spHtml('Billing profile stored');
-    const brand = (method.cardBrand || 'unknown').replace(/[^a-z]/gi, '').toLowerCase() || 'unknown';
-    return `
-      <button class="payment-prompt-option ${index === 0 ? 'selected' : ''}" data-payment-id="${method.id}">
-        <div class="payment-prompt-option-top">
-          <span class="payment-card-brand ${brand}">${brandLabel}</span>
-          <span class="payment-prompt-option-title">${title}</span>
-        </div>
-        <div class="payment-prompt-option-subtitle">${subtitle}</div>
-        <div class="payment-prompt-option-billing">${billing}</div>
-      </button>
-    `;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="login-prompt-header">
-      <i class="fas fa-credit-card"></i>
-      <span>${headerText}</span>
-    </div>
-    <div class="login-prompt-domain">${safeDomain}</div>
-    <div class="login-prompt-subtext">${detailText}</div>
-    <div class="payment-prompt-options">${methodOptions}</div>
-    <div class="login-prompt-actions">
-      <button class="login-prompt-btn primary" id="paymentPromptFill">${spHtml('Fill Saved Card')}</button>
-      <button class="login-prompt-btn ghost" id="paymentPromptSkip">${spHtml('Skip')}</button>
-    </div>
-  `;
-
-  chatMessages.appendChild(container);
+  if (options.length > 1) renderChooser();
+  else renderTyping();
   scrollToBottom();
-  setTimeout(() => container.classList.remove('new'), 400);
+}
 
-  let selectedPaymentId = methods[0]?.id || null;
-  const optionButtons = container.querySelectorAll('.payment-prompt-option');
-  optionButtons.forEach((optionBtn) => {
-    optionBtn.addEventListener('click', () => {
-      optionButtons.forEach(btn => btn.classList.remove('selected'));
-      optionBtn.classList.add('selected');
-      selectedPaymentId = optionBtn.dataset.paymentId || null;
-    });
-  });
-
-  const fillBtn = document.getElementById('paymentPromptFill');
-  if (fillBtn) {
-    fillBtn.addEventListener('click', () => {
-      if (!selectedPaymentId) return;
-      chrome.runtime.sendMessage({
-        action: 'paymentMethodSelected',
-        sessionId: currentSessionId,
-        paymentMethodId: selectedPaymentId
-      });
-      container.remove();
-      addMessage('Saved payment method selected. FSB will fill the card details, but it will not submit the final payment for you.', 'system');
-      addStatusMessage('Filling saved card...');
-    });
+// One row in the chat per 1Password outcome, never a value.
+function vaultRowSpec(row) {
+  const site = typeof row.domain === 'string' && row.domain ? row.domain : { english: 'this site' };
+  switch (row.outcome) {
+    case 'signed_in_1p':
+      return { tone: 'ok', icon: VP_SVG.ok, title: spHtml('Signed in with 1Password'),
+        sub: escapeHtml([row.title, row.username].filter(Boolean).join(' · ')), chips: vpChips(row.chips) };
+    case 'signed_in_typed':
+      return { tone: 'ok', icon: VP_SVG.ok, title: spHtml('Signed in on $DOMAIN$', { domain: site }),
+        sub: row.saved === true ? spHtml('Saved to 1Password') : spHtml('Not saved') };
+    case 'skipped':
+      return { tone: '', icon: VP_SVG.skip, title: spHtml('Skipped the sign-in'), sub: spHtml('FSB carries on without it.') };
+    case 'card_filled':
+      return { tone: 'vault', icon: VP_SVG.card, title: spHtml('Card filled on $DOMAIN$', { domain: site }),
+        sub: spHtml('$CARD$ · $LAST4$. Review and pay.', { card: row.title || row.brand || '', last4: row.last4 || '' }) };
+    case 'card_declined':
+      return { tone: 'err', icon: VP_SVG.err, title: spHtml('You declined the card fill'), sub: spHtml('Nothing was read from 1Password.') };
+    case 'card_timeout':
+      return { tone: 'err', icon: VP_SVG.err, title: spHtml('The card fill timed out'), sub: spHtml('Nothing was read from 1Password.') };
+    case 'not_https':
+      return { tone: 'warn', icon: VP_SVG.warn, title: spHtml('Not filled on $DOMAIN$', { domain: site }), sub: spHtml('The page isn\'t https.') };
+    case 'page_changed':
+      return { tone: 'warn', icon: VP_SVG.moved, title: spHtml('Page changed, nothing filled'), sub: spHtml('The tab moved to another site.') };
+    case 'not_connected':
+      return { tone: 'err', icon: VP_SVG.key, title: spHtml('1Password isn\'t connected'), sub: spHtml('FSB can\'t sign in or fill cards yet.'),
+        action: spHtml('Open Vault settings'), onAction: () => openControlPanelSection('vault') };
+    default:
+      return null;
   }
+}
 
-  const skipBtn = document.getElementById('paymentPromptSkip');
-  if (skipBtn) {
-    skipBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({
-        action: 'paymentSkipped',
-        sessionId: currentSessionId
-      });
-      container.remove();
-      addMessage('Saved payment method skipped. Review the checkout form manually before any final payment step.', 'system');
-    });
+function addVaultRow(row) {
+  if (!row || typeof row !== 'object') return;
+  const spec = vaultRowSpec(row);
+  if (!spec) return;
+  const element = document.createElement('div');
+  element.className = 'vp sp-row fv-in';
+  element.innerHTML = `<span class="sp-row-ic${spec.tone ? ' ' + spec.tone : ''}">${spec.icon}</span>`
+    + `<div class="sp-row-t"><b>${spec.title}</b><span>${spec.sub}</span>${spec.chips || ''}`
+    + (spec.action ? `<button type="button" class="fv-btn ghost" data-vp-action>${spec.action}</button>` : '')
+    + '</div>';
+  chatMessages.appendChild(element);
+  if (spec.onAction) {
+    const button = element.querySelector('[data-vp-action]');
+    if (button) button.addEventListener('click', spec.onAction);
   }
+  scrollToBottom();
 }
 
 
 /**
- * Show payment fill confirmation overlay.
- * Called when AI autopilot invokes fill_payment_method -- background sends confirmation
- * request with card brand, last 4, and merchant domain. User must approve or deny.
+ * The card fill check in autopilot: a sheet that rises inside the side panel
+ * (design: SidePanel board, frame 3). The worker sends one request at a time;
+ * the answer echoes its request id, so one click approves exactly one fill.
+ * Fill card arms after 0.7 s, and the bar drains over the 2-minute limit.
  */
+let _vpPaymentSheet = null;
+const VP_PAYMENT_LIMIT_MS = 120000;
+
+function closePaymentSheet() {
+  if (!_vpPaymentSheet) return;
+  clearInterval(_vpPaymentSheet.timer);
+  clearTimeout(_vpPaymentSheet.arm);
+  _vpPaymentSheet.dim.remove();
+  _vpPaymentSheet.sheet.remove();
+  _vpPaymentSheet = null;
+}
+
+function paymentSheetMarkup(data) {
+  const brandNames = { visa: 'Visa', mastercard: 'Mastercard', amex: 'AmEx', discover: 'Discover', diners: 'Diners', jcb: 'JCB' };
+  const brandMarks = { visa: 'VISA', mastercard: 'MC', amex: 'AMEX', discover: 'DISC', diners: 'DC', jcb: 'JCB' };
+  const brandName = brandNames[data && data.cardBrand] || '';
+  const title = data && data.title ? escapeHtml(data.title) : (brandName ? escapeHtml(brandName) : spHtml('Card'));
+  const expiry = data && data.expiryMonth && data.expiryYearLast2
+    ? ` · ${escapeHtml(String(data.expiryMonth))}/${escapeHtml(String(data.expiryYearLast2))}` : '';
+  const merchant = data && data.merchantDomain ? escapeHtml(data.merchantDomain) : spHtml('this page');
+  return `<span class="sp-grab"></span>
+    <div class="sp-sh-top"><p class="sp-t">${spHtml('Fill your card?')}</p><span class="sp-timer">${VP_SVG.clock}<span data-vp-clock>2:00</span></span></div>
+    <p class="sp-loc">${VP_SVG.lock}<span>${merchant}</span></p>
+    <div class="sp-cardrow"><span class="sp-cc" aria-hidden="true"><span>${escapeHtml(brandMarks[data && data.cardBrand] || '')}</span></span><div><b>${title}</b><span>•••• ${escapeHtml(String((data && data.last4) || '****'))}${expiry}</span></div></div>
+    <div class="sp-acts row" style="margin-top: 16px;"><button type="button" class="fv-btn ghost tall" data-vp-decline>${spHtml('Decline')}</button><button type="button" class="fv-btn primary tall sp-arm" data-vp-fill disabled>${spHtml('Fill card')}<i></i></button></div>
+    <div class="sp-bar"><i></i></div>`;
+}
+
 function showPaymentFillConfirmation(data) {
-  const overlay = document.getElementById('paymentFillConfirmOverlay');
-  if (!overlay) return;
+  closePaymentSheet();
+  const requestId = data && typeof data.requestId === 'string' ? data.requestId : '';
+  const paymentMethodId = data && data.paymentMethodId;
+  const dim = document.createElement('div');
+  dim.className = 'vp sp-dim';
+  const header = document.querySelector('.sidepanel-header');
+  dim.style.top = (header ? Math.round(header.getBoundingClientRect().bottom) : 0) + 'px';
+  const sheet = document.createElement('div');
+  sheet.className = 'vp sp-sheet';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-label', spLine('Fill your card?'));
+  sheet.innerHTML = paymentSheetMarkup(data || {});
+  document.body.appendChild(dim);
+  document.body.appendChild(sheet);
 
-  const brandLabelMap = {
-    visa: 'Visa',
-    mastercard: 'Mastercard',
-    amex: 'AmEx',
-    discover: 'Discover',
-    diners: 'Diners',
-    jcb: 'JCB'
+  const started = Date.now();
+  const clock = sheet.querySelector('[data-vp-clock]');
+  const fillBtn = sheet.querySelector('[data-vp-fill]');
+  const declineBtn = sheet.querySelector('[data-vp-decline]');
+  const state = { dim, sheet, timer: null, arm: null };
+  _vpPaymentSheet = state;
+
+  const answer = (action) => {
+    if (_vpPaymentSheet !== state) return;
+    closePaymentSheet();
+    chrome.runtime.sendMessage({ action, paymentMethodId, requestId }).catch(() => {});
+    if (action === 'paymentFillDenied') addVaultRow({ outcome: 'card_declined' });
   };
-
-  const brandEl = document.getElementById('pfcBrand');
-  const last4El = document.getElementById('pfcLast4');
-  const domainEl = document.getElementById('pfcDomain');
-
-  // Brand names and the domain stay as sent; the words around them follow the
-  // UI language, including after a switch while the confirmation is open.
-  const brandName = brandLabelMap[data.cardBrand] || data.cardBrand;
-  const canMark = !!(globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function');
-  if (brandEl) {
-    if (canMark) fsbUiLocale.markExact(brandEl, brandName || 'Card');
-    else brandEl.textContent = brandName || 'Card';
-  }
-  if (last4El) last4El.textContent = '****' + (data.last4 || '****');
-  if (domainEl) {
-    const domainTemplate = data.merchantDomain ? 'on $DOMAIN$' : 'on this page';
-    const domainSubs = data.merchantDomain ? { domain: data.merchantDomain } : undefined;
-    if (canMark) fsbUiLocale.markExact(domainEl, domainTemplate, domainSubs);
-    else domainEl.textContent = spLine(domainTemplate, domainSubs);
-  }
-
-  overlay.classList.remove('hidden');
-
-  // Wire Allow button
-  const allowBtn = document.getElementById('pfcAllow');
-  const denyBtn = document.getElementById('pfcDeny');
-
-  function cleanup() {
-    overlay.classList.add('hidden');
-    if (allowBtn) allowBtn.removeEventListener('click', onAllow);
-    if (denyBtn) denyBtn.removeEventListener('click', onDeny);
-  }
-
-  function onAllow() {
-    cleanup();
-    chrome.runtime.sendMessage({
-      action: 'paymentFillApproved',
-      paymentMethodId: data.paymentMethodId
-    }).catch(() => {});
-  }
-
-  function onDeny() {
-    cleanup();
-    chrome.runtime.sendMessage({
-      action: 'paymentFillDenied',
-      paymentMethodId: data.paymentMethodId
-    }).catch(() => {});
-  }
-
-  if (allowBtn) allowBtn.addEventListener('click', onAllow);
-  if (denyBtn) denyBtn.addEventListener('click', onDeny);
+  state.timer = setInterval(() => {
+    const left = Math.max(0, Math.ceil((VP_PAYMENT_LIMIT_MS - (Date.now() - started)) / 1000));
+    if (clock) clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    if (left <= 0 && _vpPaymentSheet === state) {
+      closePaymentSheet();
+      addVaultRow({ outcome: 'card_timeout' });
+    }
+  }, 1000);
+  // Fill card takes clicks only after it has been on screen for a moment.
+  state.arm = setTimeout(() => { if (fillBtn) fillBtn.disabled = false; }, 700);
+  if (fillBtn) fillBtn.addEventListener('click', () => answer('paymentFillApproved'));
+  if (declineBtn) declineBtn.addEventListener('click', () => answer('paymentFillDenied'));
 }
 
 // Handle keyboard shortcuts

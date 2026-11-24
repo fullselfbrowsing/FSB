@@ -2826,6 +2826,113 @@ textarea.form-input {
   flex-wrap: wrap;
 }
 
+/* ==========================================
+   Vault page (1Password): from the "FSB 1Password vault" design handoff,
+   Main and VaultStates boards. Built only from the panel's own tokens.
+   ========================================== */
+#vault [hidden] { display: none !important; }
+#vault .save-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; transform: none; }
+#vault .settings-card-header .sync-status-pill { margin-left: auto; flex: none; }
+.vx-group { display: contents; }
+.vx-legacy { grid-column: 1 / -1; margin-bottom: 0; }
+.vx-legacy .credential-vault-header { margin-bottom: var(--space-md); }
+.vx-items { grid-column: 1 / -1; }
+.vx-small { font-size: 0.85rem; }
+.vx-cmd, .vx-service { margin-top: var(--space-md); }
+.vx-service .credential-vault-helper + .onepassword-command { margin-top: 6px; }
+
+/* where a secret goes: 1Password, the local server, this browser */
+.vx-path { display: flex; align-items: flex-start; }
+.vx-node { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 112px; text-align: center; }
+.vx-node-ic { position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: 4px; border-radius: var(--radius-md); background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--primary-color); font-size: 1.05rem; }
+.vx-node-ic.dim { opacity: 0.45; }
+.vx-node-ic.err { border-color: var(--error-color); color: var(--error-color); }
+.vx-node b { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+.vx-node span { font-family: 'Space Mono', 'SF Mono', monospace; font-size: 0.66rem; color: var(--text-muted); }
+.vx-node-ic .ping { position: absolute; inset: -1px; border-radius: var(--radius-md); border: 2px solid var(--primary-color); animation: vxPing 1.6s ease-out infinite; }
+.vx-node-ic .lk { position: absolute; right: -6px; top: -6px; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--warning-color); color: #fff; font-size: 0.55rem; border: 2px solid var(--bg-primary); }
+.vx-node-ic .ping[hidden], .vx-node-ic .lk[hidden], .vx-link b[hidden] { display: none; }
+.vx-link { position: relative; flex: none; width: 40px; height: 44px; }
+.vx-link::before { content: ''; position: absolute; left: -10px; right: -10px; top: 21px; height: 2px; border-radius: 1px; background: var(--border-hover); }
+.vx-link i { display: none; }
+.vx-link.ok::before { background: color-mix(in srgb, var(--primary-color) 45%, transparent); }
+.vx-link.ok i { display: block; position: absolute; left: -10px; top: 19px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-color); --run: 56px; animation: vxFlow 1.6s linear infinite; }
+.vx-link.ok i + i { animation-delay: 0.8s; }
+.vx-link.wait::before { background: repeating-linear-gradient(90deg, var(--border-hover) 0 4px, transparent 4px 8px); }
+.vx-link.bad::before { background: repeating-linear-gradient(90deg, var(--error-color) 0 5px, transparent 5px 9px); }
+.vx-link.bad b { position: absolute; left: 11px; top: 13px; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--bg-primary); color: var(--error-color); font-size: 0.7rem; }
+.vx-conn { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 32px; }
+.vx-conn .credential-vault-helper { max-width: 560px; }
+.vx-acts { display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-lg); flex-wrap: wrap; }
+.vx-linkbtn { border: 0; background: none; padding: 0 4px; color: var(--primary-color); font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.vx-setup { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; }
+.vx-setup .form-group { margin-bottom: var(--space-lg); }
+.vx-setup-b { padding-left: 32px; border-left: 1px solid var(--border-color); display: flex; flex-direction: column; gap: var(--space-md); }
+.vx-setup[hidden], .vx-conn[hidden], .vx-service[hidden] { display: none; }
+@media (max-width: 900px) {
+  .vx-setup, .vx-conn { grid-template-columns: minmax(0, 1fr); }
+  .vx-setup-b { padding-left: 0; border-left: 0; }
+}
+
+/* vault access rows: the panel's own .onepassword-vault-option, with its toggle in place of the checkbox and a plain-language tag */
+.vx-opt { gap: var(--space-md); transition: border-color var(--transition-fast); }
+.vx-opt:hover { border-color: var(--border-hover); }
+.vx-opt.on { border-color: color-mix(in srgb, var(--primary-color) 40%, transparent); }
+.vx-opt input { display: none; }
+.vx-opt input:checked + .toggle-track { background: var(--primary-color); }
+.vx-opt input:checked + .toggle-track .toggle-thumb { transform: translateX(20px); }
+.vx-opt .onepassword-vault-count { min-width: 72px; text-align: right; }
+.vx-tag { flex: none; padding: 3px 9px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: var(--bg-tertiary); color: var(--text-secondary); }
+.vx-tag.ok { background: rgba(16, 185, 129, 0.12); color: #047857; }
+.vx-tag.warn { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+[data-theme="dark"] .vx-tag.ok { color: #34d399; }
+[data-theme="dark"] .vx-tag.warn { color: #fbbf24; }
+.vx-warn { display: flex; align-items: flex-start; gap: 8px; margin: 8px 4px 2px; font-size: 0.8rem; line-height: 1.45; color: #b45309; }
+.vx-warn i { margin-top: 3px; }
+[data-theme="dark"] .vx-warn { color: #fbbf24; }
+.vx-save { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); align-items: end; margin-top: var(--space-lg); }
+.vx-save .form-group { margin: 0; }
+.vx-save label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: var(--text-primary); }
+.vx-save .save-btn { height: 46px; }
+.vx-card-focus { border-color: color-mix(in srgb, var(--primary-color) 55%, transparent) !important; box-shadow: var(--shadow-glow); }
+
+/* rule cards */
+.vx-rule { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--text-secondary); }
+.vx-rule + .vx-rule { margin-top: var(--space-sm); }
+
+/* items */
+.vx-tools { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); }
+.vx-tools[hidden] { display: none; }
+.vx-tools .credentials-toolbar { flex: 1 1 auto; margin: 0; }
+.vx-tools .site-graph-detail-toggle { flex: none; }
+.vx-tools .detail-btn { padding: 8px 14px; font-size: 0.8rem; }
+.vx-tools .detail-btn .n { margin-left: 6px; opacity: 0.75; }
+.vx-tools .detail-btn .n:empty { display: none; }
+.vx-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+.vx-list[hidden], .vx-ro[hidden], #vault .credentials-empty-state[hidden] { display: none; }
+.vx-list .credential-card-info { flex: 1 1 auto; min-width: 0; }
+.vx-meta { flex: none; display: flex; align-items: center; gap: 6px; }
+.vx-chip { flex: none; padding: 3px 9px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color); }
+.vx-chip.acc { background: var(--primary-light); color: var(--primary-color); border-color: transparent; }
+.vx-chip.warn { background: rgba(245, 158, 11, 0.14); color: #b45309; border-color: transparent; }
+[data-theme="dark"] .vx-chip.warn { color: #fbbf24; }
+.vx-vault { flex: none; width: 56px; text-align: right; font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vx-ro { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--space-md); font-size: 0.8rem; color: var(--text-muted); }
+.vx-cards .credential-card-icon { width: auto; min-width: 72px; background: transparent; }
+.vx-prog { display: flex; flex-direction: column; gap: 6px; }
+.vx-prog[hidden] { display: none; }
+.vx-bar { height: 6px; border-radius: 3px; background: var(--bg-tertiary); overflow: hidden; }
+.vx-bar i { display: block; height: 100%; border-radius: 3px; background: var(--primary-color); }
+.vx-bar-busy i { width: 34%; animation: vxBusy 1.4s ease-in-out infinite; }
+#vault .pin-input-container { justify-content: flex-start; margin: 4px 0 8px; }
+#vault .pin-digit { width: 44px; height: 52px; font-size: 22px; }
+@keyframes vxPing { from { transform: scale(0.7); opacity: 0.7; } to { transform: scale(1.9); opacity: 0; } }
+@keyframes vxFlow { from { transform: translateX(-12px); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } to { transform: translateX(var(--run)); opacity: 0; } }
+@keyframes vxBusy { from { transform: translateX(-110%); } to { transform: translateX(310%); } }
+@media (prefers-reduced-motion: reduce) {
+  .vx-node-ic .ping, .vx-link.ok i, .vx-bar-busy i { animation: none; }
+}
+
 /* PIN Input */
 .pin-input-container {
   display: flex;

@@ -29,7 +29,10 @@ const SCOPE = [
   'extension/ui/onboarding.js',
   'extension/ui/microphone-permission.html',
   'extension/ui/microphone-permission.js',
-  'extension/content/visual-feedback.js'
+  'extension/content/visual-feedback.js',
+  'extension/content/vault-pill.js',
+  'extension/ui/credential-sheet.html',
+  'extension/ui/credential-sheet.js'
 ];
 
 const UNTRANSLATED = new Set([

@@ -4822,5 +4822,579 @@
   },
   "copy_264681c742": {
     "message": "1Password に保存"
+  },
+  "entry_vault_checking": {
+    "message": "1Password を確認中"
+  },
+  "entry_vault_signing_1p": {
+    "message": "1Password でサインイン中"
+  },
+  "entry_vault_filled_1p": {
+    "message": "1Password から入力しました"
+  },
+  "entry_vault_signing_typed": {
+    "message": "サインイン中"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "あなたが入力 · $CLIENT$ には送信されません",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "あなたが入力 · エージェントには送信されません"
+  },
+  "entry_vault_filled_saved": {
+    "message": "入力済み · 1Password に保存しました"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "入力済み · 保存していません"
+  },
+  "entry_vault_cancelled": {
+    "message": "キャンセル · 何も入力していません"
+  },
+  "entry_vault_page_changed": {
+    "message": "ページが変わりました · 何も入力していません"
+  },
+  "entry_vault_several": {
+    "message": "$COUNT$ 件のログイン情報が一致 · $CLIENT$ が確認します",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "$COUNT$ 件のログイン情報が一致 · エージェントが確認します",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "ユーザー名"
+  },
+  "entry_vault_chip_password": {
+    "message": "パスワード"
+  },
+  "entry_vault_chip_code": {
+    "message": "コード"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "サインイン"
+  },
+  "entry_vault_sheet_user": {
+    "message": "メールアドレスまたはユーザー名"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "パスワードを隠す"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "保存しません · 新しいログイン情報の保存先の保管庫が未設定です"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "一時停止中"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· クリックして入力を続ける"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "ページで一部が隠れています"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "代わりに 1Password を使う"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "1Password に追加する"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "このサイトのログイン情報を 1Password に保存してから続行してください。"
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "代わりにここで入力する"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "このサイトにはまだ何も保存されていません。"
+  },
+  "entry_vault_approve": {
+    "message": "1Password で FSB を許可してください"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "あなたの操作待ち"
+  },
+  "entry_vault_entering_code": {
+    "message": "コードを入力中"
+  },
+  "entry_vault_one_time_code": {
+    "message": "ワンタイムコード"
+  },
+  "entry_vault_not_https": {
+    "message": "入力していません · ページが https ではありません"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "入力していません · カードには https が必要です"
+  },
+  "entry_vault_locked": {
+    "message": "1Password がロックされています"
+  },
+  "entry_vault_unlock": {
+    "message": "ロックを解除して続行"
+  },
+  "entry_vault_unreachable": {
+    "message": "1Password に接続できません"
+  },
+  "entry_vault_filling_card": {
+    "message": "カードを入力中"
+  },
+  "entry_vault_card_filled": {
+    "message": "カードを入力しました · 確認して支払う"
+  },
+  "entry_vault_chip_number": {
+    "message": "番号"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "有効期限"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "セキュリティコード"
+  },
+  "entry_vault_chip_name": {
+    "message": "名義"
+  },
+  "copy_e86c3bc142": {
+    "message": "どのアカウントですか？"
+  },
+  "copy_02451a3272": {
+    "message": "$NAME$ としてサインイン",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "代わりに入力する"
+  },
+  "copy_bfd402b2f6": {
+    "message": "サインイン"
+  },
+  "copy_2a347f1933": {
+    "message": "メールアドレスまたはユーザー名"
+  },
+  "copy_50eb1b1291": {
+    "message": "1Password でサインインしました"
+  },
+  "copy_edfed2d184": {
+    "message": "$DOMAIN$ にサインインしました",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "1Password に保存しました"
+  },
+  "copy_22b3467c1b": {
+    "message": "保存していません"
+  },
+  "copy_8a56b97150": {
+    "message": "サインインをスキップしました"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB はサインインせずに続行します。"
+  },
+  "copy_735479c991": {
+    "message": "$DOMAIN$ でカードを入力しました",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$。確認して支払ってください。",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "カードの入力を拒否しました"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "1Password からは何も読み取っていません。"
+  },
+  "copy_db8bc38f4b": {
+    "message": "カードの入力がタイムアウトしました"
+  },
+  "copy_58723d2bab": {
+    "message": "カードを入力しますか？"
+  },
+  "copy_a2d285b352": {
+    "message": "拒否"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "カードを入力"
+  },
+  "copy_2a48c44dfa": {
+    "message": "$DOMAIN$ では入力していません",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "ページが https ではありません。"
+  },
+  "copy_5decaf89b7": {
+    "message": "ページが変わったため何も入力していません"
+  },
+  "copy_b41f042ed0": {
+    "message": "タブが別のサイトに移動しました。"
+  },
+  "copy_99955bb437": {
+    "message": "1Password が接続されていません"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB はまだサインインやカードの入力ができません。"
+  },
+  "copy_5cbafe67aa": {
+    "message": "保管庫の設定を開く"
+  },
+  "copy_270e420dd3": {
+    "message": "このページ"
+  },
+  "panel_5d55c415e3": {
+    "message": "保管庫"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB は 1Password の項目を使ってサインインと支払いフォームの入力を行います。FSB 自体はパスワードやカードを保存しません。"
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB は 1Password のカードで支払いフォームを入力します。"
+  },
+  "panel_a47c107d93": {
+    "message": "トークンはこのコンピュータの ~/.fsb/onepassword.json に保存されます。拡張機能がそれを受け取ることはありません。"
+  },
+  "panel_79761fb441": {
+    "message": "代わりにサービスアカウントを使う"
+  },
+  "panel_caf0111717": {
+    "message": "ローカルサーバー"
+  },
+  "panel_101f4d9537": {
+    "message": "このブラウザ"
+  },
+  "panel_87bdac40eb": {
+    "message": "FSB 拡張機能"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "アクセス"
+  },
+  "panel_22894e363f": {
+    "message": "FSB が読み取れる保管庫"
+  },
+  "panel_5e05243ee1": {
+    "message": "FSB 専用の保管庫が最も安全です。"
+  },
+  "panel_07ce99bab0": {
+    "message": "サインインのルール"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "各 1Password 項目から取得"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "ログイン情報に保存されたサイトでのみ。"
+  },
+  "panel_374082363f": {
+    "message": "https から http へは絶対に入力しません。"
+  },
+  "panel_059151ea45": {
+    "message": "カードの入力"
+  },
+  "panel_42e70101ec": {
+    "message": "エージェントが先に確認します"
+  },
+  "panel_949603eecc": {
+    "message": "MCP 経由ではエージェント自身のアプリで、オートパイロットではサイドパネルで確認します。"
+  },
+  "panel_33e5a068d8": {
+    "message": "https のページのみ。"
+  },
+  "panel_e8cb2edbc4": {
+    "message": "エージェントに見えるもの"
+  },
+  "panel_107fa062ba": {
+    "message": "MCP 経由とオートパイロット"
+  },
+  "panel_c53616b513": {
+    "message": "タイトル、ユーザー名、サイト、末尾 4 桁。"
+  },
+  "panel_ed87d52230": {
+    "message": "パスワード、コード、カード番号は決して見えません。"
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "項目"
+  },
+  "panel_f5b53d4968": {
+    "message": "接続後"
+  },
+  "panel_543eb6e59b": {
+    "message": "ログイン"
+  },
+  "panel_a52fcbbc33": {
+    "message": "カード"
+  },
+  "panel_3304ef1777": {
+    "message": "タイトル、ユーザー名、サイトを検索"
+  },
+  "panel_5a80aae52c": {
+    "message": "読み取り専用です。ログイン情報は 1Password で編集してください。"
+  },
+  "panel_547ca35987": {
+    "message": "入力するときにのみ、タブのサイト向けに 1Password から読み取ります。"
+  },
+  "panel_2fdf0b746a": {
+    "message": "保管庫を 1 つ以上選ぶと、ここにログイン情報とカードが表示されます。"
+  },
+  "panel_10c5739b95": {
+    "message": "承認待ち"
+  },
+  "panel_a424e33d90": {
+    "message": "ロック中"
+  },
+  "panel_5ad99230df": {
+    "message": "接続できません"
+  },
+  "panel_dce083a2c4": {
+    "message": "拒否されました"
+  },
+  "panel_67a926f700": {
+    "message": "見つかりません"
+  },
+  "panel_1d09faf925": {
+    "message": "更新が必要"
+  },
+  "panel_53f15ea2f2": {
+    "message": "未ペアリング"
+  },
+  "panel_a06130a5a2": {
+    "message": "リクエスト過多"
+  },
+  "panel_9f760ab207": {
+    "message": "あなたの操作待ち"
+  },
+  "panel_8985693566": {
+    "message": "まだ接続されていません"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "$ACCOUNT$ に接続中",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_009008e0d7": {
+    "message": "1Password アプリ経由で接続 · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "サービスアカウントで接続"
+  },
+  "panel_4435385a73": {
+    "message": "FSB ローカルサーバーが動いていません"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "1Password アプリが見つかりません"
+  },
+  "panel_9d094cbe0c": {
+    "message": "ローカルサーバーを更新してください"
+  },
+  "panel_b0545ee348": {
+    "message": "もう一度ペアリング"
+  },
+  "panel_a904382fc7": {
+    "message": "少し待ってください"
+  },
+  "panel_12e12023d2": {
+    "message": "1Password に接続できませんでした"
+  },
+  "panel_a5ae6c601d": {
+    "message": "1Password アプリで FSB を許可してください。"
+  },
+  "panel_f83ab4c57f": {
+    "message": "FSB が読み取れる保管庫を選んでください。"
+  },
+  "panel_e5f973beb3": {
+    "message": "すべてこのコンピュータ内にとどまります。"
+  },
+  "panel_b33cf191b9": {
+    "message": "ターミナルから設定されています。切断すると保存済みのトークンが削除されるため、先に確認します。"
+  },
+  "panel_8ba387915f": {
+    "message": "続行するには 1Password のロックを解除してください。設定は保持されます。"
+  },
+  "panel_041a40019f": {
+    "message": "FSB ローカルサーバーをインストールしてから、もう一度お試しください。"
+  },
+  "panel_40647b20fa": {
+    "message": "許可するまで FSB は何も読み取れません。もう一度試して、1Password で FSB を許可してください。"
+  },
+  "panel_942c783692": {
+    "message": "インストールしてサインインし、設定 > 開発者 > 他のアプリと連携 をオンにしてください。"
+  },
+  "panel_0233589be3": {
+    "message": "この fsb-mcp-server は 1Password には古すぎるか、SDK を読み込めません。"
+  },
+  "panel_01ddad80a6": {
+    "message": "サーバーは動いていますが、このブラウザを信頼しなくなりました。もう一度ペアリングすると直ります。"
+  },
+  "panel_1c3eb3d073": {
+    "message": "短時間にリクエストが多すぎます。アカウントに問題はありません。1 分後にもう一度お試しください。"
+  },
+  "panel_89857dc659": {
+    "message": "1Password が FSB の使用を許可するか確認しています。FSB は最大 75 秒待ちます。"
+  },
+  "panel_979a9a05cd": {
+    "message": "デスクトップアプリ"
+  },
+  "panel_69ce0728e7": {
+    "message": "確認中"
+  },
+  "panel_14493f5f54": {
+    "message": "ロック中"
+  },
+  "panel_d7da083898": {
+    "message": "サービスアカウント"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password、次に FSB ローカルサーバー、次にこのブラウザ"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password、次にローカルサーバー（このブラウザから接続できません）"
+  },
+  "panel_845f928640": {
+    "message": "個人"
+  },
+  "panel_535c99f759": {
+    "message": "FSB 専用"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "共有"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "あなたの個人用保管庫です。$COUNT$ 件すべての項目がエージェントから使えるようになります。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "他の人と共有されています。$COUNT$ 件すべての項目がエージェントから使えるようになります。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "この保管庫の $COUNT$ 件すべての項目がエージェントから使えるようになります。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "サイト全体"
+  },
+  "panel_b20197643c": {
+    "message": "完全一致のドメイン"
+  },
+  "panel_8b8c047cc1": {
+    "message": "このサイトに $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "ワンタイムコード"
+  },
+  "panel_c68b5649c4": {
+    "message": "請求先住所あり"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "請求先住所なし"
+  },
+  "panel_fdee246866": {
+    "message": "10 件ずつ移動します。1Password が確認したまとまりから FSB から消去されます。"
+  },
+  "panel_72fe828489": {
+    "message": "1Password に移動しました。ログイン情報: $LOGINS$。カード: $CARDS$。古い保管庫は消去されました。",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "途中で停止しました: $MOVED$ 件を移動、$KEPT$ 件は FSB に残っています。",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "1Password を切断しますか？FSB は 1Password の設定を忘れます。"
+  },
+  "panel_91fa9fd3cf": {
+    "message": "1Password を切断しますか？FSB は 1Password の設定を忘れ、保存済みのサービスアカウントのトークンを削除します。再接続にはもう一度ターミナルが必要です。"
   }
 }

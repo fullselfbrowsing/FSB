@@ -154,6 +154,32 @@ export function bestWebsiteMatch(websites: unknown, target: HostTarget): MatchSt
   return best;
 }
 
+/**
+ * How each saved website of an item is matched, for display: the host, the
+ * 1Password autofill rule ("site" covers subdomains, "exact" does not), and
+ * the scheme it names (empty for a bare host). Never entries are skipped.
+ */
+export function websiteDetails(websites: unknown): Array<{ host: string; rule: 'site' | 'exact'; protocol: 'http' | 'https' | '' }> {
+  if (!Array.isArray(websites)) return [];
+  const seen = new Set<string>();
+  const out: Array<{ host: string; rule: 'site' | 'exact'; protocol: 'http' | 'https' | '' }> = [];
+  for (const website of websites) {
+    if (!website || typeof website !== 'object') continue;
+    const entry = website as WebsiteLike;
+    if (entry.autofillBehavior === 'Never') continue;
+    const parsed = parseHostTarget(entry.url);
+    if (!parsed) continue;
+    const host = parsed.port ? `${parsed.hostname}:${parsed.port}` : parsed.hostname;
+    const rule = entry.autofillBehavior === 'ExactDomain' ? 'exact' : 'site';
+    const protocol = parsed.protocol === 'http:' ? 'http' : parsed.protocol === 'https:' ? 'https' : '';
+    const key = `${protocol}|${host}|${rule}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ host, rule, protocol });
+  }
+  return out;
+}
+
 /** Hostnames to show for an item, deduplicated, skipping Never entries. */
 export function websiteHosts(websites: unknown): string[] {
   if (!Array.isArray(websites)) return [];

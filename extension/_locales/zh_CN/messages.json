@@ -4822,5 +4822,579 @@
   },
   "copy_264681c742": {
     "message": "保存到 1Password"
+  },
+  "entry_vault_checking": {
+    "message": "正在检查 1Password"
+  },
+  "entry_vault_signing_1p": {
+    "message": "正在使用 1Password 登录"
+  },
+  "entry_vault_filled_1p": {
+    "message": "已从 1Password 填写"
+  },
+  "entry_vault_signing_typed": {
+    "message": "正在登录"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "由你输入 · 不会发送给 $CLIENT$",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "由你输入 · 不会发送给你的代理"
+  },
+  "entry_vault_filled_saved": {
+    "message": "已填写 · 已保存到 1Password"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "已填写 · 未保存"
+  },
+  "entry_vault_cancelled": {
+    "message": "已取消 · 未填写任何内容"
+  },
+  "entry_vault_page_changed": {
+    "message": "页面已变化 · 未填写任何内容"
+  },
+  "entry_vault_several": {
+    "message": "$COUNT$ 个登录信息匹配 · $CLIENT$ 会询问你",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "$COUNT$ 个登录信息匹配 · 你的代理会询问你",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "用户名"
+  },
+  "entry_vault_chip_password": {
+    "message": "密码"
+  },
+  "entry_vault_chip_code": {
+    "message": "验证码"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "登录"
+  },
+  "entry_vault_sheet_user": {
+    "message": "邮箱或用户名"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "隐藏密码"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "不保存 · 未设置新登录信息的保险库"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "已暂停"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· 点击继续输入"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "被页面部分遮挡"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "改用 1Password"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "在 1Password 中添加"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "请在 1Password 中保存此网站的登录信息，然后继续。"
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "改为在此输入"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "此网站仍未保存任何内容。"
+  },
+  "entry_vault_approve": {
+    "message": "在 1Password 中批准 FSB"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "正在等你"
+  },
+  "entry_vault_entering_code": {
+    "message": "正在输入验证码"
+  },
+  "entry_vault_one_time_code": {
+    "message": "一次性验证码"
+  },
+  "entry_vault_not_https": {
+    "message": "未填写 · 页面不是 https"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "未填写 · 银行卡需要 https"
+  },
+  "entry_vault_locked": {
+    "message": "1Password 已锁定"
+  },
+  "entry_vault_unlock": {
+    "message": "解锁后继续"
+  },
+  "entry_vault_unreachable": {
+    "message": "无法连接 1Password"
+  },
+  "entry_vault_filling_card": {
+    "message": "正在填写银行卡"
+  },
+  "entry_vault_card_filled": {
+    "message": "已填写银行卡 · 请核对后付款"
+  },
+  "entry_vault_chip_number": {
+    "message": "卡号"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "有效期"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "安全码"
+  },
+  "entry_vault_chip_name": {
+    "message": "持卡人"
+  },
+  "copy_e86c3bc142": {
+    "message": "哪个账号？"
+  },
+  "copy_02451a3272": {
+    "message": "以 $NAME$ 登录",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "改为手动输入"
+  },
+  "copy_bfd402b2f6": {
+    "message": "登录"
+  },
+  "copy_2a347f1933": {
+    "message": "邮箱或用户名"
+  },
+  "copy_50eb1b1291": {
+    "message": "已使用 1Password 登录"
+  },
+  "copy_edfed2d184": {
+    "message": "已登录 $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "已保存到 1Password"
+  },
+  "copy_22b3467c1b": {
+    "message": "未保存"
+  },
+  "copy_8a56b97150": {
+    "message": "已跳过登录"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB 会在不登录的情况下继续。"
+  },
+  "copy_735479c991": {
+    "message": "已在 $DOMAIN$ 填写银行卡",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$。请核对后付款。",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "你拒绝了填写银行卡"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "未从 1Password 读取任何内容。"
+  },
+  "copy_db8bc38f4b": {
+    "message": "填写银行卡已超时"
+  },
+  "copy_58723d2bab": {
+    "message": "填写你的银行卡？"
+  },
+  "copy_a2d285b352": {
+    "message": "拒绝"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "填写银行卡"
+  },
+  "copy_2a48c44dfa": {
+    "message": "未在 $DOMAIN$ 填写",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "页面不是 https。"
+  },
+  "copy_5decaf89b7": {
+    "message": "页面已变化，未填写任何内容"
+  },
+  "copy_b41f042ed0": {
+    "message": "标签页已转到其他网站。"
+  },
+  "copy_99955bb437": {
+    "message": "1Password 未连接"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB 暂时无法登录或填写银行卡。"
+  },
+  "copy_5cbafe67aa": {
+    "message": "打开保险库设置"
+  },
+  "copy_270e420dd3": {
+    "message": "此页面"
+  },
+  "panel_5d55c415e3": {
+    "message": "保险库"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB 使用你 1Password 中的项目登录并填写结账信息。FSB 本身不存储任何密码或银行卡。"
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB 使用你 1Password 中的银行卡填写结账表单。"
+  },
+  "panel_a47c107d93": {
+    "message": "令牌保存在此电脑的 ~/.fsb/onepassword.json 中，扩展程序永远不会收到它。"
+  },
+  "panel_79761fb441": {
+    "message": "改用服务账号"
+  },
+  "panel_caf0111717": {
+    "message": "本地服务器"
+  },
+  "panel_101f4d9537": {
+    "message": "此浏览器"
+  },
+  "panel_87bdac40eb": {
+    "message": "FSB 扩展程序"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "访问权限"
+  },
+  "panel_22894e363f": {
+    "message": "FSB 可以读取的保险库"
+  },
+  "panel_5e05243ee1": {
+    "message": "仅供 FSB 使用的保险库最安全。"
+  },
+  "panel_07ce99bab0": {
+    "message": "登录规则"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "取自每个 1Password 项目"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "仅限登录信息中保存的网站。"
+  },
+  "panel_374082363f": {
+    "message": "绝不从 https 用到 http。"
+  },
+  "panel_059151ea45": {
+    "message": "填写银行卡"
+  },
+  "panel_42e70101ec": {
+    "message": "你的代理会先询问你"
+  },
+  "panel_949603eecc": {
+    "message": "通过 MCP 时在代理自己的应用中询问，自动驾驶时在侧边栏中询问。"
+  },
+  "panel_33e5a068d8": {
+    "message": "仅限 https 页面。"
+  },
+  "panel_e8cb2edbc4": {
+    "message": "代理能看到什么"
+  },
+  "panel_107fa062ba": {
+    "message": "通过 MCP 和自动驾驶"
+  },
+  "panel_c53616b513": {
+    "message": "标题、用户名、网站、后四位数字。"
+  },
+  "panel_ed87d52230": {
+    "message": "绝不会看到密码、验证码或卡号。"
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "项目"
+  },
+  "panel_f5b53d4968": {
+    "message": "连接之后"
+  },
+  "panel_543eb6e59b": {
+    "message": "登录信息"
+  },
+  "panel_a52fcbbc33": {
+    "message": "银行卡"
+  },
+  "panel_3304ef1777": {
+    "message": "搜索标题、用户名和网站"
+  },
+  "panel_5a80aae52c": {
+    "message": "只读。请在 1Password 中编辑登录信息。"
+  },
+  "panel_547ca35987": {
+    "message": "仅在填写时为标签页中的网站从 1Password 读取。"
+  },
+  "panel_2fdf0b746a": {
+    "message": "至少选择一个保险库后，登录信息和银行卡会显示在这里。"
+  },
+  "panel_10c5739b95": {
+    "message": "等待批准"
+  },
+  "panel_a424e33d90": {
+    "message": "已锁定"
+  },
+  "panel_5ad99230df": {
+    "message": "无法连接"
+  },
+  "panel_dce083a2c4": {
+    "message": "已拒绝"
+  },
+  "panel_67a926f700": {
+    "message": "未找到"
+  },
+  "panel_1d09faf925": {
+    "message": "需要更新"
+  },
+  "panel_53f15ea2f2": {
+    "message": "未配对"
+  },
+  "panel_a06130a5a2": {
+    "message": "请求过多"
+  },
+  "panel_9f760ab207": {
+    "message": "等你操作"
+  },
+  "panel_8985693566": {
+    "message": "尚未连接"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "正在连接 $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_009008e0d7": {
+    "message": "已通过 1Password 应用连接 · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "已通过服务账号连接"
+  },
+  "panel_4435385a73": {
+    "message": "FSB 本地服务器未运行"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "未找到 1Password 应用"
+  },
+  "panel_9d094cbe0c": {
+    "message": "请更新本地服务器"
+  },
+  "panel_b0545ee348": {
+    "message": "重新配对"
+  },
+  "panel_a904382fc7": {
+    "message": "请放慢速度"
+  },
+  "panel_12e12023d2": {
+    "message": "无法连接到 1Password"
+  },
+  "panel_a5ae6c601d": {
+    "message": "请在 1Password 应用中批准 FSB。"
+  },
+  "panel_f83ab4c57f": {
+    "message": "选择 FSB 可以读取的保险库。"
+  },
+  "panel_e5f973beb3": {
+    "message": "一切都留在这台电脑上。"
+  },
+  "panel_b33cf191b9": {
+    "message": "通过终端设置。断开连接会删除已保存的令牌，因此会先询问你。"
+  },
+  "panel_8ba387915f": {
+    "message": "解锁 1Password 以继续。你的设置会保留。"
+  },
+  "panel_041a40019f": {
+    "message": "请安装 FSB 本地服务器，然后重试。"
+  },
+  "panel_40647b20fa": {
+    "message": "在你允许之前，FSB 无法读取任何内容。请重试，然后在 1Password 中允许 FSB。"
+  },
+  "panel_942c783692": {
+    "message": "安装并登录，然后开启 设置 > 开发者 > 与其他应用集成。"
+  },
+  "panel_0233589be3": {
+    "message": "此 fsb-mcp-server 版本过旧，无法用于 1Password，或无法加载其 SDK。"
+  },
+  "panel_01ddad80a6": {
+    "message": "服务器正在运行，但不再信任此浏览器。重新配对即可解决。"
+  },
+  "panel_1c3eb3d073": {
+    "message": "短时间内请求过多。你的账号没有问题。请一分钟后重试。"
+  },
+  "panel_89857dc659": {
+    "message": "1Password 正在询问是否允许 FSB 使用它。FSB 最多等待 75 秒。"
+  },
+  "panel_979a9a05cd": {
+    "message": "桌面应用"
+  },
+  "panel_69ce0728e7": {
+    "message": "正在询问你"
+  },
+  "panel_14493f5f54": {
+    "message": "已锁定"
+  },
+  "panel_d7da083898": {
+    "message": "服务账号"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password，然后是 FSB 本地服务器，再到此浏览器"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password，然后是本地服务器（此浏览器无法连接）"
+  },
+  "panel_845f928640": {
+    "message": "个人"
+  },
+  "panel_535c99f759": {
+    "message": "仅 FSB"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "共享"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "你的个人保险库。全部 $COUNT$ 个项目都会对代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "与他人共享。全部 $COUNT$ 个项目都会对代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "此保险库中的全部 $COUNT$ 个项目都会对代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "整个网站"
+  },
+  "panel_b20197643c": {
+    "message": "精确域名"
+  },
+  "panel_8b8c047cc1": {
+    "message": "此网站有 $COUNT$ 个",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "一次性验证码"
+  },
+  "panel_c68b5649c4": {
+    "message": "卡上有账单地址"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "未保存账单地址"
+  },
+  "panel_fdee246866": {
+    "message": "按每批 10 个移动。1Password 确认后，每一批都会从 FSB 中删除。"
+  },
+  "panel_72fe828489": {
+    "message": "已移到 1Password。登录信息：$LOGINS$。银行卡：$CARDS$。旧保险库已删除。",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "中途停止：已移动 $MOVED$ 个，$KEPT$ 个保留在 FSB 中。",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "断开 1Password？FSB 会忘记其 1Password 设置。"
+  },
+  "panel_91fa9fd3cf": {
+    "message": "断开 1Password？FSB 会忘记其 1Password 设置，并删除已保存的服务账号令牌。重新连接需要再次使用终端。"
   }
 }

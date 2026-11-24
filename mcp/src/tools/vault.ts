@@ -9,10 +9,13 @@ import { mapFSBError } from '../errors.js';
 // The first 1Password call in a while can wait on the user approving FSB in the
 // 1Password desktop app, so these leave room for that prompt.
 const LIST_TIMEOUT_MS = 75_000;
-const FILL_TIMEOUT_MS = 90_000;
-// Card metadata lookup + the extension's 120_000ms confirmation gate + the
-// post-approval card read, with headroom.
-const PAYMENT_CONFIRMATION_TIMEOUT_MS = 250_000;
+// With nothing saved for the site, the user gets up to 2 minutes to type a
+// login on the page, then saving it may wait on 1Password again.
+const FILL_TIMEOUT_MS = 250_000;
+// Card metadata lookup and the card read, each of which may wait on a
+// 1Password approval. Over MCP FSB shows no prompt of its own: the agent asks
+// the user first.
+const PAYMENT_CONFIRMATION_TIMEOUT_MS = 160_000;
 const MAX_CANDIDATES = 20;
 
 /**
@@ -90,7 +93,7 @@ export function registerVaultTools(
 
   server.tool(
     'fill_credential',
-    'Sign in on the agent\'s tab with a login from the user\'s 1Password. Fills whichever login fields the page shows: username, password, and a one-time (TOTP) code when the 1Password item has one -- call it again on a two-factor code page. Values are resolved by FSB and typed into the page; they never appear in this tool\'s result. The login is chosen from the tab\'s real URL, never from a parameter: it must be saved in 1Password for that site. If several logins match, the call fails with the candidates; pass credential_id (from list_credentials or that error) to pick one. Does not press submit. The first call may wait for the user to approve FSB in the 1Password app. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    'Sign in on the agent\'s tab with a login from the user\'s 1Password. Fills whichever login fields the page shows: username, password, and a one-time (TOTP) code when the 1Password item has one -- call it again on a two-factor code page. Values are resolved by FSB and typed into the page; they never appear in this tool\'s result. The login is chosen from the tab\'s real URL, never from a parameter. If nothing is saved for the site, FSB asks the user on the page to type a login (and optionally save it to 1Password); the call waits up to 2 minutes for them, and the result says by: "you". If they decline, the call fails with credential_not_provided: never ask for the password in chat. If several logins match, the call fails with the candidates; pass credential_id (from list_credentials or that error) to pick one. Does not press submit. The first call may wait for the user to approve FSB in the 1Password app. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
     {
       credential_id: z.string().max(140).optional().describe('Optional. A login id from list_credentials. It must still be saved for the tab\'s site, otherwise the fill is refused.'),
       domain: z.string().optional().describe('Ignored. The site is always derived from the resolved tab URL. Kept for backward compatibility.'),
@@ -134,10 +137,11 @@ export function registerVaultTools(
   );
 
   // Fill domain comes from chrome.tabs.get inside the extension, not from this
-  // request. Card data is read from 1Password only after the user approves.
+  // request. Over MCP the agent must ask the user before calling this tool;
+  // FSB fills only https pages and only while the tab stays on that site.
   server.tool(
     'use_payment_method',
-    'Fill the checkout form on the agent\'s tab with a credit card from the user\'s 1Password. FSB first shows the user a confirmation with the card brand, last 4 digits, and the merchant site (taken from the tab URL, not this request); the card is read from 1Password and filled only after they approve. Never submits the payment. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    'Fill the checkout form on the agent\'s tab with a credit card from the user\'s 1Password. FSB shows no approval prompt of its own: before calling, ask the user in this conversation and name the card (title, brand, last 4 from list_payment_methods) and the merchant. FSB fills only https pages, and only while the tab stays on the site it was on (taken from the tab URL, not this request); the card number and CVV never appear in the result. Never submits the payment. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
     {
       payment_method_id: z.string().max(140).describe('ID of the card to use (from list_payment_methods)'),
       tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple.'),

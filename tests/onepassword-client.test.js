@@ -35,6 +35,8 @@ function makeEnv({
   pairingStatus = 'paired',
   // Stands in for background.js's fsbEnsureAgentBridgeReady; null leaves it out.
   ensureReady = null,
+  // Whether the side panel answers the card prompt with { shown: true }.
+  panelShows = true,
 } = {}) {
   const requests = [];
   const pairing = { status: pairingStatus, ensureCalls: 0 };
@@ -50,7 +52,8 @@ function makeEnv({
       },
       sendMessage: async (message) => {
         runtimeSent.push(message);
-        return undefined;
+        // The side panel confirms it put the card prompt on screen.
+        return message && message.action === 'paymentFillConfirmation' && panelShows ? { shown: true } : undefined;
       },
     },
     tabs: {
@@ -83,6 +86,8 @@ function makeEnv({
     } : {}),
     URL,
     console,
+    crypto: require('node:crypto').webcrypto,
+    Uint8Array,
     // Bridge polling sleeps collapse to 0ms; the 2-minute approval timeout stays real.
     setTimeout: (fn, ms) => setTimeout(fn, ms >= 1000 ? ms : 0),
     clearTimeout: (handle) => clearTimeout(handle),
@@ -311,14 +316,20 @@ async function run() {
       return { success: true, filled: ['cc-number'], totalFieldsDetected: 4 };
     });
     await waitFor(() => env.runtimeSent.length === 1);
-    assert.deepEqual(JSON.parse(JSON.stringify(env.runtimeSent[0])), {
+    const { requestId, ...prompt } = JSON.parse(JSON.stringify(env.runtimeSent[0]));
+    assert.match(requestId, /^[0-9a-f]{24}$/, 'each prompt carries its own request id');
+    assert.deepEqual(prompt, {
       action: 'paymentFillConfirmation', paymentMethodId: 'v:c', cardBrand: 'visa', last4: '1111', merchantDomain: 'shop.test',
+      title: '', expiryMonth: '', expiryYearLast2: '',
     });
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: 'f'.repeat(24) }, trusted);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(env.requests.length, 1, 'an answer for another prompt is ignored');
     assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card'], 'no card read before approval');
-    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, { id: EXT_ID, url: 'https://shop.test/checkout' });
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, { id: EXT_ID, url: 'https://shop.test/checkout' });
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(env.requests.length, 1, 'an approval from a web page is ignored');
-    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, trusted);
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, trusted);
     const result = await pending;
     assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card', 'onepassword.resolve-card']);
     assert.equal(fills[0].tool, 'fillPaymentFields');
@@ -334,7 +345,7 @@ async function run() {
     const env = cardEnv(['https://shop.test/checkout']);
     const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
     await waitFor(() => env.runtimeSent.length === 1);
-    env.deliver({ action: 'paymentFillDenied', paymentMethodId: 'v:c' }, trusted);
+    env.deliver({ action: 'paymentFillDenied', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, trusted);
     const result = await pending;
     assert.equal(result.declined, true);
     assert.equal(result.reason, 'user_declined');
@@ -344,7 +355,7 @@ async function run() {
     const env = cardEnv(['https://shop.test/checkout', 'https://evil.test/pay']);
     const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
     await waitFor(() => env.runtimeSent.length === 1);
-    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, trusted);
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, trusted);
     const result = await pending;
     assert.equal(result.success, false);
     assert.equal(result.errorCode, 'merchant_changed');
@@ -358,7 +369,7 @@ async function run() {
       const env = cardEnv(['https://shop.test/checkout', moved]);
       const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
       await waitFor(() => env.runtimeSent.length === 1);
-      env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, trusted);
+      env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, trusted);
       const result = await pending;
       assert.equal(result.errorCode, 'merchant_changed');
       assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card']);
@@ -368,7 +379,7 @@ async function run() {
     const env = cardEnv(['https://shop.test/checkout', 'https://shop.test/checkout', 'https://evil.test/pay']);
     const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
     await waitFor(() => env.runtimeSent.length === 1);
-    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c' }, trusted);
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, trusted);
     const result = await pending;
     assert.equal(result.errorCode, 'merchant_changed');
     assert.deepEqual(env.requests.map((request) => request.method), ['onepassword.describe-card', 'onepassword.resolve-card']);
@@ -376,17 +387,73 @@ async function run() {
   });
   for (const [url, shown] of [
     ['https://shop.test:8443/checkout', 'shop.test:8443'],
-    ['http://shop.test/checkout', 'http://shop.test'],
   ]) {
     await check(`the approval prompt names ${shown}`, async () => {
       const env = cardEnv([url]);
       const pending = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
       await waitFor(() => env.runtimeSent.length === 1);
       assert.equal(env.runtimeSent[0].merchantDomain, shown);
-      env.deliver({ action: 'paymentFillDenied', paymentMethodId: 'v:c' }, trusted);
+      env.deliver({ action: 'paymentFillDenied', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, trusted);
       await pending;
     });
   }
+  await check('a second prompt replaces the first, so one click cannot approve two fills', async () => {
+    const env = cardEnv(['https://shop.test/checkout']);
+    const first = env.api.fillCardInTab(9, 'v:c', async () => assert.fail('the replaced fill must not run'));
+    await waitFor(() => env.runtimeSent.length === 1);
+    const second = env.api.fillCardInTab(9, 'v:c', async () => ({ success: true, filled: ['cc-number'], totalFieldsDetected: 1 }));
+    const firstResult = await first;
+    assert.equal(firstResult.reason, 'replaced');
+    await waitFor(() => env.runtimeSent.length === 2);
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: env.runtimeSent[0].requestId }, trusted);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(!env.requests.some((r) => r.method === 'onepassword.resolve-card'), 'the old prompt id approves nothing');
+    env.deliver({ action: 'paymentFillApproved', paymentMethodId: 'v:c', requestId: env.runtimeSent[1].requestId }, trusted);
+    assert.equal((await second).success, true);
+  });
+  await check('no side panel to show the prompt settles at once, not after 2 minutes', async () => {
+    const env = makeEnv({
+      tabUrls: ['https://shop.test/checkout'],
+      panelShows: false,
+      responses: { 'onepassword.describe-card': { ok: true, card: { id: 'v:c', cardBrand: 'visa', last4: '1111' } } },
+    });
+    const started = Date.now();
+    const result = await env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
+    assert.equal(result.errorCode, 'payment_not_approved');
+    assert.equal(result.reason, 'sidepanel_unavailable');
+    assert.ok(Date.now() - started < 1000, 'no 2-minute wait');
+    assert.ok(!env.requests.some((r) => r.method === 'onepassword.resolve-card'));
+  });
+  await check('cards are never read for an http page, and nobody is asked', async () => {
+    const env = cardEnv(['http://shop.test/checkout']);
+    const result = await env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'));
+    assert.equal(result.errorCode, 'card_requires_https');
+    assert.match(result.error, /http:\/\/shop\.test is not https/);
+    assert.equal(env.runtimeSent.length, 0, 'no approval prompt');
+    assert.ok(!env.requests.some((r) => /card/.test(r.method)), 'nothing asked of 1Password');
+  });
+  await check('over MCP (confirm: agent) the card fills with no side-panel prompt', async () => {
+    const env = cardEnv(['https://shop.test/checkout']);
+    const fills = [];
+    const pills = [];
+    const result = await env.api.fillCardInTab(9, 'v:c', async (tabId, message) => {
+      fills.push(message);
+      return { success: true, filled: ['cc-number', 'cc-exp', 'cc-csc', 'cc-name'], totalFieldsDetected: 4 };
+    }, { confirm: 'agent' }, { status: async (state) => { pills.push(state); return { shown: true }; } });
+    assert.equal(result.success, true);
+    assert.equal(env.runtimeSent.length, 0, 'no approval prompt');
+    assert.equal(fills.length, 1);
+    assert.equal(fills[0].params.expectedOrigin, 'https://shop.test');
+    assert.deepEqual(pills.map((p) => p.phase), ['checking', 'filling_card', 'card_filled']);
+    assert.ok(!JSON.stringify(pills).includes('4111'), 'no card number in pill states');
+    assert.ok(!JSON.stringify(result).includes('4111111111111111'));
+  });
+  await check('over MCP a tab that moves before the read is still refused', async () => {
+    const env = cardEnv(['https://shop.test/checkout', 'https://evil.test/']);
+    const result = await env.api.fillCardInTab(9, 'v:c', async () => assert.fail('must not fill'), { confirm: 'agent' });
+    assert.equal(result.errorCode, 'merchant_changed');
+    assert.ok(!env.requests.some((r) => r.method === 'onepassword.resolve-card'), 'the card is not read');
+  });
 
   console.log('\n--- content-script fills check the receiving document ---');
   {

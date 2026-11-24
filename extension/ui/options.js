@@ -83,6 +83,8 @@ const defaultSettings = {
   showSidepanelProgress: true,
   // Credential Manager (Beta)
   enableLogin: false,
+  // Card fills from 1Password (Beta)
+  enableSavedPayments: false,
   // CAPTCHA Solver
   captchaSolverEnabled: false,
   captchaApiKey: '',
@@ -400,6 +402,7 @@ function cacheElements() {
 
   // Credentials (Beta)
   elements.enableLogin = document.getElementById('enableLogin');
+  elements.enableSavedPayments = document.getElementById('enableSavedPayments');
 
   // CAPTCHA Solver
   elements.captchaSolverEnabled = document.getElementById('captchaSolverEnabled');
@@ -928,6 +931,7 @@ function setupEventListeners() {
     elements.animatedActionHighlights,
     elements.showSidepanelProgress,
     elements.enableLogin,
+    elements.enableSavedPayments,
     elements.captchaSolverEnabled,
     elements.captchaApiKey,
     elements.sttProvider,
@@ -1819,6 +1823,8 @@ function initFsbSelects() {
 }
 
 function normalizeSectionId(sectionId) {
+  // Passwords and Payments became one Vault page; old links still land there.
+  if (sectionId === 'passwords' || sectionId === 'payments') return 'vault';
   return sectionId === 'providers' ? 'api-config' : sectionId;
 }
 
@@ -2192,6 +2198,9 @@ function loadSettings() {
       elements.enableLogin.checked = settings.enableLogin ?? false;
       updateCredentialsManagerVisibility(settings.enableLogin ?? false);
     }
+    if (elements.enableSavedPayments) {
+      elements.enableSavedPayments.checked = settings.enableSavedPayments ?? false;
+    }
 
     // CAPTCHA Solver
     if (elements.captchaSolverEnabled) {
@@ -2491,6 +2500,7 @@ function saveSettings() {
     animatedActionHighlights: elements.animatedActionHighlights?.checked ?? true,
     showSidepanelProgress: elements.showSidepanelProgress?.checked ?? false,
     enableLogin: elements.enableLogin?.checked ?? false,
+    enableSavedPayments: elements.enableSavedPayments?.checked ?? false,
     captchaSolverEnabled: elements.captchaSolverEnabled?.checked ?? false,
     captchaApiKey: (elements.captchaApiKey?.value || '').trim(),
     sttProvider: elements.sttProvider?.checked ? 'whisper' : 'browser',
@@ -5054,17 +5064,34 @@ async function exportSessionText(sessionId, storageBackend) {
 }
 
 // ==========================================
-// 1Password (Passwords and Payments sections)
+// Vault: logins and cards from 1Password
 // ==========================================
-// FSB keeps no passwords or cards of its own. These sections show the 1Password
-// connection the FSB local server uses, the vaults FSB may read, and read-only
-// lists of what is in them. Nothing here ever receives a password, one-time
-// code, card number, or CVV: the background answers with metadata only.
+// FSB keeps no passwords or cards of its own. The Vault page shows the
+// 1Password connection the FSB local server uses, the vaults FSB may read, and
+// read-only lists of what is in them (design: the "FSB 1Password vault"
+// handoff, Main and VaultStates boards). Nothing here ever receives a password,
+// one-time code, card number, or CVV: the background answers with metadata only.
 
 let _onePasswordStatus = null;
 let _onePasswordLegacy = null;
 let _legacyVaultPin = null;
 let _onePasswordBusy = false;
+const _vaultUi = {
+  error: null,
+  waiting: false,
+  connectToken: 0,
+  vaults: [],
+  allow: new Set(),
+  savedAllow: new Set(),
+  save: '',
+  savedSave: '',
+  logins: [],
+  cards: [],
+  itemsLoaded: false,
+  tab: 'logins',
+  legacyStage: 'pin',
+  legacyResult: null
+};
 
 function onePasswordIsReady(status) {
   return !!(status && status.configured);
@@ -5072,9 +5099,9 @@ function onePasswordIsReady(status) {
 
 // Reading the saved settings needs no 1Password sign-in. Listing vaults,
 // logins, or cards does, and with the desktop app that can show an approval
-// prompt, so those calls wait until the user opens Passwords or Payments.
+// prompt, so those calls wait until the user opens the Vault page.
 function onePasswordSectionVisible() {
-  return ['passwords', 'payments'].some((id) => document.getElementById(id)?.classList.contains('active'));
+  return !!document.getElementById('vault')?.classList.contains('active');
 }
 
 function setOnePasswordStatusText(english, subs) {
@@ -5082,15 +5109,153 @@ function setOnePasswordStatusText(english, subs) {
   if (statusText) fsbUiSet(statusText, english, subs);
 }
 
+// One state per 1Password situation, keyed on the codes the client and broker
+// return (VaultStates board). path: l1/l2 are the two links of the drawing.
+const VAULT_VIEWS = {
+  checking: { pill: 'connecting', sub: 'Checking 1Password connection...', path: { l1: 'wait', l2: '' } },
+  none: { pill: 'disconnected', pillText: 'Not connected', sub: 'Not connected yet' },
+  waiting: { pill: 'connecting', pillText: 'Waiting for approval', sub: 'Connecting to $ACCOUNT$', body: 'Approve FSB in the 1Password app.',
+    cancel: true, path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
+  vaults: { pill: 'connected', pillText: 'Connected', sub: 'Connected through the 1Password app · $ACCOUNT$', body: 'Choose the vaults FSB may read.',
+    disconnect: true, service: true, path: { l1: 'ok', l2: 'ok' } },
+  ready: { pill: 'connected', pillText: 'Connected', sub: 'Connected through the 1Password app · $ACCOUNT$', body: 'Everything stays on this computer.',
+    disconnect: true, service: true, path: { l1: 'ok', l2: 'ok' } },
+  service: { pill: 'connected', pillText: 'Connected', sub: 'Connected with a service account',
+    body: 'Set up from the terminal. Disconnecting deletes the saved token, so it asks first.', disconnect: true,
+    path: { op: 'service account', l1: 'ok', l2: 'ok' } },
+  locked: { pill: 'connecting', pillText: 'Locked', sub: 'Connected through the 1Password app · $ACCOUNT$',
+    body: 'Unlock 1Password to continue. Your settings are kept.', retry: 'Try again', path: { lock: true, op: 'locked', l1: '', l2: '' } },
+  offline: { pill: 'disconnected', pillText: 'Not reachable', sub: 'The FSB local server is not running',
+    body: 'Install the FSB local server, then try again.', install: true, retry: 'Try again', path: { l1: '', l2: 'bad', cut: true, srv: 'dim' } },
+  declined: { pill: 'connecting', pillText: 'Declined', sub: 'Approve FSB in 1Password',
+    body: 'FSB can\'t read anything until you allow it. Try again, then allow FSB in 1Password.', retry: 'Try again', path: { l1: '', l2: '' } },
+  appmissing: { pill: 'disconnected', pillText: 'Not available', sub: '1Password app not found',
+    body: 'Install it, sign in, and turn on Settings > Developer > Integrate with other apps.', retry: 'Try again',
+    path: { opDim: true, l1: 'bad', l2: 'ok' } },
+  outdated: { pill: 'disconnected', pillText: 'Update needed', sub: 'Update the local server',
+    body: 'This fsb-mcp-server is too old for 1Password, or can\'t load its SDK.', install: true, retry: 'Try again', path: { srv: 'err', l1: '', l2: 'ok' } },
+  unpaired: { pill: 'connecting', pillText: 'Not paired', sub: 'Pair again',
+    body: 'The server is running but no longer trusts this browser. Pairing again fixes it.', retry: 'Pair again', pair: true, path: { l1: '', l2: 'wait' } },
+  rate: { pill: 'connecting', pillText: 'Rate limited', sub: 'Slow down',
+    body: 'Too many requests in a short time. Nothing is wrong with your account. Try again in a minute.', retry: 'Try again', path: { l1: 'wait', l2: 'ok' } },
+  approve: { pill: 'connecting', pillText: 'Waiting for you', sub: 'Approve FSB in 1Password',
+    body: '1Password is asking whether FSB may use it. FSB waits up to 75 seconds.', retry: 'Try again', path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
+  error: { pill: 'disconnected', pillText: 'Not reachable', retry: 'Try again', path: { l1: '', l2: '' } }
+};
+
+function vaultView() {
+  const status = _onePasswordStatus;
+  const error = _vaultUi.error;
+  if (_vaultUi.waiting) return 'waiting';
+  if (error) {
+    const code = error.errorCode;
+    if (code === 'onepassword_bridge_offline') return 'offline';
+    if (code === 'onepassword_bridge_unpaired') return 'unpaired';
+    if (code === 'onepassword_server_outdated' || code === 'onepassword_sdk_unavailable') return 'outdated';
+    if (code === 'onepassword_rate_limited') return 'rate';
+    if (code === 'onepassword_timeout') return 'approve';
+    if (code === 'onepassword_auth_failed') {
+      if (error.reason === 'locked') return 'locked';
+      if (error.reason === 'app_missing') return 'appmissing';
+      return 'declined';
+    }
+    if (!status) return 'error';
+  }
+  if (!status) return 'checking';
+  if (!status.authKind) return 'none';
+  if (!status.vaultIds || status.vaultIds.length === 0) return 'vaults';
+  return status.authKind === 'service-account' ? 'service' : 'ready';
+}
+
+function vaultShow(node, visible) {
+  if (node) node.hidden = !visible;
+}
+
+function vaultGroup(id, visible) {
+  const node = document.getElementById(id);
+  if (!node) return;
+  node.hidden = false;
+  node.style.display = visible ? 'contents' : 'none';
+}
+
+function renderVaultPath(spec) {
+  const path = spec.path || { l1: '', l2: '' };
+  const opNode = document.getElementById('vxNodeOp');
+  if (opNode) {
+    opNode.classList.toggle('dim', !!path.opDim);
+    vaultShow(opNode.querySelector('.ping'), !!path.ping);
+    vaultShow(opNode.querySelector('.lk'), !!path.lock);
+  }
+  const opSub = document.getElementById('vxNodeOpSub');
+  if (opSub) fsbUiSet(opSub, path.op || 'desktop app');
+  const srv = document.getElementById('vxNodeSrv');
+  if (srv) {
+    srv.classList.toggle('dim', path.srv === 'dim');
+    srv.classList.toggle('err', path.srv === 'err');
+  }
+  const link1 = document.getElementById('vxLink1');
+  const link2 = document.getElementById('vxLink2');
+  if (link1) link1.className = 'vx-link' + (path.l1 ? ' ' + path.l1 : '');
+  if (link2) {
+    link2.className = 'vx-link' + (path.l2 ? ' ' + path.l2 : '');
+    vaultShow(link2.querySelector('b'), !!path.cut);
+  }
+  const drawing = document.getElementById('onePasswordPath');
+  if (drawing) {
+    drawing.setAttribute('aria-label', path.cut
+      ? fsbUiLine('1Password, then the local server, which this browser cannot reach')
+      : fsbUiLine('1Password, then the FSB local server, then this browser'));
+  }
+}
+
+function renderVault() {
+  const view = vaultView();
+  const spec = VAULT_VIEWS[view] || VAULT_VIEWS.error;
+  const status = _onePasswordStatus || {};
+  const accountInput = document.getElementById('onePasswordAccount');
+  const account = status.accountName || (accountInput && accountInput.value ? accountInput.value.trim() : '');
+
+  const pill = document.getElementById('onePasswordPill');
+  const pillText = document.getElementById('onePasswordPillText');
+  if (pill) pill.dataset.state = spec.pill;
+  if (pillText) {
+    if (spec.pillText) fsbUiSet(pillText, spec.pillText);
+    else pillText.textContent = '';
+  }
+  if (spec.sub) setOnePasswordStatusText(spec.sub, { account });
+
+  vaultShow(document.getElementById('onePasswordSetup'), view === 'none');
+  vaultShow(document.getElementById('onePasswordConn'), view !== 'none' && view !== 'checking');
+  const body = document.getElementById('onePasswordBody');
+  if (body) {
+    if (spec.body) fsbUiSet(body, spec.body);
+    else if (view !== 'error') body.textContent = '';
+  }
+  vaultShow(document.getElementById('onePasswordInstallCmd'), !!spec.install);
+  vaultShow(document.getElementById('onePasswordDisconnectBtn'), !!spec.disconnect);
+  vaultShow(document.getElementById('onePasswordServiceBtn'), !!spec.service);
+  vaultShow(document.getElementById('onePasswordCancelBtn'), !!spec.cancel);
+  if (!spec.service) vaultShow(document.getElementById('onePasswordServiceHelp'), false);
+  const retry = document.getElementById('onePasswordRetryBtn');
+  if (retry) {
+    vaultShow(retry, !!spec.retry);
+    if (spec.retry) fsbUiSet(retry, spec.retry);
+  }
+  renderVaultPath(spec);
+
+  const connected = view === 'vaults' || view === 'ready' || view === 'service' || view === 'locked';
+  vaultGroup('vaultAccessGroup', connected);
+  vaultGroup('vaultItemsGroup', connected);
+  vaultShow(document.getElementById('vaultRulesHeading'), !connected);
+  document.getElementById('onePasswordAccessCard')?.classList.toggle('vx-card-focus', view === 'vaults');
+  renderVaultItems();
+}
+
 async function loadOnePasswordStatus(options = {}) {
   const readItems = options.readItems === true || (options.readItems !== false && onePasswordSectionVisible());
   // Pairing FSB with the local server reconnects the bridge (and any MCP call
-  // in flight on it), so only a look at Passwords or Payments may start it.
+  // in flight on it), so only a look at the Vault page may start it.
   const pair = options.pair === true || readItems;
-  const setupPanel = document.getElementById('onePasswordSetup');
-  const vaultsPanel = document.getElementById('onePasswordVaults');
-  const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
-  const manager = document.getElementById('credentialsManager');
 
   let response;
   try {
@@ -5102,50 +5267,47 @@ async function loadOnePasswordStatus(options = {}) {
   _onePasswordLegacy = response && response.legacy ? response.legacy : null;
   renderLegacyVault(_onePasswordLegacy);
 
-  if (setupPanel) setupPanel.style.display = 'none';
-  if (vaultsPanel) vaultsPanel.style.display = 'none';
-  if (disconnectBtn) disconnectBtn.style.display = 'none';
-
   if (!response || !response.success) {
     _onePasswordStatus = null;
+    _vaultUi.error = { errorCode: (response && response.errorCode) || 'onepassword_request_failed', error: response && response.error, reason: response && response.reason };
     setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
-    if (manager) manager.style.display = 'none';
-    updatePaymentsAvailability();
+    renderVault();
     return;
   }
 
-  const status = response.status || {};
-  _onePasswordStatus = status;
+  _onePasswordStatus = response.status || {};
+  const status = _onePasswordStatus;
+  if (!_vaultUi.waiting && options.keepError !== true) _vaultUi.error = null;
+  const accountInput = document.getElementById('onePasswordAccount');
+  if (accountInput && !accountInput.value && status.accountName) accountInput.value = status.accountName;
+  _vaultUi.savedAllow = new Set(status.vaultIds || []);
+  _vaultUi.allow = new Set(_vaultUi.savedAllow);
+  _vaultUi.savedSave = status.saveVaultId || '';
+  _vaultUi.save = _vaultUi.savedSave;
+  renderVault();
+  renderVaultAccess();
 
-  if (!status.authKind) {
-    setOnePasswordStatusText('1Password is not connected.');
-    if (setupPanel) setupPanel.style.display = 'flex';
-  } else {
-    if (status.authKind === 'desktop') {
-      setOnePasswordStatusText('1Password is connected through the desktop app ($ACCOUNT$).', { account: status.accountName || '' });
-      const accountInput = document.getElementById('onePasswordAccount');
-      if (accountInput && !accountInput.value) accountInput.value = status.accountName || '';
-    } else {
-      setOnePasswordStatusText('1Password is connected with a service account.');
-    }
-    if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
-    if (!status.vaultIds || status.vaultIds.length === 0) {
-      setOnePasswordStatusText('Choose the vaults FSB may use to finish setup.');
-    }
-    if (vaultsPanel) vaultsPanel.style.display = 'flex';
-    if (readItems) loadOnePasswordVaults();
+  if (status.authKind && readItems) await loadOnePasswordVaults();
+  if (onePasswordIsReady(status) && readItems) {
+    await Promise.all([loadCredentials(), loadPaymentMethods()]);
   }
+}
 
-  if (manager) {
-    manager.style.display = onePasswordIsReady(status) ? 'block' : 'none';
-    if (onePasswordIsReady(status) && readItems) loadCredentials();
+// A failed 1Password call on this page: classified codes move the status card
+// to their own state; anything else is reported as it came.
+function noteVaultFailure(response) {
+  const code = response && response.errorCode;
+  if (code && /^onepassword_/.test(code)) {
+    _vaultUi.error = { errorCode: code, error: response.error, reason: response.reason };
+    renderVault();
+    return true;
   }
-  updatePaymentsAvailability();
+  if (response && response.error) showToast(response.error, 'error');
+  return false;
 }
 
 async function loadOnePasswordVaults() {
   const list = document.getElementById('onePasswordVaultList');
-  const saveSelect = document.getElementById('onePasswordSaveVault');
   if (!list) return;
   let response;
   try {
@@ -5154,31 +5316,90 @@ async function loadOnePasswordVaults() {
     response = { success: false, error: error.message };
   }
   if (!response || !response.success) {
-    list.textContent = '';
-    setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
+    // Locked or unreachable: keep the vaults already on screen, or name the
+    // saved ones, so the page still says what FSB may read.
+    if (!_vaultUi.vaults.length) {
+      const saved = _onePasswordStatus && Array.isArray(_onePasswordStatus.vaults) ? _onePasswordStatus.vaults : [];
+      _vaultUi.vaults = saved.filter((vault) => vault && vault.id && vault.title).map((vault) => ({ id: vault.id, title: vault.title }));
+    }
+    renderVaultAccess();
+    if (!noteVaultFailure(response)) {
+      setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
+    }
     return;
   }
-  const allowed = new Set((_onePasswordStatus && _onePasswordStatus.vaultIds) || []);
-  const vaults = response.vaults || [];
-  list.innerHTML = vaults.map((vault) => `
-    <label class="onepassword-vault-option">
-      <input type="checkbox" value="${escapeHtml(vault.id)}" ${allowed.has(vault.id) ? 'checked' : ''}>
-      <span class="onepassword-vault-title">${escapeHtml(vault.title || vault.id)}</span>
-      <span class="onepassword-vault-count">${fsbUiHtml('Items: $COUNT$', { count: String(vault.itemCount || 0) })}</span>
-    </label>
-  `).join('');
+  _vaultUi.vaults = Array.isArray(response.vaults) ? response.vaults : [];
+  renderVaultAccess();
+  renderVaultItems();
+}
+
+// What enabling a vault means, in plain language. Only the user knows which
+// vault is used by FSB alone, so that tag comes from the name.
+function vaultTag(vault) {
+  if (vault.vaultType === 'personal') {
+    return { cls: 'warn', text: 'Personal', warn: 'Your personal vault. All $COUNT$ items become available to agents.' };
+  }
+  if (vault.vaultType === 'everyone') {
+    return { cls: '', text: 'Shared', warn: 'Shared with others. All $COUNT$ items become available to agents.' };
+  }
+  if (/(^|[^a-z])fsb([^a-z]|$)/i.test(vault.title || '')) return { cls: 'ok', text: 'Only FSB', warn: null };
+  return { cls: '', text: '', warn: 'All $COUNT$ items in this vault become available to agents.' };
+}
+
+function vaultAccessDirty() {
+  if (_vaultUi.save !== _vaultUi.savedSave) return true;
+  if (_vaultUi.allow.size !== _vaultUi.savedAllow.size) return true;
+  return [..._vaultUi.allow].some((id) => !_vaultUi.savedAllow.has(id));
+}
+
+function renderVaultAccess() {
+  const list = document.getElementById('onePasswordVaultList');
+  const saveSelect = document.getElementById('onePasswordSaveVault');
+  const saveBtn = document.getElementById('onePasswordSaveVaultsBtn');
+  if (!list) return;
+  const vaults = _vaultUi.vaults;
+  list.innerHTML = vaults.map((vault) => {
+    const on = _vaultUi.allow.has(vault.id);
+    const tag = vaultTag(vault);
+    const count = String(vault.itemCount || 0);
+    const warnOn = on && !!tag.warn && !_vaultUi.savedAllow.has(vault.id);
+    return `
+    <div>
+      <label class="onepassword-vault-option vx-opt${on ? ' on' : ''}">
+        <input type="checkbox" value="${escapeHtml(vault.id)}" ${on ? 'checked' : ''}>
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        <span class="onepassword-vault-title">${escapeHtml(vault.title || vault.id)}</span>
+        ${tag.text ? `<span class="vx-tag${tag.cls ? ' ' + tag.cls : ''}">${fsbUiHtml(tag.text)}</span>` : ''}
+        ${vault.itemCount == null ? '' : `<span class="onepassword-vault-count">${fsbUiHtml('Items: $COUNT$', { count })}</span>`}
+      </label>
+      ${warnOn ? `<p class="vx-warn"><i class="fas fa-triangle-exclamation"></i><span>${fsbUiHtml(tag.warn, { count })}</span></p>` : ''}
+    </div>`;
+  }).join('');
 
   if (saveSelect) {
-    const current = (_onePasswordStatus && _onePasswordStatus.saveVaultId) || '';
+    if (_vaultUi.save && !_vaultUi.allow.has(_vaultUi.save)) _vaultUi.save = '';
     while (saveSelect.options.length > 1) saveSelect.remove(1);
     for (const vault of vaults) {
+      if (!_vaultUi.allow.has(vault.id)) continue;
       const option = document.createElement('option');
       option.value = vault.id;
       option.textContent = vault.title || vault.id;
-      if (vault.id === current) option.selected = true;
       saveSelect.appendChild(option);
     }
+    saveSelect.value = _vaultUi.save;
+    // The custom dropdown copies the options once; rebuild it for the new list.
+    if (typeof saveSelect._fsbRebuildMenu === 'function') saveSelect._fsbRebuildMenu();
+    if (typeof saveSelect._fsbSyncLabel === 'function') saveSelect._fsbSyncLabel();
   }
+  if (saveBtn) saveBtn.disabled = !vaultAccessDirty();
+}
+
+function vaultTitle(vaultId) {
+  const fromList = _vaultUi.vaults.find((vault) => vault.id === vaultId);
+  if (fromList) return fromList.title || '';
+  const fromStatus = (_onePasswordStatus && Array.isArray(_onePasswordStatus.vaults) ? _onePasswordStatus.vaults : [])
+    .find((vault) => vault.id === vaultId);
+  return fromStatus ? (fromStatus.title || '') : '';
 }
 
 async function connectOnePassword() {
@@ -5191,39 +5412,60 @@ async function connectOnePassword() {
     return;
   }
   _onePasswordBusy = true;
+  _vaultUi.waiting = true;
+  _vaultUi.error = null;
+  const token = ++_vaultUi.connectToken;
   if (connectBtn) connectBtn.disabled = true;
-  setOnePasswordStatusText('Connecting... Approve FSB in the 1Password app if asked.');
+  renderVault();
   try {
     const configured = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', authKind: 'desktop', accountName });
+    if (token !== _vaultUi.connectToken) return;
     if (!configured || !configured.success) {
       showToast((configured && configured.error) || 'Unknown error', 'error');
       return;
     }
     // Listing vaults is what triggers the 1Password approval prompt.
     const vaults = await chrome.runtime.sendMessage({ action: 'onePasswordListVaults' });
+    if (token !== _vaultUi.connectToken) return;
     if (!vaults || !vaults.success) {
-      showToast((vaults && vaults.error) || 'Unknown error', 'error');
+      _vaultUi.waiting = false;
+      if (!noteVaultFailure(vaults)) showToast((vaults && vaults.error) || 'Unknown error', 'error');
     } else {
       showToast('1Password connected', 'success');
     }
   } catch (error) {
     showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   } finally {
-    _onePasswordBusy = false;
-    if (connectBtn) connectBtn.disabled = false;
-    loadOnePasswordStatus();
+    if (token === _vaultUi.connectToken) {
+      _onePasswordBusy = false;
+      _vaultUi.waiting = false;
+      if (connectBtn) connectBtn.disabled = false;
+      loadOnePasswordStatus({ keepError: !!_vaultUi.error });
+    }
   }
 }
 
+// Cancel while 1Password is asking: FSB stops waiting and forgets the account
+// it was connecting to. A late answer from 1Password is ignored.
+async function cancelOnePasswordConnect() {
+  _vaultUi.connectToken += 1;
+  _vaultUi.waiting = false;
+  _onePasswordBusy = false;
+  const connectBtn = document.getElementById('onePasswordConnectBtn');
+  if (connectBtn) connectBtn.disabled = false;
+  try {
+    await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
+  } catch (_error) { /* the status reload below shows the result */ }
+  loadOnePasswordStatus();
+}
+
 async function saveOnePasswordVaults() {
-  const list = document.getElementById('onePasswordVaultList');
-  const saveSelect = document.getElementById('onePasswordSaveVault');
-  const vaultIds = Array.from(list ? list.querySelectorAll('input[type="checkbox"]:checked') : []).map((input) => input.value);
+  const vaultIds = [..._vaultUi.allow];
   if (vaultIds.length === 0) {
     showToast('Choose at least one vault', 'error');
     return;
   }
-  const saveVaultId = saveSelect && vaultIds.includes(saveSelect.value) ? saveSelect.value : null;
+  const saveVaultId = _vaultUi.save && _vaultUi.allow.has(_vaultUi.save) ? _vaultUi.save : null;
   try {
     const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', vaultIds, saveVaultId });
     if (response && response.success) {
@@ -5238,6 +5480,11 @@ async function saveOnePasswordVaults() {
 }
 
 async function disconnectOnePassword() {
+  const service = !!(_onePasswordStatus && _onePasswordStatus.authKind === 'service-account');
+  const question = service
+    ? fsbUiLine('Disconnect 1Password? FSB forgets its 1Password settings and deletes the saved service account token. Reconnecting needs the terminal again.')
+    : fsbUiLine('Disconnect 1Password? FSB forgets its 1Password settings.');
+  if (!confirm(question)) return;
   try {
     const response = await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
     if (response && response.success) showToast('1Password disconnected', 'success');
@@ -5245,28 +5492,67 @@ async function disconnectOnePassword() {
   } catch (error) {
     showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   }
+  _vaultUi.logins = [];
+  _vaultUi.cards = [];
+  _vaultUi.itemsLoaded = false;
   loadOnePasswordStatus();
+}
+
+function retryOnePassword() {
+  const spec = VAULT_VIEWS[vaultView()] || {};
+  _vaultUi.error = null;
+  renderVault();
+  loadOnePasswordStatus({ readItems: true, pair: !!spec.pair || undefined });
 }
 
 function renderLegacyVault(legacy) {
   const panel = document.getElementById('legacyVaultPanel');
   if (!panel) return;
-  if (!legacy || !legacy.present) {
-    panel.style.display = 'none';
+  const stage = _vaultUi.legacyStage;
+  const present = !!(legacy && legacy.present);
+  if (stage === 'gone' || (!present && stage !== 'done')) {
+    panel.hidden = true;
     _legacyVaultPin = null;
     return;
   }
-  panel.style.display = 'block';
+  panel.hidden = false;
   const summary = document.getElementById('legacyVaultSummaryText');
+  const pinWrapper = document.getElementById('legacyVaultPinWrapper');
+  const actions = document.getElementById('legacyVaultActions');
+  const progress = document.getElementById('legacyVaultProgress');
+  const doneRow = document.getElementById('legacyVaultDoneRow');
+  vaultShow(actions, stage === 'pin');
+  vaultShow(progress, stage === 'moving');
+  vaultShow(doneRow, stage === 'done');
+  if (stage === 'moving') {
+    vaultShow(pinWrapper, false);
+    if (summary) fsbUiSet(summary, 'Moving in batches of 10. Each batch is erased from FSB once 1Password confirms it.');
+    return;
+  }
+  if (stage === 'done') {
+    vaultShow(pinWrapper, false);
+    const result = _vaultUi.legacyResult || {};
+    const moved = (result.imported?.logins || 0) + (result.imported?.cards || 0);
+    const kept = (result.failed?.logins || 0) + (result.failed?.cards || 0)
+      + (result.notAttempted?.logins || 0) + (result.notAttempted?.cards || 0)
+      + (result.unreadable || 0);
+    if (summary) {
+      if (kept > 0) fsbUiSet(summary, 'Stopped partway: $MOVED$ moved, $KEPT$ kept in FSB.', { moved: String(moved), kept: String(kept) });
+      else fsbUiSet(summary, 'Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$. The old vault is erased.', {
+        logins: String(result.imported?.logins || 0),
+        cards: String(result.imported?.cards || 0)
+      });
+    }
+    return;
+  }
   if (summary) {
     fsbUiSet(summary, 'FSB\'s old vault still holds items FSB no longer uses. Logins: $LOGINS$. Cards: $CARDS$.', {
       logins: String(legacy.logins || 0),
       cards: String(legacy.cards || 0)
     });
   }
-  const pinWrapper = document.getElementById('legacyVaultPinWrapper');
   const pinContainer = document.getElementById('legacyVaultPin');
-  if (pinWrapper) pinWrapper.style.display = legacy.pinProtected ? 'block' : 'none';
+  vaultShow(pinWrapper, !!legacy.pinProtected);
   if (legacy.pinProtected && pinContainer && !_legacyVaultPin && typeof createPinInput === 'function') {
     _legacyVaultPin = createPinInput(pinContainer, legacy.pinLength || 6);
   }
@@ -5279,33 +5565,30 @@ async function importLegacyVault() {
     showToast('Enter your PIN', 'error');
     return;
   }
-  if (importBtn) {
-    importBtn.disabled = true;
-    fsbUiSet(importBtn, 'Moving...');
-  }
+  if (importBtn) importBtn.disabled = true;
+  _vaultUi.legacyStage = 'moving';
+  renderLegacyVault(_onePasswordLegacy);
   try {
     const response = await chrome.runtime.sendMessage({ action: 'legacyVaultImport', pin });
     if (!response || !response.success) {
+      _vaultUi.legacyStage = 'pin';
       showToast((response && response.error) || 'Unknown error', 'error');
       if (_legacyVaultPin) _legacyVaultPin.clear();
       return;
     }
+    _vaultUi.legacyResult = response;
+    _vaultUi.legacyStage = 'done';
+    _legacyVaultPin = null;
     showToast(fsbUiLine('Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$.', {
       logins: String(response.imported?.logins || 0),
       cards: String(response.imported?.cards || 0)
     }), 'success');
-    const kept = (response.failed?.logins || 0) + (response.failed?.cards || 0)
-      + (response.notAttempted?.logins || 0) + (response.notAttempted?.cards || 0)
-      + (response.unreadable || 0);
-    if (kept > 0) showToast(fsbUiLine('Not moved and kept in FSB: $COUNT$', { count: String(kept) }), 'warning');
-    _legacyVaultPin = null;
   } catch (error) {
+    _vaultUi.legacyStage = 'pin';
     showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   } finally {
-    if (importBtn) {
-      importBtn.disabled = false;
-      fsbUiSet(importBtn, 'Move to 1Password');
-    }
+    if (importBtn) importBtn.disabled = false;
+    renderLegacyVault(_onePasswordLegacy);
     loadOnePasswordStatus();
   }
 }
@@ -5323,6 +5606,12 @@ async function deleteLegacyVault() {
   loadOnePasswordStatus();
 }
 
+function dismissLegacyVault() {
+  _vaultUi.legacyStage = 'gone';
+  _vaultUi.legacyResult = null;
+  renderLegacyVault(_onePasswordLegacy);
+}
+
 function updateCaptchaSolverVisibility(enabled) {
   const configPanel = document.getElementById('captchaSolverConfig');
   if (configPanel) {
@@ -5336,58 +5625,110 @@ function updateCredentialsManagerVisibility(_enabled) {
   loadOnePasswordStatus();
 }
 
-// Load and display the logins FSB may use (read-only; edit them in 1Password)
+// Load the logins FSB may use (read-only; edit them in 1Password)
 async function loadCredentials() {
-  const listEl = document.getElementById('credentialsList');
-  const emptyEl = document.getElementById('credentialsEmpty');
   try {
     const response = await chrome.runtime.sendMessage({ action: 'onePasswordListLogins' });
     if (!response || !response.success) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) emptyEl.style.display = 'flex';
-      if (response && response.error) showToast(response.error, 'error');
+      _vaultUi.logins = [];
+      noteVaultFailure(response);
+      renderVaultItems();
       return;
     }
-    const logins = response.logins || [];
-    if (logins.length === 0) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) emptyEl.style.display = 'flex';
-      return;
-    }
-    if (emptyEl) emptyEl.style.display = 'none';
-    if (listEl) listEl.innerHTML = logins.map(renderCredentialCard).join('');
+    _vaultUi.logins = Array.isArray(response.logins) ? response.logins : [];
+    _vaultUi.itemsLoaded = true;
+    renderVaultItems();
   } catch (error) {
     console.error('Error loading 1Password logins:', error.message);
   }
 }
 
+function loginSites(login) {
+  if (Array.isArray(login.websites) && login.websites.length) return login.websites;
+  return (Array.isArray(login.domains) ? login.domains : []).map((host) => ({ host, rule: 'site', protocol: '' }));
+}
+
+// How many logins share each saved host, for the "2 for this site" chip.
+function loginSiteCounts(logins) {
+  const counts = {};
+  for (const login of logins) {
+    const hosts = new Set(loginSites(login).map((site) => site.host));
+    hosts.forEach((host) => { counts[host] = (counts[host] || 0) + 1; });
+  }
+  return counts;
+}
+
 // Render a single login (no favicon fetch: the site list stays on this device)
-function renderCredentialCard(login) {
-  const domains = Array.isArray(login.domains) ? login.domains : [];
-  const label = login.title || domains[0] || '?';
+function renderCredentialCard(login, siteCounts) {
+  const sites = loginSites(login);
+  const label = login.title || (sites[0] && sites[0].host) || '?';
   const initial = label[0].toUpperCase();
+  const scope = sites.map((site) => (site.protocol === 'http' ? 'http://' : '') + site.host).join(', ');
+  const shared = Math.max(0, ...sites.map((site) => (siteCounts && siteCounts[site.host]) || 0));
+  const chips = [];
+  if (sites.length) {
+    chips.push(`<span class="vx-chip">${sites.every((site) => site.rule === 'exact') ? fsbUiHtml('Exact domain') : fsbUiHtml('Anywhere on site')}</span>`);
+  }
+  if (shared > 1) chips.push(`<span class="vx-chip warn">${fsbUiHtml('$COUNT$ for this site', { count: String(shared) })}</span>`);
+  if (login.hasOneTimeCode) chips.push(`<span class="vx-chip acc">${fsbUiHtml('One-time code')}</span>`);
+  if (sites.some((site) => site.protocol === 'http')) chips.push('<span class="vx-chip" translate="no">http</span>');
+  const search = [login.title, login.username, scope].filter(Boolean).join(' ').toLowerCase();
   return `
-    <div class="credential-card" data-domain="${escapeHtml(domains.join(' '))}" data-title="${escapeHtml(login.title || '')}">
+    <div class="credential-card" data-search="${escapeHtml(search)}">
       <div class="credential-card-icon">${escapeHtml(initial)}</div>
       <div class="credential-card-info">
         <div class="credential-card-domain">${escapeHtml(label)}</div>
         <div class="credential-card-username">${login.username ? escapeHtml(login.username) : fsbUiHtml('No username')}</div>
-        ${domains.length ? `<div class="credential-card-scope">${escapeHtml(domains.join(', '))}</div>` : ''}
+        ${scope ? `<div class="credential-card-scope">${escapeHtml(scope)}</div>` : ''}
       </div>
+      <div class="vx-meta">${chips.join('')}</div>
+      <span class="vx-vault">${escapeHtml(vaultTitle(login.vaultId))}</span>
     </div>
   `;
 }
 
-// Filter logins by search query
+function renderVaultItems() {
+  const view = vaultView();
+  const allowed = !!(_onePasswordStatus && Array.isArray(_onePasswordStatus.vaultIds) && _onePasswordStatus.vaultIds.length > 0);
+  const tab = _vaultUi.tab;
+  const tools = document.getElementById('vaultItemsTools');
+  const loginsList = document.getElementById('credentialsList');
+  const cardsList = document.getElementById('paymentMethodsList');
+  const showLists = allowed && view !== 'vaults';
+  vaultShow(tools, showLists);
+  vaultShow(document.getElementById('vaultNoAccessEmpty'), !showLists);
+  vaultShow(document.getElementById('vaultLoginsNote'), showLists && tab === 'logins');
+  vaultShow(document.getElementById('vaultCardsNote'), showLists && tab === 'cards');
+  const loginCount = document.getElementById('vaultLoginCount');
+  const cardCount = document.getElementById('vaultCardCount');
+  if (loginCount) loginCount.textContent = _vaultUi.itemsLoaded ? String(_vaultUi.logins.length) : '';
+  if (cardCount) cardCount.textContent = _vaultUi.itemsLoaded ? String(_vaultUi.cards.length) : '';
+  for (const [id, name] of [['vaultTabLogins', 'logins'], ['vaultTabCards', 'cards']]) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    btn.classList.toggle('active', tab === name);
+    btn.setAttribute('aria-selected', tab === name ? 'true' : 'false');
+  }
+  if (loginsList) {
+    const counts = loginSiteCounts(_vaultUi.logins);
+    loginsList.innerHTML = showLists ? _vaultUi.logins.map((login) => renderCredentialCard(login, counts)).join('') : '';
+    vaultShow(loginsList, showLists && tab === 'logins');
+  }
+  if (cardsList) {
+    cardsList.innerHTML = showLists ? _vaultUi.cards.map(renderPaymentCard).join('') : '';
+    vaultShow(cardsList, showLists && tab === 'cards');
+  }
+  vaultShow(document.getElementById('credentialsEmpty'), showLists && _vaultUi.itemsLoaded && tab === 'logins' && _vaultUi.logins.length === 0);
+  vaultShow(document.getElementById('paymentMethodsEmpty'), showLists && _vaultUi.itemsLoaded && tab === 'cards' && _vaultUi.cards.length === 0);
+  const search = document.getElementById('credentialSearch');
+  if (search && search.value) filterCredentials(search.value);
+}
+
+// Filter the visible list by title, username or site
 function filterCredentials(query) {
-  const cards = document.querySelectorAll('#credentialsList .credential-card');
-  const lowerQuery = query.toLowerCase();
-  cards.forEach(card => {
-    const haystack = [
-      card.dataset.domain || '',
-      card.dataset.title || '',
-      card.querySelector('.credential-card-username')?.textContent || ''
-    ].join(' ').toLowerCase();
+  const lowerQuery = String(query || '').toLowerCase();
+  document.querySelectorAll('#credentialsList .credential-card, #paymentMethodsList .credential-card').forEach((card) => {
+    const haystack = card.dataset.search || '';
     card.style.display = haystack.includes(lowerQuery) ? 'flex' : 'none';
   });
 }
@@ -5399,6 +5740,12 @@ function initializeCredentialManager() {
       markUnsavedChanges();
     });
   }
+  const enablePaymentsToggle = document.getElementById('enableSavedPayments');
+  if (enablePaymentsToggle) {
+    enablePaymentsToggle.addEventListener('change', () => {
+      markUnsavedChanges();
+    });
+  }
 
   const searchInput = document.getElementById('credentialSearch');
   if (searchInput) {
@@ -5406,7 +5753,35 @@ function initializeCredentialManager() {
   }
 
   const refreshBtn = document.getElementById('refreshCredentialsBtn');
-  if (refreshBtn) refreshBtn.addEventListener('click', () => loadCredentials());
+  if (refreshBtn) refreshBtn.addEventListener('click', () => Promise.all([loadCredentials(), loadPaymentMethods()]));
+
+  for (const id of ['vaultTabLogins', 'vaultTabCards']) {
+    const tabBtn = document.getElementById(id);
+    if (!tabBtn) continue;
+    tabBtn.addEventListener('click', () => {
+      _vaultUi.tab = tabBtn.dataset.tab === 'cards' ? 'cards' : 'logins';
+      renderVaultItems();
+    });
+  }
+
+  const vaultList = document.getElementById('onePasswordVaultList');
+  if (vaultList) {
+    vaultList.addEventListener('change', (e) => {
+      const box = e.target;
+      if (!box || box.type !== 'checkbox') return;
+      if (box.checked) _vaultUi.allow.add(box.value);
+      else _vaultUi.allow.delete(box.value);
+      renderVaultAccess();
+    });
+  }
+  const saveSelect = document.getElementById('onePasswordSaveVault');
+  if (saveSelect) {
+    saveSelect.addEventListener('change', () => {
+      _vaultUi.save = saveSelect.value || '';
+      const saveBtn = document.getElementById('onePasswordSaveVaultsBtn');
+      if (saveBtn) saveBtn.disabled = !vaultAccessDirty();
+    });
+  }
 
   const connectBtn = document.getElementById('onePasswordConnectBtn');
   if (connectBtn) connectBtn.addEventListener('click', connectOnePassword);
@@ -5423,27 +5798,38 @@ function initializeCredentialManager() {
   if (saveVaultsBtn) saveVaultsBtn.addEventListener('click', saveOnePasswordVaults);
   const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
   if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectOnePassword);
+  const cancelBtn = document.getElementById('onePasswordCancelBtn');
+  if (cancelBtn) cancelBtn.addEventListener('click', cancelOnePasswordConnect);
+  const retryBtn = document.getElementById('onePasswordRetryBtn');
+  if (retryBtn) retryBtn.addEventListener('click', retryOnePassword);
+  const serviceBtn = document.getElementById('onePasswordServiceBtn');
+  if (serviceBtn) {
+    serviceBtn.addEventListener('click', () => {
+      const help = document.getElementById('onePasswordServiceHelp');
+      if (help) help.hidden = !help.hidden;
+    });
+  }
   const importBtn = document.getElementById('legacyVaultImportBtn');
   if (importBtn) importBtn.addEventListener('click', importLegacyVault);
   const deleteBtn = document.getElementById('legacyVaultDeleteBtn');
   if (deleteBtn) deleteBtn.addEventListener('click', deleteLegacyVault);
+  const doneBtn = document.getElementById('legacyVaultDoneBtn');
+  if (doneBtn) doneBtn.addEventListener('click', dismissLegacyVault);
 
   // Refresh data when switching sections (DOM is ready by now)
   const origSwitchSection = switchSection;
   switchSection = function(sectionId) {
     origSwitchSection(sectionId);
-    if (sectionId === 'passwords') {
+    const section = normalizeSectionId(sectionId);
+    if (section === 'vault') {
       loadOnePasswordStatus({ readItems: true });
     }
     // Refresh memory tab when switching to it (picks up changes made while off-screen)
-    if (sectionId === 'memory') {
+    if (section === 'memory') {
       loadMemoryDashboard();
     }
-    if (sectionId === 'payments') {
-      loadPaymentMethods();
-    }
     // Phase 213: Sync tab pill state machine (SYNC-02)
-    if (sectionId === 'sync') {
+    if (section === 'sync') {
       try { initializeSyncSection(); } catch (e) { /* benign if pill markup absent */ }
       try { _refreshSyncPill(); } catch (e) { /* benign */ }
     }
@@ -5455,55 +5841,37 @@ document.addEventListener('DOMContentLoaded', () => {
   // Delay slightly to ensure all other init is done
   setTimeout(() => {
     initializeCredentialManager();
-    // Opened straight onto Passwords or Payments (URL hash): read items now.
-    if (document.getElementById('passwords')?.classList.contains('active')) loadOnePasswordStatus({ readItems: true });
-    if (document.getElementById('payments')?.classList.contains('active')) loadPaymentMethods();
+    // Opened straight onto the Vault page (URL hash): read items now.
+    if (document.getElementById('vault')?.classList.contains('active')) loadOnePasswordStatus({ readItems: true });
   }, 200);
 });
 
 // ==========================================
-// Payments: credit cards from 1Password (read-only)
+// Vault cards: credit cards from 1Password (read-only)
 // ==========================================
-
-function updatePaymentsAvailability() {
-  const blocked = document.getElementById('paymentMethodsBlocked');
-  const manager = document.getElementById('paymentMethodsManager');
-  const ready = onePasswordIsReady(_onePasswordStatus);
-  if (blocked) blocked.style.display = ready ? 'none' : 'block';
-  if (manager) manager.style.display = ready ? 'block' : 'none';
-}
 
 async function loadPaymentMethods() {
   if (!_onePasswordStatus) {
     await loadOnePasswordStatus({ readItems: false, pair: true });
   }
-  updatePaymentsAvailability();
   if (!onePasswordIsReady(_onePasswordStatus)) return;
-
-  const listEl = document.getElementById('paymentMethodsList');
-  const emptyEl = document.getElementById('paymentMethodsEmpty');
   try {
     const response = await chrome.runtime.sendMessage({ action: 'onePasswordListCards' });
     if (!response || !response.success) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) emptyEl.style.display = 'flex';
-      if (response && response.error) showToast(response.error, 'error');
+      _vaultUi.cards = [];
+      noteVaultFailure(response);
+      renderVaultItems();
       return;
     }
-    const cards = response.cards || [];
-    if (cards.length === 0) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) emptyEl.style.display = 'flex';
-      return;
-    }
-    if (emptyEl) emptyEl.style.display = 'none';
-    if (listEl) listEl.innerHTML = cards.map(renderPaymentCard).join('');
+    _vaultUi.cards = Array.isArray(response.cards) ? response.cards : [];
+    _vaultUi.itemsLoaded = true;
+    renderVaultItems();
   } catch (error) {
     console.error('Error loading 1Password cards:', error.message);
   }
 }
 
-// Render a single card (brand and last 4 only)
+// Render a single card (brand, last 4 and expiry only)
 function renderPaymentCard(pm) {
   const brandLabels = {
     visa: 'Visa',
@@ -5517,49 +5885,25 @@ function renderPaymentCard(pm) {
   const name = pm.title || pm.cardholderName;
   const masked = '**** ' + (pm.last4 || '****');
   const expiry = pm.expiryMonth && pm.expiryYearLast2
-    ? ' -- ' + fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })
+    ? ' · ' + fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })
     : '';
+  const billing = pm.hasBillingAddress ? fsbUiHtml('billing address on the card') : fsbUiHtml('no billing address saved');
+  const scope = (pm.cardholderName ? escapeHtml(pm.cardholderName) + ' · ' : '') + billing;
+  const search = [pm.title, pm.cardholderName, brandLabel, pm.last4].filter(Boolean).join(' ').toLowerCase();
   return `
-    <div class="credential-card payment-card" data-payment-id="${escapeHtml(pm.id)}">
+    <div class="credential-card payment-card" data-payment-id="${escapeHtml(pm.id)}" data-search="${escapeHtml(search)}">
       <div class="credential-card-icon">
         <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
       </div>
       <div class="credential-card-info">
         <div class="credential-card-domain">${name ? escapeHtml(name) : fsbUiHtml('Card')}</div>
         <div class="credential-card-username">${escapeHtml(masked)}${expiry}</div>
+        <div class="credential-card-scope">${scope}</div>
       </div>
+      <span class="vx-vault">${escapeHtml(vaultTitle(pm.vaultId))}</span>
     </div>
   `;
 }
-
-// Filter cards by search query
-function filterPaymentMethods(query) {
-  const cards = document.querySelectorAll('.payment-card');
-  const lowerQuery = query.toLowerCase();
-  cards.forEach(card => {
-    const name = card.querySelector('.credential-card-domain')?.textContent || '';
-    const details = card.querySelector('.credential-card-username')?.textContent || '';
-    const matches = name.toLowerCase().includes(lowerQuery) ||
-                    details.toLowerCase().includes(lowerQuery);
-    card.style.display = matches ? 'flex' : 'none';
-  });
-}
-
-function initializePaymentManager() {
-  const searchInput = document.getElementById('paymentMethodSearch');
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => filterPaymentMethods(e.target.value));
-  }
-  const refreshBtn = document.getElementById('refreshPaymentMethodsBtn');
-  if (refreshBtn) refreshBtn.addEventListener('click', () => loadPaymentMethods());
-  const openPasswordsBtn = document.getElementById('openPasswordsForPaymentsBtn');
-  if (openPasswordsBtn) openPasswordsBtn.addEventListener('click', () => switchSection('passwords'));
-}
-
-// Initialize payment manager after DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(initializePaymentManager, 250);
-});
 
 // ==========================================
 // Site Explorer Functions

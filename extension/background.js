@@ -851,6 +851,7 @@ const CONTENT_SCRIPT_FILES = [
   'content/badge-combine.js',
   'utils/ui-locale.js',
   'content/visual-feedback.js',
+  'content/vault-pill.js',
   'content/phantom-stream-capture.js',
   'content/dom-stream.js',
   'content/trigger-observe.js',
@@ -5268,6 +5269,15 @@ const contentScriptPorts = new Map();
 chrome.runtime.onConnect.addListener((port) => {
   armMcpBridge('runtime.onConnect');
   debugLog('[FSB Background] onConnect received, port name:', port.name);
+  // The on-page credential sheet (ui/credential-sheet.html). Its messages carry
+  // what the user types, so they travel on this port, which only the worker
+  // receives, and are never logged.
+  if (port.name === 'fsb-credential-sheet') {
+    const onePassword = globalThis.fsbOnePassword;
+    if (onePassword && typeof onePassword.serveSheetPort === 'function') onePassword.serveSheetPort(port);
+    else port.disconnect();
+    return;
+  }
   if (port.name === 'fsb-session-export-v2') {
     const transport = globalThis.FsbMcpSessionExportPort;
     if (!transport || typeof transport.serveExportPort !== 'function') {
@@ -14685,8 +14695,12 @@ function waitForLoginResponse(sessionId) {
     }, 120000);
 
     const handler = (request, sender, sendResponse) => {
+      // The answer carries what the user typed, so only FSB's own pages may
+      // give it.
+      if (!fsbReplayIsTrustedUiSender(sender)) return;
       if (request.sessionId === sessionId &&
-          (request.action === 'loginFormSubmitted' || request.action === 'loginSkipped')) {
+          (request.action === 'loginFormSubmitted' || request.action === 'loginSkipped'
+            || request.action === 'loginAccountChosen')) {
         clearTimeout(timeout);
         chrome.runtime.onMessage.removeListener(handler);
         resolve(request);
@@ -14810,19 +14824,30 @@ function fsbOnePasswordClient() {
 }
 
 function fsbOnePasswordFailure(result, fallback) {
-  return {
+  const out = {
     success: false,
     errorCode: (result && result.errorCode) || 'onepassword_request_failed',
     error: (result && result.error) || fallback || '1Password request failed'
   };
+  // Why a sign-in failed (locked, declined, app_missing): the Vault page names it.
+  if (result && typeof result.reason === 'string') out.reason = result.reason;
+  return out;
 }
 
 function fsbProjectLoginSummary(login) {
+  const websites = Array.isArray(login && login.websites) ? login.websites : [];
   return {
     id: String(login && login.id || ''),
     title: String(login && login.title || ''),
     domains: Array.isArray(login && login.domains) ? login.domains.map(String) : [],
-    username: String(login && login.username || '')
+    websites: websites.slice(0, 20).map((site) => ({
+      host: String(site && site.host || ''),
+      rule: site && site.rule === 'exact' ? 'exact' : 'site',
+      protocol: site && (site.protocol === 'http' || site.protocol === 'https') ? site.protocol : ''
+    })).filter((site) => site.host),
+    username: String(login && login.username || ''),
+    hasOneTimeCode: !!(login && login.hasOneTimeCode === true),
+    vaultId: String(login && login.vaultId || '')
   };
 }
 
@@ -14834,7 +14859,9 @@ function fsbProjectCardSummary(card) {
     last4: String(card && card.last4 || ''),
     cardholderName: String(card && card.cardholderName || ''),
     expiryMonth: String(card && card.expiryMonth || ''),
-    expiryYearLast2: String(card && card.expiryYearLast2 || '')
+    expiryYearLast2: String(card && card.expiryYearLast2 || ''),
+    hasBillingAddress: !!(card && card.hasBillingAddress === true),
+    vaultId: String(card && card.vaultId || '')
   };
 }
 
@@ -14958,7 +14985,14 @@ async function fsbHandleOnePasswordUiAction(request) {
     }
     case 'onePasswordListVaults': {
       const result = await op.listVaults();
-      return result && result.ok ? { success: true, vaults: result.vaults || [] } : fsbOnePasswordFailure(result);
+      return result && result.ok
+        ? { success: true, vaults: (result.vaults || []).map((vault) => ({
+          id: String(vault && vault.id || ''),
+          title: String(vault && vault.title || ''),
+          itemCount: Number(vault && vault.itemCount) || 0,
+          vaultType: String(vault && vault.vaultType || '')
+        })) }
+        : fsbOnePasswordFailure(result);
     }
     case 'onePasswordListLogins': {
       const result = await op.listLogins();
@@ -14984,6 +15018,43 @@ async function fsbHandleOnePasswordUiAction(request) {
     default:
       return { success: false, errorCode: 'invalid_request', error: 'Unknown 1Password action' };
   }
+}
+
+// Several 1Password logins matched an autopilot login page: the side panel
+// offers them by id, title and username only.
+function fsbLoginCandidates(lookup) {
+  if (!lookup || lookup.errorCode !== 'multiple_credentials' || !Array.isArray(lookup.candidates)) return [];
+  return lookup.candidates.slice(0, 10).map((candidate) => ({
+    id: String(candidate && candidate.id || ''),
+    title: String(candidate && candidate.title || ''),
+    username: String(candidate && candidate.username || '')
+  })).filter((candidate) => candidate.id);
+}
+
+// The login the user picked in the side panel. 1Password checks that it is
+// still saved for the page's site.
+async function fsbResolveChosenLogin(url, itemId) {
+  const onePassword = fsbOnePasswordClient();
+  if (!onePassword || typeof itemId !== 'string' || !itemId) return null;
+  const resolved = await onePassword.resolveLogin(url, { itemId });
+  return resolved && resolved.ok && resolved.login ? resolved : null;
+}
+
+// A metadata-only row in the side panel chat for a 1Password outcome.
+function fsbSendVaultRow(sessionId, row) {
+  chrome.runtime.sendMessage({ action: 'vaultResultRow', sessionId, row }).catch(() => {});
+}
+
+function fsbSignedInRow(login, fillResult) {
+  const chips = [];
+  if (fillResult && fillResult.filledUsername) chips.push('username');
+  if (fillResult && fillResult.filledPassword) chips.push('password');
+  return {
+    outcome: 'signed_in_1p',
+    title: String(login && login.title || ''),
+    username: String(login && login.username || ''),
+    chips
+  };
 }
 
 // Fill a login resolved from 1Password into the page's detected login form.
@@ -17183,6 +17254,7 @@ async function startAutomationLoop(sessionId) {
         }
 
         if (fillResult?.success) {
+          fsbSendVaultRow(sessionId, fsbSignedInRow(savedCred, fillResult));
           session._loginHandledForUrl.push(currentUrl);
 
           // Wait for page to settle after login submission
@@ -17213,91 +17285,124 @@ async function startAutomationLoop(sessionId) {
       } else {
         // NO 1PASSWORD LOGIN: interrupt sidepanel for credentials
         const loginFields = extractLoginFields(domResponse.structuredDOM);
-        automationLogger.info('No 1Password login for site, requesting from user', { sessionId, domain: loginDomain });
-
-        // Offer "Save to 1Password" only when FSB has a vault to save into.
-        let canSaveToOnePassword = false;
-        if (onePassword && lookup && lookup.errorCode === 'credential_not_found') {
-          const opStatus = await onePassword.status();
-          canSaveToOnePassword = !!(opStatus && opStatus.ok && opStatus.status
-            && opStatus.status.configured && opStatus.status.saveVaultId);
-        }
-
-        chrome.runtime.sendMessage({
-          action: 'loginDetected',
-          sessionId,
-          domain: loginDomain,
-          fields: loginFields,
-          canSave: canSaveToOnePassword
-        }).catch((err) => {
-          console.warn('[FSB] loginDetected sendMessage delivery failed', { sessionId, error: err && err.message });
-        });
-
-        // PAUSE: wait for user response
-        const userResponse = await waitForLoginResponse(sessionId);
-
-        if (userResponse.action === 'loginFormSubmitted') {
-          // Save to 1Password if the user asked and FSB has a save vault
-          if (userResponse.save && canSaveToOnePassword && onePassword) {
-            const saved = await onePassword.saveLogin(
-              currentUrl,
-              userResponse.credentials.username,
-              userResponse.credentials.password
-            );
-            automationLogger.info('Save login to 1Password', {
-              sessionId,
-              domain: loginDomain,
-              saved: !!(saved && saved.ok),
-              errorCode: saved && !saved.ok ? saved.errorCode : undefined
-            });
-          }
-
-          // Fill the form on page
-          const directFillResult = await fillCredentialsOnPageDirect(session.tabId, {
-            expectedOrigin: loginOrigin,
-            usernameSelector: loginFields.usernameSelector,
-            passwordSelector: loginFields.passwordSelector,
-            submitSelector: loginFields.submitSelector,
-            username: userResponse.credentials.username,
-            password: userResponse.credentials.password
-          });
-
-          if (directFillResult?.originChanged) {
-            restartOnNewPage();
-            return;
-          }
-
-          if (directFillResult?.success) {
-            session._loginHandledForUrl.push(currentUrl);
-
-            // Wait for page to settle
-            await new Promise(r => setTimeout(r, 2000));
-
-            // Check if login actually succeeded (URL changed = redirect after login)
-            try {
-              const tab = await chrome.tabs.get(session.tabId);
-              const newUrl = tab?.url || '';
-              if (newUrl === currentUrl) {
-                const idx = session._loginHandledForUrl.indexOf(currentUrl);
-                if (idx !== -1) session._loginHandledForUrl.splice(idx, 1);
-                automationLogger.debug('Still on login page after direct fill - re-enabling detection', { sessionId });
-              }
-            } catch (e) { /* tab may be gone */ }
-
-            // Direct fill succeeded -- restart loop
-            loopResolve?.();
-            if (!isSessionTerminating(sessionId) && activeSessions.has(sessionId)) {
-              setTimeout(() => startAutomationLoop(sessionId), 500);
-            }
-            return;
-          }
-          // Direct fill failed -- fall through to AI
-          automationLogger.info('Direct credential fill failed, deferring to AI', { sessionId, domain: loginDomain });
+        // An https login exists but this page is plain http: a refusal on
+        // purpose, so FSB does not ask the user to type one here either.
+        if (lookup && lookup.errorCode === 'credential_needs_https') {
+          fsbSendVaultRow(sessionId, { outcome: 'not_https', domain: loginDomain });
           session._loginHandledForUrl.push(currentUrl);
         } else {
-          // User skipped - mark as handled so we don't prompt again
-          session._loginHandledForUrl.push(currentUrl);
-          // Continue automation, AI will handle as it can
+          automationLogger.info('No 1Password login for site, requesting from user', { sessionId, domain: loginDomain });
+
+          // Offer "Save to 1Password" only when FSB has a vault to save into.
+          let canSaveToOnePassword = false;
+          if (onePassword && lookup && lookup.errorCode === 'credential_not_found') {
+            const opStatus = await onePassword.status();
+            canSaveToOnePassword = !!(opStatus && opStatus.ok && opStatus.status
+              && opStatus.status.configured && opStatus.status.saveVaultId);
+          }
+
+          chrome.runtime.sendMessage({
+            action: 'loginDetected',
+            sessionId,
+            domain: loginDomain,
+            fields: loginFields,
+            canSave: canSaveToOnePassword,
+            // Several logins match: the side panel lets the user pick one.
+            candidates: fsbLoginCandidates(lookup)
+          }).catch((err) => {
+            console.warn('[FSB] loginDetected sendMessage delivery failed', { sessionId, error: err && err.message });
+          });
+
+          // PAUSE: wait for user response
+          const userResponse = await waitForLoginResponse(sessionId);
+
+          if (userResponse.action === 'loginAccountChosen') {
+            // The user picked one of several matching logins.
+            const chosen = await fsbResolveChosenLogin(currentUrl, userResponse.itemId);
+            if (chosen && chosen.login) {
+              const chosenFill = await fillCredentialsOnPage(session.tabId, chosen.login, domResponse.structuredDOM, loginOrigin);
+              if (chosenFill?.originChanged) {
+                restartOnNewPage();
+                return;
+              }
+              if (chosenFill?.success) {
+                fsbSendVaultRow(sessionId, fsbSignedInRow(chosen.login, chosenFill));
+                session._loginHandledForUrl.push(currentUrl);
+                loopResolve?.();
+                if (!isSessionTerminating(sessionId) && activeSessions.has(sessionId)) {
+                  setTimeout(() => startAutomationLoop(sessionId), 2500);
+                }
+                return;
+              }
+            }
+            automationLogger.info('Chosen 1Password login could not be filled, deferring to AI', { sessionId, domain: loginDomain });
+            session._loginHandledForUrl.push(currentUrl);
+          } else if (userResponse.action === 'loginFormSubmitted') {
+            // Save to 1Password if the user asked and FSB has a save vault
+            let savedToOnePassword = false;
+            if (userResponse.save && canSaveToOnePassword && onePassword) {
+              const saved = await onePassword.saveLogin(
+                currentUrl,
+                userResponse.credentials.username,
+                userResponse.credentials.password
+              );
+              savedToOnePassword = !!(saved && saved.ok);
+              automationLogger.info('Save login to 1Password', {
+                sessionId,
+                domain: loginDomain,
+                saved: savedToOnePassword,
+                errorCode: saved && !saved.ok ? saved.errorCode : undefined
+              });
+            }
+
+            // Fill the form on page
+            const directFillResult = await fillCredentialsOnPageDirect(session.tabId, {
+              expectedOrigin: loginOrigin,
+              usernameSelector: loginFields.usernameSelector,
+              passwordSelector: loginFields.passwordSelector,
+              submitSelector: loginFields.submitSelector,
+              username: userResponse.credentials.username,
+              password: userResponse.credentials.password
+            });
+
+            if (directFillResult?.originChanged) {
+              restartOnNewPage();
+              return;
+            }
+
+            if (directFillResult?.success) {
+              fsbSendVaultRow(sessionId, { outcome: 'signed_in_typed', domain: loginDomain, saved: savedToOnePassword });
+              session._loginHandledForUrl.push(currentUrl);
+
+              // Wait for page to settle
+              await new Promise(r => setTimeout(r, 2000));
+
+              // Check if login actually succeeded (URL changed = redirect after login)
+              try {
+                const tab = await chrome.tabs.get(session.tabId);
+                const newUrl = tab?.url || '';
+                if (newUrl === currentUrl) {
+                  const idx = session._loginHandledForUrl.indexOf(currentUrl);
+                  if (idx !== -1) session._loginHandledForUrl.splice(idx, 1);
+                  automationLogger.debug('Still on login page after direct fill - re-enabling detection', { sessionId });
+                }
+              } catch (e) { /* tab may be gone */ }
+
+              // Direct fill succeeded -- restart loop
+              loopResolve?.();
+              if (!isSessionTerminating(sessionId) && activeSessions.has(sessionId)) {
+                setTimeout(() => startAutomationLoop(sessionId), 500);
+              }
+              return;
+            }
+            // Direct fill failed -- fall through to AI
+            automationLogger.info('Direct credential fill failed, deferring to AI', { sessionId, domain: loginDomain });
+            session._loginHandledForUrl.push(currentUrl);
+          } else {
+            // User skipped - mark as handled so we don't prompt again
+            session._loginHandledForUrl.push(currentUrl);
+            // Continue automation, AI will handle as it can
+          }
         }
       }
     }

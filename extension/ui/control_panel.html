@@ -52,13 +52,9 @@
               <i class="fas fa-sync-alt"></i>
               <span><span data-i18n="panel_8d261a372f">Sync</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
             </li>
-            <li class="nav-item" data-section="passwords">
-              <i class="fas fa-lock"></i>
-              <span><span data-i18n="panel_be146b37a0">Passwords</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
-            </li>
-            <li class="nav-item" data-section="payments">
-              <i class="fas fa-credit-card"></i>
-              <span><span data-i18n="panel_632e1c5839">Payments</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
+            <li class="nav-item" data-section="vault">
+              <i class="fas fa-vault"></i>
+              <span><span data-i18n="panel_5d55c415e3">Vault</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
             </li>
             <li class="nav-item" data-section="advanced">
               <i class="fas fa-sliders-h"></i>
@@ -1515,14 +1511,14 @@
         </section>
 
 
-        <!-- Passwords Section (Beta): logins come from the user's 1Password -->
-        <section class="content-section" id="passwords">
+        <!-- Vault (Beta): logins and cards come from the user's 1Password -->
+        <section class="content-section" id="vault">
           <div class="section-header">
-            <h2><span data-i18n="panel_be146b37a0">Passwords</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></h2>
-            <p data-i18n="panel_88c976fabd">FSB signs in with logins from your 1Password. FSB itself stores no passwords.</p>
+            <h2><span data-i18n="panel_5d55c415e3">Vault</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></h2>
+            <p data-i18n="panel_c82d7338de">FSB signs in and fills checkouts with items from your 1Password. FSB itself stores no passwords or cards.</p>
           </div>
 
-          <div class="toggle-grid single" style="margin-bottom: 1.5rem;">
+          <div class="toggle-grid" style="margin-bottom: 1.5rem;">
             <label class="modern-toggle">
               <input type="checkbox" id="enableLogin">
               <span class="toggle-track">
@@ -1533,91 +1529,6 @@
                 <span class="toggle-desc" data-i18n="panel_8b70975df7">When enabled, FSB detects login pages and signs in with the matching 1Password login.</span>
               </div>
             </label>
-          </div>
-
-          <div id="onePasswordPanel" class="credential-vault-panel">
-            <div class="credential-vault-header">
-              <div>
-                <h3 translate="no">1Password</h3>
-                <p id="onePasswordStatusText" data-i18n="panel_818962bda5">Checking 1Password connection...</p>
-              </div>
-              <button id="onePasswordDisconnectBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_acfc5be785">Disconnect</button>
-            </div>
-
-            <div id="onePasswordSetup" class="credential-vault-state" style="display: none;">
-              <div class="form-group">
-                <label for="onePasswordAccount" data-i18n="panel_b84510154a">1Password account</label>
-                <input type="text" id="onePasswordAccount" class="form-input" placeholder="my.1password.com" autocomplete="off" spellcheck="false">
-                <div class="form-help" data-i18n="panel_a6f394d865">The account name shown at the top of the 1Password sidebar. In the 1Password app, turn on Settings &gt; Developer &gt; Integrate with other apps.</div>
-              </div>
-              <button id="onePasswordConnectBtn" class="save-btn primary" data-i18n="panel_5dec08e310">Connect 1Password</button>
-              <p class="credential-vault-helper" data-i18n="panel_e175b45390">Using a service account instead? Run this in a terminal, then reload this page:</p>
-              <code class="onepassword-command" translate="no">npx fsb-mcp-server onepassword --service-account</code>
-            </div>
-
-            <div id="onePasswordVaults" class="credential-vault-state" style="display: none;">
-              <p class="credential-vault-helper" data-i18n="panel_5c0a336c67">Choose the vaults FSB may read. A vault used only by FSB is safest.</p>
-              <div id="onePasswordVaultList" class="onepassword-vault-list"></div>
-              <div class="form-group">
-                <label for="onePasswordSaveVault" data-i18n="panel_161c79f605">Save new logins to</label>
-                <select id="onePasswordSaveVault" class="form-select">
-                  <option value="" data-i18n="panel_cc6d7a8340">Do not save</option>
-                </select>
-              </div>
-              <button id="onePasswordSaveVaultsBtn" class="save-btn primary" data-i18n="panel_5d4b7e9caa">Save vault access</button>
-            </div>
-          </div>
-
-          <div id="legacyVaultPanel" class="credential-vault-panel" style="display: none;">
-            <div class="credential-vault-header">
-              <div>
-                <h3 data-i18n="panel_5ab21b8830">Move your old FSB vault to 1Password</h3>
-                <p id="legacyVaultSummaryText"></p>
-              </div>
-            </div>
-            <div class="credential-vault-state">
-              <div id="legacyVaultPinWrapper" class="form-group">
-                <div id="legacyVaultPin"></div>
-                <p class="credential-vault-helper" data-i18n="panel_911c744cd5">Enter the PIN of your old FSB vault. Items moved to 1Password are erased from FSB.</p>
-              </div>
-              <div class="legacy-vault-actions">
-                <button id="legacyVaultImportBtn" class="save-btn primary" data-i18n="panel_3f6118f701">Move to 1Password</button>
-                <button id="legacyVaultDeleteBtn" class="save-btn secondary" data-i18n="panel_0f5320398c">Delete old vault</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="credentialsManager" style="display: none;">
-            <div class="credentials-toolbar">
-              <div class="credentials-search-wrapper">
-                <i class="fas fa-search"></i>
-                <input type="search" id="credentialSearch" placeholder="Search sites..." class="form-input">
-              </div>
-              <button id="refreshCredentialsBtn" class="test-btn">
-                <i class="fas fa-sync-alt"></i>
-                <span data-i18n="panel_0e91610117">Refresh</span>
-              </button>
-            </div>
-
-            <div id="credentialsList" class="credentials-list">
-              <!-- Populated from 1Password by JS -->
-            </div>
-
-            <div id="credentialsEmpty" class="credentials-empty-state">
-              <i class="fas fa-key"></i>
-              <p data-i18n="panel_00f3328a04">No logins in the vaults FSB can use. Add or edit logins in 1Password.</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- Payments Section (Beta): cards come from the user's 1Password -->
-        <section class="content-section" id="payments">
-          <div class="section-header">
-            <h2><span data-i18n="panel_632e1c5839">Payments</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></h2>
-            <p data-i18n="panel_c6e98715b7">FSB fills checkout forms with credit cards from your 1Password, after you approve each fill.</p>
-          </div>
-
-          <div class="toggle-grid single" style="margin-bottom: 1.5rem;">
             <label class="modern-toggle">
               <input type="checkbox" id="enableSavedPayments">
               <span class="toggle-track">
@@ -1625,37 +1536,178 @@
               </span>
               <div class="toggle-content">
                 <span class="toggle-label" data-i18n="panel_195ab9772f">Enable Saved Payment Methods</span>
-                <span class="toggle-desc" data-i18n="panel_ff7378d58d">When enabled, FSB can prompt to fill a saved card on checkout pages. It never submits the final payment automatically.</span>
+                <span class="toggle-desc" data-i18n="panel_a55fac2bfd">FSB fills checkout forms with cards from your 1Password.</span>
               </div>
             </label>
           </div>
 
-          <div id="paymentMethodsBlocked" class="credential-vault-panel" style="display: none;">
-            <div class="credential-vault-state">
-              <p class="credential-vault-helper" data-i18n="panel_4875f94fbf">Connect 1Password in Passwords to use your cards.</p>
-              <button id="openPasswordsForPaymentsBtn" class="save-btn secondary" data-i18n="panel_24e06db48e">Open Passwords</button>
-            </div>
-          </div>
-
-          <div id="paymentMethodsManager" style="display: none;">
-            <div class="credentials-toolbar">
-              <div class="credentials-search-wrapper">
-                <i class="fas fa-search"></i>
-                <input type="search" id="paymentMethodSearch" placeholder="Search cards, brands, or billing details..." class="form-input" data-i18n-attr="placeholder:copy_8371bee1a3">
+          <div class="advanced-settings-grid" id="vaultGrid">
+            <div class="adv-sub"><i class="fas fa-key"></i><span translate="no">1Password</span><span class="adv-sub-rule"></span></div>
+            <div class="settings-card full-width" id="onePasswordPanel">
+              <div class="settings-card-header">
+                <div class="settings-card-icon"><i class="fas fa-vault"></i></div>
+                <div class="settings-card-title">
+                  <h3 translate="no">1Password</h3>
+                  <p id="onePasswordStatusText" data-i18n="panel_818962bda5">Checking 1Password connection...</p>
+                </div>
+                <span class="sync-status-pill" id="onePasswordPill" data-state="connecting" role="status" aria-live="polite"><span class="dot"></span><span class="label" id="onePasswordPillText"></span></span>
               </div>
-              <button id="refreshPaymentMethodsBtn" class="test-btn">
-                <i class="fas fa-sync-alt"></i>
-                <span data-i18n="panel_0e91610117">Refresh</span>
-              </button>
+              <div class="settings-card-content">
+                <div class="vx-setup" id="onePasswordSetup" hidden>
+                  <div>
+                    <div class="form-group">
+                      <label for="onePasswordAccount" data-i18n="panel_b84510154a">1Password account</label>
+                      <input type="text" id="onePasswordAccount" class="form-input" placeholder="my.1password.com" autocomplete="off" spellcheck="false">
+                      <div class="form-help" data-i18n="panel_a6f394d865">The account name shown at the top of the 1Password sidebar. In the 1Password app, turn on Settings &gt; Developer &gt; Integrate with other apps.</div>
+                    </div>
+                    <button id="onePasswordConnectBtn" class="save-btn primary" data-i18n="panel_5dec08e310">Connect 1Password</button>
+                  </div>
+                  <div class="vx-setup-b">
+                    <p class="credential-vault-helper" data-i18n="panel_e175b45390">Using a service account instead? Run this in a terminal, then reload this page:</p>
+                    <code class="onepassword-command" translate="no">npx fsb-mcp-server onepassword --service-account</code>
+                    <p class="credential-vault-helper vx-small" data-i18n="panel_a47c107d93">The token is kept on this computer in ~/.fsb/onepassword.json. The extension never receives it.</p>
+                  </div>
+                </div>
+                <div class="vx-conn" id="onePasswordConn" hidden>
+                  <div>
+                    <p class="credential-vault-helper" id="onePasswordBody"></p>
+                    <code class="onepassword-command vx-cmd" id="onePasswordInstallCmd" translate="no" hidden>npx fsb-mcp-server install --native-host</code>
+                    <div class="vx-acts">
+                      <button id="onePasswordDisconnectBtn" class="save-btn secondary" hidden data-i18n="panel_acfc5be785">Disconnect</button>
+                      <button class="vx-linkbtn" id="onePasswordServiceBtn" type="button" hidden data-i18n="panel_79761fb441">Use a service account instead</button>
+                      <button id="onePasswordCancelBtn" class="save-btn secondary" type="button" hidden data-i18n="panel_19766ed6cc">Cancel</button>
+                      <button id="onePasswordRetryBtn" class="save-btn secondary" type="button" hidden></button>
+                    </div>
+                    <div class="vx-service" id="onePasswordServiceHelp" hidden>
+                      <p class="credential-vault-helper" data-i18n="panel_e175b45390">Using a service account instead? Run this in a terminal, then reload this page:</p>
+                      <code class="onepassword-command" translate="no">npx fsb-mcp-server onepassword --service-account</code>
+                      <p class="credential-vault-helper vx-small" data-i18n="panel_a47c107d93">The token is kept on this computer in ~/.fsb/onepassword.json. The extension never receives it.</p>
+                    </div>
+                  </div>
+                  <div class="vx-path" id="onePasswordPath" role="img">
+                    <div class="vx-node"><div class="vx-node-ic" id="vxNodeOp"><i class="fas fa-vault"></i><span class="ping" hidden></span><span class="lk" hidden><i class="fas fa-lock"></i></span></div><b translate="no">1Password</b><span id="vxNodeOpSub"></span></div>
+                    <div class="vx-link" id="vxLink1"><i></i><i></i></div>
+                    <div class="vx-node"><div class="vx-node-ic" id="vxNodeSrv"><i class="fas fa-server"></i></div><b data-i18n="panel_caf0111717">Local server</b><span translate="no">fsb-mcp-server</span></div>
+                    <div class="vx-link" id="vxLink2"><i></i><i></i><b hidden><i class="fas fa-xmark"></i></b></div>
+                    <div class="vx-node"><div class="vx-node-ic"><i class="fas fa-puzzle-piece"></i></div><b data-i18n="panel_101f4d9537">This browser</b><span data-i18n="panel_87bdac40eb">FSB extension</span></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div id="paymentMethodsList" class="payment-methods-list">
-              <!-- Populated from 1Password by JS -->
+            <div id="legacyVaultPanel" class="credential-vault-panel vx-legacy" hidden>
+              <div class="credential-vault-header">
+                <div>
+                  <h3 data-i18n="panel_5ab21b8830">Move your old FSB vault to 1Password</h3>
+                  <p class="credential-vault-helper" id="legacyVaultSummaryText"></p>
+                </div>
+              </div>
+              <div class="credential-vault-state">
+                <div id="legacyVaultPinWrapper">
+                  <div id="legacyVaultPin"></div>
+                  <p class="credential-vault-helper" data-i18n="panel_911c744cd5">Enter the PIN of your old FSB vault. Items moved to 1Password are erased from FSB.</p>
+                </div>
+                <div class="legacy-vault-actions" id="legacyVaultActions">
+                  <button id="legacyVaultImportBtn" class="save-btn primary" data-i18n="panel_3f6118f701">Move to 1Password</button>
+                  <button id="legacyVaultDeleteBtn" class="save-btn secondary" data-i18n="panel_0f5320398c">Delete old vault</button>
+                </div>
+                <div class="vx-prog" id="legacyVaultProgress" hidden><div class="vx-bar vx-bar-busy"><i></i></div></div>
+                <div class="legacy-vault-actions" id="legacyVaultDoneRow" hidden>
+                  <button id="legacyVaultDoneBtn" class="save-btn secondary" type="button" data-i18n="entry_label_done">Done</button>
+                </div>
+              </div>
             </div>
 
-            <div id="paymentMethodsEmpty" class="credentials-empty-state">
-              <i class="fas fa-credit-card"></i>
-              <p data-i18n="panel_b9675cca57">No credit cards in the vaults FSB can use. Add or edit cards in 1Password.</p>
+            <div class="vx-group" id="vaultAccessGroup" hidden>
+              <div class="adv-sub"><i class="fas fa-shield-halved"></i><span data-i18n="panel_ec5ba0abb7">Access</span><span class="adv-sub-rule"></span></div>
+              <div class="settings-card full-width" id="onePasswordAccessCard">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon"><i class="fas fa-layer-group"></i></div>
+                  <div class="settings-card-title"><h3 data-i18n="panel_22894e363f">Vaults FSB may read</h3><p data-i18n="panel_5e05243ee1">A vault used only by FSB is safest.</p></div>
+                </div>
+                <div class="settings-card-content">
+                  <div id="onePasswordVaultList" class="onepassword-vault-list"></div>
+                  <div class="vx-save">
+                    <div class="form-group">
+                      <label for="onePasswordSaveVault" data-i18n="panel_161c79f605">Save new logins to</label>
+                      <select id="onePasswordSaveVault" class="form-select">
+                        <option value="" data-i18n="panel_cc6d7a8340">Do not save</option>
+                      </select>
+                    </div>
+                    <button id="onePasswordSaveVaultsBtn" class="save-btn primary" disabled data-i18n="panel_5d4b7e9caa">Save vault access</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="adv-sub" id="vaultRulesHeading"><i class="fas fa-shield-halved"></i><span data-i18n="panel_f5b53d4968">Once connected</span><span class="adv-sub-rule"></span></div>
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-card-icon"><i class="fas fa-globe"></i></div>
+                <div class="settings-card-title"><h3 data-i18n="panel_07ce99bab0">Sign-in rules</h3><p data-i18n="panel_be0dc4e4f5">Taken from each 1Password item</p></div>
+              </div>
+              <div class="settings-card-content">
+                <p class="vx-rule" data-i18n="panel_7f70ddcd8e">Only on the sites saved in a login.</p>
+                <p class="vx-rule" data-i18n="panel_374082363f">Never from https to http.</p>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-card-icon"><i class="fas fa-credit-card"></i></div>
+                <div class="settings-card-title"><h3 data-i18n="panel_059151ea45">Card fills</h3><p data-i18n="panel_42e70101ec">Your agent asks you first</p></div>
+              </div>
+              <div class="settings-card-content">
+                <p class="vx-rule" data-i18n="panel_949603eecc">Over MCP in its own app. In autopilot, in the side panel.</p>
+                <p class="vx-rule" data-i18n="panel_33e5a068d8">https pages only.</p>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-card-icon"><i class="fas fa-robot"></i></div>
+                <div class="settings-card-title"><h3 data-i18n="panel_e8cb2edbc4">What agents see</h3><p data-i18n="panel_107fa062ba">Over MCP and in autopilot</p></div>
+              </div>
+              <div class="settings-card-content">
+                <p class="vx-rule" data-i18n="panel_c53616b513">Titles, usernames, sites, last four digits.</p>
+                <p class="vx-rule" data-i18n="panel_ed87d52230">Never a password, code or card number.</p>
+              </div>
+            </div>
+
+            <div class="vx-group" id="vaultItemsGroup" hidden>
+              <div class="adv-sub"><i class="fas fa-list"></i><span data-i18n="panel_fb8e7a1a3c">Items</span><span class="adv-sub-rule"></span></div>
+              <div class="vx-items" id="credentialsManager">
+                <div class="vx-tools" id="vaultItemsTools">
+                  <div class="site-graph-detail-toggle" role="tablist">
+                    <button type="button" class="detail-btn active" id="vaultTabLogins" role="tab" aria-selected="true" data-tab="logins"><span data-i18n="panel_543eb6e59b">Logins</span><span class="n" id="vaultLoginCount"></span></button>
+                    <button type="button" class="detail-btn" id="vaultTabCards" role="tab" aria-selected="false" data-tab="cards"><span data-i18n="panel_a52fcbbc33">Cards</span><span class="n" id="vaultCardCount"></span></button>
+                  </div>
+                  <div class="credentials-toolbar">
+                    <div class="credentials-search-wrapper">
+                      <i class="fas fa-search"></i>
+                      <input type="search" id="credentialSearch" class="form-input" placeholder="Search titles, usernames and sites" data-i18n-attr="placeholder:panel_3304ef1777">
+                    </div>
+                    <button id="refreshCredentialsBtn" class="test-btn">
+                      <i class="fas fa-sync-alt"></i>
+                      <span data-i18n="panel_0e91610117">Refresh</span>
+                    </button>
+                  </div>
+                </div>
+                <p class="vx-ro" id="vaultLoginsNote"><i class="fas fa-lock"></i><span data-i18n="panel_5a80aae52c">Read only. Edit logins in 1Password.</span></p>
+                <p class="vx-ro" id="vaultCardsNote" hidden><i class="fas fa-lock"></i><span data-i18n="panel_547ca35987">Read from 1Password only at fill time, for the site in the tab.</span></p>
+                <div id="credentialsList" class="vx-list"></div>
+                <div id="paymentMethodsList" class="vx-list vx-cards" hidden></div>
+                <div id="credentialsEmpty" class="credentials-empty-state" hidden>
+                  <i class="fas fa-key"></i>
+                  <p data-i18n="panel_00f3328a04">No logins in the vaults FSB can use. Add or edit logins in 1Password.</p>
+                </div>
+                <div id="paymentMethodsEmpty" class="credentials-empty-state" hidden>
+                  <i class="fas fa-credit-card"></i>
+                  <p data-i18n="panel_b9675cca57">No credit cards in the vaults FSB can use. Add or edit cards in 1Password.</p>
+                </div>
+                <div id="vaultNoAccessEmpty" class="credentials-empty-state" hidden>
+                  <i class="fas fa-key"></i>
+                  <p data-i18n="panel_2fdf0b746a">Logins and cards appear here after you choose at least one vault.</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>

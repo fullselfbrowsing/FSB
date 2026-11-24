@@ -147,12 +147,17 @@
     // An in-flight capability invocation. Design-only: no ring pulse or 1.6s cadence exists upstream.
     ring: { duration: 1600, form: 'ring', from: '#8b5cf6', to: '#8b5cf6', animated: true },
     // A trigger watch. fsb-trigger-badge-dot cadence.
-    breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS }
+    breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS },
+    // The page is asking the user to type a login (the 1Password sheet). The
+    // design's orange ring and key dot: it tells the real prompt from a
+    // lookalike drawn by the page.
+    ask: { duration: 1600, form: 'ask', from: '#ff8c00', to: '#ff8c00', animated: true }
   };
 
   // Highest claim wins. A watch outranks everything on every tab: it is the one
   // state the user armed deliberately and is waiting on.
-  var RANK = { breathe: 4, ring: 3, orbit: 2, sweep: 1 };
+  // The ask outranks a watch: the user is the one being waited on.
+  var RANK = { ask: 5, breathe: 4, ring: 3, orbit: 2, sweep: 1 };
 
   // ---- Module state -------------------------------------------------------
   var unavailable = false;
@@ -535,6 +540,31 @@
     ctx.stroke();
   }
 
+  // An orange inset ring and a key dot in the bottom-right corner, the dot
+  // easing between 85% and full strength.
+  function drawAskBadge(ctx, size, progress) {
+    var rgb = parseHex(STATES.ask.from);
+    var width = Math.max(CAP_RING_W_MIN, Math.round(CAP_RING_W_RATIO * size));
+    var half = width / 2;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = mixColor(rgb, rgb, 0, 1);
+    ctx.beginPath();
+    ctx.rect(half, half, size - width, size - width);
+    ctx.stroke();
+    var pulse = progress < 0.5 ? easeInOut(progress / 0.5) : 1 - easeInOut((progress - 0.5) / 0.5);
+    var radius = Math.max(2.5, size * 0.22);
+    var cx = size - radius - width * 0.5;
+    var cy = size - radius - width * 0.5;
+    ctx.fillStyle = mixColor(rgb, rgb, 0, lerp(0.85, 1, pulse));
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, Math.round(size / 32));
+    ctx.strokeStyle = 'rgba(11, 11, 13, 0.85)';
+    ctx.stroke();
+  }
+
   // Renders one frame at every shipped size, each from its own source bitmap.
   // Nothing paints a background of its own -- the artwork already carries an
   // opaque tile, and a service worker cannot read the toolbar theme to pick one.
@@ -552,6 +582,7 @@
       if (spec.form === 'orbit') strokeSquareOrbit(ctx, size, spec.palette, progress);
       else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress);
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
+      else if (spec.form === 'ask') drawAskBadge(ctx, size, progress);
       frame[size] = ctx.getImageData(0, 0, size, size);
     }
     // Reuse this exact request object for every cycle. Rebuilding the two nested
@@ -1194,6 +1225,8 @@
             // Capability claims never survive their owning promise or worker.
             // Ignore any stale record written by an older worker generation.
             if (sk.indexOf('capability:') === 0) continue;
+            // So do asks: the sheet that made one died with the old worker.
+            if (sk.indexOf('ask:') === 0) continue;
             // A call that raced this init already holds the truth for its key.
             if (Object.prototype.hasOwnProperty.call(preReadyClaimKeys, sk)) continue;
             if (STATES[intent.claims[sk]]) claims[sk] = intent.claims[sk];
@@ -1294,6 +1327,13 @@
     setClaim('watch:' + tabKey(tabId), isWatching === true ? 'breathe' : null);
   }
 
+  // The page shows the typed-login sheet. A state, not a pulse: it lasts until
+  // the sheet is answered or closed.
+  function setAsking(tabId, isAsking) {
+    if (unavailable) return;
+    setClaim('ask:' + tabKey(tabId), isAsking === true ? 'ask' : null);
+  }
+
   // A closed tab cannot still be acting, invoking a capability, or watching.
   function dropTab(tabId) {
     var suffix = ':' + tabKey(tabId);
@@ -1372,6 +1412,7 @@
     beginCapability: beginCapability,
     endCapability: endCapability,
     setWatching: setWatching,
+    setAsking: setAsking,
     setAnimationsEnabled: setAnimationsEnabled,
     setConnected: setConnected,
     dropTab: dropTab,

@@ -83,8 +83,8 @@ function makeSdk(items, options = {}) {
           async list() {
             await lapse();
             return [
-              { id: 'vaultA', title: 'FSB', activeItemCount: 3 },
-              { id: 'vaultB', title: 'Private', activeItemCount: 1 },
+              { id: 'vaultA', title: 'FSB', activeItemCount: 3, vaultType: 'userCreated' },
+              { id: 'vaultB', title: 'Private', activeItemCount: 1, vaultType: 'personal' },
             ];
           },
         },
@@ -266,6 +266,20 @@ async function run() {
     for (const secret of ['pw-a', 'pw-bank', '123456', 'SEED']) assert.ok(!serialized.includes(secret), `list omits ${secret}`);
     assert.equal(logins.find((login) => login.id === 'vaultA:loginA').username, 'alice');
   });
+  await check('logins list how each site matches and whether a code is saved, never the code', async () => {
+    const logins = await broker.listLogins();
+    const byId = Object.fromEntries(logins.map((login) => [login.id, login]));
+    assert.deepEqual(byId['vaultA:loginA'].websites, [{ host: 'example.com', rule: 'site', protocol: 'https' }]);
+    assert.deepEqual(byId['vaultA:loginShop'].websites, [{ host: 'shop.test', rule: 'exact', protocol: 'https' }]);
+    assert.equal(byId['vaultA:loginA'].hasOneTimeCode, true);
+    assert.equal(byId['vaultA:loginA2'].hasOneTimeCode, false);
+    assert.equal(byId['vaultA:loginA'].vaultId, 'vaultA');
+    assert.ok(!JSON.stringify(logins).includes('123456') && !JSON.stringify(logins).includes('SEED'), 'no code or seed');
+  });
+  await check('vaults carry their type so the UI can name personal and shared vaults', async () => {
+    const vaults = await broker.listVaults();
+    assert.deepEqual(vaults.map((vault) => vault.vaultType), ['userCreated', 'personal']);
+  });
 
   console.log('\n--- resolving logins for a page ---');
   await check('the most specific, most recent match wins without requireUnique', async () => {
@@ -303,8 +317,10 @@ async function run() {
     await rejects(broker.resolveLogin({ url: 'https://bank.test' }), 'credential_not_found');
   });
   await check('an https login is withheld from the http version of its site, and the error says why', async () => {
-    const error = await rejects(broker.resolveLogin({ url: 'http://example.com/login' }), 'credential_not_found');
-    assert.match(error.message, /never filled on http:\/\/ pages/);
+    // A refusal on purpose has its own code, so FSB never offers to type a
+    // login on that http page instead.
+    const error = await rejects(broker.resolveLogin({ url: 'http://example.com/login' }), 'credential_needs_https');
+    assert.match(error.message, /never fills it on an http:\/\/ page/);
     const pinned = await rejects(broker.resolveLogin({ url: 'http://example.com', itemId: 'vaultA:loginA' }), 'credential_domain_mismatch');
     assert.match(pinned.message, /https:\/\//);
     const plain = await rejects(broker.resolveLogin({ url: 'https://nothing-saved.test' }), 'credential_not_found');
@@ -324,6 +340,8 @@ async function run() {
     assert.equal(cards[0].cardBrand, 'visa');
     assert.equal(cards[0].last4, '1111');
     assert.equal(cards[0].expiryYearLast2, '31');
+    assert.equal(cards[0].hasBillingAddress, true, 'whether an address is saved, never the address');
+    assert.ok(!JSON.stringify(cards).includes('Main St') && !JSON.stringify(cards).includes('60601'));
     const described = await broker.describeCard({ itemId: 'vaultA:cardA' });
     for (const value of [JSON.stringify(cards), JSON.stringify(described)]) {
       assert.ok(!value.includes('4111111111111111') && !value.includes('737'), 'metadata only');
@@ -516,6 +534,7 @@ async function run() {
     failing.configure({ vaultIds: ['vaultA'] });
     const error = await rejects(failing.listLogins(), 'onepassword_auth_failed');
     assert.ok(!error.message.includes(token));
+    assert.ok(!JSON.stringify(error.details || {}).includes(token), 'the reason detail never carries the token');
     const status = failing.status();
     assert.equal(status.tokenSource, 'env');
     assert.ok(!JSON.stringify(status).includes(token), 'status never includes the token');
@@ -528,6 +547,7 @@ async function run() {
     });
     const error = await rejects(missing.listVaults(), 'onepassword_auth_failed');
     assert.match(error.message, /Integrate with other apps/);
+    assert.equal(error.details && error.details.reason, 'app_missing', 'the UI can tell a missing app from a lock');
   });
   await check('item refs are strict', () => {
     assert.deepEqual(parseItemRef('abc:def'), { vaultId: 'abc', itemId: 'def' });

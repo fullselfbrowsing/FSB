@@ -258,6 +258,7 @@
       errorCode: (result && result.errorCode) || 'onepassword_request_failed',
       error: (result && result.error) || fallback
     };
+    if (result && typeof result.reason === 'string') out.reason = result.reason;
     if (result && Array.isArray(result.candidates)) {
       out.candidates = result.candidates.map(function (candidate) {
         return {
@@ -270,18 +271,83 @@
     return out;
   }
 
-  api.fillLoginInTab = async function (tabId, options, send) {
+  // `hooks.status(state)` reports progress to the on-page status pill. It is
+  // optional, receives no secret values, and its failures never affect a fill.
+  function pill(hooks, state) {
+    if (!hooks || typeof hooks.status !== 'function') return Promise.resolve(null);
+    try {
+      return Promise.resolve(hooks.status(state)).catch(function () { return null; });
+    } catch (_e) {
+      return Promise.resolve(null);
+    }
+  }
+
+  function filledFields(reply) {
+    return Array.isArray(reply && reply.filled)
+      ? reply.filled.filter(function (field) { return typeof field === 'string'; })
+      : [];
+  }
+
+  // The pill state for a failed fill: amber for a refusal on purpose, red for
+  // a 1Password that cannot be reached, nothing for the rest.
+  function failurePhase(result) {
+    var code = result && result.errorCode;
+    if (code === 'multiple_credentials') {
+      return { phase: 'several', count: Array.isArray(result.candidates) ? result.candidates.length : 0 };
+    }
+    if (code === 'credential_needs_https') return { phase: 'not_https' };
+    if (code === 'card_requires_https') return { phase: 'card_needs_https' };
+    if (code === 'page_changed' || code === 'merchant_changed') return { phase: 'page_changed' };
+    if (code === 'onepassword_auth_failed' && result.reason === 'locked') return { phase: 'locked' };
+    if (/^onepassword_(bridge_offline|bridge_unpaired|server_outdated|timeout|request_failed|sdk_unavailable|auth_failed|unavailable)$/.test(String(code || ''))) {
+      return { phase: 'unreachable' };
+    }
+    return { phase: 'exit' };
+  }
+
+  // A 1Password call that takes this long is usually waiting on the user to
+  // approve FSB in the 1Password app, so the pill says so.
+  var APPROVAL_HINT_MS = 2500;
+  function withApprovalHint(hooks, promise) {
+    if (!hooks) return promise;
+    var timer = setTimeout(function () { pill(hooks, { phase: 'approve' }); }, APPROVAL_HINT_MS);
+    return Promise.resolve(promise).then(function (value) {
+      clearTimeout(timer);
+      return value;
+    }, function (error) {
+      clearTimeout(timer);
+      throw error;
+    });
+  }
+
+  api.fillLoginInTab = async function (tabId, options, send, hooks) {
     var site = await tabSite(tabId);
     if (site.error) return toFillFailure(site.error, 'Tab unavailable');
-    var resolved = await api.resolveLogin(site.url, {
+    pill(hooks, { phase: 'checking', site: site.label });
+    var resolved = await withApprovalHint(hooks, api.resolveLogin(site.url, {
       itemId: options && options.itemId,
       requireUnique: !!(options && options.requireUnique)
-    });
+    }));
     if (!resolved || !resolved.ok || !resolved.login) {
+      // Nothing saved for the site: the caller may let the user type a login
+      // on the page instead. A credential_id that does not fit the site is the
+      // agent's mistake, so it is reported, not turned into a prompt.
+      if (options && options.askUser === true && !options.itemId
+          && resolved && resolved.errorCode === 'credential_not_found') {
+        return api.askLoginInTab(tabId, site, send, hooks, options);
+      }
+      pill(hooks, failurePhase(resolved));
       return toFillFailure(resolved, 'No 1Password login for ' + site.hostname);
     }
-    var login = resolved.login;
+    return fillResolvedLogin(tabId, site, resolved.login, send, hooks);
+  };
+
+  // Types one login resolved from 1Password into the tab.
+  async function fillResolvedLogin(tabId, site, login, send, hooks) {
+    var who = [login.title, login.username].filter(Boolean).join(' · ');
+    pill(hooks, { phase: 'signing_1p', who: who });
     if (!(await sameOrigin(tabId, site.origin))) {
+      pill(hooks, { phase: 'page_changed' });
       return toFillFailure(
         failure('page_changed', 'The page changed while 1Password was answering; the login was not filled'),
         'Page changed'
@@ -300,6 +366,7 @@
         }
       });
     } catch (error) {
+      pill(hooks, { phase: 'exit' });
       return failure('fill_failed', 'Content script fill failed: ' + ((error && error.message) || error));
     }
     var ok = !!reply && reply.success !== false;
@@ -315,8 +382,250 @@
       out.errorCode = (reply && reply.errorCode) || 'fill_failed';
       out.error = (reply && reply.error) || 'Fill failed';
     }
+    var chips = filledFields(reply);
+    var codeOnly = chips.length === 1 && chips[0] === 'one-time-code';
+    pill(hooks, ok
+      ? { phase: codeOnly ? 'filled_code' : 'filled_1p', who: codeOnly ? String(login.title || '') : who, chips: chips }
+      : failurePhase(out));
     return out;
+  }
+
+  // -------------------------------------------------------------------------
+  // Typing a login on the page when 1Password has none for the site.
+  //
+  // FSB shows a sheet on the page whose fields live in an extension frame
+  // (ui/credential-sheet.html), so page scripts never see a keystroke. The
+  // frame talks to this worker over its own port, which no other extension
+  // page receives, and must present the request's nonce. The content script
+  // hands the nonce to the frame by postMessage, never in the frame URL, which
+  // the page can read from its resource timing entries.
+  //
+  // Typed values go from the frame to this worker, then into the page fill and,
+  // when the user asks and a save vault is set, to 1Password. They are never
+  // returned, logged, or stored.
+  // -------------------------------------------------------------------------
+
+  var LOGIN_ASK_TIMEOUT_MS = 120000;
+  var SHEET_PAGE = 'ui/credential-sheet.html';
+  var SHEET_PORT = 'fsb-credential-sheet';
+  var MAX_TYPED_LENGTH = 2048;
+  var pendingAsks = Object.create(null);
+  var asksByTab = Object.create(null);
+
+  function randomToken(bytes) {
+    var buffer = new Uint8Array(bytes);
+    (root.crypto || globalThis.crypto).getRandomValues(buffer);
+    var out = '';
+    for (var i = 0; i < buffer.length; i += 1) out += (buffer[i] < 16 ? '0' : '') + buffer[i].toString(16);
+    return out;
+  }
+
+  function notProvided(site, reason) {
+    return {
+      success: false,
+      errorCode: 'credential_not_provided',
+      reason: reason,
+      error: reason === 'timeout'
+        ? 'Nobody typed a login for ' + site.hostname + ' within 2 minutes; nothing was filled'
+        : 'The user did not sign in to ' + site.hostname + '; nothing was filled'
+    };
+  }
+
+  function settleAsk(entry, result, finalState) {
+    if (entry.settled) return;
+    entry.settled = true;
+    clearTimeout(entry.timer);
+    delete pendingAsks[entry.requestId];
+    if (asksByTab[entry.tabId] === entry.requestId) delete asksByTab[entry.tabId];
+    if (finalState) pill(entry.hooks, finalState);
+    if (entry.port) {
+      try { entry.port.disconnect(); } catch (_e) { /* already gone */ }
+      entry.port = null;
+    }
+    entry.resolve(result);
+  }
+
+  api.askLoginInTab = async function (tabId, site, send, hooks, options) {
+    var statusResult = await api.status({ pair: false });
+    var status = statusResult && statusResult.ok ? statusResult.status : null;
+    var canSave = !!(status && status.configured && status.saveVaultId);
+    var previous = asksByTab[tabId] && pendingAsks[asksByTab[tabId]];
+    if (previous) settleAsk(previous, notProvided(previous.site, 'replaced'));
+
+    return new Promise(function (resolve) {
+      var entry = {
+        requestId: randomToken(16),
+        nonce: randomToken(24),
+        tabId: tabId,
+        site: site,
+        send: send,
+        hooks: hooks,
+        canSave: canSave,
+        client: (options && typeof options.client === 'string') ? options.client : '',
+        port: null,
+        busy: false,
+        settled: false,
+        resolve: resolve,
+        timer: null
+      };
+      entry.timer = setTimeout(function () {
+        settleAsk(entry, notProvided(site, 'timeout'), { phase: 'cancelled' });
+      }, LOGIN_ASK_TIMEOUT_MS);
+      pendingAsks[entry.requestId] = entry;
+      asksByTab[tabId] = entry.requestId;
+      pill(hooks, {
+        phase: 'ask',
+        site: site.label,
+        frameUrl: chrome.runtime.getURL(SHEET_PAGE),
+        requestId: entry.requestId,
+        nonce: entry.nonce
+      }).then(function (reply) {
+        // No sheet on this page (no content script, or a page FSB cannot draw
+        // on): report the original miss instead of waiting out the timer.
+        if (!reply || reply.shown !== true) {
+          settleAsk(entry, toFillFailure(
+            failure('credential_not_found', 'No 1Password login is saved for ' + site.hostname + ', and FSB could not show the sign-in sheet on this page'),
+            'No 1Password login for ' + site.hostname
+          ), { phase: 'exit' });
+        }
+      });
+    });
   };
+
+  function sheetSenderOk(entry, message, sender) {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    if (!message || typeof message.nonce !== 'string' || message.nonce !== entry.nonce) return false;
+    if (!sender.tab || sender.tab.id !== entry.tabId) return false;
+    if (typeof sender.frameId !== 'number' || sender.frameId <= 0) return false;
+    if (typeof sender.url !== 'string') return false;
+    return sender.url.split(/[?#]/)[0] === chrome.runtime.getURL(SHEET_PAGE);
+  }
+
+  async function submitTypedLogin(entry, message) {
+    var username = typeof message.username === 'string' ? message.username : '';
+    var password = typeof message.password === 'string' ? message.password : '';
+    if ((!username && !password) || username.length > MAX_TYPED_LENGTH || password.length > MAX_TYPED_LENGTH) {
+      return { type: 'refused', errorCode: 'invalid_request' };
+    }
+    var site = entry.site;
+    var save = message.save === true && entry.canSave;
+    entry.busy = true;
+    pill(entry.hooks, { phase: 'signing_typed', client: entry.client });
+    if (!(await sameOrigin(entry.tabId, site.origin))) {
+      settleAsk(entry, toFillFailure(
+        failure('page_changed', 'The page changed before the typed login was filled; nothing was filled'),
+        'Page changed'
+      ), { phase: 'page_changed' });
+      return null;
+    }
+    var reply;
+    try {
+      reply = await entry.send(entry.tabId, {
+        action: 'executeAction',
+        tool: 'fillCredentialFields',
+        params: { username: username, password: password, oneTimeCode: '', expectedOrigin: site.origin }
+      });
+    } catch (error) {
+      settleAsk(entry, failure('fill_failed', 'Content script fill failed: ' + ((error && error.message) || error)), { phase: 'exit' });
+      return null;
+    }
+    var ok = !!reply && reply.success !== false;
+    var out = {
+      success: ok,
+      site: site.hostname,
+      by: 'you',
+      filled: filledFields(reply),
+      fieldsFound: (reply && reply.fieldsFound) || {},
+      savedTo1Password: false
+    };
+    if (!ok) {
+      out.errorCode = (reply && reply.errorCode) || 'fill_failed';
+      out.error = (reply && reply.error) || 'Fill failed';
+      settleAsk(entry, out, { phase: reply && reply.errorCode === 'page_changed' ? 'page_changed' : 'exit' });
+      return null;
+    }
+    if (save) {
+      var saved = await api.saveLogin(site.url, username, password);
+      out.savedTo1Password = !!(saved && saved.ok);
+      if (out.savedTo1Password && saved.saved && saved.saved.id) out.credentialId = String(saved.saved.id);
+      if (!out.savedTo1Password) out.saveErrorCode = (saved && saved.errorCode) || 'onepassword_request_failed';
+    }
+    settleAsk(entry, out, {
+      phase: out.savedTo1Password ? 'filled_saved' : 'filled_not_saved',
+      chips: out.filled
+    });
+    return null;
+  }
+
+  // "Use 1Password instead", then Continue: the user saved the login in
+  // 1Password, so look again and fill it the usual way.
+  async function retryFromOnePassword(entry) {
+    entry.busy = true;
+    var resolved = await api.resolveLogin(entry.site.url, { requireUnique: true });
+    if (resolved && resolved.ok && resolved.login) {
+      var out = await fillResolvedLogin(entry.tabId, entry.site, resolved.login, entry.send, entry.hooks);
+      settleAsk(entry, out);
+      return null;
+    }
+    if (resolved && resolved.errorCode === 'credential_not_found') {
+      entry.busy = false;
+      return { type: 'still_missing' };
+    }
+    if (resolved && resolved.errorCode === 'multiple_credentials') {
+      settleAsk(entry, toFillFailure(resolved, 'Several 1Password logins match'), {
+        phase: 'several',
+        count: Array.isArray(resolved.candidates) ? resolved.candidates.length : 0
+      });
+      return null;
+    }
+    settleAsk(entry, toFillFailure(resolved, '1Password request failed'), { phase: 'exit' });
+    return null;
+  }
+
+  async function handleSheetMessage(entry, message) {
+    if (entry.busy || entry.settled || !message) return null;
+    if (message.type === 'cancel') {
+      settleAsk(entry, notProvided(entry.site, 'cancelled'), { phase: 'cancelled' });
+      return null;
+    }
+    if (message.type === 'submit') return submitTypedLogin(entry, message);
+    if (message.type === 'retry') return retryFromOnePassword(entry);
+    return { type: 'refused', errorCode: 'invalid_request' };
+  }
+
+  function postSafely(port, message) {
+    try { port.postMessage(message); } catch (_e) { /* the frame went away */ }
+  }
+
+  // background.js hands every port named SHEET_PORT to this function.
+  api.serveSheetPort = function (port) {
+    var entry = null;
+    port.onMessage.addListener(function (message) {
+      if (!entry) {
+        var candidate = message && typeof message.requestId === 'string' ? pendingAsks[message.requestId] : null;
+        if (!candidate || candidate.port || candidate.settled || message.type !== 'ready'
+            || !sheetSenderOk(candidate, message, port.sender)) {
+          postSafely(port, { type: 'refused', errorCode: 'untrusted_sender' });
+          return;
+        }
+        entry = candidate;
+        entry.port = port;
+        postSafely(port, { type: 'init', site: entry.site.label, canSave: entry.canSave, client: entry.client });
+        return;
+      }
+      Promise.resolve(handleSheetMessage(entry, message)).then(function (reply) {
+        if (reply && entry.port === port) postSafely(port, reply);
+      });
+    });
+    port.onDisconnect.addListener(function () {
+      // A closed or navigated frame ends the request at once. A submit already
+      // in flight finishes on its own.
+      if (entry && entry.port === port && !entry.settled && !entry.busy) {
+        settleAsk(entry, notProvided(entry.site, 'closed'), { phase: 'exit' });
+      }
+    });
+  };
+  api.SHEET_PORT = SHEET_PORT;
 
   function isTrustedUiSender(sender) {
     var prefix = 'chrome-extension://' + chrome.runtime.id + '/';
@@ -324,19 +633,29 @@
   }
 
   // Ask the side panel to approve a card fill. Resolves { approved, reason }.
+  // Ask the side panel to approve a card fill. Resolves { approved, reason }.
+  // Each prompt carries its own request id, which the answer must echo, and
+  // only one prompt is open at a time: one click can never approve two fills.
+  // The side panel answers the request with { shown: true } once the prompt is
+  // on screen; any other answer (another extension page, or none) settles at
+  // once as sidepanel_unavailable instead of waiting out the 2 minutes.
+  var pendingPayment = null;
   api.requestPaymentConfirmation = function (details) {
+    if (pendingPayment) pendingPayment({ approved: false, reason: 'replaced' });
     return new Promise(function (resolve) {
       var settled = false;
+      var requestId = randomToken(12);
       var timeoutId = setTimeout(function () { settle({ approved: false, reason: 'timeout' }); }, PAYMENT_CONFIRM_TIMEOUT_MS);
       function settle(value) {
         if (settled) return;
         settled = true;
         clearTimeout(timeoutId);
         chrome.runtime.onMessage.removeListener(handler);
+        if (pendingPayment === settle) pendingPayment = null;
         resolve(value);
       }
       function handler(request, sender, sendResponse) {
-        if (!request || request.paymentMethodId !== details.paymentMethodId) return;
+        if (!request || request.requestId !== requestId || request.paymentMethodId !== details.paymentMethodId) return;
         if (request.action !== 'paymentFillApproved' && request.action !== 'paymentFillDenied') return;
         if (!isTrustedUiSender(sender)) return;
         sendResponse({ received: true });
@@ -344,58 +663,102 @@
           ? { approved: true }
           : { approved: false, reason: 'user_declined' });
       }
+      pendingPayment = settle;
       chrome.runtime.onMessage.addListener(handler);
-      chrome.runtime.sendMessage({
+      Promise.resolve(chrome.runtime.sendMessage({
         action: 'paymentFillConfirmation',
+        requestId: requestId,
         paymentMethodId: details.paymentMethodId,
         cardBrand: details.cardBrand || 'unknown',
         last4: details.last4 || '****',
+        title: details.title || '',
+        expiryMonth: details.expiryMonth || '',
+        expiryYearLast2: details.expiryYearLast2 || '',
         merchantDomain: details.merchantDomain
-      }).catch(function () { settle({ approved: false, reason: 'sidepanel_unavailable' }); });
+      })).then(function (reply) {
+        if (!reply || reply.shown !== true) settle({ approved: false, reason: 'sidepanel_unavailable' });
+      }, function () {
+        settle({ approved: false, reason: 'sidepanel_unavailable' });
+      });
     });
   };
 
-  api.fillCardInTab = async function (tabId, itemId, send) {
+  // `options.confirm`: 'sidepanel' (the default) asks the user in FSB's side
+  // panel before the card is read; 'agent' skips that prompt because the MCP
+  // agent already asked in its own app. Either way the card is read only for
+  // an https page and filled only while the tab stays on the same origin.
+  api.fillCardInTab = async function (tabId, itemId, send, options, hooks) {
     var site = await tabSite(tabId);
     if (site.error) return toFillFailure(site.error, 'Tab unavailable');
+    if (site.origin.indexOf('https:') !== 0) {
+      pill(hooks, { phase: 'card_needs_https' });
+      var insecure = toFillFailure(
+        failure('card_requires_https', 'Cards are filled only on https pages, and ' + site.label + ' is not https; nothing was read from 1Password'),
+        'Cards need https'
+      );
+      insecure.merchantDomain = site.label;
+      return insecure;
+    }
+    var askInPanel = !(options && options.confirm === 'agent');
+    pill(hooks, { phase: 'checking', site: site.label });
 
-    // Metadata only until the user approves.
-    var described = await api.describeCard(itemId);
+    // Metadata only until the fill is cleared.
+    var described = await withApprovalHint(hooks, api.describeCard(itemId));
     if (!described || !described.ok || !described.card) {
-      return toFillFailure(described, 'Payment method not found in 1Password');
+      var missing = toFillFailure(described, 'Payment method not found in 1Password');
+      pill(hooks, failurePhase(missing));
+      return missing;
     }
-    var confirm = await api.requestPaymentConfirmation({
-      paymentMethodId: String(itemId),
-      cardBrand: described.card.cardBrand,
-      last4: described.card.last4,
-      merchantDomain: site.label
-    });
-    if (!confirm.approved) {
-      var reason = confirm.reason || 'user_declined';
-      return {
-        success: false,
-        declined: true,
-        reason: reason,
-        errorCode: 'payment_not_approved',
-        error: reason === 'sidepanel_unavailable'
-          ? 'Payment confirmation requires the FSB side panel to be open'
-          : (reason === 'timeout' ? 'Payment confirmation timed out (2 minutes)' : 'User declined payment fill')
-      };
+    var who = [described.card.title, described.card.last4].filter(Boolean).join(' · ');
+    if (askInPanel) {
+      var confirm = await api.requestPaymentConfirmation({
+        paymentMethodId: String(itemId),
+        cardBrand: described.card.cardBrand,
+        last4: described.card.last4,
+        title: described.card.title,
+        expiryMonth: described.card.expiryMonth,
+        expiryYearLast2: described.card.expiryYearLast2,
+        merchantDomain: site.label
+      });
+      if (!confirm.approved) {
+        var reason = confirm.reason || 'user_declined';
+        pill(hooks, { phase: 'exit' });
+        return {
+          success: false,
+          declined: true,
+          reason: reason,
+          errorCode: 'payment_not_approved',
+          error: reason === 'sidepanel_unavailable'
+            ? 'Payment confirmation requires the FSB side panel to be open'
+            : (reason === 'timeout' ? 'Payment confirmation timed out (2 minutes)' : 'User declined payment fill')
+        };
+      }
     }
+    pill(hooks, { phase: 'filling_card', who: who });
 
-    // The approval was for this origin. Check before reading the card, and
+    // The fill was cleared for this origin. Check before reading the card, and
     // again after, since that read can wait on 1Password as well.
     var merchantChanged = toFillFailure(
-      failure('merchant_changed', 'The page changed after approval; the card was not filled'),
+      failure('merchant_changed', askInPanel
+        ? 'The page changed after approval; the card was not filled'
+        : 'The page changed before the card fill; the card was not filled'),
       'Page changed'
     );
-    if (!(await sameOrigin(tabId, site.origin))) return merchantChanged;
-
-    var resolved = await api.resolveCard(itemId);
-    if (!resolved || !resolved.ok || !resolved.card) {
-      return toFillFailure(resolved, 'Could not read the card from 1Password');
+    if (!(await sameOrigin(tabId, site.origin))) {
+      pill(hooks, failurePhase(merchantChanged));
+      return merchantChanged;
     }
-    if (!(await sameOrigin(tabId, site.origin))) return merchantChanged;
+
+    var resolved = await withApprovalHint(hooks, api.resolveCard(itemId));
+    if (!resolved || !resolved.ok || !resolved.card) {
+      var unread = toFillFailure(resolved, 'Could not read the card from 1Password');
+      pill(hooks, failurePhase(unread));
+      return unread;
+    }
+    if (!(await sameOrigin(tabId, site.origin))) {
+      pill(hooks, failurePhase(merchantChanged));
+      return merchantChanged;
+    }
     var card = resolved.card;
     var reply;
     try {
@@ -421,12 +784,14 @@
         }
       });
     } catch (error) {
+      pill(hooks, { phase: 'exit' });
       return failure('fill_failed', 'Content script payment fill failed: ' + ((error && error.message) || error));
     }
     var ok = !!reply && reply.success !== false;
     var out = {
       success: ok,
       paymentMethodId: String(itemId),
+      title: String(described.card.title || ''),
       cardBrand: described.card.cardBrand,
       last4: described.card.last4,
       merchantDomain: site.label,
@@ -437,6 +802,7 @@
       out.errorCode = (reply && reply.errorCode) || 'fill_failed';
       out.error = (reply && reply.error) || 'Payment fill failed';
     }
+    pill(hooks, ok ? { phase: 'card_filled', who: who, chips: filledFields(reply) } : failurePhase(out));
     return out;
   };
 

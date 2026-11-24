@@ -3,6 +3,7 @@ import {
   bestWebsiteMatch,
   defaultSchemeForHost,
   parseHostTarget,
+  websiteDetails,
   websiteHosts,
   type HostTarget,
   type MatchStrength,
@@ -75,7 +76,7 @@ export interface SdkItem extends SdkItemOverview {
   fields: SdkField[];
   notes?: string;
 }
-export interface SdkVaultOverview { id: string; title: string; activeItemCount?: number }
+export interface SdkVaultOverview { id: string; title: string; activeItemCount?: number; vaultType?: string }
 export interface SdkClient {
   items: {
     list(vaultId: string, ...filters: unknown[]): Promise<SdkItemOverview[]>;
@@ -102,6 +103,7 @@ export type BrokerErrorCode =
   | 'onepassword_save_vault_missing'
   | 'invalid_request'
   | 'credential_not_found'
+  | 'credential_needs_https'
   | 'credential_domain_mismatch'
   | 'multiple_credentials'
   | 'payment_method_not_found';
@@ -120,7 +122,11 @@ export interface LoginSummary {
   id: string;
   title: string;
   domains: string[];
+  /** How each saved website matches (host, autofill rule, scheme). No secrets. */
+  websites: Array<{ host: string; rule: 'site' | 'exact'; protocol: 'http' | 'https' | '' }>;
   username: string;
+  /** Whether the item holds a one-time password. The code itself is never listed. */
+  hasOneTimeCode: boolean;
   vaultId: string;
 }
 
@@ -141,6 +147,8 @@ export interface CardSummary {
   cardholderName: string;
   expiryMonth: string;
   expiryYearLast2: string;
+  /** Whether a billing address is saved on the card. The address is never listed. */
+  hasBillingAddress: boolean;
   vaultId: string;
 }
 
@@ -273,6 +281,15 @@ function describeSignInFailure(kind: 'desktop' | 'service-account', message: str
     return 'The request was declined in the 1Password app.';
   }
   return message;
+}
+
+// Why a sign-in failed, for the UI: the code stays onepassword_auth_failed and
+// this detail tells "locked", "declined" and "app not found" apart.
+function signInFailureReason(kind: 'desktop' | 'service-account', message: string): 'app_missing' | 'declined' | 'locked' | 'other' {
+  if (kind === 'desktop' && /native library|desktop app(lication)? (is )?not (found|running)|not available/i.test(message)) return 'app_missing';
+  if (kind === 'desktop' && /denied|declined|rejected|cancel/i.test(message)) return 'declined';
+  if (/locked|session expired|unlock/i.test(message)) return 'locked';
+  return 'other';
 }
 
 function errorName(error: unknown): string {
@@ -593,9 +610,12 @@ export class OnePasswordBroker {
       this.lastError = null;
       return client;
     } catch (error) {
-      const message = describeSignInFailure(auth.kind, sanitizeSdkMessage(error));
+      const raw = sanitizeSdkMessage(error);
+      const message = describeSignInFailure(auth.kind, raw);
       this.noteError('onepassword_auth_failed', message);
-      throw new BrokerError('onepassword_auth_failed', `1Password sign-in failed: ${message}`);
+      throw new BrokerError('onepassword_auth_failed', `1Password sign-in failed: ${message}`, {
+        reason: signInFailureReason(auth.kind, raw),
+      });
     }
   }
 
@@ -633,7 +653,7 @@ export class OnePasswordBroker {
         throw new BrokerError('onepassword_request_failed', `1Password request failed: ${message}`);
       }
     }
-    throw new BrokerError('onepassword_auth_failed', '1Password session expired');
+    throw new BrokerError('onepassword_auth_failed', '1Password session expired', { reason: 'locked' });
   }
 
   private requireVaults(config: OnePasswordConfig): string[] {
@@ -674,13 +694,16 @@ export class OnePasswordBroker {
 
   // ----- operations ---------------------------------------------------------
 
-  async listVaults(): Promise<Array<{ id: string; title: string; itemCount: number }>> {
+  async listVaults(): Promise<Array<{ id: string; title: string; itemCount: number; vaultType: string }>> {
     return this.withClient(async (client) => {
       const vaults = await client.vaults.list({ decryptDetails: true });
       const list = (Array.isArray(vaults) ? vaults : []).map((vault) => ({
         id: String(vault.id),
         title: clip(vault.title, 200),
         itemCount: Number.isFinite(vault.activeItemCount) ? Number(vault.activeItemCount) : 0,
+        // personal, everyone, transfer, userCreated: tells the UI which vault
+        // is the user's own and which are shared before access is granted.
+        vaultType: typeof vault.vaultType === 'string' ? clip(vault.vaultType, 40) : '',
       })).filter((vault) => isValidVaultId(vault.id));
       for (const vault of list) this.vaultTitles.set(vault.id, vault.title);
       return list;
@@ -698,7 +721,9 @@ export class OnePasswordBroker {
             id: makeItemRef(vaultId, item.id),
             title: clip(item.title, 200),
             domains: websiteHosts(item.websites),
+            websites: websiteDetails(item.websites),
             username: extractLoginFields(item).username.slice(0, 320),
+            hasOneTimeCode: Array.isArray(item.fields) && item.fields.some((field) => field && field.fieldType === 'Totp'),
             vaultId,
           });
           if (results.length >= MAX_LISTED_ITEMS) return results;
@@ -734,6 +759,19 @@ export class OnePasswordBroker {
       }
 
       if (candidates.length === 0) {
+        // An https login exists for this host but the page is plain http: a
+        // refusal on purpose, with its own code, so FSB never offers to type
+        // a login there instead.
+        if (!requested && target.protocol === 'http:') {
+          const secureTarget: HostTarget = { ...target, protocol: 'https:' };
+          for (const vaultId of vaults) {
+            for (const overview of await this.overviews(client, vaultId)) {
+              if (overview.category === 'Login' && bestWebsiteMatch(overview.websites, secureTarget)) {
+                throw new BrokerError('credential_needs_https', `A 1Password login is saved for https://${target.hostname}, and FSB never fills it on an http:// page`);
+              }
+            }
+          }
+        }
         // On a plain-http page, say why an https login that exists was withheld.
         const httpNote = target.protocol === 'http:'
           ? ' on this http:// page. Logins saved for https:// websites are never filled on http:// pages'
@@ -803,6 +841,7 @@ export class OnePasswordBroker {
             cardholderName: fields.cardholderName,
             expiryMonth: fields.expiryMonth,
             expiryYearLast2: fields.expiryYear.slice(-2),
+            hasBillingAddress: !!(fields.addressLine1 || fields.city || fields.postalCode || fields.country),
             vaultId,
           });
         }
@@ -847,6 +886,7 @@ export class OnePasswordBroker {
         cardholderName: fields.cardholderName,
         expiryMonth: fields.expiryMonth,
         expiryYearLast2: fields.expiryYear.slice(-2),
+        hasBillingAddress: !!(fields.addressLine1 || fields.city || fields.postalCode || fields.country),
         vaultId: ref.vaultId,
       };
     });

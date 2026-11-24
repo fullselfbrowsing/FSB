@@ -494,6 +494,15 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
           String(pmId),
           (targetTabId, message) => chrome.tabs.sendMessage(targetTabId, message)
         );
+        // One metadata-only row in the side panel chat for the outcome.
+        const cardRow = fill.success === true
+          ? { outcome: 'card_filled', domain: fill.merchantDomain || '', title: fill.title || '', brand: fill.cardBrand || '', last4: fill.last4 || '' }
+          : fill.reason === 'timeout' ? { outcome: 'card_timeout' }
+          : fill.errorCode === 'card_requires_https' ? { outcome: 'not_https', domain: fill.merchantDomain || '' }
+          : fill.errorCode === 'merchant_changed' ? { outcome: 'page_changed' }
+          : /^onepassword_(not_configured|no_vaults|bridge_offline|bridge_unpaired|server_outdated)$/.test(String(fill.errorCode || '')) ? { outcome: 'not_connected' }
+          : null;
+        if (cardRow) chrome.runtime.sendMessage({ action: 'vaultResultRow', row: cardRow }).catch(() => {});
         if (fill.declined) {
           return makeResult({
             success: false,
