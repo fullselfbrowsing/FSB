@@ -236,12 +236,17 @@ function rawUpgrade(port, headerLines) {
 async function withTempHome(label, callback) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), `fsb-${label}-`));
   const previousHome = process.env.HOME;
+  // os.homedir() reads USERPROFILE on Windows.
+  const previousProfile = process.env.USERPROFILE;
   process.env.HOME = home;
+  process.env.USERPROFILE = home;
   try {
     return await callback(home);
   } finally {
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
+    if (previousProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = previousProfile;
     fs.rmSync(home, { recursive: true, force: true });
   }
 }
