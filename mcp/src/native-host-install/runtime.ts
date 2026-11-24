@@ -16,6 +16,8 @@ import {
   nativeHostProcessInvocationFromRecipe,
   type NativeHostProcessInvocation,
   type NativeHostProcessResult,
+  type NativeHostProvenance,
+  type NativeHostProvenanceRecord,
   type NativeHostRuntimeDependencies,
   type NativeHostRuntimeIntegrityReceipt,
   type NativeHostRuntimePackageRecord,
@@ -27,6 +29,17 @@ import {
   type NativeHostSecurePathFact,
   type NativeHostWindowsArchitecture,
 } from './types.js';
+
+/** Beside the receipt in the stable root; see NativeHostProvenanceRecord. */
+export const NATIVE_HOST_PROVENANCE_RELATIVE_PATH = 'provenance.json';
+
+export function nativeHostProvenanceContents(
+  installToken: string,
+  provenance: NativeHostProvenance,
+): string {
+  const record: NativeHostProvenanceRecord = { schema: 1, installToken, provenance };
+  return `${JSON.stringify(record)}\n`;
+}
 
 const MAX_PROCESS_OUTPUT_BYTES = 64 * 1024;
 const MAX_METADATA_BYTES = 64 * 1024;
@@ -897,13 +910,24 @@ export async function publishNativeHostRuntime(
       registryHelperPath: layout.registryHelperPath,
       registryHelperSha256,
       marker,
-      ...(provenance ? { provenance } : {}),
     };
     await files.writeFileExclusiveNoFollow(
       stagedReceiptPath,
       `${JSON.stringify(receipt)}\n`,
       layout.markerMode,
     );
+    // Provenance stays out of the receipt, whose exact key set earlier
+    // package versions require before they will repair or remove the helper.
+    const stagedProvenancePath = provenance
+      ? api.join(layout.stageRoot, NATIVE_HOST_PROVENANCE_RELATIVE_PATH)
+      : null;
+    if (stagedProvenancePath && provenance) {
+      await files.writeFileExclusiveNoFollow(
+        stagedProvenancePath,
+        nativeHostProvenanceContents(layout.installToken, provenance),
+        layout.markerMode,
+      );
+    }
     await files.writeFileExclusiveNoFollow(
       stagedMarkerPath,
       `${JSON.stringify(marker)}\n`,
@@ -927,6 +951,7 @@ export async function publishNativeHostRuntime(
       ...(stagedRegistryHelperPath ? [stagedRegistryHelperPath] : []),
       stagedMarkerPath,
       stagedReceiptPath,
+      ...(stagedProvenancePath ? [stagedProvenancePath] : []),
       ...(stagedManifestPath ? [stagedManifestPath] : []),
     ]) {
       await files.fsyncFile(pathname);

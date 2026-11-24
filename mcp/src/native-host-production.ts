@@ -79,7 +79,11 @@ import {
   nativeHostBrowsersFromEnvironment,
   resolveNativeHostPlatformLayout,
 } from './native-host-install/platform.js';
-import { publishNativeHostRuntime } from './native-host-install/runtime.js';
+import {
+  NATIVE_HOST_PROVENANCE_RELATIVE_PATH,
+  nativeHostProvenanceContents,
+  publishNativeHostRuntime,
+} from './native-host-install/runtime.js';
 import type {
   NativeHostDaemonStopAdapter,
   NativeHostEnsureDependencies,
@@ -602,6 +606,35 @@ function receiptsEqual(
   return Boolean(left && JSON.stringify(left) === JSON.stringify(right));
 }
 
+/**
+ * The provenance recorded for the publication `receipt` describes: the
+ * separate record when its install token matches, else a value an earlier
+ * build wrote into the receipt itself, else `explicit`.
+ */
+async function readProvenance(
+  layout: NativeHostRuntimeInspectionLayout,
+  receipt: Readonly<NativeHostRuntimeReceipt>,
+): Promise<NativeHostProvenance> {
+  const fact = await inspectFile(join(layout.stableRoot, NATIVE_HOST_PROVENANCE_RELATIVE_PATH), 1024);
+  if (fact.status === 'file') {
+    try {
+      const value = ordinaryRecord(JSON.parse(fact.contents) as unknown);
+      if (
+        value
+        && sameKeys(value, ['schema', 'installToken', 'provenance'])
+        && value.schema === 1
+        && value.installToken === receipt.installToken
+        && (value.provenance === 'auto' || value.provenance === 'explicit')
+      ) {
+        return value.provenance;
+      }
+    } catch {
+      // An unreadable record counts as none.
+    }
+  }
+  return receipt.provenance === 'auto' ? 'auto' : 'explicit';
+}
+
 async function inspectOwnedRuntime(
   layout: NativeHostRuntimeInspectionLayout,
 ): Promise<Readonly<NativeHostRuntimeOwnedInspection>> {
@@ -672,10 +705,22 @@ async function inspectOwnedRuntime(
       // Marker, receipt and layout agree and every other file is in place;
       // only the launcher changed. That one case is safe to rebuild.
       return Object.freeze({
-        state: 'invalid', reason: 'launcher-integrity', markerFact, marker, receipt,
+        state: 'invalid',
+        reason: 'launcher-integrity',
+        markerFact,
+        marker,
+        receipt,
+        provenance: await readProvenance(layout, receipt),
       });
     }
-    return Object.freeze({ state: 'exact', reason: 'exact', markerFact, marker, receipt });
+    return Object.freeze({
+      state: 'exact',
+      reason: 'exact',
+      markerFact,
+      marker,
+      receipt,
+      provenance: await readProvenance(layout, receipt),
+    });
   } catch {
     return Object.freeze({
       state: 'invalid', reason: 'runtime-metadata-invalid', markerFact, marker: null, receipt: null,
@@ -2249,15 +2294,17 @@ async function pinnedNodePresent(layout: NativeHostRuntimeInspectionLayout): Pro
   }
 }
 
-async function rewriteReceiptProvenance(
+async function rewriteProvenance(
   layout: NativeHostRuntimeInspectionLayout,
   receipt: Readonly<NativeHostRuntimeReceipt>,
   provenance: NativeHostProvenance,
 ): Promise<boolean> {
   const inspected = await inspectOwnedRuntime(layout);
   if (inspected.state !== 'exact' || !receiptsEqual(inspected.receipt, receipt)) return false;
-  const receiptPath = join(layout.stableRoot, NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH);
-  await replaceFileAtomic(receiptPath, `${JSON.stringify({ ...receipt, provenance })}\n`);
+  await replaceFileAtomic(
+    join(layout.stableRoot, NATIVE_HOST_PROVENANCE_RELATIVE_PATH),
+    nativeHostProvenanceContents(receipt.installToken, provenance),
+  );
   return true;
 }
 
@@ -2358,10 +2405,10 @@ async function productionEnsureDependencies(
         windowsManifest: publisher.windowsManifest,
       }));
     },
-    rewriteReceiptProvenance: (
+    rewriteProvenance: (
       receipt: Readonly<NativeHostRuntimeReceipt>,
       provenance: NativeHostProvenance,
-    ) => rewriteReceiptProvenance(inspectionLayout, receipt, provenance),
+    ) => rewriteProvenance(inspectionLayout, receipt, provenance),
     now: context.now,
   });
 }

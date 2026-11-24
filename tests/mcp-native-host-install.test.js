@@ -41,6 +41,25 @@ const REGISTRY_HELPER_SHA256 = 'e'.repeat(64);
 const BUILD_ENTRY_SHA256 = 'b'.repeat(64);
 const TARBALL_SHA512 = `sha512-${Buffer.alloc(64, 7).toString('base64')}`;
 const MAX_PROCESS_OUTPUT_BYTES = 64 * 1024;
+// The exact receipt key set 0.11.5 accepts; any other key makes it read the
+// helper as invalid and refuse to repair or remove it.
+const EARLIER_RELEASE_RECEIPT_KEYS = Object.freeze([
+  'schema',
+  'platform',
+  'packageName',
+  'packageVersion',
+  'stableRoot',
+  'launcherPath',
+  'packageRoot',
+  'markerPath',
+  'origin',
+  'installToken',
+  'tarballIntegrity',
+  'artifactSha256',
+  'registryHelperPath',
+  'registryHelperSha256',
+  'marker',
+]);
 
 let passed = 0;
 
@@ -1204,6 +1223,30 @@ async function runRuntimeTransaction() {
       harness.trace.filter((entry) => entry.startsWith('process:')).length,
       2,
       `${platformName} has no online retry or package-manager fallback`,
+    );
+    deepEqual(
+      Object.keys(result.receipt).sort(),
+      [...EARLIER_RELEASE_RECEIPT_KEYS].sort(),
+      `${platformName} the receipt has exactly the keys earlier releases accept`,
+    );
+    check(
+      !harness.trace.some((entry) => entry.includes('provenance.json')),
+      `${platformName} a publish with no provenance writes no provenance record`,
+    );
+
+    const tagged = fakeRuntimeDependencies(layout);
+    const taggedResult = await runtime.publishNativeHostRuntime(layout, tagged.dependencies, { provenance: 'auto' });
+    equal(taggedResult.status, 'published', `${platformName} a publish with provenance succeeds`);
+    equal(Object.hasOwn(taggedResult.receipt, 'provenance'), false, `${platformName} provenance never enters the receipt`);
+    const provenanceWrite = tagged.trace.indexOf(`write:${platformPath(platformName).join(layout.stageRoot, 'provenance.json')}:600`);
+    check(
+      provenanceWrite >= 0 && provenanceWrite < tagged.trace.indexOf(`rename:${layout.stageRoot}:${layout.stableRoot}`),
+      `${platformName} the provenance record is staged with the tree before the final rename`,
+    );
+    equal(
+      runtime.nativeHostProvenanceContents(layout.installToken, 'auto'),
+      `${JSON.stringify({ schema: 1, installToken: layout.installToken, provenance: 'auto' })}\n`,
+      `${platformName} the provenance record ties the value to this publication's token`,
     );
   }
 
@@ -3395,15 +3438,13 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
       packageVersion: fields.version || PACKAGE_VERSION,
       installToken: fields.token || INSTALL_TOKEN,
     });
-    const receipt = Object.freeze({
-      ...runtimeReceipt(runtimeLayout, marker),
-      ...(fields.provenance ? { provenance: fields.provenance } : {}),
-    });
+    const receipt = Object.freeze(runtimeReceipt(runtimeLayout, marker));
     return {
       state: fields.state || 'exact',
       reason: fields.reason || (fields.state === 'invalid' ? 'launcher-integrity' : 'exact'),
       marker,
       receipt,
+      provenance: fields.provenance,
       manifest: null,
       label: fields.label || 'installed',
     };
@@ -3534,6 +3575,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
         markerFact: markerFact(stable),
         marker: Object.freeze({ ...stable.marker }),
         receipt: stable.receipt,
+        ...(stable.provenance ? { provenance: stable.provenance } : {}),
       });
     },
     recheckExactRuntime: async (receipt) => {
@@ -3755,10 +3797,10 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
         removeExactRuntime: runtime.removeExactRuntime,
       });
     },
-    rewriteReceiptProvenance: async (receipt, provenance) => {
+    rewriteProvenance: async (receipt, provenance) => {
       trace.push(`provenance:${provenance}`);
       if (!stable || stable.receipt !== receipt) return false;
-      stable.receipt = Object.freeze({ ...receipt, provenance });
+      stable.provenance = provenance;
       rewrites += 1;
       return true;
     },
@@ -3869,7 +3911,7 @@ async function runEnsureTransaction() {
       deepEqual(result.browsers, ['chrome', 'edge'], `${platformName} install registers every browser that has the extension`);
       deepEqual(result.addedBrowsers, ['chrome', 'edge'], `${platformName} install reports the added browsers`);
       deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} both registrations exist`);
-      equal(harness.stable().receipt.provenance, 'auto', `${platformName} the receipt records automatic provenance`);
+      equal(harness.stable().provenance, 'auto', `${platformName} the receipt records automatic provenance`);
       equal(harness.optOut(), null, `${platformName} any install clears the opt-out marker`);
       equal(harness.stamp().failures, 0, `${platformName} a successful publish writes a clean stamp`);
       deepEqual(harness.stamp().browsers, ['chrome', 'edge'], `${platformName} the stamp is keyed on the browser set`);
@@ -3893,7 +3935,7 @@ async function runEnsureTransaction() {
         harness.dependencies,
       );
       deepEqual(result.browsers, ['chrome'], `${platformName} install falls back to Chrome when no profile has the extension`);
-      equal(harness.stable().receipt.provenance, 'explicit', `${platformName} explicit provenance is recorded`);
+      equal(harness.stable().provenance, 'explicit', `${platformName} explicit provenance is recorded`);
     }
     {
       const harness = fakeEnsureHarness(modules, platformName, {
@@ -3970,7 +4012,7 @@ async function runEnsureTransaction() {
         `${platformName} the refresh keeps the marker's extension id instead of the store default`,
       );
       equal(harness.published[0].options.destination, 'next', `${platformName} the refresh publishes beside the live root`);
-      equal(harness.stable().receipt.provenance, 'auto', `${platformName} the refresh keeps automatic provenance`);
+      equal(harness.stable().provenance, 'auto', `${platformName} the refresh keeps automatic provenance`);
       traceOrder(harness.trace, [
         'publish:next',
         'stop:write:refresh',
@@ -4538,13 +4580,13 @@ async function runEnsureTransaction() {
       harness.dependencies,
     );
     equal(result.outcome, 'current', 'an explicit install of a current automatic helper stays current');
-    equal(harness.stable().receipt.provenance, 'explicit', 'an explicit install promotes automatic provenance');
+    equal(harness.stable().provenance, 'explicit', 'an explicit install promotes automatic provenance');
     const automatic = await installer.ensureNativeHost(
       { mode: 'install', browsers: 'auto', provenance: 'auto' },
       harness.dependencies,
     );
     equal(automatic.outcome, 'current', 'an automatic install of an explicit helper stays current');
-    equal(harness.stable().receipt.provenance, 'explicit', 'an automatic install never demotes explicit provenance');
+    equal(harness.stable().provenance, 'explicit', 'an automatic install never demotes explicit provenance');
     equal(harness.rewrites(), 1, 'provenance is rewritten exactly once');
   }
   {
@@ -4788,7 +4830,7 @@ async function runEnsureTransaction() {
     const harness = fakeEnsureHarness(modules, 'darwin', {});
     const result = await installer.installNativeHostBrowser({ extensionId: EXTENSION_ID }, harness.dependencies);
     equal(result.status, 'installed', 'an explicit install with nothing present runs the original install');
-    equal(harness.stable().receipt.provenance, 'explicit', 'an explicit single-browser install records explicit provenance');
+    equal(harness.stable().provenance, 'explicit', 'an explicit single-browser install records explicit provenance');
     const already = await installer.installNativeHostBrowser({ extensionId: EXTENSION_ID }, harness.dependencies);
     equal(already.status, 'already-installed', 'a repeated explicit install reports already installed');
   }
@@ -5015,6 +5057,7 @@ async function runProductionEnsure() {
   const fsbRoot = path.join(home, '.fsb');
   const stableRoot = path.join(fsbRoot, 'native-host');
   const receiptPath = path.join(stableRoot, 'install-receipt.json');
+  const provenancePath = path.join(stableRoot, 'provenance.json');
   const markerPath = path.join(stableRoot, 'owner.json');
   const manifestName = `${HOST_NAME}.json`;
   const manifestPath = (browser) => (process.platform === 'darwin'
@@ -5062,7 +5105,17 @@ async function runProductionEnsure() {
       equal(installed.outcome, 'installed', 'production install-mode ensure installs the helper');
       deepEqual(installed.browsers, ['chrome', 'edge'], 'production install registers each test-mode browser');
       check(fs.existsSync(manifestPath('chrome')) && fs.existsSync(manifestPath('edge')), 'production install writes both manifests');
-      equal(JSON.parse(fs.readFileSync(receiptPath, 'utf8')).provenance, 'auto', 'production receipt records automatic provenance');
+      const writtenReceipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+      deepEqual(
+        Object.keys(writtenReceipt).sort(),
+        [...EARLIER_RELEASE_RECEIPT_KEYS].sort(),
+        'the receipt keeps exactly the keys earlier releases require, so they can still repair and remove the helper',
+      );
+      deepEqual(
+        JSON.parse(fs.readFileSync(provenancePath, 'utf8')),
+        { schema: 1, installToken: writtenReceipt.installToken, provenance: 'auto' },
+        'production records automatic provenance beside the receipt, tied to the install token',
+      );
       check(fs.existsSync(path.join(fsbRoot, 'native-host-ensure.json')), 'production install writes the ensure stamp');
       equal(current.outcome, 'current', 'a second production ensure finds the helper current');
       check(!fs.existsSync(`${stableRoot}.lock`), 'production ensure releases its lock');
@@ -5075,7 +5128,12 @@ async function runProductionEnsure() {
       const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
       equal(receipt.packageVersion, PACKAGE_VERSION, 'the refreshed receipt carries the running version');
       equal(receipt.origin, `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`, 'a development extension id survives refresh');
-      equal(receipt.provenance, 'auto', 'refresh keeps automatic provenance');
+      equal(Object.hasOwn(receipt, 'provenance'), false, 'the refreshed receipt carries no provenance key');
+      deepEqual(
+        JSON.parse(fs.readFileSync(provenancePath, 'utf8')),
+        { schema: 1, installToken: receipt.installToken, provenance: 'auto' },
+        'refresh keeps automatic provenance for the new publication',
+      );
       deepEqual(
         JSON.parse(fs.readFileSync(manifestPath('chrome'), 'utf8')).allowed_origins,
         [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`],
@@ -5164,6 +5222,11 @@ async function runProductionEnsure() {
       equal(cleared, null, 'clearing the opt-out removes the marker');
     }
     {
+      // A helper from a build that kept provenance inside the receipt, with
+      // no separate record, is still read as automatic.
+      const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+      fs.writeFileSync(receiptPath, `${JSON.stringify({ ...receipt, provenance: 'auto' })}\n`);
+      fs.unlinkSync(provenancePath);
       const [removed] = runProductionSteps(home, [
         { op: 'uninstallAll', request: { onlyProvenance: 'auto' } },
       ], 'chrome');

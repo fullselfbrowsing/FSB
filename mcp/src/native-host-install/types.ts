@@ -221,10 +221,19 @@ export type NativeHostWindowsArchitecture = 'x64' | 'arm64';
 /**
  * Who asked for the helper. `auto` installs come from installing an MCP client
  * and may be removed again when the last client goes; `explicit` installs come
- * from `install --native-host` and stay until removed by name. Receipts written
- * before this field existed count as `explicit`.
+ * from `install --native-host` and stay until removed by name. It is recorded
+ * in `provenance.json` inside the stable root, apart from the install receipt,
+ * so earlier package versions can still read and remove the helper. A helper
+ * with no record counts as `explicit`.
  */
 export type NativeHostProvenance = 'auto' | 'explicit';
+
+/** `<stableRoot>/provenance.json`: tied to one publication by its install token. */
+export interface NativeHostProvenanceRecord {
+  schema: 1;
+  installToken: string;
+  provenance: NativeHostProvenance;
+}
 
 /**
  * `stable` publishes into the absent stable root. `next` publishes beside a
@@ -274,6 +283,7 @@ export interface NativeHostRuntimeReceipt {
   registryHelperPath: string | null;
   registryHelperSha256: string | null;
   marker: NativeHostOwnerMarker;
+  /** Only in receipts from builds that kept provenance there; read, never written. */
   provenance?: NativeHostProvenance;
 }
 
@@ -363,6 +373,8 @@ export interface NativeHostRuntimeOwnedInspection {
   markerFact: NativeHostFileFact;
   marker: NativeHostOwnerMarker | null;
   receipt: Readonly<NativeHostRuntimeReceipt> | null;
+  /** Who asked for this runtime; absent counts as `explicit`. */
+  provenance?: NativeHostProvenance;
 }
 
 export interface NativeHostRuntimeInspectionLayout {
@@ -613,7 +625,8 @@ export interface NativeHostEnsureDependencies {
   /** False only when the interpreter the installed launcher names is gone. */
   pinnedNodePresent(): Promise<boolean>;
   createPublisher(options: NativeHostPublisherOptions): Promise<NativeHostInstallRuntimeAdapter>;
-  rewriteReceiptProvenance(
+  /** Records `provenance` for the exact runtime `receipt` describes. */
+  rewriteProvenance(
     receipt: Readonly<NativeHostRuntimeReceipt>,
     provenance: NativeHostProvenance,
   ): Promise<boolean>;

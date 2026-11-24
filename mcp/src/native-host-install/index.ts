@@ -184,12 +184,11 @@ function receiptsEqual(
     && left.installToken === right.installToken
     && left.tarballIntegrity === right.tarballIntegrity
     && left.artifactSha256 === right.artifactSha256
-    && receiptProvenance(left) === receiptProvenance(right)
     && markersEqual(left.marker, right.marker);
 }
 
-function receiptProvenance(receipt: Readonly<NativeHostRuntimeReceipt>): NativeHostProvenance {
-  return receipt.provenance === 'auto' ? 'auto' : 'explicit';
+function runtimeProvenance(runtime: Readonly<NativeHostRuntimeOwnedInspection>): NativeHostProvenance {
+  return runtime.provenance === 'auto' ? 'auto' : 'explicit';
 }
 
 function exactRuntimeReceipt(
@@ -1019,6 +1018,7 @@ type EnsurePlan =
   | Readonly<{
     kind: 'update' | 'quarantine';
     receipt: Readonly<NativeHostRuntimeReceipt>;
+    provenance: NativeHostProvenance;
     extensionId: string;
     registered: readonly NativeHostBrowser[];
     additions: readonly NativeHostBrowser[];
@@ -1127,6 +1127,7 @@ async function planEnsure(
     return Object.freeze({
       kind: 'quarantine',
       receipt,
+      provenance: runtimeProvenance(runtime),
       extensionId,
       registered,
       additions,
@@ -1148,7 +1149,7 @@ async function planEnsure(
     }
     if (!nodePresent) refresh = 'node';
   }
-  const promote = request.provenance === 'explicit' && receiptProvenance(receipt) === 'auto';
+  const promote = request.provenance === 'explicit' && runtimeProvenance(runtime) === 'auto';
   if (registered.length === 0 && additions.length === 0) {
     return finalPlan(ensureResult(dependencies, 'refused', {
       reason: surfacesOwnershipReason(runtime.state, surfaces),
@@ -1165,6 +1166,7 @@ async function planEnsure(
   return Object.freeze({
     kind: 'update',
     receipt,
+    provenance: runtimeProvenance(runtime),
     extensionId,
     registered,
     additions,
@@ -2038,7 +2040,7 @@ async function executeUpdate(
   let outcome: 'current' | 'refreshed' | 'registered' = 'current';
   const provenance: NativeHostProvenance = request.provenance === 'explicit'
     ? 'explicit'
-    : receiptProvenance(receipt);
+    : plan.provenance;
   if (plan.refresh !== null) {
     const key = stampKey(dependencies, plan);
     const context = Object.freeze({
@@ -2064,7 +2066,7 @@ async function executeUpdate(
     await recordStamp(dependencies, key, true);
   } else if (plan.promote) {
     try {
-      await dependencies.rewriteReceiptProvenance(receipt, 'explicit');
+      await dependencies.rewriteProvenance(receipt, 'explicit');
     } catch {
       // The helper keeps working; it only stays removable with its last client.
     }
@@ -2362,8 +2364,8 @@ async function promoteProvenance(dependencies: NativeHostEnsureDependencies): Pr
     const receipt = runtime.state === 'exact'
       ? exactRuntimeReceipt(runtime, ensurePair(dependencies))
       : null;
-    if (receipt && receiptProvenance(receipt) === 'auto') {
-      await dependencies.rewriteReceiptProvenance(receipt, 'explicit');
+    if (receipt && runtimeProvenance(runtime) === 'auto') {
+      await dependencies.rewriteProvenance(receipt, 'explicit');
     }
   } catch {
     // See executeUpdate.
@@ -2571,7 +2573,7 @@ export async function uninstallAllNativeHost(
       if (!receipt || !installedExtensionId) {
         return uninstallAllResult('refused', { reason: 'ownership-mismatch' });
       }
-      const provenance = receiptProvenance(receipt);
+      const provenance = runtimeProvenance(runtime);
       if (onlyAuto && provenance !== 'auto') {
         return uninstallAllResult('kept', { reason: 'explicit-provenance', provenance });
       }
