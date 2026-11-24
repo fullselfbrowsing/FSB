@@ -1030,20 +1030,22 @@ function run() {
         'a later client install sets the helper up again');
       assert(!fs.existsSync(optOutPath), 'a later client install clears the opt-out marker');
 
-      // A configured delegation provider keeps the helper.
-      const providerRoot = path.join(fixture.home, '.fsb', 'agent-providers', 'grok');
-      fs.mkdirSync(providerRoot, { recursive: true });
+      // A delegated run the extension started through the helper keeps it.
+      const runtimeRoot = path.join(fixture.home, '.fsb', 'agent-runtime');
+      fs.mkdirSync(runtimeRoot, { recursive: true });
+      fs.writeFileSync(path.join(runtimeRoot, 'delegation-events.jsonl'),
+        '{"ts":"2026-11-01T00:00:00.000Z","event":"run_started","delegationId":"abcdefgh12345678","adapterId":"claude-code"}\n');
       const keptProvider = helper(['uninstall', '--codex']);
       assertIncludes(`${keptProvider.stdout}${keptProvider.stderr}`,
-        'was not removed: a delegation provider is configured in ~/.fsb/agent-providers (grok)',
-        'a delegation provider keeps the helper after its last client');
-      assert(fs.existsSync(stableRoot), 'the helper survives while a delegation provider is configured');
+        'was not removed: the browser extension has run delegated agents through it (claude-code)',
+        'a delegated run keeps the helper after its last client');
+      assert(fs.existsSync(stableRoot), 'the helper survives while the extension delegates through it');
       const keptAll = helper(['uninstall', '--all'], { PATH: path.join(fixture.root, 'empty-bin') });
-      assert(fs.existsSync(stableRoot), 'uninstall --all keeps a helper a delegation provider uses');
+      assert(fs.existsSync(stableRoot), 'uninstall --all keeps a helper the extension delegates through');
       assertEqual(readJson(optOutPath).reason, 'uninstall-all', 'uninstall --all still writes the opt-out marker');
-      assertIncludes(`${keptAll.stdout}${keptAll.stderr}`, 'a delegation provider is configured',
+      assertIncludes(`${keptAll.stdout}${keptAll.stderr}`, 'has run delegated agents through it',
         'uninstall --all says why the helper stays');
-      fs.rmSync(path.join(fixture.home, '.fsb', 'agent-providers'), { recursive: true, force: true });
+      fs.rmSync(runtimeRoot, { recursive: true, force: true });
       const removedAll = helper(['uninstall', '--all'], { PATH: path.join(fixture.root, 'empty-bin') });
       assertIncludes(`${removedAll.stdout}${removedAll.stderr}`, "Removed FSB's local helper (native messaging host)",
         'uninstall --all removes an auto helper once nothing else needs it');

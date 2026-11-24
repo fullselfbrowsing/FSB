@@ -10,7 +10,7 @@ import type { ConfigResult, FsbClientFinding, FsbConfigurationScan } from './con
 import { FSB_MCP_VERSION, FSB_SERVER_NAME } from './version.js';
 import { execSync, spawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
+import { lstat, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import {
@@ -22,6 +22,10 @@ import {
   uninstallNativeHost,
 } from './native-host-install/index.js';
 import { NATIVE_HOST_BROWSERS, isNativeHostBrowser } from './native-host-install/browser.js';
+import {
+  DELEGATION_LOG_FILENAME,
+  DELEGATION_LOG_ROTATED_FILENAME,
+} from './agent-providers/delegation-log.js';
 import { resolveNativeHostPlatformLayout } from './native-host-install/platform.js';
 import type {
   NativeHostBrowser,
@@ -57,11 +61,14 @@ export interface NativeHostUninstallChecks {
   /** Every client config FSB can read, after this run's removals. */
   scanClients(): Promise<FsbConfigurationScan>;
   /**
-   * Names under ~/.fsb/agent-providers, where a configured delegation
-   * provider keeps its private profile. Null when the directory exists but
-   * cannot be read.
+   * Agents the browser extension has run delegated work with through the
+   * helper, as the local agent service's delegation log records them (a
+   * `run_started` entry per run). Connection tests and sign-ins never count.
+   * Null when the log exists but cannot be read.
    */
-  delegationProviders(): Promise<readonly string[] | null>;
+  delegatedAgents(): Promise<readonly string[] | null>;
+  /** False only when the helper's directory is certainly not there. */
+  helperPresent(): Promise<boolean>;
 }
 
 /** Matched platform for file-based install/uninstall */
@@ -651,27 +658,75 @@ function describeFindings(findings: readonly FsbClientFinding[]): string {
   return labels.join(', ');
 }
 
-async function configuredDelegationProviders(homeDirectory: string): Promise<readonly string[] | null> {
+// The log rotates at about 1 MiB; anything far past that is not the log.
+const DELEGATION_LOG_SCAN_MAX_BYTES = 8 * 1024 * 1024;
+
+/**
+ * The agent providers that have started a delegated run through the local
+ * agent service, read from its delegation log and the one rotated copy. The
+ * extension reaches that service only through the helper, so any such run
+ * means the extension still needs it. A connection test or sign-in writes no
+ * `run_started` entry and so never counts.
+ */
+async function delegatedAgentsInLog(homeDirectory: string): Promise<readonly string[] | null> {
+  const root = join(homeDirectory, '.fsb', 'agent-runtime');
+  const agents = new Set<string>();
+  let unreadable = false;
+  for (const name of [DELEGATION_LOG_FILENAME, DELEGATION_LOG_ROTATED_FILENAME]) {
+    let text: string;
+    try {
+      const fact = await lstat(join(root, name));
+      if (!fact.isFile() || fact.size > DELEGATION_LOG_SCAN_MAX_BYTES) {
+        unreadable = true;
+        continue;
+      }
+      text = await readFile(join(root, name), 'utf8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') unreadable = true;
+      continue;
+    }
+    for (const line of text.split('\n')) {
+      if (!line.includes('run_started')) continue;
+      try {
+        const record = JSON.parse(line) as { event?: unknown; adapterId?: unknown };
+        if (record?.event !== 'run_started') continue;
+        agents.add(typeof record.adapterId === 'string' && PROVIDER_NAME_PATTERN.test(record.adapterId)
+          ? record.adapterId
+          : 'an agent');
+      } catch {
+        // A torn line is skipped; the other lines still count.
+      }
+    }
+  }
+  if (agents.size === 0 && unreadable) return null;
+  return [...agents].sort();
+}
+
+async function nativeHostDirectoryPresent(): Promise<boolean> {
+  const root = defaultNativeHostLayout()?.stableRoot;
+  if (!root) return true;
   try {
-    return (await readdir(join(homeDirectory, '.fsb', 'agent-providers')))
-      .filter((name) => !name.startsWith('.'))
-      .sort();
+    await lstat(root);
+    return true;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException)?.code;
-    return code === 'ENOENT' || code === 'ENOTDIR' ? [] : null;
+    return code !== 'ENOENT' && code !== 'ENOTDIR';
   }
 }
 
 const productionUninstallChecks: NativeHostUninstallChecks = Object.freeze({
   scanClients: () => isFsbConfiguredAnywhere(),
-  delegationProviders: () => configuredDelegationProviders(homedir()),
+  delegatedAgents: () => delegatedAgentsInLog(homedir()),
+  helperPresent: () => nativeHostDirectoryPresent(),
 });
 
 /**
  * The helper step client uninstall ends with. The helper goes only when no
- * client config still names FSB (skipped for --all), no delegation provider
- * is configured, and `install` rather than `install --native-host` set it up.
- * `--all` also pauses the automatic refresh, whatever happens to the helper.
+ * client config still names FSB (skipped for --all), the extension has never
+ * run a delegated agent through it, and `install` rather than
+ * `install --native-host` set it up. `--all` also pauses the automatic
+ * refresh, whatever happens to the helper.
  */
 async function runUninstallHelperStep(
   flags: InstallFlags,
@@ -682,8 +737,8 @@ async function runUninstallHelperStep(
   if (flags['dry-run'] === true) {
     console.log('[DRY RUN] ' + HELPER_LABEL);
     console.log(isAll
-      ? '  Would remove it if install set it up and no delegation provider is configured, and pause its automatic refresh'
-      : '  Would remove it if install set it up, no other client uses FSB, and no delegation provider is configured');
+      ? '  Would remove it if install set it up and the extension has not run a delegated agent through it, and pause its automatic refresh'
+      : '  Would remove it if install set it up, no other client uses FSB, and the extension has not run a delegated agent through it');
     return;
   }
   if (isAll) {
@@ -711,21 +766,30 @@ async function runUninstallHelperStep(
       }
     }
   }
-  let providers: readonly string[] | null = null;
+  let agents: readonly string[] | null = null;
   try {
-    providers = await checks.delegationProviders();
+    agents = await checks.delegatedAgents();
   } catch {
-    providers = null;
+    agents = null;
   }
-  if (providers === null) {
-    reasons.push('~/.fsb/agent-providers could not be read');
-  } else if (providers.length > 0) {
-    const names = providers.filter((name) => PROVIDER_NAME_PATTERN.test(name));
-    reasons.push('a delegation provider is configured in ~/.fsb/agent-providers'
+  if (agents === null) {
+    reasons.push('the delegation log in ~/.fsb/agent-runtime could not be read');
+  } else if (agents.length > 0) {
+    const names = agents.filter((name) => PROVIDER_NAME_PATTERN.test(name));
+    reasons.push('the browser extension has run delegated agents through it'
       + (names.length > 0 ? ' (' + names.join(', ') + ')' : ''));
   }
   if (reasons.length > 0) {
-    console.log('\u25CB ' + HELPER_LABEL + ' was not removed: ' + reasons.join('; '));
+    let present = true;
+    try {
+      present = await checks.helperPresent();
+    } catch {
+      present = true;
+    }
+    // Nothing to keep: say nothing, as when no reason applies and no helper exists.
+    if (!present) return;
+    console.log('\u25CB ' + HELPER_LABEL + ' was not removed: ' + reasons.join('; ')
+      + '. To remove it anyway, run npx -y fsb-mcp-server@latest uninstall --native-host');
     return;
   }
   let result: Readonly<Record<string, unknown>> | null = null;

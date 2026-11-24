@@ -2287,6 +2287,14 @@ process.stdout.write(JSON.stringify({
 }));
 `;
 
+function DELEGATION_LOG_WITH_RUN(adapterId) {
+  return [
+    '{"ts":"2026-11-01T00:00:00.000Z","event":"daemon_shutdown","exitCode":0,"degraded":false}',
+    `{"ts":"2026-11-01T00:00:01.000Z","event":"run_started","delegationId":"abcdefgh12345678","adapterId":"${adapterId}"}`,
+    '',
+  ].join('\n');
+}
+
 function createCliHome() {
   const fs = require('node:fs');
   const os = require('node:os');
@@ -2915,9 +2923,39 @@ async function runCliRouting() {
       ['Claude Code names FSB in one project', () => fixture.write('.claude.json', JSON.stringify({ projects: { '/work/a': { mcpServers: {} }, '/work/b': { mcpServers: { fsb: {} } } } })), 'FSB is still configured in Claude Code'],
       ['Claude Code config cannot be parsed', () => fixture.write('.claude.json', '{'), 'Claude Code (config could not be read)'],
       ['the Claude Code CLI still lists FSB', () => fixture.fakeClaude('configured'), 'FSB is still configured in Claude Code'],
-      ['a delegation provider is configured', () => fixture.write('.fsb/agent-providers/grok/grok-home/config.toml', ''), 'a delegation provider is configured in ~/.fsb/agent-providers (grok)'],
+      ['the extension ran a Claude Code delegation', () => fixture.write('.fsb/agent-runtime/delegation-events.jsonl', DELEGATION_LOG_WITH_RUN('claude-code')), 'the browser extension has run delegated agents through it (claude-code)'],
+      ['a run survives only in the rotated log', () => fixture.write('.fsb/agent-runtime/delegation-events.1.jsonl', DELEGATION_LOG_WITH_RUN('grok')), 'the browser extension has run delegated agents through it (grok)'],
     ];
     for (const [label, arrange, reason] of keptScenarios) {
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.fakeClaude('missing');
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      fixture.write('.fsb/native-host/owner.json', '{}');
+      arrange();
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [], `the helper is kept when ${label}`);
+      check(result.stdout.includes(`FSB's local helper (native messaging host) was not removed: `)
+        && result.stdout.includes(reason), `uninstall says why the helper stays when ${label}`);
+      check(result.stdout.includes('uninstall --native-host'), `uninstall names the explicit removal when ${label}`);
+      check(!fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), `the codex entry is still removed when ${label}`);
+    }
+    // Only a delegated run counts: a Grok connection test leaves a profile
+    // directory, and every stdio server writes its bridge log beside the
+    // delegation log, but neither keeps the helper.
+    for (const [label, arrange] of [
+      ['a Grok profile left by a connection test', () => fixture.write('.fsb/agent-providers/grok/grok-home/config.toml', '')],
+      ['a bridge log and a shutdown record', () => {
+        fixture.write('.fsb/agent-runtime/bridge-events.jsonl', '{"event":"extension_connected"}\n');
+        fixture.write('.fsb/agent-runtime/delegation-events.jsonl', '{"ts":"2026-11-01T00:00:00.000Z","event":"daemon_shutdown","exitCode":0,"degraded":false}\n');
+      }],
+    ]) {
       const fs = require('node:fs');
       for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
         fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
@@ -2930,10 +2968,26 @@ async function runCliRouting() {
         flags: { codex: true },
         results: { uninstallAll: UNINSTALL_ALL_REMOVED },
       });
-      deepEqual(result.calls, [], `the helper is kept when ${label}`);
-      check(result.stdout.includes(`FSB's local helper (native messaging host) was not removed: `)
-        && result.stdout.includes(reason), `uninstall says why the helper stays when ${label}`);
-      check(!fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), `the codex entry is still removed when ${label}`);
+      deepEqual(result.calls, [{ operation: 'uninstallAll', request: { onlyProvenance: 'auto' } }],
+        `${label} does not keep the helper`);
+    }
+    {
+      // No helper installed: the reasons it would have been kept are not
+      // reported as if one were.
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      fixture.write('.cursor/mcp.json', JSON.stringify({ mcpServers: { fsb: { command: 'npx' } } }));
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [], 'a kept reason without a helper calls no native operation');
+      check(!`${result.stdout}${result.stderr}`.includes('local helper'), 'no helper means no helper line at all');
+      fs.rmSync(path.join(fixture.home, '.cursor'), { recursive: true, force: true });
     }
     {
       const fs = require('node:fs');
@@ -2969,7 +3023,8 @@ async function runCliRouting() {
       );
     }
     {
-      fixture.write('.fsb/agent-providers/grok/grok-home/config.toml', '');
+      fixture.write('.fsb/native-host/owner.json', '{}');
+      fixture.write('.fsb/agent-runtime/delegation-events.jsonl', DELEGATION_LOG_WITH_RUN('grok'));
       const result = runCliScenario(fixture, {
         command: 'uninstall',
         flags: { all: true },
@@ -2978,9 +3033,9 @@ async function runCliRouting() {
       deepEqual(
         result.calls,
         [{ operation: 'writeOptOut', reason: 'uninstall-all' }],
-        'uninstall --all still pauses the refresh but keeps a helper a delegation provider uses',
+        'uninstall --all still pauses the refresh but keeps a helper the extension delegates through',
       );
-      check(result.stdout.includes('a delegation provider is configured'), 'uninstall --all says why the helper stays');
+      check(result.stdout.includes('has run delegated agents through it'), 'uninstall --all says why the helper stays');
     }
     {
       fixture.write('.codex/config.toml', CODEX_WITH_FSB);

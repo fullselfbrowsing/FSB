@@ -243,9 +243,9 @@ The native messaging host, `io.github.fullselfbrowsing.fsb_native_host`, is FSB'
 
 - the helper was set up by `install` rather than `install --native-host`;
 - no other FSB client config can be found;
-- no delegation provider is configured under `~/.fsb/agent-providers`.
+- the browser extension has never run a delegated agent, such as Claude Code or Grok Build, through it. The local agent service records every delegated run in `~/.fsb/agent-runtime/delegation-events.jsonl`; a connection test or sign-in is not a run.
 
-Otherwise the helper stays, and the command prints why. A client config that cannot be read counts as still using FSB, and clients that only print setup instructions cannot be checked. `uninstall --all` removes every client entry, stops the automatic refresh, and removes the helper when it was set up by `install` and no delegation provider is configured. Removing FSB in a client's own settings, or by editing its config by hand, is invisible to FSB, so the helper stays until you remove it.
+Otherwise the helper stays, and the command prints why along with the `uninstall --native-host` command that removes it anyway. A client config that cannot be read counts as still using FSB, and clients that only print setup instructions cannot be checked. `uninstall --all` removes every client entry, stops the automatic refresh, and removes the helper when it was set up by `install` and the extension has not run a delegated agent through it. Removing FSB in a client's own settings, or by editing its config by hand, is invisible to FSB, so the helper stays until you remove it.
 
 `uninstall --native-host` removes the helper however it was installed, including one installed by an earlier version, and stops the automatic refresh until you next run `install`.
 
