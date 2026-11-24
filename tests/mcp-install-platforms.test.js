@@ -928,6 +928,7 @@ function run() {
       });
       const stableRoot = path.join(fixture.home, '.fsb', 'native-host');
       const receiptPath = path.join(stableRoot, 'install-receipt.json');
+      const provenancePath = path.join(stableRoot, 'provenance.json');
       const markerPath = path.join(stableRoot, 'owner.json');
       const optOutPath = path.join(fixture.home, '.fsb', 'native-host-opt-out.json');
       const manifestPath = process.platform === 'darwin'
@@ -956,7 +957,7 @@ function run() {
       assertIncludes(firstOutput, "Installed FSB's local helper (native messaging host) for Chrome",
         'install --codex sets up the helper for the detected browser');
       assert(fs.existsSync(stableRoot) && fs.existsSync(manifestPath), 'install --codex publishes the helper and its registration');
-      assertEqual(readJson(receiptPath).provenance, 'auto', 'a helper set up by client install records auto provenance');
+      assertEqual(readJson(provenancePath).provenance, 'auto', 'a helper set up by client install records auto provenance');
 
       const second = helper(['install', '--codex']);
       assertIncludes(`${second.stdout}${second.stderr}`,
@@ -972,7 +973,7 @@ function run() {
       assertEqual(refreshed.status, 0, 'refreshing an older helper exits 0');
       assertEqual(`${refreshed.stdout}${refreshed.stderr}`, '', 'refreshing an older helper writes nothing');
       assertEqual(readJson(receiptPath).packageVersion, mcpVersion, 'the background refresh replaces an older helper');
-      assertEqual(readJson(receiptPath).provenance, 'auto', 'the background refresh keeps auto provenance');
+      assertEqual(readJson(provenancePath).provenance, 'auto', 'the background refresh keeps auto provenance');
       assertEqual(siblings().length, 0, 'the refresh leaves no staging, next or retired directories');
 
       const lastClient = helper(['uninstall', '--codex']);
@@ -1003,7 +1004,7 @@ function run() {
       assertIncludes(`${repair.stdout}${repair.stderr}`,
         `Native messaging host updated from 0.0.1 to ${mcpVersion}.`,
         'install --native-host reports the refresh');
-      assertEqual(readJson(receiptPath).provenance, 'explicit', 'install --native-host records explicit provenance');
+      assertEqual(readJson(provenancePath).provenance, 'explicit', 'install --native-host records explicit provenance');
       fs.writeFileSync(path.join(fixture.home, '.codex', 'config.toml'),
         '[mcp_servers.fsb]\ncommand = "npx"\nargs = ["-y", "fsb-mcp-server@latest"]\n');
       const keptExplicit = helper(['uninstall', '--codex']);
