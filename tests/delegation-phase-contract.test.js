@@ -166,6 +166,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/showcase-depth-ghost-parity.test.js',
   'node tests/icon-fonts-parity.test.js',
   'node tests/fsb-wordmark-parity.test.js',
+  'node tests/fsb-icon-corners.test.js',
   'node tests/jev-gateway-config.test.js',
   'node tests/jev-gateway-contract.test.js',
   'node tests/jev-gateway-upstream.test.js',

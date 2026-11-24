@@ -63,6 +63,9 @@ const BEAD_FRACTION = 0.12;
 const FADE_FRACTION = 0.02;
 const BEAD_SEGMENTS = 24;
 const ORBIT_WIDTH_RATIO = 0.10;
+// The tile's corner radius as a share of its side, the same 30/128 the PNGs are
+// cut with (scripts/build-icon-corners.mjs).
+const CORNER_RATIO = 30 / 128;
 const FRAME_INTERVAL_MS = 66;
 const WATCHDOG = 'fsb-action-icon-watchdog';
 const ACTIVITY_TTL_MS = 60000;
@@ -393,6 +396,14 @@ async function renderCapability(w, tabId) {
 }
 
 const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
+// An undimmed frame ends by cutting itself with the artwork's rounded alpha: the
+// bitmap drawn destination-in over the whole tile. Returns that op, or null.
+const cutOf = (group, size) => {
+  const last = group && group[group.length - 1];
+  return last && last.op === 'drawImage' && last.source === 'bitmap'
+    && last.composite === 'destination-in'
+    && last.x === 0 && last.y === 0 && last.w === size && last.h === size ? last : null;
+};
 
 (async function run() {
 
@@ -540,10 +551,24 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
 
     const g32 = w.groups(32);
     assertEq(g32.length, 5, 'four resting frames and one Ring kickoff render at 32');
-    assertEq(g32[0][0].alpha, 1, 'idle:on drawn at full alpha');
-    assertEq(g32[0][0].filter, 'none', 'idle:on drawn unfiltered');
-    assertEq(g32[1][0].alpha, 0.5, 'idle:off drawn at half alpha');
-    assert(/grayscale/.test(g32[1][0].filter), 'idle:off drawn desaturated');
+    const firstDraw = (group) => opsOf(group, 'drawImage')[0] || {};
+    assertEq(firstDraw(g32[0]).alpha, 1, 'idle:on drawn at full alpha');
+    assertEq(firstDraw(g32[0]).filter, 'none', 'idle:on drawn unfiltered');
+    assertEq(firstDraw(g32[1]).alpha, 0.5, 'idle:off drawn at half alpha');
+    assert(/grayscale/.test(firstDraw(g32[1]).filter), 'idle:off drawn desaturated');
+
+    // The artwork's corners are cut (transparent). An undimmed frame rebuilds the
+    // square tile with black under it, draws, then cuts itself back to the
+    // artwork's alpha, so its corners match the static icon in every state. A
+    // dimmed frame is only the faded artwork, which already carries the corners.
+    const idleOn = g32[0] || [];
+    const plate = opsOf(idleOn, 'fillRect')[0];
+    assert(!!plate && plate.fillStyle === '#000000' && plate.w === 32 && plate.h === 32
+      && plate.composite === 'source-over' && idleOn.indexOf(plate) < idleOn.indexOf(firstDraw(idleOn)),
+    'idle:on paints the black square under the artwork first');
+    assert(!!cutOf(idleOn, 32), 'idle:on ends with the corner cut');
+    assert(!cutOf(g32[1], 32) && opsOf(g32[1], 'fillRect').length === 0,
+      'idle:off has no plate and no cut: its faded artwork keeps the corners');
 
     // The regression: a relay that never connects must not dim anything.
     w.api.setConnected(false);
@@ -617,7 +642,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   }
 
   // -------------------------------------------------------------------------
-  console.log('\nICON-05a: acting traces the sharp square perimeter');
+  console.log('\nICON-05a: acting traces the rounded tile\'s outline');
   // -------------------------------------------------------------------------
 
   {
@@ -630,9 +655,13 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assert(!/createConicGradient|strokeBeadConic|conicGradients/.test(ICON_SRC),
       'Orbit no longer carries a circular/conic-gradient code path');
 
+    assert(ICON_SRC.includes('var CORNER_RATIO = 30 / 128;'),
+      'the icon declares the corner radius its PNGs are cut with');
+
     const close = (a, b, tol = 1e-7) => Math.abs(a - b) <= tol;
     const pointsOf = (stroke) => (stroke && stroke.path || [])
       .filter((p) => p.kind === 'moveTo' || p.kind === 'lineTo');
+    const arcEnd = (a) => ({ x: a.cx + a.r * Math.cos(a.a1), y: a.cy + a.r * Math.sin(a.a1) });
     const strokeAlpha = (stroke) => {
       const hit = stroke && String(stroke.strokeStyle).match(/,\s*([\d.]+)\)\s*$/);
       return hit ? Number(hit[1]) : NaN;
@@ -643,26 +672,84 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
       const half = width / 2;
       const far = size - half;
       const side = size - width;
+      // The bead's centreline: the rounded tile outline inset by half the stroke,
+      // worked out here independently of the module. Its corner arcs share their
+      // centres with the tile's own corners, so the bead's outer edge runs exactly
+      // along the tile's curve.
+      const tileRadius = CORNER_RATIO * size;
+      const rc = Math.min(side / 2, Math.max(0, tileRadius - half));
+      const straight = side - 2 * rc;
+      const quarter = Math.PI / 2 * rc;
+      const perimeter = 4 * (straight + quarter);
+      const centres = {
+        tr: { x: size - tileRadius, y: tileRadius },
+        br: { x: size - tileRadius, y: size - tileRadius },
+        bl: { x: tileRadius, y: size - tileRadius },
+        tl: { x: tileRadius, y: tileRadius }
+      };
+      const arcAt = (corner, angle) => ({
+        x: centres[corner].x + rc * Math.cos(angle),
+        y: centres[corner].y + rc * Math.sin(angle)
+      });
+      const runs = [
+        { len: straight, at: (t) => ({ x: half + rc + t, y: half }) },
+        { len: quarter, at: (t) => arcAt('tr', -Math.PI / 2 + t / rc) },
+        { len: straight, at: (t) => ({ x: far, y: half + rc + t }) },
+        { len: quarter, at: (t) => arcAt('br', t / rc) },
+        { len: straight, at: (t) => ({ x: far - rc - t, y: far }) },
+        { len: quarter, at: (t) => arcAt('bl', Math.PI / 2 + t / rc) },
+        { len: straight, at: (t) => ({ x: half, y: far - rc - t }) },
+        { len: quarter, at: (t) => arcAt('tl', Math.PI + t / rc) }
+      ];
+      const pointAt = (distance) => {
+        let d = ((distance % perimeter) + perimeter) % perimeter;
+        for (const run of runs) {
+          if (d <= run.len) return run.at(d);
+          d -= run.len;
+        }
+        return runs[0].at(0);
+      };
+      const onStraight = (p) => {
+        const along = (v) => v >= half + rc - 1e-7 && v <= far - rc + 1e-7;
+        if (close(p.y, half) && along(p.x)) return 'top';
+        if (close(p.x, far) && along(p.y)) return 'right';
+        if (close(p.y, far) && along(p.x)) return 'bottom';
+        if (close(p.x, half) && along(p.y)) return 'left';
+        return null;
+      };
+      const cornerOf = (a) => Object.keys(centres)
+        .find((k) => close(a.cx, centres[k].x) && close(a.cy, centres[k].y)) || null;
+      // A segment that starts inside a corner opens with a moveTo on the curve.
+      const onCurve = (p) => Object.keys(centres).some((k) => {
+        const c = centres[k];
+        const outward = (k[1] === 'r' ? p.x >= c.x - 1e-7 : p.x <= c.x + 1e-7)
+          && (k[0] === 'b' ? p.y >= c.y - 1e-7 : p.y <= c.y + 1e-7);
+        return outward && close(Math.hypot(p.x - c.x, p.y - c.y), rc);
+      });
+      const arcStart = (a) => ({ x: a.cx + a.r * Math.cos(a.a0), y: a.cy + a.r * Math.sin(a.a0) });
+
       const frames = acting[size];
       const firstFrame = frames[0] || [];
       const strokes = opsOf(firstFrame, 'stroke');
 
-      assertEq(opsOf(firstFrame, 'arc').length, 0, `${size}px: Orbit draws no circular arcs`);
+      assert(rc > 0 && straight > 0, `${size}px: the orbit has both straight runs and rounded corners`);
       assertEq(opsOf(firstFrame, 'conic').length, 0, `${size}px: Orbit draws no conic gradient`);
       assertEq(strokes.length, BEAD_SEGMENTS, `${size}px: Orbit uses the locked segment count`);
       assert(strokes.every((s) => s.lineCap === 'butt' && s.lineJoin === 'miter'),
-        `${size}px: segments use butt caps and sharp miter joins`);
+        `${size}px: segments use butt caps and miter joins`);
+      assert(frames.every((f) => !!cutOf(f, size)), `${size}px: every Orbit frame ends with the corner cut`);
 
       const firstPoints = pointsOf(strokes[0]);
       const start = firstPoints[0] || { x: NaN, y: NaN };
       assertClose(start.x, size / 2, 1e-7, `${size}px: progress 0 starts at top centre`);
       assertClose(start.y, half, 1e-7, `${size}px: top edge sits half a stroke inside`);
 
-      const lastPoints = pointsOf(strokes[strokes.length - 1]);
-      const end = lastPoints[lastPoints.length - 1] || { x: NaN, y: NaN };
-      assertClose(end.x, half + (0.5 + BEAD_FRACTION * 4) * side, 1e-7,
-        `${size}px: trailing edge lands exactly 12% of the perimeter after the start`);
-      assertClose(end.y, half, 1e-7, `${size}px: the initial bead remains on the top edge`);
+      const lastPath = (strokes[strokes.length - 1] || {}).path || [];
+      const lastEntry = lastPath[lastPath.length - 1] || {};
+      const end = lastEntry.kind === 'arc' ? arcEnd(lastEntry) : lastEntry;
+      const expectedEnd = pointAt(straight / 2 + BEAD_FRACTION * perimeter);
+      assert(close(end.x, expectedEnd.x) && close(end.y, expectedEnd.y),
+        `${size}px: trailing edge lands exactly 12% of the rounded outline after the start`);
 
       const firstAlpha = strokeAlpha(strokes[0]);
       const middleAlpha = strokeAlpha(strokes[Math.floor(strokes.length / 2)]);
@@ -672,50 +759,50 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
       assertClose(lastAlpha, expectedEdgeAlpha, 1e-9, `${size}px: trailing fade is preserved`);
       assertClose(middleAlpha, 1, 1e-9, `${size}px: bead centre remains fully opaque`);
 
-      let allOnEdges = true;
-      let allInside = true;
+      let allOnOutline = true;
+      let arcsConcentric = true;
+      let arcsContinuous = true;
       let noDiagonals = true;
       const visited = new Set();
       for (const frame of frames) {
         for (const stroke of opsOf(frame, 'stroke')) {
-          const points = pointsOf(stroke);
-          for (const point of points) {
-            const onTop = close(point.y, half);
-            const onRight = close(point.x, far);
-            const onBottom = close(point.y, far);
-            const onLeft = close(point.x, half);
-            if (!(onTop || onRight || onBottom || onLeft)) allOnEdges = false;
-            if (point.x - half < -1e-7 || point.x + half > size + 1e-7
-                || point.y - half < -1e-7 || point.y + half > size + 1e-7) {
-              allInside = false;
+          let prev = null;
+          for (const entry of stroke.path || []) {
+            if (entry.kind === 'arc') {
+              const corner = cornerOf(entry);
+              if (!corner || !close(entry.r, rc)) arcsConcentric = false;
+              if (corner) visited.add(corner);
+              const from = arcStart(entry);
+              if (!prev || !close(prev.x, from.x, 1e-6) || !close(prev.y, from.y, 1e-6)) arcsContinuous = false;
+              prev = arcEnd(entry);
+              continue;
             }
-            if (onTop) visited.add('top');
-            if (onRight) visited.add('right');
-            if (onBottom) visited.add('bottom');
-            if (onLeft) visited.add('left');
-          }
-          for (let i = 1; i < points.length; i++) {
-            if (!close(points[i - 1].x, points[i].x)
-                && !close(points[i - 1].y, points[i].y)) {
+            if (entry.kind !== 'moveTo' && entry.kind !== 'lineTo') continue;
+            const run = onStraight(entry);
+            if (!run && !(entry.kind === 'moveTo' && onCurve(entry))) allOnOutline = false;
+            if (run) visited.add(run);
+            if (entry.kind === 'lineTo' && prev && !close(prev.x, entry.x) && !close(prev.y, entry.y)) {
               noDiagonals = false;
             }
+            prev = entry;
           }
         }
       }
-      assert(allOnEdges, `${size}px: every Orbit coordinate lies on a square edge`);
-      assert(allInside, `${size}px: the outer stroke edge hugs but never leaves the tile`);
-      assert(noDiagonals, `${size}px: no segment shortcuts diagonally across a corner`);
-      assertEq(Array.from(visited).sort().join(','), 'bottom,left,right,top',
-        `${size}px: one cycle visits all four edges`);
+      assert(allOnOutline, `${size}px: every Orbit coordinate lies on the inset outline`);
+      assert(arcsConcentric, `${size}px: every corner arc shares its centre with the tile's own rounded corner`);
+      assert(arcsContinuous, `${size}px: every arc starts where the path already is, so no stray line joins it`);
+      assertClose(rc + half, tileRadius, 1e-9, `${size}px: so the bead's outer edge is the tile's corner curve`);
+      assert(noDiagonals, `${size}px: no straight segment shortcuts diagonally across a corner`);
+      assertEq(Array.from(visited).sort().join(','), 'bl,bottom,br,left,right,tl,top,tr',
+        `${size}px: one cycle visits all four sides and all four corners`);
 
-      const secondFrameStrokes = opsOf(frames[1] || [], 'stroke');
-      const cornerStroke = secondFrameStrokes.find((stroke) =>
-        pointsOf(stroke).some((p) => close(p.x, far) && close(p.y, half)));
-      assert(!!cornerStroke, `${size}px: a corner-crossing frame explicitly visits top-right`);
-      assert(pointsOf(cornerStroke).length >= 3,
-        `${size}px: the corner is an intermediate vertex rather than a diagonal endpoint`);
+      const cornerStroke = opsOf(frames[1] || [], 'stroke').find((stroke) =>
+        (stroke.path || []).some((p) => p.kind === 'arc' && cornerOf(p) === 'tr'));
+      assert(!!cornerStroke, `${size}px: a corner-crossing frame follows the top-right curve`);
+      assert(!!cornerStroke && (cornerStroke.path || []).some((p) => onStraight(p) === 'top'),
+        `${size}px: and joins it from the top side's straight run`);
 
-      const nextStart = pointsOf(secondFrameStrokes[0])[0] || { x: NaN, y: NaN };
+      const nextStart = pointsOf(opsOf(frames[1] || [], 'stroke')[0])[0] || { x: NaN, y: NaN };
       assert(close(nextStart.y, half) && nextStart.x > start.x,
         `${size}px: frame progression moves clockwise from top centre`);
     }
@@ -734,6 +821,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(frames.length, Math.round(1200 / 66), 'thinking builds one cycle of sweep frames');
     const f0 = frames[0] || [];
 
+    assert(frames.every((f) => !!cutOf(f, 32)), 'every sweep frame ends with the corner cut');
     assertEq(opsOf(f0, 'arc').length, 0, 'the sweep carries no orbit bead');
     assertEq(opsOf(f0, 'fill').length, 2, 'two fills: the track and the moving fill');
     assertEq(opsOf(f0, 'clip').length, 1, 'the fill is clipped to the track, as overflow:hidden does');
@@ -810,12 +898,26 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(s0.length, 2, 'progress 0 draws the inset ring plus the ping');
     assert(/139, 92, 246/.test(s0[0] && s0[0].strokeStyle || ''), 'ring uses the capability violet');
 
-    const ringRect = s0[0] && s0[0].path.find((p) => p.kind === 'rect');
-    assert(!!ringRect, 'the ring is a rect stroke');
-    assert(!!ringRect && ringRect.x === s0[0].lineWidth / 2,
+    // Both strokes trace the tile's rounded outline: roundRectPath records
+    // moveTo(x + r, y) and then the four corners as arcTo, clockwise from top-right.
+    const boxOf = (stroke) => {
+      const path = (stroke && stroke.path) || [];
+      const move = path.find((p) => p.kind === 'moveTo');
+      const corners = path.filter((p) => p.kind === 'arcTo');
+      if (!move || corners.length !== 4) return null;
+      const x = corners[3].x1;
+      return { x, y: move.y, w: corners[0].x1 - x, h: corners[1].y1 - move.y, r: corners[0].r };
+    };
+    assert(frames.every((f) => !!cutOf(f, 32)), 'every ring frame ends with the corner cut');
+    const ringBox = boxOf(s0[0]);
+    const ringHalf = s0[0] ? s0[0].lineWidth / 2 : NaN;
+    assert(!!ringBox, 'the ring is a rounded-rectangle stroke');
+    assert(!!ringBox && ringBox.x === ringHalf && ringBox.y === ringHalf,
       'the ring is inset by half its own stroke width, so it sits fully inside the tile');
-    assert(!!ringRect && ringRect.x + ringRect.w + s0[0].lineWidth / 2 <= 32,
+    assert(!!ringBox && ringBox.x + ringBox.w + ringHalf <= 32,
       'the ring stays inside the 32px tile');
+    assertClose(ringBox ? ringBox.r : NaN, CORNER_RATIO * 32 - ringHalf, 1e-9,
+      'its corners are the tile\'s curve shrunk by the same inset, so its outer edge is the tile\'s edge');
 
     // Alpha dips to the 70% stop and recovers by 100%.
     const alphaOf = (i) => {
@@ -831,17 +933,16 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
       'ring recovers between the 70% and 100% stops');
 
     // The ping travels INWARD and fades out, then stops being drawn entirely.
-    const pingRect = (i) => {
-      const st = opsOf(frames[i] || [], 'stroke')[1];
-      return st ? st.path.find((p) => p.kind === 'rect') : null;
-    };
-    const p0 = pingRect(0);
-    const pMid = pingRect(Math.round(0.35 * frames.length));
+    const pingBox = (i) => boxOf(opsOf(frames[i] || [], 'stroke')[1]);
+    const p0 = pingBox(0);
+    const pMid = pingBox(Math.round(0.35 * frames.length));
     assert(!!p0 && !!pMid, 'the ping is drawn early in the cycle');
     assert(!!p0 && !!pMid && pMid.x > p0.x && pMid.w < p0.w,
       'the ping contracts inward rather than spreading outward');
+    assert(!!p0 && !!pMid && [p0, pMid].every((b) => Math.abs(b.r - (CORNER_RATIO * 32 - b.x)) <= 1e-9),
+      'the ping keeps the tile\'s curve at every inset');
     // Full travel is CAP_PING_INSET_RATIO * size; at 32 that is ~4.8px.
-    const pLate = pingRect(Math.round(0.65 * frames.length));
+    const pLate = pingBox(Math.round(0.65 * frames.length));
     assert(!!pLate && (pLate.x - p0.x) > 4,
       'the ping travels at least 4px inward before it fades out');
     assertEq(opsOf(frames[frames.length - 1] || [], 'stroke').length, 1,
@@ -868,20 +969,24 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(opsOf(f0, 'arc').length, 0, 'breathe draws no bead');
     assertEq(opsOf(f0, 'stroke').length, 0, 'breathe draws no ring');
 
-    // THE regression this guards. The artwork is a flat opaque tile, so fading
-    // it fades the whole icon -- the plate has to be repainted solid and the
-    // mark composited over it, exactly as the design nests the lockup inside a
-    // static black container.
+    // THE regression this guards. The artwork is a flat tile, so fading it fades
+    // the whole icon -- the plate has to be repainted solid and the mark
+    // composited over it, exactly as the design nests the lockup inside a static
+    // black container. The frame's corner cut then rounds the plate with the rest.
     const plateAt = (frameSet, i) => opsOf(frameSet[i] || [], 'fillRect')[0];
     const plate0 = plateAt(frames, 0);
     assert(!!plate0, 'every breathe frame repaints the plate');
     assertEq(plate0 && plate0.fillStyle, '#000000', 'the plate is solid black');
     assertEq(plate0 && plate0.w, 32, 'and covers the whole tile');
     assertEq(plate0 && plate0.composite, 'source-over', 'painted normally, not blended');
+    assert(frames.every((f) => !!cutOf(f, 32)) && frames16.every((f) => !!cutOf(f, 16)),
+      'every breathe frame ends with the corner cut, at 16px and 32px');
 
-    // The mark is the LAST drawImage -- the glow pass, when present, precedes it.
+    // The mark is the last ordinary bitmap draw -- the glow pass, when present,
+    // precedes it, and only the corner cut follows it.
     const markAt = (frameSet, i) => {
-      const draws = opsOf(frameSet[i] || [], 'drawImage').filter((d) => d.source === 'bitmap');
+      const draws = opsOf(frameSet[i] || [], 'drawImage')
+        .filter((d) => d.source === 'bitmap' && d.composite !== 'destination-in');
       return draws[draws.length - 1] || {};
     };
     const glowAt = (frameSet, i) => opsOf(frameSet[i] || [], 'drawImage').find((d) => d.source === 'scratch');

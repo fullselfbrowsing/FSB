@@ -37,14 +37,21 @@
 
   // ---- Locked geometry + cadence -----------------------------------------
   var FRAME_INTERVAL_MS = 66;        // ~15fps. chrome.alarms floors at 30s.
-  var BEAD_FRACTION = 0.12;          // bead spans 12% of the square perimeter
-  var FADE_FRACTION = 0.02;          // 2% of the perimeter fades at each end
+  var BEAD_FRACTION = 0.12;          // bead spans 12% of the orbit path
+  var FADE_FRACTION = 0.02;          // 2% of the path fades at each end
   var SIZES = [16, 32];              // toolbar renders 16/24/32 DIPs
   var ORBIT_WIDTH_RATIO = 0.10;
   // Full bleed, so the toolbar mark is the same size as the static manifest icon.
   // Orbit's centreline sits half its own width inside that tile: its outside edge
-  // is flush with the square artwork without being clipped by the canvas.
+  // is flush with the tile's edge, round the corners too, without being clipped
+  // by the canvas.
   var GLYPH_SCALE = 1.0;
+  // The tile's corner radius as a share of its side: 30px on the 128px artwork,
+  // the same rounding the showcase draws its icon tiles with. The PNGs carry it in
+  // their alpha (scripts/build-icon-corners.mjs cuts it), every frame is cut with
+  // that alpha in renderFrame, and the orbit, ring and ping follow the same curve.
+  // tests/fsb-icon-corners.test.js keeps this equal to the files.
+  var CORNER_RATIO = 30 / 128;
   var BEAD_SEGMENTS = 24;
   var SEAM_OVERLAP = 0.5;            // fraction of a segment
   var DIM_ALPHA = 0.5;
@@ -292,7 +299,7 @@
   }
 
   // One scratch surface per size, reused. Needed because the artwork is a FLAT
-  // opaque tile: the mark is distinguished from the plate by luminance, not by
+  // tile: the mark is distinguished from the black plate by luminance, not by
   // alpha, so it cannot be isolated with a composite op on the main canvas.
   function scratchFor(size) {
     var ctx = scratches[size];
@@ -308,13 +315,20 @@
   // 'multiply' on the scratch turns the white mark orange and leaves the black
   // plate black (x * 0 = 0). Compositing that back with 'lighter' then adds only
   // where the scratch is non-black, so the halo hugs the lettering and the plate
-  // contributes nothing. A filter on the tile itself would halo the SQUARE.
+  // contributes nothing. A filter on the tile itself would halo the whole tile.
+  //
+  // The scratch starts as a black square, which under the rounded artwork
+  // rebuilds the full tile. Without it, 'multiply' over the transparent corners
+  // would paint them orange (a blend over nothing leaves the source colour), and
+  // the blur would carry that orange into the tile.
   function drawMarkGlow(ctx, size, bitmap, spec, offset, drawn) {
     var scratch = scratchFor(size);
     scratch.globalCompositeOperation = 'source-over';
     scratch.globalAlpha = 1;
     scratch.filter = 'none';
     scratch.clearRect(0, 0, size, size);
+    scratch.fillStyle = PLATE_COLOR;
+    scratch.fillRect(0, 0, size, size);
     scratch.drawImage(bitmap, offset, offset, drawn, drawn);
     scratch.globalCompositeOperation = 'multiply';
     scratch.fillStyle = alphaColor(GLOW_RGB, 1);
@@ -336,6 +350,13 @@
   // mark composited over it: black-on-black is a no-op, so only the lettering
   // varies. Dim is deliberately different -- a dropped relay recedes the whole
   // icon, and it outranks the glow because grayscale would fight an orange halo.
+  //
+  // Every undimmed frame starts from that black plate as a full square. The
+  // artwork's cut corners are plain black, so the square under it rebuilds the
+  // uncut tile; renderFrame then cuts the finished frame back to the artwork's
+  // own rounded edge, so whatever was drawn near a corner ends on exactly the
+  // edge pixels of the static icon. A dimmed frame is only the faded artwork,
+  // whose alpha already carries the corners.
   function drawGlyph(ctx, size, bitmap, spec) {
     var drawn = size * GLYPH_SCALE;
     var offset = (size - drawn) / 2;
@@ -349,6 +370,9 @@
       return;
     }
 
+    ctx.fillStyle = PLATE_COLOR;
+    ctx.fillRect(0, 0, size, size);
+
     var markAlpha = typeof spec.glyphAlpha === 'number' ? spec.glyphAlpha : 1;
     var wantsGlow = typeof spec.glowRatio === 'number' && spec.glowRatio > 0
       && spec.glowAlpha > 0 && supportsDropShadow(ctx);
@@ -357,77 +381,122 @@
       return;
     }
 
-    ctx.fillStyle = PLATE_COLOR;
-    ctx.fillRect(0, 0, size, size);
     if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn);
     ctx.globalAlpha = markAlpha;
     ctx.drawImage(bitmap, offset, offset, drawn, drawn);
     ctx.globalAlpha = 1;
   }
 
-  function squareOrbitGeometry(size) {
+  // The tile's outline inset by `inset` px, its radius shrunk by the same amount
+  // so the curve stays parallel to the tile's edge. Square once that reaches 0.
+  function tilePath(ctx, size, inset) {
+    var span = size - inset * 2;
+    var radius = Math.max(0, CORNER_RATIO * size - inset);
+    if (radius > 0) {
+      roundRectPath(ctx, inset, inset, span, span, radius);
+      return;
+    }
+    ctx.beginPath();
+    ctx.rect(inset, inset, span, span);
+  }
+
+  // The orbit's centreline: the tile's outline inset by half the stroke, so the
+  // bead's outside edge runs flush with the tile along the sides and round the
+  // corners. Eight runs, clockwise from where the top side's straight run
+  // begins: one straight run per side and a quarter arc per corner.
+  function orbitGeometry(size) {
     var width = ORBIT_WIDTH_RATIO * size;
     var half = width / 2;
     var side = size - width;
+    var radius = Math.min(side / 2, Math.max(0, CORNER_RATIO * size - half));
+    var left = half;
+    var top = half;
+    var right = size - half;
+    var bottom = size - half;
+    var straight = side - radius * 2;
+    var arc = Math.PI / 2 * radius;
     return {
       width: width,
-      half: half,
-      left: half,
-      top: half,
-      right: size - half,
-      bottom: size - half,
-      side: side,
-      perimeter: side * 4
+      radius: radius,
+      runs: [
+        { length: straight, line: [left + radius, top, right - radius, top] },
+        { length: arc, arc: [right - radius, top + radius, -Math.PI / 2, 0] },
+        { length: straight, line: [right, top + radius, right, bottom - radius] },
+        { length: arc, arc: [right - radius, bottom - radius, 0, Math.PI / 2] },
+        { length: straight, line: [right - radius, bottom, left + radius, bottom] },
+        { length: arc, arc: [left + radius, bottom - radius, Math.PI / 2, Math.PI] },
+        { length: straight, line: [left, bottom - radius, left, top + radius] },
+        { length: arc, arc: [left + radius, top + radius, Math.PI, Math.PI * 1.5] }
+      ],
+      perimeter: (straight + arc) * 4,
+      // Half the top run is top centre: Orbit's 12 o'clock start.
+      startOffset: straight / 2
     };
   }
 
-  // Distance zero is the top-left corner. Increasing distance walks clockwise:
-  // top -> right -> bottom -> left. Callers use side / 2 as their phase offset,
-  // preserving Orbit's old 12-o'clock (top-centre) starting position.
-  function squareOrbitPointAt(geometry, distance) {
-    var perimeter = geometry.perimeter;
-    var d = distance % perimeter;
-    if (d < 0) d += perimeter;
-    if (d < geometry.side) {
-      return { x: geometry.left + d, y: geometry.top };
+  function orbitPointAt(geometry, run, t) {
+    var f = run.length > 0 ? t / run.length : 0;
+    if (run.line) {
+      return { x: lerp(run.line[0], run.line[2], f), y: lerp(run.line[1], run.line[3], f) };
     }
-    d -= geometry.side;
-    if (d < geometry.side) {
-      return { x: geometry.right, y: geometry.top + d };
-    }
-    d -= geometry.side;
-    if (d < geometry.side) {
-      return { x: geometry.right - d, y: geometry.bottom };
-    }
-    d -= geometry.side;
-    return { x: geometry.left, y: geometry.bottom - d };
+    var angle = lerp(run.arc[2], run.arc[3], f);
+    return {
+      x: run.arc[0] + geometry.radius * Math.cos(angle),
+      y: run.arc[1] + geometry.radius * Math.sin(angle)
+    };
   }
 
-  // Append one unwrapped distance interval. Corner distances are inserted as
-  // explicit vertices, so a segment that turns a corner follows the square and
-  // never shortcuts diagonally across the artwork.
-  function appendSquareOrbitInterval(ctx, geometry, start, end) {
-    var point = squareOrbitPointAt(geometry, start);
-    ctx.moveTo(point.x, point.y);
-    var corner = (Math.floor(start / geometry.side) + 1) * geometry.side;
-    while (corner < end) {
-      point = squareOrbitPointAt(geometry, corner);
-      ctx.lineTo(point.x, point.y);
-      corner += geometry.side;
+  // Append one unwrapped distance interval. Straight runs become lines and
+  // corners become arcs, so a segment that turns a corner follows the tile and
+  // never shortcuts across the artwork. A square tile has zero-length arcs,
+  // which become plain corner vertices joined with a miter.
+  function appendOrbitInterval(ctx, geometry, start, end) {
+    var runs = geometry.runs;
+    var base = Math.floor(start / geometry.perimeter) * geometry.perimeter;
+    var from = start - base;
+    var to = end - base;
+    var index = 0;
+    var runStart = 0;
+    while (index < runs.length * 2 && runStart + runs[index % runs.length].length <= from) {
+      runStart += runs[index % runs.length].length;
+      index++;
     }
-    point = squareOrbitPointAt(geometry, end);
-    ctx.lineTo(point.x, point.y);
+    var first = true;
+    for (var guard = 0; runStart < to && guard < runs.length * 3; guard++, index++) {
+      var run = runs[index % runs.length];
+      var t0 = Math.max(0, from - runStart);
+      var t1 = Math.min(run.length, to - runStart);
+      if (run.length === 0) {
+        var corner = orbitPointAt(geometry, run, 0);
+        if (first) ctx.moveTo(corner.x, corner.y);
+        else ctx.lineTo(corner.x, corner.y);
+        first = false;
+      } else if (t1 > t0) {
+        var p0 = orbitPointAt(geometry, run, t0);
+        if (first) ctx.moveTo(p0.x, p0.y);
+        if (run.line) {
+          var p1 = orbitPointAt(geometry, run, t1);
+          ctx.lineTo(p1.x, p1.y);
+        } else {
+          ctx.arc(run.arc[0], run.arc[1], geometry.radius,
+            lerp(run.arc[2], run.arc[3], t0 / run.length),
+            lerp(run.arc[2], run.arc[3], t1 / run.length));
+        }
+        first = false;
+      }
+      runStart += run.length;
+    }
   }
 
   // Canvas has no gradient primitive that follows an arbitrary path. The bead
   // is therefore a short sequence of colour/alpha segments, pre-rendered with
-  // the rest of the animation. Each segment carries a mitered polyline when it
-  // crosses a corner, keeping the outside edge sharp and fully inside the tile.
-  function strokeSquareOrbit(ctx, size, palette, progress) {
-    var geometry = squareOrbitGeometry(size);
+  // the rest of the animation. A segment that crosses a corner follows the
+  // tile's curve, keeping the outside edge fully inside the tile.
+  function strokeOrbit(ctx, size, palette, progress) {
+    var geometry = orbitGeometry(size);
     var head = parseHex(palette.from);
     var tail = parseHex(palette.to);
-    var start = progress * geometry.perimeter + geometry.side / 2;
+    var start = progress * geometry.perimeter + geometry.startOffset;
     ctx.lineWidth = geometry.width;
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'miter';
@@ -446,7 +515,7 @@
       var d0 = start + t0 * BEAD_FRACTION * geometry.perimeter;
       var d1 = start + tEnd * BEAD_FRACTION * geometry.perimeter;
       ctx.beginPath();
-      appendSquareOrbitInterval(ctx, geometry, d0, d1);
+      appendOrbitInterval(ctx, geometry, d0, d1);
       ctx.stroke();
     }
   }
@@ -507,6 +576,7 @@
   // Two strokes: the inset border, whose alpha dips and recovers, and a ping.
   // The design's ping spreads outward, which an icon cannot do -- there is no
   // canvas outside the tile -- so it travels inward from the border instead.
+  // Both follow the tile's rounded outline at their own inset.
   function drawCapabilityRing(ctx, size, progress) {
     var rgb = parseHex(CAP_COLOR);
     var width = Math.max(CAP_RING_W_MIN, Math.round(CAP_RING_W_RATIO * size));
@@ -527,8 +597,7 @@
     ctx.lineWidth = width;
     ctx.lineCap = 'butt';
     ctx.strokeStyle = mixColor(rgb, rgb, 0, ringAlpha);
-    ctx.beginPath();
-    ctx.rect(half, half, size - width, size - width);
+    tilePath(ctx, size, half);
     ctx.stroke();
 
     if (pingAlpha <= 0) return;
@@ -536,17 +605,19 @@
     var span = size - inset * 2;
     if (span <= 0) return;
     ctx.strokeStyle = mixColor(rgb, rgb, 0, pingAlpha);
-    ctx.beginPath();
-    ctx.rect(inset, inset, span, span);
+    tilePath(ctx, size, inset);
     ctx.stroke();
   }
 
   // Renders one frame at every shipped size, each from its own source bitmap.
-  // Nothing paints a background of its own -- the artwork already carries an
-  // opaque tile, and a service worker cannot read the toolbar theme to pick one.
+  // The only background is the artwork's own black tile, rebuilt as a square
+  // under it (drawGlyph); a service worker cannot read the toolbar theme to pick
+  // one. The last step cuts each undimmed frame with the artwork's alpha, so its
+  // rounded corners are pixel-for-pixel the static icon's in every state.
   //
-  // Exactly one clearRect and one drawImage per frame, glyph first: the test
-  // harness splits its recorded op log on clearRect to reconstruct frames.
+  // Exactly one clearRect per frame, which opens it: the test harness splits its
+  // recorded op log on clearRect to reconstruct frames. The glyph is the first
+  // bitmap draw and, in an undimmed frame, the corner cut is the last.
   function renderFrame(bitmaps, spec) {
     var frame = {};
     for (var i = 0; i < SIZES.length; i++) {
@@ -555,9 +626,16 @@
       var progress = spec.progress || 0;
       ctx.clearRect(0, 0, size, size);
       drawGlyph(ctx, size, bitmaps[size], spec);
-      if (spec.form === 'orbit') strokeSquareOrbit(ctx, size, spec.palette, progress);
+      if (spec.form === 'orbit') strokeOrbit(ctx, size, spec.palette, progress);
       else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress);
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
+      if (spec.dimmed !== true) {
+        var drawn = size * GLYPH_SCALE;
+        var offset = (size - drawn) / 2;
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(bitmaps[size], offset, offset, drawn, drawn);
+        ctx.globalCompositeOperation = 'source-over';
+      }
       frame[size] = ctx.getImageData(0, 0, size, size);
     }
     // Reuse this exact request object for every cycle. Rebuilding the two nested
