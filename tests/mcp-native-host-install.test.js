@@ -2127,67 +2127,276 @@ async function runInstallTransaction() {
   }
 }
 
+const NATIVE_LOCATION = '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json';
+
+function nativeReceipt(status, overrides = {}) {
+  return Object.freeze({
+    status,
+    reason: status === 'installed' ? 'installed' : status === 'already-installed' ? 'exact' : status,
+    location: NATIVE_LOCATION,
+    origin: ORIGIN,
+    packageVersion: PACKAGE_VERSION,
+    ...overrides,
+  });
+}
+
+// Records every native operation the CLI calls, in order. `script` supplies
+// the results; each entry may be a value, a function of the request, or an
+// array consumed one call at a time.
+function recordingOperations(calls, script = {}) {
+  const next = (name, request, fallback) => {
+    const entry = script[name];
+    const value = Array.isArray(entry) ? entry.shift() : entry;
+    const resolved = typeof value === 'function' ? value(request) : value;
+    return resolved === undefined ? fallback : resolved;
+  };
+  return Object.freeze({
+    install: async (request) => {
+      calls.push(Object.freeze({ operation: 'install', request: { ...request } }));
+      return next('install', request, nativeReceipt('installed', {
+        origin: `chrome-extension://${request.extensionId || EXTENSION_ID}/`,
+      }));
+    },
+    uninstall: async (request = {}) => {
+      calls.push(Object.freeze({ operation: 'uninstall', request: { ...request } }));
+      return next('uninstall', request, nativeReceipt('removed', { reason: 'removed' }));
+    },
+    ensure: async (request) => {
+      calls.push(Object.freeze({ operation: 'ensure', request: ordinaryClone(request) }));
+      return next('ensure', request, Object.freeze({
+        outcome: 'installed',
+        version: PACKAGE_VERSION,
+        browsers: ['chrome'],
+        addedBrowsers: ['chrome'],
+        stableRoot: '/home/fsb/.fsb/native-host',
+      }));
+    },
+    uninstallAll: async (request = {}) => {
+      calls.push(Object.freeze({ operation: 'uninstallAll', request: { ...request } }));
+      return next('uninstallAll', request, Object.freeze({
+        outcome: 'removed',
+        removedBrowsers: ['chrome'],
+        provenance: 'auto',
+      }));
+    },
+    readOptOut: () => {
+      calls.push(Object.freeze({ operation: 'readOptOut' }));
+      return null;
+    },
+    writeOptOut: (reason) => {
+      calls.push(Object.freeze({ operation: 'writeOptOut', reason }));
+    },
+    clearOptOut: () => {
+      calls.push(Object.freeze({ operation: 'clearOptOut' }));
+    },
+  });
+}
+
+function operationNames(calls) {
+  return calls.map((call) => call.operation);
+}
+
+const INSTALL_ENSURE = Object.freeze({ mode: 'install', browsers: 'auto', provenance: 'auto' });
+const REFRESH_ENSURE = Object.freeze({ mode: 'refresh-only', browsers: 'auto', provenance: 'auto' });
+
+// Runs install.js in a child whose HOME is a temporary directory, so client
+// installs and uninstalls write real config files without touching the
+// user's. The native operations are recording fakes.
+const CLI_DRIVER = `
+const [href, scenarioJson] = process.argv.slice(1);
+const cli = await import(href);
+const scenario = JSON.parse(scenarioJson);
+const calls = [];
+const results = scenario.results || {};
+const pick = (name, fallback) => {
+  const entry = results[name];
+  const value = Array.isArray(entry) ? entry.shift() : entry;
+  return value === undefined ? fallback : value;
+};
+const ops = {
+  install: async (request) => { calls.push({ operation: 'install', request }); return pick('install', null); },
+  uninstall: async (request = {}) => { calls.push({ operation: 'uninstall', request }); return pick('uninstall', null); },
+  ensure: async (request) => {
+    calls.push({ operation: 'ensure', request });
+    if (results.ensureThrows) throw new Error('SENSITIVE_ENSURE_FAILURE');
+    return pick('ensure', null);
+  },
+  uninstallAll: async (request = {}) => {
+    calls.push({ operation: 'uninstallAll', request });
+    if (results.uninstallAllThrows) throw new Error('SENSITIVE_UNINSTALL_FAILURE');
+    return pick('uninstallAll', null);
+  },
+  readOptOut: () => { calls.push({ operation: 'readOptOut' }); return null; },
+  writeOptOut: (reason) => { calls.push({ operation: 'writeOptOut', reason }); },
+  clearOptOut: () => { calls.push({ operation: 'clearOptOut' }); },
+};
+const stdout = [];
+const stderr = [];
+console.log = (...values) => stdout.push(values.join(' '));
+console.error = (...values) => stderr.push(values.join(' '));
+const run = scenario.command === 'uninstall' ? cli.runUninstall : cli.runInstall;
+await run(scenario.flags, ops);
+process.stdout.write(JSON.stringify({
+  calls,
+  stdout: stdout.join('\\n'),
+  stderr: stderr.join('\\n'),
+  exitCode: process.exitCode ?? 0,
+}));
+`;
+
+function createCliHome() {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-cli-routing-')));
+  const home = path.join(root, 'home');
+  const bin = path.join(root, 'bin');
+  fs.mkdirSync(home, { recursive: true });
+  fs.mkdirSync(bin, { recursive: true });
+  return Object.freeze({
+    root,
+    home,
+    bin,
+    write(relativePath, contents) {
+      const target = path.join(home, relativePath);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, contents, 'utf8');
+      return target;
+    },
+    exists(relativePath) {
+      return fs.existsSync(path.join(home, relativePath));
+    },
+    read(relativePath) {
+      return fs.readFileSync(path.join(home, relativePath), 'utf8');
+    },
+    // A stand-in Claude Code CLI on PATH: `add` and `remove` succeed, and
+    // `get` answers as the scenario says.
+    fakeClaude(getAnswer) {
+      const script = [
+        '#!/bin/sh',
+        'if [ "$2" = "get" ]; then',
+        getAnswer === 'configured'
+          ? '  echo "fsb:"; exit 0'
+          : '  echo "No MCP server found with name: $3" >&2; exit 1',
+        'fi',
+        'exit 0',
+        '',
+      ].join('\n');
+      const target = path.join(bin, 'claude');
+      fs.writeFileSync(target, script, { mode: 0o755 });
+    },
+    cleanup() {
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  });
+}
+
+function runCliScenario(fixture, scenario) {
+  const { spawnSync } = require('node:child_process');
+  const environment = { ...process.env };
+  delete environment.npm_execpath;
+  for (const key of Object.keys(environment)) {
+    if (key.startsWith('FSB_') || key.startsWith('CLINE_') || key === 'CLAUDE_CONFIG_DIR') {
+      delete environment[key];
+    }
+  }
+  const result = spawnSync(process.execPath, [
+    '--input-type=module',
+    '-e',
+    CLI_DRIVER,
+    pathToFileURL(path.join(repositoryRoot, 'mcp', 'build', 'install.js')).href,
+    JSON.stringify(scenario),
+  ], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    env: {
+      ...environment,
+      HOME: fixture.home,
+      USERPROFILE: fixture.home,
+      APPDATA: path.join(fixture.root, 'appdata'),
+      LOCALAPPDATA: path.join(fixture.root, 'localappdata'),
+      // Only the scenario's stand-in claude is reachable.
+      PATH: fixture.bin,
+    },
+    shell: false,
+    timeout: 60_000,
+  });
+  if (result.status !== 0) {
+    throw new Error(`CLI driver failed (${result.status}): ${result.stderr}`);
+  }
+  return JSON.parse(result.stdout);
+}
+
+const ENSURE_INSTALLED = Object.freeze({
+  outcome: 'installed',
+  version: PACKAGE_VERSION,
+  browsers: ['chrome', 'edge'],
+  addedBrowsers: ['chrome', 'edge'],
+  stableRoot: '/home/fsb/.fsb/native-host',
+});
+const UNINSTALL_ALL_REMOVED = Object.freeze({
+  outcome: 'removed',
+  removedBrowsers: ['chrome', 'edge'],
+  provenance: 'auto',
+});
+const CODEX_WITH_FSB = '[mcp_servers.fsb]\ncommand = "npx"\nargs = ["-y", "fsb-mcp-server@latest"]\n';
+
 async function runCliRouting() {
   const cli = await importBuild('install.js');
   const platforms = await importBuild('platforms.js');
   const calls = [];
-  const operations = Object.freeze({
-    install: async (request) => {
-      calls.push(Object.freeze({ operation: 'install', request: { ...request } }));
-      const extensionId = request.extensionId || EXTENSION_ID;
-      return Object.freeze({
-        status: 'installed',
-        reason: 'installed',
-        location: '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
-        origin: `chrome-extension://${extensionId}/`,
-        packageVersion: PACKAGE_VERSION,
-      });
-    },
-    uninstall: async (request = {}) => {
-      calls.push(Object.freeze({ operation: 'uninstall', request: { ...request } }));
-      return Object.freeze({
-        status: 'removed',
-        reason: 'removed',
-        location: '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
-        origin: ORIGIN,
-        packageVersion: PACKAGE_VERSION,
-      });
-    },
-  });
+  const operations = recordingOperations(calls);
 
-  await captureCliAction(() => cli.runInstall({ 'native-host': true }, operations));
-  equal(calls.length, 1, 'exact native install calls the injected install operation once');
-  deepEqual(calls[0], { operation: 'install', request: {} }, 'default native install passes no extension override');
-
-  await captureCliAction(() => cli.runInstall({
-    'native-host': true,
-    'extension-id': DEVELOPMENT_EXTENSION_ID,
-  }, operations));
-  equal(calls.length, 2, 'development native install calls the injected install operation once');
-  deepEqual(
-    calls[1],
-    { operation: 'install', request: { extensionId: DEVELOPMENT_EXTENSION_ID } },
-    'development native install passes only the validated exact extension id',
-  );
-
-  await captureCliAction(() => cli.runUninstall({ 'native-host': true }, operations));
-  equal(calls.length, 3, 'exact native uninstall calls the injected uninstall operation once');
-  deepEqual(calls[2], { operation: 'uninstall', request: {} }, 'default native uninstall passes no browser override');
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runInstall({ 'native-host': true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'clearOptOut' }, { operation: 'install', request: {} }],
+      'exact native install clears the opt-out, then calls the injected install once with no extension override',
+    );
+  }
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runInstall({
+      'native-host': true,
+      'extension-id': DEVELOPMENT_EXTENSION_ID,
+    }, operations));
+    deepEqual(
+      calls.slice(before),
+      [
+        { operation: 'clearOptOut' },
+        { operation: 'install', request: { extensionId: DEVELOPMENT_EXTENSION_ID } },
+      ],
+      'development native install passes only the validated exact extension id',
+    );
+  }
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runUninstall({ 'native-host': true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [
+        { operation: 'writeOptOut', reason: 'uninstall-native-host' },
+        { operation: 'uninstallAll', request: {} },
+      ],
+      'native uninstall without --browser writes the opt-out first, then removes every registration',
+    );
+  }
 
   for (const browser of ['chrome', 'edge', 'brave', 'chromium']) {
     const installIndex = calls.length;
     await captureCliAction(() => cli.runInstall({ 'native-host': true, browser }, operations));
     deepEqual(
-      calls[installIndex],
-      { operation: 'install', request: { browser } },
+      calls.slice(installIndex),
+      [{ operation: 'clearOptOut' }, { operation: 'install', request: { browser } }],
       `${browser} install forwards the exact browser selector`,
     );
     const uninstallIndex = calls.length;
     await captureCliAction(() => cli.runUninstall({ 'native-host': true, browser }, operations));
     deepEqual(
-      calls[uninstallIndex],
-      { operation: 'uninstall', request: { browser } },
-      `${browser} uninstall forwards the exact browser selector`,
+      calls.slice(uninstallIndex),
+      [{ operation: 'uninstall', request: { browser } }],
+      `${browser} uninstall removes only that browser's registration and writes no opt-out`,
     );
   }
 
@@ -2199,7 +2408,7 @@ async function runCliRouting() {
       'extension-id': DEVELOPMENT_EXTENSION_ID,
     }, operations));
     deepEqual(
-      calls[index],
+      calls[index + 1],
       {
         operation: 'install',
         request: { browser: 'edge', extensionId: DEVELOPMENT_EXTENSION_ID },
@@ -2224,6 +2433,14 @@ async function runCliRouting() {
     { 'native-host': true, list: true },
     { 'native-host': true, 'dry-run': true },
     { 'native-host': true, unknown: true },
+    { 'native-host': true, quiet: true },
+    { 'native-host': true, 'no-native-host': true },
+    { 'native-host': true, ensure: 'yes' },
+    { 'native-host': true, ensure: true, quiet: 'yes' },
+    { 'native-host': true, ensure: true, browser: 'chrome' },
+    { 'native-host': true, ensure: true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+    { 'native-host': true, ensure: true, 'dry-run': true },
+    { 'native-host': true, ensure: true, codex: true },
   ];
   for (const flags of invalidInstallFlags) {
     const before = calls.length;
@@ -2248,6 +2465,7 @@ async function runCliRouting() {
     { 'native-host': true, list: true },
     { 'native-host': true, 'dry-run': true },
     { 'native-host': true, unknown: true },
+    { 'native-host': true, ensure: true },
   ];
   for (const flags of invalidUninstallFlags) {
     const before = calls.length;
@@ -2262,9 +2480,17 @@ async function runCliRouting() {
 
   for (const key of Object.keys(platforms.PLATFORMS)) {
     const before = calls.length;
-    await captureCliAction(() => cli.runInstall({ [key]: true, 'dry-run': true }, operations));
+    const preview = await captureCliAction(() => cli.runInstall({ [key]: true, 'dry-run': true }, operations));
     await captureCliAction(() => cli.runUninstall({ [key]: true, 'dry-run': true }, operations));
-    equal(calls.length, before, `${key} legacy install/uninstall never calls native operations`);
+    equal(calls.length, before, `${key} dry-run install/uninstall never calls native operations`);
+    const instructionsOnly = platforms.PLATFORMS[key].installMode === 'instructions';
+    equal(
+      preview.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)"),
+      !instructionsOnly,
+      instructionsOnly
+        ? `${key} prints setup steps only, so its dry run previews no helper step`
+        : `${key} dry run previews the helper step`,
+    );
 
     const mixedInstall = await captureCliAction(() => cli.runInstall({
       'native-host': true,
@@ -2279,24 +2505,465 @@ async function runCliRouting() {
     equal(calls.length, before, `${key} mixed native/client syntax performs zero native mutation`);
   }
 
-  const beforeOrdinary = calls.length;
-  await captureCliAction(() => cli.runInstall({}, operations));
-  await captureCliAction(() => cli.runUninstall({}, operations));
-  await captureCliAction(() => cli.runInstall({ list: true }, operations));
-  await captureCliAction(() => cli.runInstall({ all: true, 'dry-run': true }, operations));
-  await captureCliAction(() => cli.runUninstall({ all: true, 'dry-run': true }, operations));
-  equal(calls.length, beforeOrdinary, 'ordinary/list/all routes never call native operations');
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runUninstall({}, operations));
+    await captureCliAction(() => cli.runInstall({ list: true }, operations));
+    await captureCliAction(() => cli.runInstall({ all: true, 'dry-run': true }, operations));
+    await captureCliAction(() => cli.runUninstall({ all: true, 'dry-run': true }, operations));
+    await captureCliAction(() => cli.runInstall({ windsurf: true }, operations));
+    await captureCliAction(() => cli.runInstall({ jetbrains: true, chatgpt: true }, operations));
+    await captureCliAction(() => cli.runUninstall({ warp: true }, operations));
+    equal(
+      calls.length,
+      before,
+      'bare uninstall, --list, dry runs, unknown flags and instructions-only runs never call native operations',
+    );
+  }
   equal(Object.keys(platforms.PLATFORMS).length, 21, 'native host does not change the 21-client platform registry');
+
+  // A bare install sets up the helper once, then prints the usage.
+  {
+    const before = calls.length;
+    const bare = await captureCliAction(() => cli.runInstall({}, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'clearOptOut' }, { operation: 'ensure', request: INSTALL_ENSURE }],
+      'bare install clears the opt-out and runs exactly one install-mode ensure',
+    );
+    equal(bare.exitCode, 0, 'bare install exits cleanly');
+    check(
+      bare.stdout.indexOf("Installed FSB's local helper (native messaging host) for Chrome")
+        < bare.stdout.indexOf('Usage: fsb-mcp-server install --<platform>'),
+      'bare install reports the helper before printing the usage',
+    );
+  }
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runInstall({ 'extension-id': DEVELOPMENT_EXTENSION_ID }, operations));
+    deepEqual(
+      calls.slice(before),
+      [
+        { operation: 'clearOptOut' },
+        { operation: 'ensure', request: { ...INSTALL_ENSURE, extensionId: DEVELOPMENT_EXTENSION_ID } },
+      ],
+      'bare install passes --extension-id through to ensure',
+    );
+  }
+  for (const invalidId of ['abcdefghijklmnop', DEVELOPMENT_EXTENSION_ID.toUpperCase(), true]) {
+    const before = calls.length;
+    const result = await captureCliAction(() => cli.runInstall({ 'extension-id': invalidId }, operations));
+    equal(calls.length, before, 'an invalid --extension-id reaches no native operation');
+    equal(result.exitCode, 0, 'an invalid --extension-id is a warning, not a failed install');
+    check(result.stderr.includes('--extension-id must be the 32 lowercase a-p characters'),
+      'an invalid --extension-id says what a valid one looks like');
+  }
+  {
+    const before = calls.length;
+    const preview = await captureCliAction(() => cli.runInstall({ 'dry-run': true }, operations));
+    equal(calls.length, before, 'bare install --dry-run calls no native operation');
+    check(preview.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)")
+      && preview.stdout.includes('Would install or refresh it'),
+    'bare install --dry-run previews the helper step');
+    check(preview.stdout.includes('Usage: fsb-mcp-server install --<platform>'), 'bare install --dry-run still prints the usage');
+  }
+  {
+    const before = calls.length;
+    const skipped = await captureCliAction(() => cli.runInstall({ 'no-native-host': true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'writeOptOut', reason: 'install-no-native-host' }],
+      'bare install --no-native-host writes the opt-out and runs no ensure',
+    );
+    check(skipped.stdout.includes('--no-native-host was given'), 'bare install --no-native-host says the helper was skipped');
+  }
+  {
+    const before = calls.length;
+    const preview = await captureCliAction(() => cli.runInstall({ 'no-native-host': true, 'dry-run': true }, operations));
+    equal(calls.length, before, 'install --no-native-host --dry-run writes no opt-out');
+    check(preview.stdout.includes('Would skip it and pause its automatic refresh'), 'the dry run says the helper would be skipped');
+  }
+  {
+    const failing = recordingOperations([], {
+      ensure: Object.freeze({
+        outcome: 'refused',
+        reason: 'foreign-state',
+        browsers: [],
+        addedBrowsers: [],
+        stableRoot: '/home/fsb/.fsb/native-host',
+      }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({}, failing));
+    equal(result.exitCode, 0, 'a refused helper during bare install is a warning only');
+    check(result.stderr.includes("FSB's local helper (native messaging host) was not changed: foreign-state"),
+      'a refused helper is reported with its stable reason on stderr');
+    check(result.stdout.includes('Usage: fsb-mcp-server install --<platform>'), 'the usage still follows a refused helper');
+  }
+
+  // The background refresh a stdio server starts.
+  {
+    const before = calls.length;
+    const quiet = await captureCliAction(() => cli.runInstall({ 'native-host': true, ensure: true, quiet: true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'ensure', request: REFRESH_ENSURE }],
+      'install --native-host --ensure --quiet runs exactly one refresh-only ensure',
+    );
+    equal(quiet.stdout, '', 'the quiet refresh writes nothing to stdout');
+    equal(quiet.stderr, '', 'the quiet refresh writes nothing to stderr');
+    equal(quiet.exitCode, 0, 'the quiet refresh exits 0');
+  }
+  for (const [label, script] of [
+    ['refused', { ensure: Object.freeze({ outcome: 'refused', reason: 'split-state', browsers: [], addedBrowsers: [], stableRoot: '' }) }],
+    ['throwing', { ensure: () => { throw new Error('SENSITIVE_REFRESH_FAILURE'); } }],
+  ]) {
+    const quiet = await captureCliAction(() => cli.runInstall(
+      { 'native-host': true, ensure: true, quiet: true },
+      recordingOperations([], script),
+    ));
+    equal(`${quiet.stdout}${quiet.stderr}`, '', `a ${label} quiet refresh stays silent`);
+    equal(quiet.exitCode, 0, `a ${label} quiet refresh still exits 0`);
+  }
+  {
+    const loud = await captureCliAction(() => cli.runInstall(
+      { 'native-host': true, ensure: true },
+      recordingOperations([], { ensure: Object.freeze({ outcome: 'skipped-absent', reason: 'absent', browsers: [], addedBrowsers: [], stableRoot: '' }) }),
+    ));
+    equal(loud.stdout, "○ FSB's local helper (native messaging host) was not changed: absent\n",
+      'without --quiet the refresh prints one result line');
+    equal(loud.exitCode, 0, 'without --quiet the refresh still exits 0');
+  }
+
+  // The explicit repair path refreshes an older helper instead of refusing.
+  {
+    const repairCalls = [];
+    const repair = recordingOperations(repairCalls, {
+      install: [
+        nativeReceipt('refused', { reason: 'version-mismatch', packageVersion: '0.0.1' }),
+        nativeReceipt('already-installed'),
+      ],
+      ensure: Object.freeze({
+        outcome: 'refreshed',
+        version: PACKAGE_VERSION,
+        browsers: ['chrome'],
+        addedBrowsers: [],
+        stableRoot: '/home/fsb/.fsb/native-host',
+      }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({ 'native-host': true }, repair));
+    deepEqual(
+      operationNames(repairCalls),
+      ['clearOptOut', 'install', 'ensure', 'install'],
+      'an older owned helper is refreshed between two explicit installs',
+    );
+    deepEqual(
+      repairCalls[2].request,
+      { mode: 'install', browsers: ['chrome'], provenance: 'explicit' },
+      'the repair refresh targets the requested browser with explicit provenance',
+    );
+    equal(result.exitCode, 0, 'refreshing an older helper exits cleanly');
+    equal(
+      result.stdout,
+      `Native messaging host updated from 0.0.1 to ${PACKAGE_VERSION}.\nExpected location: ${NATIVE_LOCATION}\nAllowed origin: ${ORIGIN}\n`,
+      'the repair reports the old and new versions with the factual location and origin',
+    );
+  }
+  {
+    const repairCalls = [];
+    const repair = recordingOperations(repairCalls, {
+      install: [
+        nativeReceipt('refused', {
+          reason: 'version-mismatch',
+          packageVersion: '0.0.1',
+          origin: `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`,
+        }),
+        nativeReceipt('installed', { origin: `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/` }),
+      ],
+      ensure: Object.freeze({ outcome: 'refreshed', version: PACKAGE_VERSION, browsers: ['chrome', 'edge'], addedBrowsers: ['edge'], stableRoot: '' }),
+    });
+    await captureCliAction(() => cli.runInstall(
+      { 'native-host': true, browser: 'edge', 'extension-id': DEVELOPMENT_EXTENSION_ID },
+      repair,
+    ));
+    deepEqual(
+      repairCalls[2].request,
+      { mode: 'install', browsers: ['edge'], extensionId: DEVELOPMENT_EXTENSION_ID, provenance: 'explicit' },
+      'the repair refresh keeps the browser and extension id the user named',
+    );
+  }
+  {
+    const repairCalls = [];
+    const newer = recordingOperations(repairCalls, {
+      install: nativeReceipt('refused', { reason: 'version-mismatch', packageVersion: '999.0.0' }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({ 'native-host': true }, newer));
+    deepEqual(operationNames(repairCalls), ['clearOptOut', 'install'], 'a newer helper is never refreshed by an older package');
+    equal(result.exitCode, 1, 'a newer helper still refuses');
+    check(result.stderr.includes('not changed: version-mismatch'), 'a newer helper reports the stable version-mismatch reason');
+  }
+  {
+    const repairCalls = [];
+    const busy = recordingOperations(repairCalls, {
+      install: nativeReceipt('refused', { reason: 'version-mismatch', packageVersion: '0.0.1' }),
+      ensure: Object.freeze({ outcome: 'deferred', reason: 'daemon-busy', version: '0.0.1', browsers: ['chrome'], addedBrowsers: [], stableRoot: '' }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({ 'native-host': true }, busy));
+    deepEqual(operationNames(repairCalls), ['clearOptOut', 'install', 'ensure'], 'a deferred repair does not install again');
+    equal(result.exitCode, 1, 'a deferred repair exits nonzero');
+    check(result.stderr.includes('not changed: daemon-busy'), 'a deferred repair names the busy local service');
+  }
+
+  if (process.platform === 'win32') {
+    console.log('  SKIP: client install and uninstall routing in a temporary home runs on macOS and Linux');
+    return;
+  }
+
+  // Client install and uninstall in a temporary home.
+  const fixture = createCliHome();
+  try {
+    fixture.write('.codex/config.toml', 'model = "gpt-5.4"\n');
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'clearOptOut' }, { operation: 'ensure', request: INSTALL_ENSURE }],
+        'install --codex clears the opt-out and runs exactly one install-mode ensure',
+      );
+      check(result.stdout.indexOf('Installed to Codex CLI') !== -1
+        && result.stdout.indexOf('Installed to Codex CLI')
+          < result.stdout.indexOf("Installed FSB's local helper (native messaging host) for Chrome, Edge"),
+      'install --codex writes the client config before reporting the helper');
+      equal(result.exitCode, 0, 'install --codex exits cleanly');
+      check(fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), 'install --codex writes the codex entry');
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      deepEqual(
+        result.calls[1],
+        { operation: 'ensure', request: { ...INSTALL_ENSURE, extensionId: DEVELOPMENT_EXTENSION_ID } },
+        'install --codex --extension-id passes the id through to ensure',
+      );
+    }
+    for (const [label, results, reason] of [
+      ['refused', { ensure: { outcome: 'refused', reason: 'foreign-state', browsers: [], addedBrowsers: [], stableRoot: '' } }, 'foreign-state'],
+      ['unavailable', { ensure: { outcome: 'unavailable', reason: 'unavailable', browsers: [], addedBrowsers: [], stableRoot: '' } }, 'unavailable'],
+      ['throwing', { ensureThrows: true }, 'unavailable'],
+      ['malformed', { ensure: { outcome: 'installed', browsers: 'SENSITIVE', reason: 'SENSITIVE VALUE' } }, null],
+    ]) {
+      const result = runCliScenario(fixture, { command: 'install', flags: { codex: true }, results });
+      equal(result.exitCode, 0, `a ${label} helper never changes the exit code of a successful client install`);
+      equal(result.calls.filter((call) => call.operation === 'ensure').length, 1, `a ${label} helper is attempted exactly once`);
+      check(!`${result.stdout}${result.stderr}`.includes('SENSITIVE'), `a ${label} helper result never echoes unbounded text`);
+      if (reason) {
+        check(result.stderr.includes(`was not changed: ${reason}`), `a ${label} helper is a warning with its stable reason`);
+        check(result.stderr.includes('doctor'), `a ${label} helper warning points at doctor`);
+      }
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true },
+        results: { ensure: { outcome: 'current', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '' } },
+      });
+      check(result.stdout.includes("FSB's local helper (native messaging host) is already installed for Chrome"),
+        'a current helper is reported as already installed');
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true, 'no-native-host': true },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'writeOptOut', reason: 'install-no-native-host' }],
+        'install --codex --no-native-host writes the opt-out and never runs ensure',
+      );
+    }
+    {
+      const before = fixture.read('.codex/config.toml');
+      const result = runCliScenario(fixture, { command: 'install', flags: { codex: true, 'dry-run': true } });
+      deepEqual(result.calls, [], 'install --codex --dry-run calls no native operation');
+      check(result.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)"), 'install --codex --dry-run previews the helper');
+      equal(fixture.read('.codex/config.toml'), before, 'install --codex --dry-run writes no config');
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { all: true },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      equal(result.calls.filter((call) => call.operation === 'ensure').length, 1, 'install --all runs exactly one ensure');
+      check(result.stdout.indexOf('platforms') < result.stdout.indexOf("Installed FSB's local helper"),
+        'install --all reports the helper after its client summary');
+    }
+    {
+      fixture.fakeClaude('missing');
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { 'claude-code': true },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'clearOptOut' }, { operation: 'ensure', request: INSTALL_ENSURE }],
+        'install --claude-code runs exactly one ensure after the CLI add',
+      );
+      check(result.stdout.includes('Added to Claude Code'), 'install --claude-code still uses the Claude Code CLI');
+    }
+
+    // Uninstall: the last client removes an auto helper.
+    fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+    {
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'uninstallAll', request: { onlyProvenance: 'auto' } }],
+        'uninstalling the last client removes only an auto helper, with no opt-out',
+      );
+      check(result.stdout.includes("Removed FSB's local helper (native messaging host) from Chrome, Edge"),
+        'the last-client uninstall reports the removed registrations');
+      check(result.stdout.includes('Not checked, because they are set up by hand: JetBrains, ChatGPT, Claude.ai, Warp'),
+        'the last-client uninstall lists the instructions-only clients it cannot check');
+      equal(result.exitCode, 0, 'the last-client uninstall exits cleanly');
+    }
+    fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+    {
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: { outcome: 'kept', reason: 'explicit-provenance', removedBrowsers: [], provenance: 'explicit' } },
+      });
+      check(result.stdout.includes("Kept FSB's local helper (native messaging host): install --native-host set it up"),
+        'an explicit helper is kept and the reason is printed');
+    }
+    for (const [label, results, expectedOutput, stream] of [
+      ['absent', { uninstallAll: { outcome: 'absent', reason: 'absent', removedBrowsers: [] } }, null, null],
+      ['refused', { uninstallAll: { outcome: 'refused', reason: 'daemon-busy', removedBrowsers: [] } }, 'was not removed: daemon-busy', 'stderr'],
+      ['throwing', { uninstallAllThrows: true }, 'was not removed: unavailable', 'stderr'],
+    ]) {
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      const result = runCliScenario(fixture, { command: 'uninstall', flags: { codex: true }, results });
+      equal(result.exitCode, 0, `an ${label} helper never changes the uninstall exit code`);
+      if (expectedOutput) {
+        check(result[stream].includes(expectedOutput), `an ${label} helper removal is reported on ${stream}`);
+      } else {
+        check(!`${result.stdout}${result.stderr}`.includes('local helper'), `an ${label} helper adds no output`);
+      }
+      check(!`${result.stdout}${result.stderr}`.includes('SENSITIVE'), `an ${label} helper result never echoes error text`);
+    }
+
+    // Uninstall: anything still using FSB keeps the helper.
+    const keptScenarios = [
+      ['another client config names FSB', () => fixture.write('.cursor/mcp.json', JSON.stringify({ mcpServers: { fsb: { command: 'npx' } } })), 'FSB is still configured in Cursor'],
+      ['another client config cannot be parsed', () => fixture.write('.cursor/mcp.json', '{ not json'), 'Cursor (config could not be read)'],
+      ['Claude Code names FSB at user scope', () => fixture.write('.claude.json', JSON.stringify({ mcpServers: { fsb: {} } })), 'FSB is still configured in Claude Code'],
+      ['Claude Code names FSB in one project', () => fixture.write('.claude.json', JSON.stringify({ projects: { '/work/a': { mcpServers: {} }, '/work/b': { mcpServers: { fsb: {} } } } })), 'FSB is still configured in Claude Code'],
+      ['Claude Code config cannot be parsed', () => fixture.write('.claude.json', '{'), 'Claude Code (config could not be read)'],
+      ['the Claude Code CLI still lists FSB', () => fixture.fakeClaude('configured'), 'FSB is still configured in Claude Code'],
+      ['a delegation provider is configured', () => fixture.write('.fsb/agent-providers/grok/grok-home/config.toml', ''), 'a delegation provider is configured in ~/.fsb/agent-providers (grok)'],
+    ];
+    for (const [label, arrange, reason] of keptScenarios) {
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.fakeClaude('missing');
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      arrange();
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [], `the helper is kept when ${label}`);
+      check(result.stdout.includes(`FSB's local helper (native messaging host) was not removed: `)
+        && result.stdout.includes(reason), `uninstall says why the helper stays when ${label}`);
+      check(!fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), `the codex entry is still removed when ${label}`);
+    }
+    {
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      fixture.write('.claude.json', JSON.stringify({ mcpServers: { other: {} }, projects: { '/work/a': { mcpServers: { other: {} } } } }));
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [{ operation: 'uninstallAll', request: { onlyProvenance: 'auto' } }],
+        'a Claude Code config without FSB does not keep the helper');
+    }
+
+    // --all writes the opt-out first and skips the client scan.
+    {
+      fixture.write('.cursor/mcp.json', '{ not json');
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { all: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(
+        result.calls,
+        [
+          { operation: 'writeOptOut', reason: 'uninstall-all' },
+          { operation: 'uninstallAll', request: { onlyProvenance: 'auto' } },
+        ],
+        'uninstall --all writes the opt-out before removing an auto helper',
+      );
+    }
+    {
+      fixture.write('.fsb/agent-providers/grok/grok-home/config.toml', '');
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { all: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'writeOptOut', reason: 'uninstall-all' }],
+        'uninstall --all still pauses the refresh but keeps a helper a delegation provider uses',
+      );
+      check(result.stdout.includes('a delegation provider is configured'), 'uninstall --all says why the helper stays');
+    }
+    {
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      const result = runCliScenario(fixture, { command: 'uninstall', flags: { codex: true, 'dry-run': true } });
+      deepEqual(result.calls, [], 'uninstall --codex --dry-run calls no native operation');
+      check(result.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)"), 'uninstall --codex --dry-run previews the helper decision');
+      check(fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), 'uninstall --codex --dry-run removes nothing');
+    }
+  } finally {
+    fixture.cleanup();
+  }
 }
 
 async function runCliOutput() {
   const cli = await importBuild('install.js');
   const location = '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json';
 
-  function operationsWith(installResult, uninstallResult = null) {
+  function operationsWith(installResult, uninstallResult = null, extra = {}) {
     return Object.freeze({
       install: async () => Object.freeze(installResult),
       uninstall: async () => Object.freeze(uninstallResult || installResult),
+      ensure: async () => extra.ensure,
+      uninstallAll: async () => extra.uninstallAll,
+      readOptOut: () => null,
+      writeOptOut: () => undefined,
+      clearOptOut: () => undefined,
     });
   }
 
@@ -2336,7 +3003,7 @@ async function runCliOutput() {
   );
 
   const removed = await captureCliAction(() => cli.runUninstall(
-    { 'native-host': true },
+    { 'native-host': true, browser: 'chrome' },
     operationsWith(null, {
       status: 'removed',
       reason: 'removed',
@@ -2353,7 +3020,7 @@ async function runCliOutput() {
   );
 
   const notInstalled = await captureCliAction(() => cli.runUninstall(
-    { 'native-host': true },
+    { 'native-host': true, browser: 'chrome' },
     operationsWith(null, {
       status: 'not-installed',
       reason: 'absent',
@@ -2431,19 +3098,121 @@ async function runCliOutput() {
   check(!`${inherited.stdout}${inherited.stderr}`.includes(sensitive), 'prototype-backed receipt fields never reach output');
   check(inherited.stderr.includes('not changed: unavailable'), 'prototype-backed native receipt collapses to unavailable');
 
-  const thrown = await captureCliAction(() => cli.runUninstall(
+  const throwingOperations = Object.freeze({
+    install: async () => { throw new Error(sensitive); },
+    uninstall: async () => { throw new Error(sensitive); },
+    ensure: async () => { throw new Error(sensitive); },
+    uninstallAll: async () => { throw new Error(sensitive); },
+    readOptOut: () => { throw new Error(sensitive); },
+    writeOptOut: () => { throw new Error(sensitive); },
+    clearOptOut: () => { throw new Error(sensitive); },
+  });
+  for (const [label, flags] of [
+    ['all-browser', { 'native-host': true }],
+    ['single-browser', { 'native-host': true, browser: 'chrome' }],
+  ]) {
+    const thrown = await captureCliAction(() => cli.runUninstall(flags, throwingOperations));
+    equal(thrown.exitCode, 1, `${label} native adapter exception becomes a refusal without throwing`);
+    check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), `${label} native adapter exception text is never serialized`);
+    check(thrown.stderr.includes('not changed: unavailable'), `${label} native adapter exception collapses to unavailable`);
+    check(thrown.stderr.includes('Run npx -y fsb-mcp-server@latest doctor for repair details.'), `${label} native adapter exception retains exact doctor guidance`);
+  }
+  {
+    const thrown = await captureCliAction(() => cli.runInstall({ 'native-host': true }, throwingOperations));
+    equal(thrown.exitCode, 1, 'a throwing explicit install becomes a refusal without throwing');
+    check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), 'a throwing explicit install never serializes error text');
+  }
+
+  // uninstall --native-host without --browser reports the uninstall-all result.
+  const platformModule = await importBuild('native-host-install/platform.js');
+  const helperRoot = ['darwin', 'linux', 'win32'].includes(process.platform)
+    ? platformModule.resolveNativeHostPlatformLayout({
+      platform: process.platform,
+      homeDirectory: require('node:os').homedir(),
+      ...(process.platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
+    }).stableRoot
+    : 'Unavailable';
+  const removedAll = await captureCliAction(() => cli.runUninstall(
     { 'native-host': true },
-    Object.freeze({
-      install: async () => { throw new Error(sensitive); },
-      uninstall: async () => { throw new Error(sensitive); },
+    operationsWith(null, null, {
+      uninstallAll: { outcome: 'removed', removedBrowsers: ['edge', 'chrome'], provenance: 'explicit' },
     }),
   ));
-  equal(thrown.exitCode, 1, 'native adapter exception becomes a refusal without throwing');
-  check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), 'native adapter exception text is never serialized');
-  check(thrown.stderr.includes('not changed: unavailable'), 'native adapter exception collapses to unavailable');
-  check(thrown.stderr.includes('Run npx -y fsb-mcp-server@latest doctor for repair details.'), 'native adapter exception retains exact doctor guidance');
+  equal(removedAll.exitCode, 0, 'uninstall-all removal exits cleanly');
+  equal(
+    removedAll.stdout,
+    `Native messaging host removed.\nRemoved registrations: Chrome, Edge\nExpected location: ${helperRoot}\n`,
+    'uninstall-all removal names each removed registration in browser order and the helper location',
+  );
+  const absentAll = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true },
+    operationsWith(null, null, { uninstallAll: { outcome: 'absent', reason: 'absent', removedBrowsers: [] } }),
+  ));
+  equal(absentAll.exitCode, 0, 'uninstall-all with nothing installed exits cleanly');
+  equal(
+    absentAll.stdout,
+    `Native messaging host is not installed.\nRemoved registrations: none\nExpected location: ${helperRoot}\n`,
+    'uninstall-all with nothing installed reports zero removals',
+  );
+  for (const [reason, expected] of [['split-state', 'split-state'], [sensitive, 'unavailable']]) {
+    const refusedAll = await captureCliAction(() => cli.runUninstall(
+      { 'native-host': true },
+      operationsWith(null, null, {
+        uninstallAll: { outcome: 'refused', reason, removedBrowsers: [sensitive], provenance: sensitive },
+      }),
+    ));
+    equal(refusedAll.exitCode, 1, `uninstall-all refusal (${expected}) exits nonzero`);
+    equal(
+      refusedAll.stderr,
+      `Native messaging host was not changed: ${expected}\nExpected location: ${helperRoot}\nRun npx -y fsb-mcp-server@latest doctor for repair details.\n`,
+      `uninstall-all refusal (${expected}) prints only the stable reason, location and doctor guidance`,
+    );
+  }
+  {
+    const tainted = await captureCliAction(() => cli.runUninstall(
+      { 'native-host': true },
+      operationsWith(null, null, {
+        uninstallAll: { outcome: 'removed', removedBrowsers: ['chrome', sensitive], extra: sensitive },
+      }),
+    ));
+    check(!tainted.stdout.includes(sensitive), 'uninstall-all output keeps only known browser names');
+  }
 
-  for (const result of [installed, alreadyInstalled, removed, notInstalled]) {
+  // The one line client install prints for the helper.
+  const helper = "FSB's local helper (native messaging host)";
+  for (const [label, ensure, stream, line] of [
+    ['installed', { outcome: 'installed', version: PACKAGE_VERSION, browsers: ['edge', 'chrome'], addedBrowsers: ['chrome', 'edge'], stableRoot: '' },
+      'stdout', `\u2713 Installed ${helper} for Chrome, Edge`],
+    ['refreshed', { outcome: 'refreshed', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stdout', `\u2713 Updated ${helper} to ${PACKAGE_VERSION} for Chrome`],
+    ['registered', { outcome: 'registered', version: PACKAGE_VERSION, browsers: ['chrome', 'brave'], addedBrowsers: ['brave'], stableRoot: '' },
+      'stdout', `\u2713 Registered ${helper} for Brave`],
+    ['current', { outcome: 'current', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stdout', `\u25CB ${helper} is already installed for Chrome`],
+    ['newer', { outcome: 'current', reason: 'installed-newer', version: '999.0.0', browsers: ['chromium'], addedBrowsers: [], stableRoot: '' },
+      'stdout', `\u25CB ${helper} is already installed for Chromium (a newer version than this package)`],
+    ['deferred', { outcome: 'deferred', reason: 'locked', browsers: [], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not updated: locked. Run npx -y fsb-mcp-server@latest install --native-host to retry.`],
+    ['refused', { outcome: 'refused', reason: 'registry-shadow', browsers: [], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not changed: registry-shadow. Run npx -y fsb-mcp-server@latest doctor for details.`],
+    ['unknown', { outcome: sensitive, reason: sensitive },
+      'stderr', `\u26A0 ${helper} was not changed: unavailable. Run npx -y fsb-mcp-server@latest doctor for details.`],
+    ['missing', undefined,
+      'stderr', `\u26A0 ${helper} was not changed: unavailable. Run npx -y fsb-mcp-server@latest doctor for details.`],
+  ]) {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, { ensure })));
+    equal(result.exitCode, 0, `a ${label} helper result never changes the install exit code`);
+    equal(result[stream].split('\n')[0], line, `a ${label} helper result prints its one fixed line on ${stream}`);
+  }
+  {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, {
+      ensure: { outcome: 'refreshed', version: `${sensitive}`, browsers: ['chrome', sensitive], addedBrowsers: [sensitive], stableRoot: sensitive },
+    })));
+    check(!`${result.stdout}${result.stderr}`.includes(sensitive), 'tainted ensure fields never reach terminal output');
+    equal(result.stdout.split('\n')[0], `\u2713 Updated ${helper} for Chrome`, 'an unparseable version is left out of the helper line');
+  }
+
+  for (const result of [installed, alreadyInstalled, removed, notInstalled, removedAll, absentAll]) {
     const output = `${result.stdout}${result.stderr}`.toLowerCase();
     for (const optimistic of ['paired', 'provider', 'delegation', 'agent started']) {
       check(!output.includes(optimistic), `successful native output never claims ${optimistic}`);
@@ -2455,6 +3224,78 @@ async function runCliOutput() {
   check(!/case 'serve':[\s\S]*runInstall\(/u.test(beforeInstallCase), 'serve router never calls installer code');
   check(!/case 'doctor':[\s\S]*runInstall\(/u.test(beforeInstallCase), 'doctor router never calls installer code');
   check(/let command = 'stdio'/u.test(indexSource), 'no-argument startup remains the stdio server route');
+
+  // The background refresh is started only by the stdio server, after the
+  // transport connects and before the bridge does.
+  const stdioSource = indexSource.slice(
+    indexSource.indexOf('async function runStdioServer()'),
+    indexSource.indexOf('async function runHttpMode('),
+  );
+  const connectAt = stdioSource.indexOf('await runtime.server.connect(transport);');
+  const refreshAt = stdioSource.indexOf('startNativeHostAutoRefresh({ entryPath: fileURLToPath(import.meta.url) });');
+  const bridgeAt = stdioSource.indexOf('await runtime.bridge.connect();');
+  check(connectAt !== -1 && refreshAt > connectAt && bridgeAt > refreshAt,
+    'the stdio server starts the helper refresh after the MCP transport connects and before the bridge');
+  check(/setImmediate\(\(\) => \{\s*startNativeHostAutoRefresh\(/u.test(stdioSource),
+    'the helper refresh waits for the next event-loop turn, behind any initialize request already on stdin');
+  equal((indexSource.match(/startNativeHostAutoRefresh\(/gu) || []).length, 1,
+    'nothing but the stdio server starts the helper refresh');
+
+  const installedEntry = path.join(path.sep, 'opt', 'npm', '_npx', 'a1b2', 'node_modules', 'fsb-mcp-server', 'build', 'index.js');
+  const spawned = [];
+  const fakeSpawn = (command, args, options) => {
+    const child = { events: [], unrefCalls: 0 };
+    spawned.push({ command, args, options, child });
+    return {
+      on(event, listener) { child.events.push([event, typeof listener]); return this; },
+      unref() { child.unrefCalls += 1; return this; },
+    };
+  };
+  equal(
+    cli.startNativeHostAutoRefresh({ entryPath: installedEntry, environment: {}, execPath: '/usr/bin/node', spawnChild: fakeSpawn }),
+    true,
+    'a server running from node_modules starts the helper refresh',
+  );
+  deepEqual(
+    { command: spawned[0].command, args: spawned[0].args, options: spawned[0].options },
+    {
+      command: '/usr/bin/node',
+      args: [installedEntry, 'install', '--native-host', '--ensure', '--quiet'],
+      options: { detached: true, stdio: 'ignore', windowsHide: true },
+    },
+    'the refresh runs this build as a detached, silent, hidden install --native-host --ensure --quiet',
+  );
+  deepEqual(spawned[0].child.events, [['error', 'function']], 'the refresh child has an error listener, so a spawn failure cannot crash the server');
+  equal(spawned[0].child.unrefCalls, 1, 'the refresh child is unreferenced, so it never holds the server open');
+  equal(
+    cli.startNativeHostAutoRefresh({
+      entryPath: path.join(path.sep, 'repo', 'node_modules', '.pnpm', 'fsb-mcp-server@1.0.0', 'node_modules', 'fsb-mcp-server', 'build', 'index.js'),
+      environment: {},
+      spawnChild: fakeSpawn,
+    }),
+    true,
+    'a package inside a nested node_modules layout also refreshes',
+  );
+  for (const [label, entryPath, environment] of [
+    ['FSB_NATIVE_HOST_AUTO=0', installedEntry, { FSB_NATIVE_HOST_AUTO: '0' }],
+    ['a source checkout', path.join(path.sep, 'work', 'fsb', 'mcp', 'build', 'index.js'), {}],
+    ['the helper\'s own staged copy', path.join(path.sep, 'home', 'u', '.fsb', 'native-host', 'runtime', 'package', 'build', 'index.js'), {}],
+    ['a relative entry path', path.join('node_modules', 'fsb-mcp-server', 'build', 'index.js'), {}],
+  ]) {
+    const before = spawned.length;
+    equal(cli.startNativeHostAutoRefresh({ entryPath, environment, spawnChild: fakeSpawn }), false,
+      `the helper refresh is skipped for ${label}`);
+    equal(spawned.length, before, `nothing is spawned for ${label}`);
+  }
+  equal(
+    cli.startNativeHostAutoRefresh({
+      entryPath: installedEntry,
+      environment: { FSB_NATIVE_HOST_AUTO: '1' },
+      spawnChild: () => { throw new Error(sensitive); },
+    }),
+    false,
+    'a spawn that throws is swallowed and reported as not started',
+  );
 }
 
 async function runDoctorBrowserSelection() {
