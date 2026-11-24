@@ -77,6 +77,39 @@ async function run() {
     assert.match(text, /Do not call fill_credential again on your own/);
     assert.deepEqual(JSON.parse(text.slice(text.lastIndexOf('\n') + 1)), { errorCode: 'credential_not_provided', reason: 'cancelled' });
   });
+  console.log('\n--- a failed 1Password sign-in says what the user must do ---');
+  const authText = (reason) => mapFSBError({
+    success: false,
+    errorCode: 'onepassword_auth_failed',
+    error: '1Password sign-in failed',
+    ...(reason ? { reason } : {}),
+  }).content[0].text;
+  const nextAction = (text) => text.split('\n').find((line) => line.startsWith('Next action: '));
+  check('a missing app is not retried', () => {
+    const text = authText('app_missing');
+    assert.match(nextAction(text), /not installed/);
+    assert.match(nextAction(text), /do not retry/);
+    assert.deepEqual(JSON.parse(text.slice(text.lastIndexOf('\n') + 1)), { errorCode: 'onepassword_auth_failed', reason: 'app_missing' });
+  });
+  check('an app that refuses FSB names the setting to turn on', () => {
+    const text = authText('integration_off');
+    assert.match(nextAction(text), /Settings > Developer, and turn on Integrate with 1Password SDKs/);
+    assert.doesNotMatch(text, /other apps/);
+  });
+  check('a declined approval stops the agent', () => {
+    const text = authText('declined');
+    assert.match(nextAction(text), /Do not retry/);
+    assert.match(nextAction(text), /Never ask for a password/);
+  });
+  check('a locked app asks for an unlock', () => {
+    assert.match(nextAction(authText('locked')), /^Next action: Ask the user to unlock 1Password, then retry once\.$/);
+  });
+  check('an unknown reason keeps the general advice', () => {
+    for (const reason of ['unknown', undefined]) {
+      assert.match(nextAction(authText(reason)), /unlock 1Password or approve FSB/);
+    }
+  });
+
   check('several matching logins still return their candidates', () => {
     const out = multipleCredentialsResult({ success: false, errorCode: 'multiple_credentials', error: 'Several 1Password logins match example.com.', candidates: [{ id: 'v:1', title: 'A', username: 'a' }] });
     assert.match(out.content[0].text, /Detected: Several 1Password logins match this site/);

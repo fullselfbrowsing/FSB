@@ -202,6 +202,23 @@ function isBridgeOwnershipError(
     || /bridge disconnected|port 7225|relay|disconnected mode/i.test(errorMsg);
 }
 
+// What to do after a 1Password sign-in failed, by the reason the FSB server
+// gives. Each one needs the user first: calling again at once fails the same way.
+function authFailedNextAction(reason: unknown): string {
+  switch (reason) {
+    case 'app_missing':
+      return 'The 1Password desktop app is not installed on this computer. Tell the user, and do not retry until they have installed it and logged in to 1Password from FSB settings.';
+    case 'integration_off':
+      return 'Ask the user to open the 1Password app, go to Settings > Developer, and turn on Integrate with 1Password SDKs. Retry once after they have.';
+    case 'declined':
+      return `The user declined FSB in the 1Password app. Do not retry; ask the user how they want to continue. ${NEVER_IN_CHAT}`;
+    case 'locked':
+      return 'Ask the user to unlock 1Password, then retry once.';
+    default:
+      return 'Ask the user to unlock 1Password or approve FSB in the 1Password app, then retry once.';
+  }
+}
+
 function buildLayeredDetail(
   errorKey: string,
   fsbResult: Record<string, unknown> | null | undefined,
@@ -501,7 +518,7 @@ function buildLayeredDetail(
       return {
         detected: LAYER_LABELS.vault,
         why: errorMsg || '1Password did not let FSB sign in.',
-        nextAction: 'Ask the user to unlock 1Password or approve FSB in the 1Password app, then retry once.',
+        nextAction: authFailedNextAction(fsbResult?.reason),
       };
     case 'no_active_tab':
       return {
