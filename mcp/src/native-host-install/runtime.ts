@@ -628,6 +628,22 @@ function refused(reason: NativeHostRuntimeRefusalReason): NativeHostRuntimePubli
   return Object.freeze({ status: 'refused', reason, receipt: null });
 }
 
+/**
+ * Where a `next` publication lands. Every path inside the tree (receipt,
+ * marker, Windows bootstrap config) still names the stable root, because the
+ * tree only runs after it has been renamed there.
+ */
+export function nativeHostNextRoot(layout: Pick<NativeHostRuntimeLayout, 'stableRoot' | 'installToken'>): string {
+  return `${layout.stableRoot}.next-${layout.installToken}`;
+}
+
+function validWindowsManifest(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && Buffer.byteLength(value, 'utf8') <= 16 * 1024
+    && !value.includes('\0');
+}
+
 export async function publishNativeHostRuntime(
   layout: NativeHostRuntimeLayout,
   dependencies: NativeHostRuntimeDependencies,
@@ -643,6 +659,19 @@ export async function publishNativeHostRuntime(
   ) {
     return refused('unsupported-architecture');
   }
+  const destination = options.destination ?? 'stable';
+  if (destination !== 'stable' && destination !== 'next') {
+    return refused('invalid-source-package');
+  }
+  const provenance = options.provenance;
+  if (provenance !== undefined && provenance !== 'auto' && provenance !== 'explicit') {
+    return refused('invalid-source-package');
+  }
+  const windowsManifest = layout.platform === 'win32' ? options.windowsManifest ?? null : null;
+  if (windowsManifest !== null && !validWindowsManifest(windowsManifest)) {
+    return refused('invalid-source-package');
+  }
+  const publishedRoot = destination === 'next' ? nativeHostNextRoot(layout) : layout.stableRoot;
 
   const { files, process: materializer } = dependencies;
   const api = pathApi(layout);
@@ -650,8 +679,10 @@ export async function publishNativeHostRuntime(
   let publicationStarted = false;
   let sourceSnapshot: Readonly<NativeHostRuntimePackageSnapshot> | null = null;
   try {
-    const stableFact = await files.inspectSecurePath(layout.stableRoot, 'directory');
-    if (stableFact.status !== 'absent') return refused('stable-root-not-absent');
+    // A `next` publication sits beside a live stable root, so only its own
+    // destination has to be free.
+    const destinationFact = await files.inspectSecurePath(publishedRoot, 'directory');
+    if (destinationFact.status !== 'absent') return refused('stable-root-not-absent');
 
     const nodeFact = await files.inspectSecurePath(layout.nodePath, 'file');
     const npmFact = await files.inspectSecurePath(layout.npmCliPath, 'file');
@@ -866,6 +897,7 @@ export async function publishNativeHostRuntime(
       registryHelperPath: layout.registryHelperPath,
       registryHelperSha256,
       marker,
+      ...(provenance ? { provenance } : {}),
     };
     await files.writeFileExclusiveNoFollow(
       stagedReceiptPath,
@@ -877,6 +909,16 @@ export async function publishNativeHostRuntime(
       `${JSON.stringify(marker)}\n`,
       layout.markerMode,
     );
+    const stagedManifestPath = windowsManifest !== null
+      ? api.join(layout.stageRoot, 'manifest.json')
+      : null;
+    if (stagedManifestPath && windowsManifest !== null) {
+      await files.writeFileExclusiveNoFollow(
+        stagedManifestPath,
+        windowsManifest,
+        layout.markerMode,
+      );
+    }
     for (const pathname of [
       stagedEntryPath,
       stagedIntegrityPath,
@@ -885,13 +927,14 @@ export async function publishNativeHostRuntime(
       ...(stagedRegistryHelperPath ? [stagedRegistryHelperPath] : []),
       stagedMarkerPath,
       stagedReceiptPath,
+      ...(stagedManifestPath ? [stagedManifestPath] : []),
     ]) {
       await files.fsyncFile(pathname);
     }
     for (const pathname of [stagedPackageRoot, stagedRuntimeRoot, stagedBinRoot, layout.stageRoot]) {
       await files.fsyncDirectory(pathname);
     }
-    await files.renameDirectoryAtomic(layout.stageRoot, layout.stableRoot);
+    await files.renameDirectoryAtomic(layout.stageRoot, publishedRoot);
     stageTouched = false;
 
     return published(receipt, pack, install);

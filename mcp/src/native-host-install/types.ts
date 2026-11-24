@@ -110,6 +110,12 @@ export interface NativeHostInstallPlatformAdapter {
   readonly layout: NativeHostInstallPlatformLayout;
   readRegistrationFacts(): Promise<NativeHostRegistrationReadFacts>;
   publishRegistration(contents: string): Promise<void>;
+  /**
+   * Registers one more browser beside an existing install. On Windows the
+   * shared manifest may already exist with exactly these contents, and only
+   * the browser's registry value is written.
+   */
+  publishBrowserRegistration(contents: string): Promise<void>;
   removeCanonicalRegistration(): Promise<void>;
   inspectCanonicalKey(): Promise<NativeHostRegistryKeyFact>;
   deleteCanonicalKeyIfEmpty(): Promise<void>;
@@ -212,8 +218,30 @@ export interface NativeHostRuntimeDependencies {
 
 export type NativeHostWindowsArchitecture = 'x64' | 'arm64';
 
+/**
+ * Who asked for the helper. `auto` installs come from installing an MCP client
+ * and may be removed again when the last client goes; `explicit` installs come
+ * from `install --native-host` and stay until removed by name. Receipts written
+ * before this field existed count as `explicit`.
+ */
+export type NativeHostProvenance = 'auto' | 'explicit';
+
+/**
+ * `stable` publishes into the absent stable root. `next` publishes beside a
+ * live stable root, at `${stableRoot}.next-<installToken>`, so a refresh can
+ * swap the finished tree in with two renames.
+ */
+export type NativeHostRuntimePublishDestination = 'stable' | 'next';
+
 export interface NativeHostRuntimePublishOptions {
   architecture?: NativeHostWindowsArchitecture | string;
+  destination?: NativeHostRuntimePublishDestination;
+  provenance?: NativeHostProvenance;
+  /**
+   * Windows keeps the one manifest every browser's registry value points at
+   * inside the stable root, so a replacement tree must carry it.
+   */
+  windowsManifest?: string | null;
 }
 
 export type NativeHostRuntimeRefusalReason =
@@ -246,6 +274,7 @@ export interface NativeHostRuntimeReceipt {
   registryHelperPath: string | null;
   registryHelperSha256: string | null;
   marker: NativeHostOwnerMarker;
+  provenance?: NativeHostProvenance;
 }
 
 export interface NativeHostRuntimeProcessTrace {
@@ -400,6 +429,164 @@ export type NativeHostUninstallResult = Readonly<{
   origin: string | null;
   packageVersion: string | null;
 }>;
+
+/**
+ * `install` may create the helper from nothing; `refresh-only` keeps an
+ * existing helper current and never creates one, so registration stays an
+ * explicit user action.
+ */
+export interface NativeHostEnsureRequest {
+  mode: 'install' | 'refresh-only';
+  browsers?: 'auto' | NativeHostBrowser[];
+  extensionId?: string;
+  provenance: NativeHostProvenance;
+}
+
+export type NativeHostEnsureOutcome =
+  | 'installed'
+  | 'refreshed'
+  | 'current'
+  | 'registered'
+  | 'skipped-absent'
+  | 'skipped-opt-out'
+  | 'deferred'
+  | 'refused'
+  | 'unavailable';
+
+export interface NativeHostEnsureResult {
+  outcome: NativeHostEnsureOutcome;
+  reason?: string;
+  version?: string;
+  browsers: NativeHostBrowser[];
+  addedBrowsers: NativeHostBrowser[];
+  stableRoot: string;
+}
+
+export interface NativeHostUninstallAllRequest {
+  onlyProvenance?: 'auto';
+}
+
+export interface NativeHostUninstallAllResult {
+  outcome: 'removed' | 'absent' | 'kept' | 'refused' | 'unavailable';
+  reason?: string;
+  removedBrowsers: NativeHostBrowser[];
+  provenance?: NativeHostProvenance;
+}
+
+export interface NativeHostOptOutRecord {
+  at: number;
+  reason: string;
+}
+
+/** The operations the CLI adds on top of the single-browser install and uninstall. */
+export interface NativeHostEnsureOperations {
+  ensure(request: NativeHostEnsureRequest): Promise<NativeHostEnsureResult>;
+  uninstallAll(request?: NativeHostUninstallAllRequest): Promise<NativeHostUninstallAllResult>;
+  readOptOut(): NativeHostOptOutRecord | null;
+  writeOptOut(reason: string): void;
+  clearOptOut(): void;
+}
+
+/** The success-or-backoff record that gates the expensive publish step. */
+export interface NativeHostEnsureStamp {
+  version: 1;
+  packageVersion: string;
+  nodePath: string;
+  browsers: NativeHostBrowser[];
+  at: number;
+  failures: number;
+  nextAttemptAt: number;
+}
+
+/**
+ * Directories that live beside the stable root while a transaction runs:
+ * `stage` (publish in progress), `next` (finished replacement), `retired`
+ * (the replaced tree), `quarantine` (a tree whose launcher failed its hash)
+ * and `remove` (a tree on its way to deletion).
+ */
+export type NativeHostSiblingKind = 'stage' | 'next' | 'retired' | 'quarantine' | 'remove';
+
+export interface NativeHostSiblingFact {
+  kind: NativeHostSiblingKind;
+  token: string;
+  ageMs: number;
+}
+
+export interface NativeHostLockLease {
+  /** Doubles as the install token, so every directory this holder creates carries it. */
+  readonly token: string;
+  /** Tokens of dead holders whose lock this acquisition broke. */
+  readonly staleTokens: readonly string[];
+  lost(): boolean;
+  release(): Promise<void>;
+}
+
+export interface NativeHostEnsureStateAdapter {
+  /** Resolves null when a live holder keeps the lock past `waitMs`. */
+  acquireLock(waitMs: number): Promise<NativeHostLockLease | null>;
+  readOptOut(): Promise<NativeHostOptOutRecord | null>;
+  clearOptOut(): Promise<void>;
+  readStamp(): Promise<NativeHostEnsureStamp | null>;
+  writeStamp(stamp: NativeHostEnsureStamp): Promise<void>;
+  writeStopRequest(token: string, reason: 'refresh' | 'uninstall'): Promise<void>;
+  removeStopRequest(token: string): Promise<void>;
+  stableRootPresent(): Promise<boolean>;
+  listSiblings(): Promise<readonly NativeHostSiblingFact[]>;
+  moveStableToSibling(kind: NativeHostSiblingKind, token: string): Promise<void>;
+  moveSiblingToStable(kind: NativeHostSiblingKind, token: string): Promise<void>;
+  removeSibling(kind: NativeHostSiblingKind, token: string): Promise<void>;
+}
+
+/** What is listening on the local service port. */
+export type NativeHostListenerFact =
+  | Readonly<{ status: 'none' }>
+  | Readonly<{ status: 'other' }>
+  | Readonly<{ status: 'stable-root'; pid: number }>
+  | Readonly<{ status: 'unknown' }>;
+
+export interface NativeHostDaemonStopAdapter {
+  isOnline(): Promise<boolean>;
+  waitForOffline(timeoutMs: number): Promise<boolean>;
+  identifyListener(): Promise<NativeHostListenerFact>;
+  terminate(pid: number): Promise<boolean>;
+}
+
+export interface NativeHostPublisherOptions {
+  extensionId: string;
+  installToken: string;
+  provenance: NativeHostProvenance;
+  destination: NativeHostRuntimePublishDestination;
+  windowsManifest: string | null;
+}
+
+export interface NativeHostEnsureTiming {
+  lockWaitMs: number;
+  offlineTimeoutMs: number;
+}
+
+export interface NativeHostEnsureDependencies {
+  readonly platform: import('../native-host/runtime-layout.js').NativeHostPlatform;
+  readonly stableRoot: string;
+  /** Version of the package running this transaction. */
+  readonly packageVersion: string;
+  /** Interpreter a fresh publish would pin. */
+  readonly nodePath: string;
+  readonly runtime: NativeHostUninstallRuntimeAdapter;
+  readonly registrations: Readonly<Record<NativeHostBrowser, NativeHostInstallPlatformAdapter>>;
+  readonly state: NativeHostEnsureStateAdapter;
+  readonly daemon: NativeHostDaemonStopAdapter;
+  readonly timing: NativeHostEnsureTiming;
+  /** Browsers whose profiles hold the extension; may be empty. */
+  detectBrowsers(extensionId: string): Promise<readonly NativeHostBrowser[]>;
+  /** False only when the interpreter the installed launcher names is gone. */
+  pinnedNodePresent(): Promise<boolean>;
+  createPublisher(options: NativeHostPublisherOptions): Promise<NativeHostInstallRuntimeAdapter>;
+  rewriteReceiptProvenance(
+    receipt: Readonly<NativeHostRuntimeReceipt>,
+    provenance: NativeHostProvenance,
+  ): Promise<boolean>;
+  now(): number;
+}
 
 export function nativeHostProcessInvocationFromRecipe(
   recipe: NativeHostCommandRecipe,
