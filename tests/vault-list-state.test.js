@@ -55,6 +55,23 @@ for (const [methodName, clientMethod, listField, resultField, secretRecord, expe
     }
   });
 
+  test(`${methodName} keeps why 1Password refused the sign-in`, async () => {
+    for (const reason of ['declined', 'app_missing', 'locked']) {
+      const client = {
+        _onePasswordFailure: onePasswordFailure,
+        _onePassword: () => ({ [clientMethod]: async () => ({ ok: false, errorCode: 'onepassword_auth_failed', error: 'x', reason }) })
+      };
+      const result = await method.call(client);
+      assert.equal(result.errorCode, 'onepassword_auth_failed');
+      assert.equal(result.reason, reason, `${methodName} passes reason ${reason} on to the agent guidance`);
+    }
+    const plain = await method.call({
+      _onePasswordFailure: onePasswordFailure,
+      _onePassword: () => ({ [clientMethod]: async () => ({ ok: false, errorCode: 'onepassword_no_vaults', error: 'x' }) })
+    });
+    assert.equal('reason' in plain, false, 'no reason is made up');
+  });
+
   test(`${methodName} reports an empty vault as success`, async () => {
     const client = {
       _onePasswordFailure: onePasswordFailure,

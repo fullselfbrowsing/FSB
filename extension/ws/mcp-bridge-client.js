@@ -3137,6 +3137,8 @@ class MCPBridgeClient {
       errorCode: (result && result.errorCode) || 'onepassword_request_failed',
       error: (result && result.error) || fallback,
     };
+    // Why a sign-in failed (locked, declined, app_missing): the agent's next step depends on it.
+    if (result && typeof result.reason === 'string') out.reason = result.reason;
     if (result && Array.isArray(result.candidates)) out.candidates = result.candidates;
     return out;
   }
