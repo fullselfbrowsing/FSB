@@ -161,7 +161,7 @@ async function main() {
   const httpSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'http.ts'), 'utf8');
   assert.match(
     indexSource,
-    /async function runStdioServer[\s\S]*?const runtime = createRuntime\(\);/,
+    /async function runStdioServer[\s\S]*?const runtime = createRuntime\(\{\s*bridge: new WebSocketBridge\(\{ daemonHealthPort: DEFAULT_HTTP_PORT \}\),\s*\}\);/,
     'stdio transport constructs its server through createRuntime',
   );
   assert.match(

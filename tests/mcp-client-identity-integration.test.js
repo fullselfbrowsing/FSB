@@ -297,7 +297,7 @@ async function main() {
 
     const indexSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'index.ts'), 'utf8');
     const httpSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'http.ts'), 'utf8');
-    assert.match(indexSource, /async function runStdioServer[\s\S]*?const runtime = createRuntime\(\);/,
+    assert.match(indexSource, /async function runStdioServer[\s\S]*?const runtime = createRuntime\(\{\s*bridge: new WebSocketBridge\(\{ daemonHealthPort: DEFAULT_HTTP_PORT \}\),\s*\}\);/,
       'stdio uses the common identity-aware runtime');
     assert.match(httpSource, /isInitializeRequest\(parsedBody\)[\s\S]*?const runtime = createRuntime\(\{\n\s*bridge: options\.bridge,\n\s*queue: options\.queue,\n\s*agentScope: sessionAgentScope,\n\s*\}\);/,
       'HTTP initialize uses the common identity-aware runtime with a session-scoped AgentScope');
