@@ -270,5 +270,100 @@ console.log('\n--- Integration Test 5: PASS-style varied-progress task does not 
   );
 }
 
+console.log('\n--- Test 8: the service worker sees the threshold helper ---');
+{
+  // A worker realm: `self` is the global, and there is no `window` or `module`.
+  const fs = require('fs');
+  const path = require('path');
+  const vm = require('vm');
+  const trackerSource = fs.readFileSync(path.join(__dirname, '../extension/ai/goal-progress-tracker.js'), 'utf8');
+  const agentLoopSource = fs.readFileSync(path.join(__dirname, '../extension/ai/agent-loop.js'), 'utf8');
+  const worker = vm.createContext({});
+  vm.runInContext('var self = this;', worker);
+  vm.runInContext(trackerSource, worker);
+  assertEqual(typeof worker.getGoalProgressOverrideThreshold, 'function', 'getGoalProgressOverrideThreshold is a worker global');
+  assertEqual(typeof worker.GoalProgressTracker, 'function', 'GoalProgressTracker is a worker global');
+  // The lookup agent-loop.js does at load time, run in that realm.
+  const at = agentLoopSource.indexOf('var _al_getGoalProgressOverrideThreshold');
+  assert(at >= 0, 'found the threshold lookup in agent-loop.js');
+  const end = agentLoopSource.indexOf('});', at);
+  assert(end > at, 'found the end of the threshold lookup');
+  vm.runInContext('var _al_goalProgress;\n' + agentLoopSource.slice(at, end + 3), worker);
+  assertEqual(worker._al_getGoalProgressOverrideThreshold('form'), 16, 'agent-loop.js resolves the form window to 16 in the worker');
+
+  // A page realm keeps the window attachment and gains nothing on self.
+  const page = vm.createContext({});
+  vm.runInContext('var window = this; var self = { marker: true };', page);
+  vm.runInContext(trackerSource, page);
+  assertEqual(typeof page.getGoalProgressOverrideThreshold, 'function', 'page realm still attaches to window');
+  assertEqual(page.self.getGoalProgressOverrideThreshold, undefined, 'page realm does not also attach to self');
+}
+
+console.log('\n--- Integration Test 6: the task is classified when no task type is set ---');
+{
+  // In the worker AIIntegration is a global; here it is lent for this block.
+  globalThis.AIIntegration = require('../extension/ai/ai-integration.js');
+  try {
+    const runLoop = (task, iterations) => {
+      const session = makeSession({ task: task });
+      let firedAt = null;
+      for (let i = 1; i <= iterations; i++) {
+        session.agentState.iterationCount = i;
+        session.iterationCount = i;
+        session.lastKnownUrl = 'https://app.test/form';
+        const outcome = detectStuck(session, varyingDropdownResultsAt(i));
+        if (firedAt === null && outcome.reasonCode === STUCK_REASONS.NO_GOAL_PROGRESS) firedAt = i;
+      }
+      return { session: session, firedAt: firedAt };
+    };
+
+    const form = runLoop('Fill out the contact form with my details', 12);
+    assertEqual(form.session._goalTaskType && form.session._goalTaskType.type, 'form', 'a form task is classified as form');
+    assertEqual(form.firedAt, null, 'a form task gets the 16-step window: no NO_GOAL_PROGRESS by iteration 12');
+
+    const search = runLoop('Search for wireless headphones', 12);
+    assertEqual(search.session._goalTaskType && search.session._goalTaskType.type, 'search', 'a search task is classified as search');
+    assert(search.firedAt !== null && search.firedAt <= 10, 'a search task keeps the 8-step window (fired at ' + search.firedAt + ')');
+
+    const explicit = makeSession({ task: 'Search for wireless headphones', taskType: 'form_fill' });
+    explicit.agentState.iterationCount = 1;
+    explicit.iterationCount = 1;
+    detectStuck(explicit, varyingDropdownResultsAt(1));
+    assertEqual(explicit._goalTaskType, undefined, 'an assigned session.taskType is used as is, without classifying');
+
+    // A follow-up command replaces session.task; it is classified afresh.
+    const followUp = makeSession({ task: 'Search for wireless headphones' });
+    followUp.agentState.iterationCount = 1;
+    followUp.iterationCount = 1;
+    detectStuck(followUp, varyingDropdownResultsAt(1));
+    followUp.task = 'Now fill out the contact form';
+    followUp.agentState.iterationCount = 2;
+    followUp.iterationCount = 2;
+    detectStuck(followUp, varyingDropdownResultsAt(2));
+    assertEqual(followUp._goalTaskType && followUp._goalTaskType.type, 'form', 'a follow-up task is classified afresh');
+  } finally {
+    delete globalThis.AIIntegration;
+  }
+
+  // Without the classifier (or with one that throws) the default window stays.
+  const plain = makeSession({ task: 'Fill out the contact form with my details' });
+  plain.agentState.iterationCount = 1;
+  plain.iterationCount = 1;
+  detectStuck(plain, varyingDropdownResultsAt(1));
+  assertEqual(plain._goalTaskType && plain._goalTaskType.type, null, 'no classifier: no task type, default window');
+
+  globalThis.AIIntegration = { prototype: { detectTaskType: function () { throw new Error('boom'); } } };
+  try {
+    const broken = makeSession({ task: 'Fill out the contact form with my details' });
+    broken.agentState.iterationCount = 1;
+    broken.iterationCount = 1;
+    const outcome = detectStuck(broken, varyingDropdownResultsAt(1));
+    assertEqual(broken._goalTaskType && broken._goalTaskType.type, null, 'a throwing classifier leaves the default window');
+    assertEqual(outcome.isStuck, false, 'and detectStuck still answers');
+  } finally {
+    delete globalThis.AIIntegration;
+  }
+}
+
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
 process.exit(failed > 0 ? 1 : 0);

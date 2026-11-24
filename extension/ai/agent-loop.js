@@ -423,6 +423,43 @@ function checkSafetyBreakers(session) {
  * @param {Array<{callId: string, name: string, args: Object, result: Object}>} toolResults - Results from this iteration
  * @returns {{ isStuck: boolean, hint: string|null }}
  */
+/**
+ * The task type for the goal-progress window (form filling gets 16 steps, not
+ * 8). Nothing on this path assigns session.taskType, so the task is classified
+ * here with the rules the prompt builder uses (AIIntegration.detectTaskType,
+ * with the site guide when one matches). The result is kept per task text, so
+ * a follow-up command is classified afresh. Null when the classifier is not
+ * loaded or throws, which keeps the default window.
+ *
+ * @param {Object} session
+ * @param {string|null} url - Best known page URL at the time of the check.
+ * @returns {string|null}
+ */
+function _al_goalTaskType(session, url) {
+  var task = (session && typeof session.task === 'string') ? session.task : '';
+  if (!task) return null;
+  if (session._goalTaskType && session._goalTaskType.task === task) return session._goalTaskType.type;
+  var type = null;
+  try {
+    var classifier = (typeof AIIntegration !== 'undefined' && AIIntegration && AIIntegration.prototype)
+      ? AIIntegration.prototype.detectTaskType
+      : null;
+    if (typeof classifier === 'function') {
+      var guide = null;
+      try {
+        guide = (typeof getGuideForTask === 'function') ? getGuideForTask(task, url || null) : null;
+      } catch (_guideErr) {
+        guide = null;
+      }
+      type = classifier.call(null, task, url || null, guide) || null;
+    }
+  } catch (_e) {
+    type = null;
+  }
+  session._goalTaskType = { task: task, type: type };
+  return type;
+}
+
 function detectStuck(session, toolResults) {
   const state = session.agentState || {};
   var stuckThreshold = _al_SESSION_DEFAULTS.stuckThreshold || 3;
@@ -558,7 +595,7 @@ function detectStuck(session, toolResults) {
       focusedElementId: gpFocused,
       actionOutcomeKey: gpOutcomeKey
     });
-    var taskTypeForGoal = session.taskType || (session.agentState && session.agentState.taskType) || null;
+    var taskTypeForGoal = session.taskType || (session.agentState && session.agentState.taskType) || _al_goalTaskType(session, gpUrl);
     goalWindowSize = _al_getGoalProgressOverrideThreshold(taskTypeForGoal);
     goalStuck = !session.goalProgressTracker.hasProgressed(iterForTracker, goalWindowSize);
     // Reset goal-progress warning counter on actual progress.
