@@ -99,7 +99,7 @@ function makeEnv({
   const deliver = (message, sender) => {
     for (const listener of [...listeners]) listener(message, sender, () => {});
   };
-  return { api: context.fsbOnePassword, requests, runtimeSent, deliver, listeners, pairing };
+  return { api: context.fsbOnePassword, requests, runtimeSent, deliver, listeners, pairing, context };
 }
 
 // The service worker loads mcp-bridge-client.js, which declares the client as
@@ -887,6 +887,36 @@ async function run() {
     const env = makeEnv({ responses: { 'onepassword.configure': { ok: true } } });
     await env.api.configure({ authKind: 'desktop', accountName: 'acct', vaultIds: ['v'], token: 'ops_leak' });
     assert.deepEqual(env.requests[0].payload, { authKind: 'desktop', accountName: 'acct', vaultIds: ['v'] });
+  });
+  await check('configure forwards the vault scope', async () => {
+    const env = makeEnv({ responses: { 'onepassword.configure': { ok: true } } });
+    await env.api.configure({ authKind: 'desktop', accountName: 'acct', vaultScope: 'all' });
+    assert.deepEqual(env.requests[0].payload, { authKind: 'desktop', accountName: 'acct', vaultScope: 'all' });
+  });
+  await check('the Vault page configure handler passes the vault scope through', async () => {
+    const handlerStart = background.indexOf('async function fsbHandleOnePasswordUiAction(');
+    const handler = background.slice(handlerStart, background.indexOf('\n}\n', handlerStart));
+    assert.match(handler, /for \(const key of \['authKind', 'accountName', 'vaultIds', 'saveVaultId', 'vaultScope'\]\)/);
+  });
+  await check('the logged-in flag is read from local storage only', async () => {
+    for (const [stored, expected] of [[{ fsbOnePasswordLoggedIn: true }, true], [{ fsbOnePasswordLoggedIn: false }, false], [{}, false], [{ fsbOnePasswordLoggedIn: 'yes' }, false]]) {
+      const env = makeEnv();
+      const keys = [];
+      env.context.chrome.storage = { local: { get: async (key) => { keys.push(key); return stored; } } };
+      assert.equal(await env.api.isLoggedIn(), expected);
+      assert.deepEqual(keys, ['fsbOnePasswordLoggedIn']);
+      assert.equal(env.requests.length, 0, 'the local server is not asked');
+    }
+    const broken = makeEnv();
+    broken.context.chrome.storage = { local: { get: async () => { throw new Error('storage gone'); } } };
+    assert.equal(await broken.api.isLoggedIn(), false);
+    assert.equal(await makeEnv().api.isLoggedIn(), false, 'no storage reads as not logged in');
+  });
+  await check('the autopilot save offer follows the effective save vault', () => {
+    const hookStart = background.indexOf('// LOGIN DETECTION HOOK');
+    const hook = background.slice(hookStart, background.indexOf('// END LOGIN DETECTION HOOK', hookStart));
+    assert.match(hook, /opStatus\.status\.configured && opStatus\.status\.effectiveSaveVaultId\)/);
+    assert.ok(!/status\.saveVaultId/.test(hook), 'the stored save vault alone never offers a save');
   });
 
   console.log(`\nonepassword-client: ${passed} passed, 0 failed`);

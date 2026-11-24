@@ -14977,7 +14977,7 @@ async function fsbHandleOnePasswordUiAction(request) {
     }
     case 'onePasswordConfigure': {
       const settings = {};
-      for (const key of ['authKind', 'accountName', 'vaultIds', 'saveVaultId']) {
+      for (const key of ['authKind', 'accountName', 'vaultIds', 'saveVaultId', 'vaultScope']) {
         if (Object.prototype.hasOwnProperty.call(request, key)) settings[key] = request[key];
       }
       const result = await op.configure(settings);
@@ -17293,12 +17293,13 @@ async function startAutomationLoop(sessionId) {
         } else {
           automationLogger.info('No 1Password login for site, requesting from user', { sessionId, domain: loginDomain });
 
-          // Offer "Save to 1Password" only when FSB has a vault to save into.
+          // Offer "Save to 1Password" only when FSB has a vault to save into:
+          // effectiveSaveVaultId is set only while 1Password still lists it.
           let canSaveToOnePassword = false;
           if (onePassword && lookup && lookup.errorCode === 'credential_not_found') {
             const opStatus = await onePassword.status();
             canSaveToOnePassword = !!(opStatus && opStatus.ok && opStatus.status
-              && opStatus.status.configured && opStatus.status.saveVaultId);
+              && opStatus.status.configured && opStatus.status.effectiveSaveVaultId);
           }
 
           chrome.runtime.sendMessage({

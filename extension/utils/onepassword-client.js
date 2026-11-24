@@ -27,6 +27,8 @@
   var BRIDGE_WAIT_MS = 50;
   // As long as the bridge client's own pairing check may take.
   var PAIRING_PROBE_WAIT_MS = 5000;
+  // chrome.storage.local flag: true once the user logged in from the Vault page.
+  var LOGGED_IN_KEY = 'fsbOnePasswordLoggedIn';
 
   function failure(errorCode, error) {
     return { ok: false, errorCode: errorCode, error: error };
@@ -152,9 +154,10 @@
     },
 
     // Non-secret settings only. Service-account tokens are set from the CLI.
+    // vaultScope 'all' lets FSB read every vault; a vaultIds list limits it.
     configure: function (settings) {
       var payload = {};
-      ['authKind', 'accountName', 'vaultIds', 'saveVaultId'].forEach(function (key) {
+      ['authKind', 'accountName', 'vaultIds', 'saveVaultId', 'vaultScope'].forEach(function (key) {
         if (settings && Object.prototype.hasOwnProperty.call(settings, key)) payload[key] = settings[key];
       });
       return request('configure', payload, TIMEOUTS.configure);
@@ -205,7 +208,23 @@
         logins: Array.isArray(logins) ? logins : [],
         cards: Array.isArray(cards) ? cards : []
       }, TIMEOUTS.importLegacy);
-    }
+    },
+
+    // Whether the user logged in to 1Password from the Vault page. The page
+    // sets the flag after a successful Log in and clears it on Disconnect.
+    // Reading it never contacts the local server.
+    isLoggedIn: async function () {
+      try {
+        var storage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+        if (!storage || typeof storage.get !== 'function') return false;
+        var stored = await storage.get(LOGGED_IN_KEY);
+        return !!(stored && stored[LOGGED_IN_KEY] === true);
+      } catch (_e) {
+        return false;
+      }
+    },
+
+    LOGGED_IN_KEY: LOGGED_IN_KEY
   };
 
   // -------------------------------------------------------------------------
@@ -448,7 +467,8 @@
   api.askLoginInTab = async function (tabId, site, send, hooks, options) {
     var statusResult = await api.status({ pair: false });
     var status = statusResult && statusResult.ok ? statusResult.status : null;
-    var canSave = !!(status && status.configured && status.saveVaultId);
+    // effectiveSaveVaultId is the save vault only while 1Password still lists it.
+    var canSave = !!(status && status.configured && status.effectiveSaveVaultId);
     var previous = asksByTab[tabId] && pendingAsks[asksByTab[tabId]];
     if (previous) settleAsk(previous, notProvided(previous.site, 'replaced'));
 

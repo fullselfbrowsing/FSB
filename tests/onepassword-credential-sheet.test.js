@@ -35,7 +35,9 @@ async function check(name, fn) {
 
 const NOT_FOUND = { ok: false, errorCode: 'credential_not_found', error: 'No 1Password login is saved for example.com' };
 
-function makeEnv({ tabUrls = ['https://example.com/login'], saveVault = null, resolve = () => NOT_FOUND, timeoutMs = null, sheetShown = true } = {}) {
+// saveVault is the broker's effectiveSaveVaultId; staleSaveVault is a stored
+// saveVaultId that 1Password no longer lists (effectiveSaveVaultId stays null).
+function makeEnv({ tabUrls = ['https://example.com/login'], saveVault = null, staleSaveVault = null, resolve = () => NOT_FOUND, timeoutMs = null, sheetShown = true } = {}) {
   const requests = [];
   const pills = [];
   const fills = [];
@@ -56,7 +58,7 @@ function makeEnv({ tabUrls = ['https://example.com/login'], saveVault = null, re
     },
   };
   const responses = {
-    'onepassword.status': () => ({ ok: true, status: { configured: true, saveVaultId: saveVault } }),
+    'onepassword.status': () => ({ ok: true, status: { configured: true, saveVaultId: saveVault || staleSaveVault, effectiveSaveVaultId: saveVault } }),
     'onepassword.resolve-login': (payload) => resolve(payload),
     'onepassword.save-login': () => ({ ok: true, saved: { id: 'v1:new1', title: 'example.com' } }),
   };
@@ -238,6 +240,16 @@ async function run() {
     assert.deepEqual(save.payload, { url: 'https://example.com', username: USER, password: SECRET });
     assert.ok(!JSON.stringify(result).includes(SECRET));
     assert.equal(env.pills[env.pills.length - 1].phase, 'filled_saved');
+  });
+  await check('a stored save vault that 1Password no longer lists offers no save', async () => {
+    const env = makeEnv({ staleSaveVault: 'v-gone' });
+    const { pending, ask } = await startAsk(env);
+    const port = await readyPort(env, ask);
+    assert.equal(port.posted[0].canSave, false);
+    port.fromFrame({ type: 'submit', username: USER, password: SECRET, save: true });
+    const result = await pending;
+    assert.equal(result.savedTo1Password, false);
+    assert.ok(!env.requests.some((r) => r.method === 'onepassword.save-login'));
   });
   await check('save switched off saves nothing', async () => {
     const env = makeEnv({ saveVault: 'v1' });
