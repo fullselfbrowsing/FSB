@@ -4676,18 +4676,6 @@
   "panel_818962bda5": {
     "message": "1Password との接続を確認しています..."
   },
-  "panel_b84510154a": {
-    "message": "1Password アカウント"
-  },
-  "panel_a6f394d865": {
-    "message": "1Password のサイドバー上部に表示されるアカウント名です。1Password アプリで Settings > Developer > Integrate with other apps をオンにしてください。"
-  },
-  "panel_5dec08e310": {
-    "message": "1Password を接続"
-  },
-  "panel_e175b45390": {
-    "message": "代わりにサービスアカウントを使う場合は、ターミナルで次を実行してからこのページを再読み込みしてください:"
-  },
   "panel_5c0a336c67": {
     "message": "FSB が読み取れる保管庫を選んでください。FSB 専用の保管庫が最も安全です。"
   },
@@ -5095,12 +5083,6 @@
   "panel_a55fac2bfd": {
     "message": "FSB は 1Password のカードで支払いフォームを入力します。"
   },
-  "panel_a47c107d93": {
-    "message": "トークンはこのコンピュータの ~/.fsb/onepassword.json に保存されます。拡張機能がそれを受け取ることはありません。"
-  },
-  "panel_79761fb441": {
-    "message": "代わりにサービスアカウントを使う"
-  },
   "panel_caf0111717": {
     "message": "ローカルサーバー"
   },
@@ -5218,15 +5200,6 @@
       }
     }
   },
-  "panel_009008e0d7": {
-    "message": "1Password アプリ経由で接続 · $ACCOUNT$",
-    "placeholders": {
-      "account": {
-        "content": "$1",
-        "example": "my.1password.com"
-      }
-    }
-  },
   "panel_65c448bae4": {
     "message": "サービスアカウントで接続"
   },
@@ -5254,9 +5227,6 @@
   "panel_f83ab4c57f": {
     "message": "FSB が読み取れる保管庫を選んでください。"
   },
-  "panel_e5f973beb3": {
-    "message": "すべてこのコンピュータ内にとどまります。"
-  },
   "panel_b33cf191b9": {
     "message": "ターミナルから設定されています。切断すると保存済みのトークンが削除されるため、先に確認します。"
   },
@@ -5268,9 +5238,6 @@
   },
   "panel_40647b20fa": {
     "message": "許可するまで FSB は何も読み取れません。もう一度試して、1Password で FSB を許可してください。"
-  },
-  "panel_942c783692": {
-    "message": "インストールしてサインインし、設定 > 開発者 > 他のアプリと連携 をオンにしてください。"
   },
   "panel_0233589be3": {
     "message": "この fsb-mcp-server は 1Password には古すぎるか、SDK を読み込めません。"
@@ -5396,5 +5363,100 @@
   },
   "panel_91fa9fd3cf": {
     "message": "1Password を切断しますか？FSB は 1Password の設定を忘れ、保存済みのサービスアカウントのトークンを削除します。再接続にはもう一度ターミナルが必要です。"
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "1Password にログイン"
+  },
+  "panel_26639e7832": {
+    "message": "アカウントを変更"
+  },
+  "panel_61a5454aac": {
+    "message": "アカウント名 — 1Password のサイドバー上部に表示されます"
+  },
+  "panel_24f92b0c67": {
+    "message": "1Password デスクトップアプリを使います。Settings > Developer > Integrate with 1Password SDKs をオンにする必要があり (オフの場合は FSB がそのページを開きます)、その後 FSB の許可を求められます。"
+  },
+  "panel_0db703c375": {
+    "message": "1Password をインストール"
+  },
+  "panel_887ff0e04c": {
+    "message": "1Password の設定を開く"
+  },
+  "panel_af67e786b5": {
+    "message": "保存先の保管庫がまだありません。FSB が新しいログイン情報を 1Password に保存できるよう、1 つ選んでください。"
+  },
+  "panel_9f088dbebd": {
+    "message": "詳細設定"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "FSB をこれらの保管庫に限定"
+  },
+  "panel_104a4be90f": {
+    "message": "すべての保管庫を使用"
+  },
+  "panel_65f5a87194": {
+    "message": "1Password の Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "1Password で Integrate with 1Password SDKs をオンにしてから、ここに戻ってください。FSB は 2 分間確認を続けます。"
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs はまだオフです"
+  },
+  "panel_3facf5a8dc": {
+    "message": "管理対象のデバイスですか？管理者に問い合わせてください。"
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs がオフです"
+  },
+  "panel_e5dab5535e": {
+    "message": "1Password で Integrate with 1Password SDKs をオンにしてから、ここに戻ってください。"
+  },
+  "panel_55a8cd8239": {
+    "message": "ログイン済み"
+  },
+  "panel_06e7541e0b": {
+    "message": "ログイン済み · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "10 分間操作がなかったとき、ロックされたとき、またはローカルサーバーが再起動したときは、1Password から再び FSB の許可を求められることがあります。"
+  },
+  "panel_41a0e0aead": {
+    "message": "1Password にログインできませんでした"
+  },
+  "panel_f24552b4b3": {
+    "message": "アカウント名を確認してから、もう一度お試しください。"
+  },
+  "panel_bf74b77b3d": {
+    "message": "アカウント名を確認してから、もう一度お試しください。詳細: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "1Password アプリをインストールしてサインインしてから、もう一度お試しください。"
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password アカウント: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "1Password アカウント内のすべての保管庫"
+  },
+  "panel_7a9e047a27": {
+    "message": "詳細設定でオンにした保管庫のみ"
   }
 }

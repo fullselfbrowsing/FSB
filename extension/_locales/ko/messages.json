@@ -4676,18 +4676,6 @@
   "panel_818962bda5": {
     "message": "1Password 연결을 확인하는 중..."
   },
-  "panel_b84510154a": {
-    "message": "1Password 계정"
-  },
-  "panel_a6f394d865": {
-    "message": "1Password 사이드바 상단에 표시되는 계정 이름입니다. 1Password 앱에서 Settings > Developer > Integrate with other apps를 켜세요."
-  },
-  "panel_5dec08e310": {
-    "message": "1Password 연결"
-  },
-  "panel_e175b45390": {
-    "message": "서비스 계정을 대신 사용하시나요? 터미널에서 다음을 실행한 뒤 이 페이지를 새로 고치세요:"
-  },
   "panel_5c0a336c67": {
     "message": "FSB가 읽을 수 있는 보관함을 선택하세요. FSB 전용 보관함이 가장 안전합니다."
   },
@@ -5095,12 +5083,6 @@
   "panel_a55fac2bfd": {
     "message": "FSB는 1Password의 카드로 결제 양식을 채웁니다."
   },
-  "panel_a47c107d93": {
-    "message": "토큰은 이 컴퓨터의 ~/.fsb/onepassword.json에 보관됩니다. 확장 프로그램은 토큰을 받지 않습니다."
-  },
-  "panel_79761fb441": {
-    "message": "대신 서비스 계정 사용"
-  },
   "panel_caf0111717": {
     "message": "로컬 서버"
   },
@@ -5218,15 +5200,6 @@
       }
     }
   },
-  "panel_009008e0d7": {
-    "message": "1Password 앱으로 연결됨 · $ACCOUNT$",
-    "placeholders": {
-      "account": {
-        "content": "$1",
-        "example": "my.1password.com"
-      }
-    }
-  },
   "panel_65c448bae4": {
     "message": "서비스 계정으로 연결됨"
   },
@@ -5254,9 +5227,6 @@
   "panel_f83ab4c57f": {
     "message": "FSB가 읽을 수 있는 보관함을 선택하세요."
   },
-  "panel_e5f973beb3": {
-    "message": "모든 정보는 이 컴퓨터에만 있습니다."
-  },
   "panel_b33cf191b9": {
     "message": "터미널에서 설정했습니다. 연결을 끊으면 저장된 토큰이 삭제되므로 먼저 확인합니다."
   },
@@ -5268,9 +5238,6 @@
   },
   "panel_40647b20fa": {
     "message": "허용하기 전까지 FSB는 아무것도 읽을 수 없습니다. 다시 시도한 다음 1Password에서 FSB를 허용하세요."
-  },
-  "panel_942c783692": {
-    "message": "설치하고 로그인한 다음 설정 > 개발자 > 다른 앱과 통합을 켜세요."
   },
   "panel_0233589be3": {
     "message": "이 fsb-mcp-server는 1Password를 쓰기에 너무 오래되었거나 SDK를 불러올 수 없습니다."
@@ -5396,5 +5363,100 @@
   },
   "panel_91fa9fd3cf": {
     "message": "1Password 연결을 끊을까요? FSB가 1Password 설정을 잊고 저장된 서비스 계정 토큰을 삭제합니다. 다시 연결하려면 터미널이 필요합니다."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "1Password에 로그인"
+  },
+  "panel_26639e7832": {
+    "message": "계정 변경"
+  },
+  "panel_61a5454aac": {
+    "message": "계정 이름 — 1Password 사이드바 상단에 표시됩니다"
+  },
+  "panel_24f92b0c67": {
+    "message": "1Password 데스크톱 앱을 사용합니다. Settings > Developer > Integrate with 1Password SDKs가 켜져 있어야 하며(꺼져 있으면 FSB가 해당 페이지를 엽니다), 그다음 FSB를 허용하라는 요청이 표시됩니다."
+  },
+  "panel_0db703c375": {
+    "message": "1Password 설치"
+  },
+  "panel_887ff0e04c": {
+    "message": "1Password 설정 열기"
+  },
+  "panel_af67e786b5": {
+    "message": "아직 저장할 보관함이 없습니다. FSB가 새 로그인 정보를 1Password에 저장할 수 있도록 하나를 선택하세요."
+  },
+  "panel_9f088dbebd": {
+    "message": "고급"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "FSB를 이 보관함으로 제한"
+  },
+  "panel_104a4be90f": {
+    "message": "모든 보관함 사용"
+  },
+  "panel_65f5a87194": {
+    "message": "1Password의 Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "1Password에서 Integrate with 1Password SDKs를 켠 다음 돌아오세요. FSB가 2분 동안 계속 확인합니다."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs가 아직 꺼져 있습니다"
+  },
+  "panel_3facf5a8dc": {
+    "message": "관리되는 기기인가요? 관리자에게 문의하세요."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs가 꺼져 있습니다"
+  },
+  "panel_e5dab5535e": {
+    "message": "1Password에서 Integrate with 1Password SDKs를 켠 다음 돌아오세요."
+  },
+  "panel_55a8cd8239": {
+    "message": "로그인됨"
+  },
+  "panel_06e7541e0b": {
+    "message": "로그인됨 · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "10분 동안 사용하지 않거나, 잠기거나, 로컬 서버가 다시 시작되면 1Password가 FSB 허용을 다시 요청할 수 있습니다."
+  },
+  "panel_41a0e0aead": {
+    "message": "1Password에 로그인할 수 없습니다"
+  },
+  "panel_f24552b4b3": {
+    "message": "계정 이름을 확인한 다음 다시 시도하세요."
+  },
+  "panel_bf74b77b3d": {
+    "message": "계정 이름을 확인한 다음 다시 시도하세요. 세부 정보: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "1Password 앱을 설치하고 로그인한 다음 다시 시도하세요."
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password 계정: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "1Password 계정의 모든 보관함"
+  },
+  "panel_7a9e047a27": {
+    "message": "고급에서 켠 보관함만"
   }
 }

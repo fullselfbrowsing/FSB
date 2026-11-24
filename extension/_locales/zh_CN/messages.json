@@ -4676,18 +4676,6 @@
   "panel_818962bda5": {
     "message": "正在检查 1Password 连接..."
   },
-  "panel_b84510154a": {
-    "message": "1Password 账户"
-  },
-  "panel_a6f394d865": {
-    "message": "即 1Password 侧边栏顶部显示的账户名称。请在 1Password 应用中打开 Settings > Developer > Integrate with other apps。"
-  },
-  "panel_5dec08e310": {
-    "message": "连接 1Password"
-  },
-  "panel_e175b45390": {
-    "message": "想改用服务账户？请在终端中运行以下命令，然后重新加载此页面："
-  },
   "panel_5c0a336c67": {
     "message": "选择 FSB 可以读取的保险库。仅供 FSB 使用的保险库最安全。"
   },
@@ -5095,12 +5083,6 @@
   "panel_a55fac2bfd": {
     "message": "FSB 使用你 1Password 中的银行卡填写结账表单。"
   },
-  "panel_a47c107d93": {
-    "message": "令牌保存在此电脑的 ~/.fsb/onepassword.json 中，扩展程序永远不会收到它。"
-  },
-  "panel_79761fb441": {
-    "message": "改用服务账号"
-  },
   "panel_caf0111717": {
     "message": "本地服务器"
   },
@@ -5218,15 +5200,6 @@
       }
     }
   },
-  "panel_009008e0d7": {
-    "message": "已通过 1Password 应用连接 · $ACCOUNT$",
-    "placeholders": {
-      "account": {
-        "content": "$1",
-        "example": "my.1password.com"
-      }
-    }
-  },
   "panel_65c448bae4": {
     "message": "已通过服务账号连接"
   },
@@ -5254,9 +5227,6 @@
   "panel_f83ab4c57f": {
     "message": "选择 FSB 可以读取的保险库。"
   },
-  "panel_e5f973beb3": {
-    "message": "一切都留在这台电脑上。"
-  },
   "panel_b33cf191b9": {
     "message": "通过终端设置。断开连接会删除已保存的令牌，因此会先询问你。"
   },
@@ -5268,9 +5238,6 @@
   },
   "panel_40647b20fa": {
     "message": "在你允许之前，FSB 无法读取任何内容。请重试，然后在 1Password 中允许 FSB。"
-  },
-  "panel_942c783692": {
-    "message": "安装并登录，然后开启 设置 > 开发者 > 与其他应用集成。"
   },
   "panel_0233589be3": {
     "message": "此 fsb-mcp-server 版本过旧，无法用于 1Password，或无法加载其 SDK。"
@@ -5396,5 +5363,100 @@
   },
   "panel_91fa9fd3cf": {
     "message": "断开 1Password？FSB 会忘记其 1Password 设置，并删除已保存的服务账号令牌。重新连接需要再次使用终端。"
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "登录 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "更换账户"
+  },
+  "panel_61a5454aac": {
+    "message": "账户名称 — 显示在 1Password 侧边栏顶部"
+  },
+  "panel_24f92b0c67": {
+    "message": "使用 1Password 桌面应用。需要打开 Settings > Developer > Integrate with 1Password SDKs（如果未打开，FSB 会为你打开该页面），之后 1Password 会请你批准 FSB。"
+  },
+  "panel_0db703c375": {
+    "message": "安装 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "打开 1Password 设置"
+  },
+  "panel_af67e786b5": {
+    "message": "尚未选择保存用的保险库。请选择一个，以便 FSB 将新登录信息保存到 1Password。"
+  },
+  "panel_9f088dbebd": {
+    "message": "高级"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "将 FSB 限制在这些保险库"
+  },
+  "panel_104a4be90f": {
+    "message": "使用所有保险库"
+  },
+  "panel_65f5a87194": {
+    "message": "1Password 中的 Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "请在 1Password 中打开 Integrate with 1Password SDKs，然后回到这里。FSB 会持续检查 2 分钟。"
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs 仍未打开"
+  },
+  "panel_3facf5a8dc": {
+    "message": "使用的是受管理的设备？请联系你的管理员。"
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs 未打开"
+  },
+  "panel_e5dab5535e": {
+    "message": "请在 1Password 中打开 Integrate with 1Password SDKs，然后回到这里。"
+  },
+  "panel_55a8cd8239": {
+    "message": "已登录"
+  },
+  "panel_06e7541e0b": {
+    "message": "已登录 · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "闲置 10 分钟、锁定或本地服务器重启后，1Password 可能会再次请你批准 FSB。"
+  },
+  "panel_41a0e0aead": {
+    "message": "无法登录 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "请检查账户名称，然后重试。"
+  },
+  "panel_bf74b77b3d": {
+    "message": "请检查账户名称，然后重试。详细信息：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "请安装 1Password 应用并登录，然后重试。"
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password 账户：$ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "你的 1Password 账户中的所有保险库"
+  },
+  "panel_7a9e047a27": {
+    "message": "仅限在“高级”中打开的保险库"
   }
 }

@@ -1554,18 +1554,17 @@
               </div>
               <div class="settings-card-content">
                 <div class="vx-setup" id="onePasswordSetup" hidden>
-                  <div>
-                    <div class="form-group">
-                      <label for="onePasswordAccount" data-i18n="panel_b84510154a">1Password account</label>
-                      <input type="text" id="onePasswordAccount" class="form-input" placeholder="my.1password.com" autocomplete="off" spellcheck="false">
-                      <div class="form-help" data-i18n="panel_a6f394d865">The account name shown at the top of the 1Password sidebar. In the 1Password app, turn on Settings &gt; Developer &gt; Integrate with other apps.</div>
+                  <div class="vx-login">
+                    <button id="onePasswordLoginBtn" class="save-btn primary" type="button" data-i18n="panel_a2e8f0dbf3">Log in to 1Password</button>
+                    <p class="credential-vault-helper vx-small" id="onePasswordAccountLine" hidden><span id="onePasswordAccountText"></span> <button class="vx-linkbtn" id="onePasswordChangeAccountBtn" type="button" data-i18n="panel_26639e7832">Change account</button></p>
+                    <div class="vx-account" id="onePasswordAccountRow" hidden>
+                      <div class="form-group">
+                        <label for="onePasswordAccount" data-i18n="panel_61a5454aac">Account name — shown at the top of the 1Password sidebar</label>
+                        <input type="text" id="onePasswordAccount" class="form-input" placeholder="my.1password.com" autocomplete="off" spellcheck="false">
+                      </div>
+                      <button id="onePasswordContinueBtn" class="save-btn primary" type="button" data-i18n="entry_continue">Continue</button>
                     </div>
-                    <button id="onePasswordConnectBtn" class="save-btn primary" data-i18n="panel_5dec08e310">Connect 1Password</button>
-                  </div>
-                  <div class="vx-setup-b">
-                    <p class="credential-vault-helper" data-i18n="panel_e175b45390">Using a service account instead? Run this in a terminal, then reload this page:</p>
-                    <code class="onepassword-command" translate="no">npx fsb-mcp-server onepassword --service-account</code>
-                    <p class="credential-vault-helper vx-small" data-i18n="panel_a47c107d93">The token is kept on this computer in ~/.fsb/onepassword.json. The extension never receives it.</p>
+                    <p class="credential-vault-helper vx-small" data-i18n="panel_24f92b0c67">Uses the 1Password desktop app. It needs Settings &gt; Developer &gt; Integrate with 1Password SDKs turned on (FSB opens that page if it is off), then asks you to approve FSB.</p>
                   </div>
                 </div>
                 <div class="vx-conn" id="onePasswordConn" hidden>
@@ -1573,15 +1572,12 @@
                     <p class="credential-vault-helper" id="onePasswordBody"></p>
                     <code class="onepassword-command vx-cmd" id="onePasswordInstallCmd" translate="no" hidden>npx fsb-mcp-server install --native-host</code>
                     <div class="vx-acts">
+                      <a id="onePasswordDownloadLink" class="save-btn primary" href="https://1password.com/downloads/" target="_blank" rel="noopener" hidden data-i18n="panel_0db703c375">Install 1Password</a>
+                      <button id="onePasswordOpenSettingsBtn" class="save-btn primary" type="button" hidden data-i18n="panel_887ff0e04c">Open 1Password settings</button>
                       <button id="onePasswordDisconnectBtn" class="save-btn secondary" hidden data-i18n="panel_acfc5be785">Disconnect</button>
-                      <button class="vx-linkbtn" id="onePasswordServiceBtn" type="button" hidden data-i18n="panel_79761fb441">Use a service account instead</button>
                       <button id="onePasswordCancelBtn" class="save-btn secondary" type="button" hidden data-i18n="panel_19766ed6cc">Cancel</button>
                       <button id="onePasswordRetryBtn" class="save-btn secondary" type="button" hidden></button>
-                    </div>
-                    <div class="vx-service" id="onePasswordServiceHelp" hidden>
-                      <p class="credential-vault-helper" data-i18n="panel_e175b45390">Using a service account instead? Run this in a terminal, then reload this page:</p>
-                      <code class="onepassword-command" translate="no">npx fsb-mcp-server onepassword --service-account</code>
-                      <p class="credential-vault-helper vx-small" data-i18n="panel_a47c107d93">The token is kept on this computer in ~/.fsb/onepassword.json. The extension never receives it.</p>
+                      <button class="vx-linkbtn" id="onePasswordEditAccountBtn" type="button" hidden data-i18n="panel_26639e7832">Change account</button>
                     </div>
                   </div>
                   <div class="vx-path" id="onePasswordPath" role="img">
@@ -1623,19 +1619,30 @@
               <div class="settings-card full-width" id="onePasswordAccessCard">
                 <div class="settings-card-header">
                   <div class="settings-card-icon"><i class="fas fa-layer-group"></i></div>
-                  <div class="settings-card-title"><h3 data-i18n="panel_22894e363f">Vaults FSB may read</h3><p data-i18n="panel_5e05243ee1">A vault used only by FSB is safest.</p></div>
+                  <div class="settings-card-title"><h3 data-i18n="panel_22894e363f">Vaults FSB may read</h3><p id="onePasswordScopeText"></p></div>
                 </div>
                 <div class="settings-card-content">
-                  <div id="onePasswordVaultList" class="onepassword-vault-list"></div>
-                  <div class="vx-save">
+                  <div class="vx-save vx-save-one">
                     <div class="form-group">
                       <label for="onePasswordSaveVault" data-i18n="panel_161c79f605">Save new logins to</label>
                       <select id="onePasswordSaveVault" class="form-select">
                         <option value="" data-i18n="panel_cc6d7a8340">Do not save</option>
                       </select>
+                      <p class="vx-warn" id="onePasswordSaveHint" hidden><i class="fas fa-circle-info"></i><span data-i18n="panel_af67e786b5">No save vault yet. Choose one so FSB can save new logins to 1Password.</span></p>
                     </div>
-                    <button id="onePasswordSaveVaultsBtn" class="save-btn primary" disabled data-i18n="panel_5d4b7e9caa">Save vault access</button>
                   </div>
+                  <details class="vx-adv" id="onePasswordAdvanced">
+                    <summary><i class="fas fa-chevron-right"></i><span data-i18n="panel_9f088dbebd">Advanced</span></summary>
+                    <div class="vx-adv-body">
+                      <h4 data-i18n="panel_1a6cfc8a7f">Limit FSB to these vaults</h4>
+                      <p class="credential-vault-helper vx-small" data-i18n="panel_5e05243ee1">A vault used only by FSB is safest.</p>
+                      <div id="onePasswordVaultList" class="onepassword-vault-list"></div>
+                      <div class="vx-acts">
+                        <button id="onePasswordSaveVaultsBtn" class="save-btn primary" type="button" disabled data-i18n="panel_5d4b7e9caa">Save vault access</button>
+                        <button id="onePasswordAllVaultsBtn" class="save-btn secondary" type="button" hidden data-i18n="panel_104a4be90f">Use all vaults</button>
+                      </div>
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>

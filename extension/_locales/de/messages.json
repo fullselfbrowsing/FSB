@@ -4676,18 +4676,6 @@
   "panel_818962bda5": {
     "message": "1Password-Verbindung wird geprüft..."
   },
-  "panel_b84510154a": {
-    "message": "1Password-Konto"
-  },
-  "panel_a6f394d865": {
-    "message": "Der Kontoname oben in der Seitenleiste von 1Password. Aktiviere in der 1Password-App Settings > Developer > Integrate with other apps."
-  },
-  "panel_5dec08e310": {
-    "message": "1Password verbinden"
-  },
-  "panel_e175b45390": {
-    "message": "Lieber ein Dienstkonto verwenden? Führe dies in einem Terminal aus und lade diese Seite dann neu:"
-  },
   "panel_5c0a336c67": {
     "message": "Wähle die Tresore, die FSB lesen darf. Am sichersten ist ein Tresor, den nur FSB nutzt."
   },
@@ -5095,12 +5083,6 @@
   "panel_a55fac2bfd": {
     "message": "FSB füllt Kassenformulare mit Karten aus deinem 1Password aus."
   },
-  "panel_a47c107d93": {
-    "message": "Das Token bleibt auf diesem Computer in ~/.fsb/onepassword.json. Die Erweiterung erhält es nie."
-  },
-  "panel_79761fb441": {
-    "message": "Stattdessen ein Dienstkonto verwenden"
-  },
   "panel_caf0111717": {
     "message": "Lokaler Server"
   },
@@ -5218,15 +5200,6 @@
       }
     }
   },
-  "panel_009008e0d7": {
-    "message": "Über die 1Password-App verbunden · $ACCOUNT$",
-    "placeholders": {
-      "account": {
-        "content": "$1",
-        "example": "my.1password.com"
-      }
-    }
-  },
   "panel_65c448bae4": {
     "message": "Mit einem Dienstkonto verbunden"
   },
@@ -5254,9 +5227,6 @@
   "panel_f83ab4c57f": {
     "message": "Wähle die Tresore, die FSB lesen darf."
   },
-  "panel_e5f973beb3": {
-    "message": "Alles bleibt auf diesem Computer."
-  },
   "panel_b33cf191b9": {
     "message": "Im Terminal eingerichtet. Beim Trennen wird das gespeicherte Token gelöscht, deshalb fragt FSB vorher."
   },
@@ -5268,9 +5238,6 @@
   },
   "panel_40647b20fa": {
     "message": "FSB kann nichts lesen, bis du es erlaubst. Versuche es erneut und erlaube FSB dann in 1Password."
-  },
-  "panel_942c783692": {
-    "message": "Installiere sie, melde dich an und aktiviere Einstellungen > Entwickler > Mit anderen Apps integrieren."
   },
   "panel_0233589be3": {
     "message": "Dieser fsb-mcp-server ist für 1Password zu alt oder kann sein SDK nicht laden."
@@ -5396,5 +5363,100 @@
   },
   "panel_91fa9fd3cf": {
     "message": "1Password trennen? FSB vergisst seine 1Password-Einstellungen und löscht das gespeicherte Dienstkonto-Token. Zum erneuten Verbinden brauchst du wieder das Terminal."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "Bei 1Password anmelden"
+  },
+  "panel_26639e7832": {
+    "message": "Konto ändern"
+  },
+  "panel_61a5454aac": {
+    "message": "Kontoname – steht oben in der Seitenleiste von 1Password"
+  },
+  "panel_24f92b0c67": {
+    "message": "Nutzt die 1Password-Desktop-App. Dort muss Settings > Developer > Integrate with 1Password SDKs aktiviert sein (FSB öffnet die Seite, falls nicht). Danach bittet 1Password dich, FSB zu erlauben."
+  },
+  "panel_0db703c375": {
+    "message": "1Password installieren"
+  },
+  "panel_887ff0e04c": {
+    "message": "1Password-Einstellungen öffnen"
+  },
+  "panel_af67e786b5": {
+    "message": "Noch kein Tresor zum Speichern. Wähle einen, damit FSB neue Anmeldedaten in 1Password speichern kann."
+  },
+  "panel_9f088dbebd": {
+    "message": "Erweitert"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "FSB auf diese Tresore beschränken"
+  },
+  "panel_104a4be90f": {
+    "message": "Alle Tresore verwenden"
+  },
+  "panel_65f5a87194": {
+    "message": "In 1Password: Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "Aktiviere Integrate with 1Password SDKs in 1Password und komm dann zurück. FSB prüft 2 Minuten lang weiter."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs ist noch aus"
+  },
+  "panel_3facf5a8dc": {
+    "message": "Wird dein Gerät verwaltet? Frag deinen Admin."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs ist aus"
+  },
+  "panel_e5dab5535e": {
+    "message": "Aktiviere Integrate with 1Password SDKs in 1Password und komm dann zurück."
+  },
+  "panel_55a8cd8239": {
+    "message": "Angemeldet"
+  },
+  "panel_06e7541e0b": {
+    "message": "Angemeldet · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "1Password fragt nach 10 Minuten Inaktivität, einer Sperre oder einem Neustart des lokalen Servers eventuell erneut, ob FSB zugreifen darf."
+  },
+  "panel_41a0e0aead": {
+    "message": "Anmeldung bei 1Password fehlgeschlagen"
+  },
+  "panel_f24552b4b3": {
+    "message": "Prüfe den Kontonamen und versuche es dann erneut."
+  },
+  "panel_bf74b77b3d": {
+    "message": "Prüfe den Kontonamen und versuche es dann erneut. Details: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "Installiere die 1Password-App, melde dich an und versuche es dann erneut."
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password-Konto: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "Alle Tresore in deinem 1Password-Konto"
+  },
+  "panel_7a9e047a27": {
+    "message": "Nur die unter „Erweitert“ aktivierten Tresore"
   }
 }

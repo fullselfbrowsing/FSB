@@ -5066,11 +5066,12 @@ async function exportSessionText(sessionId, storageBackend) {
 // ==========================================
 // Vault: logins and cards from 1Password
 // ==========================================
-// FSB keeps no passwords or cards of its own. The Vault page shows the
-// 1Password connection the FSB local server uses, the vaults FSB may read, and
-// read-only lists of what is in them (design: the "FSB 1Password vault"
-// handoff, Main and VaultStates boards). Nothing here ever receives a password,
-// one-time code, card number, or CVV: the background answers with metadata only.
+// FSB keeps no passwords or cards of its own. The Vault page logs in to the
+// 1Password account the FSB local server uses, shows which vaults FSB may read
+// (all of them unless Advanced limits it), and read-only lists of what is in
+// them (design: the "FSB 1Password vault" handoff, Main and VaultStates
+// boards). Nothing here ever receives a password, one-time code, card number,
+// or CVV: the background answers with metadata only.
 
 let _onePasswordStatus = null;
 let _onePasswordLegacy = null;
@@ -5080,10 +5081,20 @@ const _vaultUi = {
   error: null,
   waiting: false,
   connectToken: 0,
+  // The first status read has answered, so a guest sees Log in, not Checking.
+  checked: false,
+  // The user logged in from this page (the chrome.storage.local flag).
+  loggedIn: false,
+  // The account name field is open.
+  askAccount: false,
+  // 'integration' while FSB waits for the 1Password setting, 'managed' once it stops.
+  integration: null,
+  scope: 'listed',
   vaults: [],
+  vaultsLoaded: false,
   allow: new Set(),
   savedAllow: new Set(),
-  save: '',
+  allowEdited: false,
   savedSave: '',
   logins: [],
   cards: [],
@@ -5093,8 +5104,68 @@ const _vaultUi = {
   legacyResult: null
 };
 
+// chrome.storage.local keys. The flag records that the user logged in here;
+// the account name is kept only to fill in the field next time.
+const ONEPASSWORD_LOGGED_IN_KEY = 'fsbOnePasswordLoggedIn';
+const ONEPASSWORD_ACCOUNT_KEY = 'fsbOnePasswordAccountName';
+// Opens Settings > Developer in the 1Password app.
+const ONEPASSWORD_DEVELOPER_SETTINGS_URL = 'onepassword://settings/developers';
+// While Integrate with 1Password SDKs is off, FSB tries again this often, for this long.
+const ONEPASSWORD_SETTING_RETRY_MS = 3000;
+const ONEPASSWORD_SETTING_WAIT_MS = 120000;
+// A try that is still running after this is waiting on the approval prompt.
+const ONEPASSWORD_APPROVAL_SHOWN_MS = 2500;
+
+// 'all': FSB reads every vault. 'listed': only the vaults chosen under Advanced.
+function onePasswordScope(status) {
+  return status && status.vaultScope === 'all' ? 'all' : 'listed';
+}
+
+// The vault new logins go to, while 1Password still lists it.
+function onePasswordSaveVault(status) {
+  return status && typeof status.effectiveSaveVaultId === 'string' ? status.effectiveSaveVaultId : '';
+}
+
+// Signed in, and FSB may read at least one vault.
 function onePasswordIsReady(status) {
-  return !!(status && status.configured);
+  if (!status || !status.configured) return false;
+  return onePasswordScope(status) === 'all' || (Array.isArray(status.vaultIds) && status.vaultIds.length > 0);
+}
+
+// Whether this page may ask 1Password for vaults and items. With the desktop
+// app that can show an approval prompt, so it waits until the user logs in.
+// A service account set up from the terminal never shows one.
+function onePasswordMayRead(status) {
+  return _vaultUi.loggedIn || !!(status && status.authKind === 'service-account');
+}
+
+function onePasswordStoredAccount(status) {
+  return status && status.authKind === 'desktop' && typeof status.accountName === 'string' ? status.accountName : '';
+}
+
+// With every vault readable FSB still leaves out transfer and unsupported vaults.
+function onePasswordVaultReadable(vault) {
+  return !!vault && vault.vaultType !== 'transfer' && vault.vaultType !== 'unsupported';
+}
+
+async function readOnePasswordLocal(key) {
+  try {
+    const stored = await chrome.storage.local.get(key);
+    return stored ? stored[key] : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+async function writeOnePasswordLocal(values) {
+  try {
+    await chrome.storage.local.set(values);
+  } catch (_error) { /* the page itself still shows the right state */ }
+}
+
+async function setOnePasswordLoggedIn(loggedIn) {
+  _vaultUi.loggedIn = loggedIn === true;
+  await writeOnePasswordLocal({ [ONEPASSWORD_LOGGED_IN_KEY]: _vaultUi.loggedIn });
 }
 
 // Reading the saved settings needs no 1Password sign-in. Listing vaults,
@@ -5111,26 +5182,42 @@ function setOnePasswordStatusText(english, subs) {
 
 // One state per 1Password situation, keyed on the codes the client and broker
 // return (VaultStates board). path: l1/l2 are the two links of the drawing.
+// login: Try again runs Log in again. account: offers Change account before
+// the user has logged in. guestSub: the line shown before that.
 const VAULT_VIEWS = {
   checking: { pill: 'connecting', sub: 'Checking 1Password connection...', path: { l1: 'wait', l2: '' } },
   none: { pill: 'disconnected', pillText: 'Not connected', sub: 'Not connected yet' },
   waiting: { pill: 'connecting', pillText: 'Waiting for approval', sub: 'Connecting to $ACCOUNT$', body: 'Approve FSB in the 1Password app.',
-    cancel: true, path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
-  vaults: { pill: 'connected', pillText: 'Connected', sub: 'Connected through the 1Password app · $ACCOUNT$', body: 'Choose the vaults FSB may read.',
-    disconnect: true, service: true, path: { l1: 'ok', l2: 'ok' } },
-  ready: { pill: 'connected', pillText: 'Connected', sub: 'Connected through the 1Password app · $ACCOUNT$', body: 'Everything stays on this computer.',
-    disconnect: true, service: true, path: { l1: 'ok', l2: 'ok' } },
+    cancel: true, account: true, path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
+  integration: { pill: 'connecting', pillText: 'Waiting for you', sub: 'Settings > Developer in 1Password',
+    body: 'Turn on Integrate with 1Password SDKs in 1Password, then come back. FSB keeps checking for 2 minutes.',
+    settings: true, cancel: true, account: true, path: { opDim: true, l1: 'wait', l2: 'ok' } },
+  managed: { pill: 'disconnected', pillText: 'Not available', sub: 'Integrate with 1Password SDKs is still off',
+    body: 'On a managed device? Ask your admin.', settings: true, retry: 'Try again', login: true, account: true,
+    path: { opDim: true, l1: 'bad', l2: 'ok' } },
+  integrationoff: { pill: 'disconnected', pillText: 'Not available', sub: 'Integrate with 1Password SDKs is off',
+    body: 'Turn on Integrate with 1Password SDKs in 1Password, then come back.', settings: true, retry: 'Try again', login: true, account: true,
+    path: { opDim: true, l1: 'bad', l2: 'ok' } },
+  vaults: { pill: 'connected', pillText: 'Logged in', sub: 'Logged in · $ACCOUNT$', body: 'Choose the vaults FSB may read.',
+    disconnect: true, path: { l1: 'ok', l2: 'ok' } },
+  ready: { pill: 'connected', pillText: 'Logged in', sub: 'Logged in · $ACCOUNT$',
+    body: '1Password may ask you to approve FSB again after 10 idle minutes, a lock, or a local-server restart.',
+    disconnect: true, path: { l1: 'ok', l2: 'ok' } },
   service: { pill: 'connected', pillText: 'Connected', sub: 'Connected with a service account',
     body: 'Set up from the terminal. Disconnecting deletes the saved token, so it asks first.', disconnect: true,
     path: { op: 'service account', l1: 'ok', l2: 'ok' } },
-  locked: { pill: 'connecting', pillText: 'Locked', sub: 'Connected through the 1Password app · $ACCOUNT$',
-    body: 'Unlock 1Password to continue. Your settings are kept.', retry: 'Try again', path: { lock: true, op: 'locked', l1: '', l2: '' } },
+  locked: { pill: 'connecting', pillText: 'Locked', sub: 'Logged in · $ACCOUNT$', guestSub: 'Connecting to $ACCOUNT$',
+    body: 'Unlock 1Password to continue. Your settings are kept.', retry: 'Try again', login: true, account: true,
+    path: { lock: true, op: 'locked', l1: '', l2: '' } },
   offline: { pill: 'disconnected', pillText: 'Not reachable', sub: 'The FSB local server is not running',
     body: 'Install the FSB local server, then try again.', install: true, retry: 'Try again', path: { l1: '', l2: 'bad', cut: true, srv: 'dim' } },
   declined: { pill: 'connecting', pillText: 'Declined', sub: 'Approve FSB in 1Password',
-    body: 'FSB can\'t read anything until you allow it. Try again, then allow FSB in 1Password.', retry: 'Try again', path: { l1: '', l2: '' } },
+    body: 'FSB can\'t read anything until you allow it. Try again, then allow FSB in 1Password.', retry: 'Try again', login: true, account: true,
+    path: { l1: '', l2: '' } },
+  signin: { pill: 'disconnected', pillText: 'Sign-in failed', sub: 'Could not log in to 1Password',
+    body: 'Check the account name, then try again.', retry: 'Try again', login: true, account: true, path: { l1: 'bad', l2: 'ok' } },
   appmissing: { pill: 'disconnected', pillText: 'Not available', sub: '1Password app not found',
-    body: 'Install it, sign in, and turn on Settings > Developer > Integrate with other apps.', retry: 'Try again',
+    body: 'Install the 1Password app and sign in, then try again.', download: true, retry: 'Try again', login: true, account: true,
     path: { opDim: true, l1: 'bad', l2: 'ok' } },
   outdated: { pill: 'disconnected', pillText: 'Update needed', sub: 'Update the local server',
     body: 'This fsb-mcp-server is too old for 1Password, or can\'t load its SDK.', install: true, retry: 'Try again', path: { srv: 'err', l1: '', l2: 'ok' } },
@@ -5139,7 +5226,8 @@ const VAULT_VIEWS = {
   rate: { pill: 'connecting', pillText: 'Rate limited', sub: 'Slow down',
     body: 'Too many requests in a short time. Nothing is wrong with your account. Try again in a minute.', retry: 'Try again', path: { l1: 'wait', l2: 'ok' } },
   approve: { pill: 'connecting', pillText: 'Waiting for you', sub: 'Approve FSB in 1Password',
-    body: '1Password is asking whether FSB may use it. FSB waits up to 75 seconds.', retry: 'Try again', path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
+    body: '1Password is asking whether FSB may use it. FSB waits up to 75 seconds.', retry: 'Try again', login: true, account: true,
+    path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
   error: { pill: 'disconnected', pillText: 'Not reachable', retry: 'Try again', path: { l1: '', l2: '' } }
 };
 
@@ -5147,6 +5235,7 @@ function vaultView() {
   const status = _onePasswordStatus;
   const error = _vaultUi.error;
   if (_vaultUi.waiting) return 'waiting';
+  if (_vaultUi.integration) return _vaultUi.integration;
   if (error) {
     const code = error.errorCode;
     if (code === 'onepassword_bridge_offline') return 'offline';
@@ -5157,14 +5246,18 @@ function vaultView() {
     if (code === 'onepassword_auth_failed') {
       if (error.reason === 'locked') return 'locked';
       if (error.reason === 'app_missing') return 'appmissing';
-      return 'declined';
+      if (error.reason === 'integration_off') return 'integrationoff';
+      if (error.reason === 'declined') return 'declined';
+      return 'signin';
     }
     if (!status) return 'error';
   }
-  if (!status) return 'checking';
-  if (!status.authKind) return 'none';
-  if (!status.vaultIds || status.vaultIds.length === 0) return 'vaults';
-  return status.authKind === 'service-account' ? 'service' : 'ready';
+  // A guest whose status could not be read without pairing: Log in pairs.
+  if (!status) return _vaultUi.checked && !_vaultUi.loggedIn ? 'none' : 'checking';
+  if (status.authKind === 'service-account') return 'service';
+  if (!status.authKind || !_vaultUi.loggedIn) return 'none';
+  if (onePasswordScope(status) !== 'all' && (!Array.isArray(status.vaultIds) || status.vaultIds.length === 0)) return 'vaults';
+  return 'ready';
 }
 
 function vaultShow(node, visible) {
@@ -5208,6 +5301,21 @@ function renderVaultPath(spec) {
   }
 }
 
+// The Log in button, or the account name field once FSB needs one.
+function renderOnePasswordSetup() {
+  const stored = onePasswordStoredAccount(_onePasswordStatus);
+  const asking = _vaultUi.askAccount;
+  vaultShow(document.getElementById('onePasswordLoginBtn'), !asking);
+  vaultShow(document.getElementById('onePasswordAccountRow'), asking);
+  vaultShow(document.getElementById('onePasswordAccountLine'), !asking && !!stored);
+  const accountText = document.getElementById('onePasswordAccountText');
+  if (accountText && stored) fsbUiSet(accountText, '1Password account: $ACCOUNT$', { account: stored });
+  for (const id of ['onePasswordLoginBtn', 'onePasswordContinueBtn']) {
+    const button = document.getElementById(id);
+    if (button) button.disabled = _onePasswordBusy;
+  }
+}
+
 function renderVault() {
   const view = vaultView();
   const spec = VAULT_VIEWS[view] || VAULT_VIEWS.error;
@@ -5222,20 +5330,27 @@ function renderVault() {
     if (spec.pillText) fsbUiSet(pillText, spec.pillText);
     else pillText.textContent = '';
   }
-  if (spec.sub) setOnePasswordStatusText(spec.sub, { account });
+  const sub = !_vaultUi.loggedIn && spec.guestSub ? spec.guestSub : spec.sub;
+  if (sub) setOnePasswordStatusText(sub, { account });
 
   vaultShow(document.getElementById('onePasswordSetup'), view === 'none');
+  renderOnePasswordSetup();
   vaultShow(document.getElementById('onePasswordConn'), view !== 'none' && view !== 'checking');
   const body = document.getElementById('onePasswordBody');
   if (body) {
-    if (spec.body) fsbUiSet(body, spec.body);
+    const detail = view === 'signin' && _vaultUi.error && typeof _vaultUi.error.error === 'string' ? _vaultUi.error.error : '';
+    // The local server explains a failed sign-in in its own words.
+    if (detail) fsbUiSet(body, 'Check the account name, then try again. Details: $ERROR$', { error: detail });
+    else if (spec.body) fsbUiSet(body, spec.body);
     else if (view !== 'error') body.textContent = '';
   }
   vaultShow(document.getElementById('onePasswordInstallCmd'), !!spec.install);
+  vaultShow(document.getElementById('onePasswordDownloadLink'), !!spec.download);
+  vaultShow(document.getElementById('onePasswordOpenSettingsBtn'), !!spec.settings);
   vaultShow(document.getElementById('onePasswordDisconnectBtn'), !!spec.disconnect);
-  vaultShow(document.getElementById('onePasswordServiceBtn'), !!spec.service);
   vaultShow(document.getElementById('onePasswordCancelBtn'), !!spec.cancel);
-  if (!spec.service) vaultShow(document.getElementById('onePasswordServiceHelp'), false);
+  vaultShow(document.getElementById('onePasswordEditAccountBtn'),
+    !!spec.account && !_vaultUi.loggedIn && !!onePasswordStoredAccount(_onePasswordStatus));
   const retry = document.getElementById('onePasswordRetryBtn');
   if (retry) {
     vaultShow(retry, !!spec.retry);
@@ -5243,16 +5358,24 @@ function renderVault() {
   }
   renderVaultPath(spec);
 
-  const connected = view === 'vaults' || view === 'ready' || view === 'service' || view === 'locked';
+  const connected = onePasswordMayRead(_onePasswordStatus)
+    && (view === 'vaults' || view === 'ready' || view === 'service' || view === 'locked');
   vaultGroup('vaultAccessGroup', connected);
   vaultGroup('vaultItemsGroup', connected);
   vaultShow(document.getElementById('vaultRulesHeading'), !connected);
   document.getElementById('onePasswordAccessCard')?.classList.toggle('vx-card-focus', view === 'vaults');
+  // No vault chosen yet: open the list that chooses them.
+  const advanced = document.getElementById('onePasswordAdvanced');
+  if (advanced && view === 'vaults') advanced.open = true;
   renderVaultItems();
 }
 
 async function loadOnePasswordStatus(options = {}) {
-  const readItems = options.readItems === true || (options.readItems !== false && onePasswordSectionVisible());
+  _vaultUi.loggedIn = (await readOnePasswordLocal(ONEPASSWORD_LOGGED_IN_KEY)) === true;
+  const onPage = options.readItems === true || (options.readItems !== false && onePasswordSectionVisible());
+  // Until the user logs in, a look at the page only reads what is there: it
+  // never pairs FSB with the local server or asks 1Password anything.
+  let readItems = onPage && _vaultUi.loggedIn;
   // Pairing FSB with the local server reconnects the bridge (and any MCP call
   // in flight on it), so only a look at the Vault page may start it.
   const pair = options.pair === true || readItems;
@@ -5266,9 +5389,16 @@ async function loadOnePasswordStatus(options = {}) {
 
   _onePasswordLegacy = response && response.legacy ? response.legacy : null;
   renderLegacyVault(_onePasswordLegacy);
+  _vaultUi.checked = true;
 
   if (!response || !response.success) {
     _onePasswordStatus = null;
+    if (!pair && !_vaultUi.loggedIn) {
+      // Not paired yet. Log in pairs, and reports any problem it finds.
+      if (options.keepError !== true) _vaultUi.error = null;
+      renderVault();
+      return;
+    }
     _vaultUi.error = { errorCode: (response && response.errorCode) || 'onepassword_request_failed', error: response && response.error, reason: response && response.reason };
     setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
     renderVault();
@@ -5277,13 +5407,15 @@ async function loadOnePasswordStatus(options = {}) {
 
   _onePasswordStatus = response.status || {};
   const status = _onePasswordStatus;
+  // No saved sign-in on the local server means the user is logged out.
+  if (_vaultUi.loggedIn && !status.authKind) await setOnePasswordLoggedIn(false);
+  if (onPage && status.authKind === 'service-account') readItems = true;
   if (!_vaultUi.waiting && options.keepError !== true) _vaultUi.error = null;
   const accountInput = document.getElementById('onePasswordAccount');
   if (accountInput && !accountInput.value && status.accountName) accountInput.value = status.accountName;
-  _vaultUi.savedAllow = new Set(status.vaultIds || []);
-  _vaultUi.allow = new Set(_vaultUi.savedAllow);
-  _vaultUi.savedSave = status.saveVaultId || '';
-  _vaultUi.save = _vaultUi.savedSave;
+  _vaultUi.scope = onePasswordScope(status);
+  _vaultUi.allowEdited = false;
+  _vaultUi.savedSave = onePasswordSaveVault(status);
   renderVault();
   renderVaultAccess();
 
@@ -5329,8 +5461,30 @@ async function loadOnePasswordVaults() {
     return;
   }
   _vaultUi.vaults = Array.isArray(response.vaults) ? response.vaults : [];
+  // A service account counts as logged in once 1Password has answered.
+  if (!_vaultUi.loggedIn && _onePasswordStatus && _onePasswordStatus.authKind === 'service-account'
+      && _onePasswordStatus.configured) {
+    await setOnePasswordLoggedIn(true);
+  }
+  // Reading every vault, the local server picks the Personal vault for new
+  // logins on its first list. Read the status again to show that choice.
+  if (_vaultUi.scope === 'all' && !_vaultUi.savedSave) await refreshOnePasswordSaveVault();
+  _vaultUi.vaultsLoaded = true;
   renderVaultAccess();
   renderVaultItems();
+}
+
+// Status only (no pairing, nothing asked of 1Password): picks up the save vault.
+async function refreshOnePasswordSaveVault() {
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordStatus', pair: false });
+  } catch (_error) {
+    return;
+  }
+  if (!response || !response.success || !response.status) return;
+  _onePasswordStatus = response.status;
+  _vaultUi.savedSave = onePasswordSaveVault(response.status);
 }
 
 // What enabling a vault means, in plain language. Only the user knows which
@@ -5347,7 +5501,6 @@ function vaultTag(vault) {
 }
 
 function vaultAccessDirty() {
-  if (_vaultUi.save !== _vaultUi.savedSave) return true;
   if (_vaultUi.allow.size !== _vaultUi.savedAllow.size) return true;
   return [..._vaultUi.allow].some((id) => !_vaultUi.savedAllow.has(id));
 }
@@ -5357,7 +5510,15 @@ function renderVaultAccess() {
   const saveSelect = document.getElementById('onePasswordSaveVault');
   const saveBtn = document.getElementById('onePasswordSaveVaultsBtn');
   if (!list) return;
-  const vaults = _vaultUi.vaults;
+  const scopeAll = _vaultUi.scope === 'all';
+  const vaults = _vaultUi.vaults.filter(onePasswordVaultReadable);
+  // Reading every vault, each one counts as turned on.
+  _vaultUi.savedAllow = scopeAll
+    ? new Set(vaults.map((vault) => vault.id))
+    : new Set((_onePasswordStatus && Array.isArray(_onePasswordStatus.vaultIds)) ? _onePasswordStatus.vaultIds : []);
+  if (!_vaultUi.allowEdited) _vaultUi.allow = new Set(_vaultUi.savedAllow);
+  const scopeText = document.getElementById('onePasswordScopeText');
+  if (scopeText) fsbUiSet(scopeText, scopeAll ? 'All vaults in your 1Password account' : 'Only the vaults turned on under Advanced');
   list.innerHTML = vaults.map((vault) => {
     const on = _vaultUi.allow.has(vault.id);
     const tag = vaultTag(vault);
@@ -5376,21 +5537,29 @@ function renderVaultAccess() {
     </div>`;
   }).join('');
 
+  // New logins can go to any vault FSB may read, as saved.
   if (saveSelect) {
-    if (_vaultUi.save && !_vaultUi.allow.has(_vaultUi.save)) _vaultUi.save = '';
     while (saveSelect.options.length > 1) saveSelect.remove(1);
     for (const vault of vaults) {
-      if (!_vaultUi.allow.has(vault.id)) continue;
+      if (!_vaultUi.savedAllow.has(vault.id)) continue;
       const option = document.createElement('option');
       option.value = vault.id;
       option.textContent = vault.title || vault.id;
       saveSelect.appendChild(option);
     }
-    saveSelect.value = _vaultUi.save;
+    if (_vaultUi.savedSave && !Array.prototype.some.call(saveSelect.options, (option) => option.value === _vaultUi.savedSave)) {
+      const option = document.createElement('option');
+      option.value = _vaultUi.savedSave;
+      option.textContent = vaultTitle(_vaultUi.savedSave) || _vaultUi.savedSave;
+      saveSelect.appendChild(option);
+    }
+    saveSelect.value = _vaultUi.savedSave;
     // The custom dropdown copies the options once; rebuild it for the new list.
     if (typeof saveSelect._fsbRebuildMenu === 'function') saveSelect._fsbRebuildMenu();
     if (typeof saveSelect._fsbSyncLabel === 'function') saveSelect._fsbSyncLabel();
   }
+  vaultShow(document.getElementById('onePasswordSaveHint'), _vaultUi.vaultsLoaded && !_vaultUi.savedSave);
+  vaultShow(document.getElementById('onePasswordAllVaultsBtn'), !scopeAll);
   if (saveBtn) saveBtn.disabled = !vaultAccessDirty();
 }
 
@@ -5402,70 +5571,189 @@ function vaultTitle(vaultId) {
   return fromStatus ? (fromStatus.title || '') : '';
 }
 
-async function connectOnePassword() {
-  if (_onePasswordBusy) return;
-  const accountInput = document.getElementById('onePasswordAccount');
-  const connectBtn = document.getElementById('onePasswordConnectBtn');
-  const accountName = (accountInput && accountInput.value || '').trim();
-  if (!accountName) {
-    showToast('Enter your 1Password account name', 'error');
-    return;
-  }
-  _onePasswordBusy = true;
-  _vaultUi.waiting = true;
-  _vaultUi.error = null;
-  const token = ++_vaultUi.connectToken;
-  if (connectBtn) connectBtn.disabled = true;
-  renderVault();
+// Opens Settings > Developer in the 1Password app. Chrome asks the user before
+// it hands the link to 1Password.
+function openOnePasswordDeveloperSettings() {
+  const fallback = () => {
+    try {
+      window.open(ONEPASSWORD_DEVELOPER_SETTINGS_URL, '_blank', 'noopener');
+    } catch (_error) { /* the button on the page opens it too */ }
+  };
   try {
-    const configured = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', authKind: 'desktop', accountName });
-    if (token !== _vaultUi.connectToken) return;
-    if (!configured || !configured.success) {
-      showToast((configured && configured.error) || 'Unknown error', 'error');
+    if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+      Promise.resolve(chrome.tabs.create({ url: ONEPASSWORD_DEVELOPER_SETTINGS_URL })).catch(fallback);
       return;
     }
-    // Listing vaults is what triggers the 1Password approval prompt.
-    const vaults = await chrome.runtime.sendMessage({ action: 'onePasswordListVaults' });
-    if (token !== _vaultUi.connectToken) return;
-    if (!vaults || !vaults.success) {
-      _vaultUi.waiting = false;
-      if (!noteVaultFailure(vaults)) showToast((vaults && vaults.error) || 'Unknown error', 'error');
-    } else {
-      showToast('1Password connected', 'success');
+  } catch (_error) { /* fall back to a window */ }
+  fallback();
+}
+
+// Opens the account name field, filled in with the name used last time.
+async function askOnePasswordAccount(prefill) {
+  _vaultUi.askAccount = true;
+  _vaultUi.error = null;
+  _vaultUi.integration = null;
+  const input = document.getElementById('onePasswordAccount');
+  if (input) {
+    if (prefill) input.value = prefill;
+    if (!input.value) {
+      const last = await readOnePasswordLocal(ONEPASSWORD_ACCOUNT_KEY);
+      if (typeof last === 'string') input.value = last;
     }
+  }
+  renderVault();
+  if (input) input.focus();
+}
+
+// Log in to 1Password, the one button on this page. 1Password still needs its
+// Developer setting turned on (FSB can only open that pane), the account name
+// the first time, and the user's approval, which it asks for again after 10
+// idle minutes, a lock, or a restart of the local server.
+async function logInToOnePassword(options = {}) {
+  if (_onePasswordBusy) return;
+  const token = ++_vaultUi.connectToken;
+  _onePasswordBusy = true;
+  _vaultUi.error = null;
+  _vaultUi.integration = null;
+  renderVault();
+  try {
+    // The click is the go-ahead to pair FSB with the local server.
+    const current = await chrome.runtime.sendMessage({ action: 'onePasswordStatus', pair: true });
+    if (token !== _vaultUi.connectToken) return;
+    if (!current || !current.success) {
+      if (!noteVaultFailure(current)) showToast((current && current.error) || 'Unknown error', 'error');
+      return;
+    }
+    _onePasswordStatus = current.status || {};
+    // A service account set up from the terminal needs no account name.
+    if (_onePasswordStatus.authKind !== 'service-account') {
+      const stored = onePasswordStoredAccount(_onePasswordStatus);
+      const accountName = (typeof options.accountName === 'string' ? options.accountName.trim() : '') || stored;
+      if (!accountName) {
+        await askOnePasswordAccount('');
+        return;
+      }
+      if (accountName !== stored) {
+        // A new sign-in reads every vault. Advanced can limit it later.
+        const configured = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', authKind: 'desktop', accountName, vaultScope: 'all' });
+        if (token !== _vaultUi.connectToken) return;
+        if (!configured || !configured.success) {
+          showToast((configured && configured.error) || 'Unknown error', 'error');
+          return;
+        }
+        if (configured.status) _onePasswordStatus = configured.status;
+      }
+      _vaultUi.askAccount = false;
+      await writeOnePasswordLocal({ [ONEPASSWORD_ACCOUNT_KEY]: accountName });
+    }
+    await waitForOnePasswordApproval(token);
   } catch (error) {
     showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   } finally {
     if (token === _vaultUi.connectToken) {
       _onePasswordBusy = false;
       _vaultUi.waiting = false;
-      if (connectBtn) connectBtn.disabled = false;
-      loadOnePasswordStatus({ keepError: !!_vaultUi.error });
+      loadOnePasswordStatus({ readItems: true, keepError: true });
     }
   }
 }
 
-// Cancel while 1Password is asking: FSB stops waiting and forgets the account
-// it was connecting to. A late answer from 1Password is ignored.
-async function cancelOnePasswordConnect() {
+// Listing vaults is what makes 1Password ask the user to approve FSB. While
+// Integrate with 1Password SDKs is off, FSB opens that setting once and tries
+// again every few seconds for up to 2 minutes.
+async function waitForOnePasswordApproval(token) {
+  const startedAt = Date.now();
+  let settingOpened = false;
+  for (;;) {
+    _vaultUi.waiting = !_vaultUi.integration;
+    renderVault();
+    // A try that does not fail at once has reached the approval prompt.
+    const approvalShown = _vaultUi.integration ? setTimeout(() => {
+      if (token !== _vaultUi.connectToken) return;
+      _vaultUi.integration = null;
+      _vaultUi.waiting = true;
+      renderVault();
+    }, ONEPASSWORD_APPROVAL_SHOWN_MS) : null;
+    let vaults;
+    try {
+      vaults = await chrome.runtime.sendMessage({ action: 'onePasswordListVaults' });
+    } finally {
+      if (approvalShown) clearTimeout(approvalShown);
+    }
+    if (token !== _vaultUi.connectToken) return;
+    _vaultUi.waiting = false;
+    if (vaults && vaults.success) {
+      _vaultUi.integration = null;
+      _vaultUi.vaults = Array.isArray(vaults.vaults) ? vaults.vaults : [];
+      await setOnePasswordLoggedIn(true);
+      showToast('1Password connected', 'success');
+      return;
+    }
+    if (vaults && vaults.errorCode === 'onepassword_auth_failed' && vaults.reason === 'integration_off') {
+      if (!settingOpened) {
+        settingOpened = true;
+        openOnePasswordDeveloperSettings();
+      }
+      if (Date.now() - startedAt >= ONEPASSWORD_SETTING_WAIT_MS) {
+        _vaultUi.integration = 'managed';
+        renderVault();
+        return;
+      }
+      _vaultUi.integration = 'integration';
+      renderVault();
+      await new Promise((resolve) => setTimeout(resolve, ONEPASSWORD_SETTING_RETRY_MS));
+      if (token !== _vaultUi.connectToken) return;
+      continue;
+    }
+    _vaultUi.integration = null;
+    if (!noteVaultFailure(vaults)) showToast((vaults && vaults.error) || 'Unknown error', 'error');
+    return;
+  }
+}
+
+function continueOnePasswordLogin() {
+  const accountInput = document.getElementById('onePasswordAccount');
+  const accountName = (accountInput && accountInput.value || '').trim();
+  if (!accountName) {
+    showToast('Enter your 1Password account name', 'error');
+    return;
+  }
+  logInToOnePassword({ accountName });
+}
+
+// Stops any wait in progress and opens the account name field.
+function changeOnePasswordAccount() {
   _vaultUi.connectToken += 1;
   _vaultUi.waiting = false;
   _onePasswordBusy = false;
-  const connectBtn = document.getElementById('onePasswordConnectBtn');
-  if (connectBtn) connectBtn.disabled = false;
-  try {
-    await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
-  } catch (_error) { /* the status reload below shows the result */ }
+  askOnePasswordAccount(onePasswordStoredAccount(_onePasswordStatus));
+}
+
+// Cancel while FSB waits for 1Password: a late answer is ignored. Before the
+// first Log in finished, FSB also forgets the account it was connecting to.
+async function cancelOnePasswordConnect() {
+  _vaultUi.connectToken += 1;
+  _vaultUi.waiting = false;
+  _vaultUi.integration = null;
+  _vaultUi.error = null;
+  _onePasswordBusy = false;
+  renderVault();
+  if (!_vaultUi.loggedIn) {
+    try {
+      await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
+    } catch (_error) { /* the status reload below shows the result */ }
+  }
   loadOnePasswordStatus();
 }
 
+// Limit FSB to the vaults turned on. The save vault stays if it is one of them.
 async function saveOnePasswordVaults() {
   const vaultIds = [..._vaultUi.allow];
   if (vaultIds.length === 0) {
     showToast('Choose at least one vault', 'error');
     return;
   }
-  const saveVaultId = _vaultUi.save && _vaultUi.allow.has(_vaultUi.save) ? _vaultUi.save : null;
+  const saveVaultId = _vaultUi.savedSave && _vaultUi.allow.has(_vaultUi.savedSave) ? _vaultUi.savedSave : null;
   try {
     const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', vaultIds, saveVaultId });
     if (response && response.success) {
@@ -5477,6 +5765,37 @@ async function saveOnePasswordVaults() {
     showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   }
   loadOnePasswordStatus();
+}
+
+// Back to reading every vault.
+async function useAllOnePasswordVaults() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', vaultScope: 'all' });
+    if (response && response.success) showToast('Vault access saved', 'success');
+    else showToast((response && response.error) || 'Unknown error', 'error');
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  loadOnePasswordStatus();
+}
+
+// "Save new logins to" saves as soon as it changes.
+async function saveOnePasswordSaveVault(vaultId) {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', saveVaultId: vaultId || null });
+    if (response && response.success) {
+      showToast('Vault access saved', 'success');
+      if (response.status) {
+        _onePasswordStatus = response.status;
+        _vaultUi.savedSave = onePasswordSaveVault(response.status);
+      }
+    } else {
+      showToast((response && response.error) || 'Unknown error', 'error');
+    }
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  renderVaultAccess();
 }
 
 async function disconnectOnePassword() {
@@ -5492,14 +5811,24 @@ async function disconnectOnePassword() {
   } catch (error) {
     showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   }
+  // Logged out in this browser even if the local server could not be reached.
+  await setOnePasswordLoggedIn(false);
   _vaultUi.logins = [];
   _vaultUi.cards = [];
   _vaultUi.itemsLoaded = false;
+  _vaultUi.vaults = [];
+  _vaultUi.vaultsLoaded = false;
+  _vaultUi.askAccount = false;
   loadOnePasswordStatus();
 }
 
 function retryOnePassword() {
   const spec = VAULT_VIEWS[vaultView()] || {};
+  // Before the first Log in, and for every sign-in problem, Try again logs in again.
+  if (spec.login || !_vaultUi.loggedIn) {
+    logInToOnePassword();
+    return;
+  }
   _vaultUi.error = null;
   renderVault();
   loadOnePasswordStatus({ readItems: true, pair: !!spec.pair || undefined });
@@ -5627,6 +5956,7 @@ function updateCredentialsManagerVisibility(_enabled) {
 
 // Load the logins FSB may use (read-only; edit them in 1Password)
 async function loadCredentials() {
+  if (!onePasswordMayRead(_onePasswordStatus)) return;
   try {
     const response = await chrome.runtime.sendMessage({ action: 'onePasswordListLogins' });
     if (!response || !response.success) {
@@ -5689,7 +6019,8 @@ function renderCredentialCard(login, siteCounts) {
 
 function renderVaultItems() {
   const view = vaultView();
-  const allowed = !!(_onePasswordStatus && Array.isArray(_onePasswordStatus.vaultIds) && _onePasswordStatus.vaultIds.length > 0);
+  const status = _onePasswordStatus;
+  const allowed = !!status && (onePasswordScope(status) === 'all' || (Array.isArray(status.vaultIds) && status.vaultIds.length > 0));
   const tab = _vaultUi.tab;
   const tools = document.getElementById('vaultItemsTools');
   const loginsList = document.getElementById('credentialsList');
@@ -5769,6 +6100,7 @@ function initializeCredentialManager() {
     vaultList.addEventListener('change', (e) => {
       const box = e.target;
       if (!box || box.type !== 'checkbox') return;
+      _vaultUi.allowEdited = true;
       if (box.checked) _vaultUi.allow.add(box.value);
       else _vaultUi.allow.delete(box.value);
       renderVaultAccess();
@@ -5777,38 +6109,39 @@ function initializeCredentialManager() {
   const saveSelect = document.getElementById('onePasswordSaveVault');
   if (saveSelect) {
     saveSelect.addEventListener('change', () => {
-      _vaultUi.save = saveSelect.value || '';
-      const saveBtn = document.getElementById('onePasswordSaveVaultsBtn');
-      if (saveBtn) saveBtn.disabled = !vaultAccessDirty();
+      if ((saveSelect.value || '') !== _vaultUi.savedSave) saveOnePasswordSaveVault(saveSelect.value || '');
     });
   }
 
-  const connectBtn = document.getElementById('onePasswordConnectBtn');
-  if (connectBtn) connectBtn.addEventListener('click', connectOnePassword);
+  const loginBtn = document.getElementById('onePasswordLoginBtn');
+  if (loginBtn) loginBtn.addEventListener('click', () => logInToOnePassword());
+  const continueBtn = document.getElementById('onePasswordContinueBtn');
+  if (continueBtn) continueBtn.addEventListener('click', continueOnePasswordLogin);
   const accountInput = document.getElementById('onePasswordAccount');
   if (accountInput) {
     accountInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        connectOnePassword();
+        continueOnePasswordLogin();
       }
     });
   }
+  for (const id of ['onePasswordChangeAccountBtn', 'onePasswordEditAccountBtn']) {
+    const changeBtn = document.getElementById(id);
+    if (changeBtn) changeBtn.addEventListener('click', changeOnePasswordAccount);
+  }
+  const openSettingsBtn = document.getElementById('onePasswordOpenSettingsBtn');
+  if (openSettingsBtn) openSettingsBtn.addEventListener('click', openOnePasswordDeveloperSettings);
   const saveVaultsBtn = document.getElementById('onePasswordSaveVaultsBtn');
   if (saveVaultsBtn) saveVaultsBtn.addEventListener('click', saveOnePasswordVaults);
+  const allVaultsBtn = document.getElementById('onePasswordAllVaultsBtn');
+  if (allVaultsBtn) allVaultsBtn.addEventListener('click', useAllOnePasswordVaults);
   const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
   if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectOnePassword);
   const cancelBtn = document.getElementById('onePasswordCancelBtn');
   if (cancelBtn) cancelBtn.addEventListener('click', cancelOnePasswordConnect);
   const retryBtn = document.getElementById('onePasswordRetryBtn');
   if (retryBtn) retryBtn.addEventListener('click', retryOnePassword);
-  const serviceBtn = document.getElementById('onePasswordServiceBtn');
-  if (serviceBtn) {
-    serviceBtn.addEventListener('click', () => {
-      const help = document.getElementById('onePasswordServiceHelp');
-      if (help) help.hidden = !help.hidden;
-    });
-  }
   const importBtn = document.getElementById('legacyVaultImportBtn');
   if (importBtn) importBtn.addEventListener('click', importLegacyVault);
   const deleteBtn = document.getElementById('legacyVaultDeleteBtn');
@@ -5854,7 +6187,7 @@ async function loadPaymentMethods() {
   if (!_onePasswordStatus) {
     await loadOnePasswordStatus({ readItems: false, pair: true });
   }
-  if (!onePasswordIsReady(_onePasswordStatus)) return;
+  if (!onePasswordIsReady(_onePasswordStatus) || !onePasswordMayRead(_onePasswordStatus)) return;
   try {
     const response = await chrome.runtime.sendMessage({ action: 'onePasswordListCards' });
     if (!response || !response.success) {

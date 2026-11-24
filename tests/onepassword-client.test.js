@@ -919,6 +919,404 @@ async function run() {
     assert.ok(!/status\.saveVaultId/.test(hook), 'the stored save vault alone never offers a save');
   });
 
+  console.log('\n--- the Vault page: Log in to 1Password ---');
+  {
+    const options = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ui', 'options.js'), 'utf8');
+    const between = (from, to) => {
+      const start = options.indexOf(from);
+      const end = options.indexOf(to, start);
+      assert.ok(start > 0 && end > start, `options.js has ${from}`);
+      return options.slice(start, end);
+    };
+    // The connection block, the item lists, and the card list, as the page runs them.
+    const pageCode = [
+      between('let _onePasswordStatus = null;', 'function updateCaptchaSolverVisibility('),
+      between('// Load the logins FSB may use', 'function initializeCredentialManager() {'),
+      between('async function loadPaymentMethods() {', '// Site Explorer Functions'),
+    ].join('\n');
+
+    // Enough of the DOM for the Vault page: every id is a node that keeps
+    // what the page last wrote to it.
+    function makeNode(id) {
+      const classes = new Set();
+      const children = {};
+      return {
+        id,
+        hidden: false,
+        disabled: false,
+        open: false,
+        value: '',
+        textContent: '',
+        innerHTML: '',
+        i18n: null,
+        dataset: {},
+        style: {},
+        attrs: {},
+        options: [],
+        focused: false,
+        classList: {
+          add: (c) => classes.add(c),
+          remove: (c) => classes.delete(c),
+          contains: (c) => classes.has(c),
+          toggle: (c, on) => { if (on === undefined ? !classes.has(c) : on) classes.add(c); else classes.delete(c); },
+        },
+        setAttribute(name, value) { this.attrs[name] = value; },
+        getAttribute(name) { return this.attrs[name]; },
+        querySelector(selector) { children[selector] = children[selector] || makeNode(id + ' ' + selector); return children[selector]; },
+        focus() { this.focused = true; },
+        appendChild(child) { this.options.push(child); },
+        remove(index) { this.options.splice(index, 1); },
+      };
+    }
+
+    function makePage({ stored = {}, onPage = true, answer }) {
+      const nodes = {};
+      const sent = [];
+      const toasts = [];
+      const tabsOpened = [];
+      const storage = { ...stored };
+      let clock = 1_000_000;
+      const document = {
+        getElementById(id) {
+          nodes[id] = nodes[id] || makeNode(id);
+          return nodes[id];
+        },
+        createElement: () => ({ value: '', textContent: '' }),
+      };
+      const select = document.getElementById('onePasswordSaveVault');
+      select.options.push({ value: '', textContent: 'Do not save' });
+      if (onPage) document.getElementById('vault').classList.add('active');
+      const context = {
+        console,
+        document,
+        Date: { now: () => clock },
+        // Timers run at once; the clock moves only when one fires.
+        setTimeout: (fn, ms) => setTimeout(() => { clock += ms; fn(); }, 0),
+        clearTimeout: (handle) => clearTimeout(handle),
+        Promise,
+        Set,
+        chrome: {
+          runtime: {
+            sendMessage: async (request) => {
+              sent.push(JSON.parse(JSON.stringify(request)));
+              return answer(request, sent);
+            },
+          },
+          storage: {
+            local: {
+              get: async (key) => (Object.prototype.hasOwnProperty.call(storage, key) ? { [key]: storage[key] } : {}),
+              set: async (values) => { Object.assign(storage, values); },
+            },
+          },
+          tabs: { create: async (props) => { tabsOpened.push(props.url); return { id: 9 }; } },
+        },
+        window: { open: (url) => tabsOpened.push('window:' + url) },
+        confirm: () => true,
+        escapeHtml: (value) => String(value == null ? '' : value),
+        fsbUiLine: (english) => english,
+        fsbUiHtml: (english) => english,
+        fsbUiSet: (node, english, subs) => {
+          if (!node) return;
+          node.textContent = english;
+          node.i18n = { english, subs: subs ? JSON.parse(JSON.stringify(subs)) : undefined };
+        },
+        showToast: (message, type) => toasts.push({ message, type }),
+        createPinInput: () => ({ getValue: () => '', clear() {} }),
+      };
+      vm.createContext(context);
+      const page = vm.runInContext(`${pageCode}
+        ({
+          ui: _vaultUi,
+          status: () => _onePasswordStatus,
+          view: vaultView,
+          load: loadOnePasswordStatus,
+          logIn: logInToOnePassword,
+          continueLogin: continueOnePasswordLogin,
+          disconnect: disconnectOnePassword,
+          retry: retryOnePassword,
+          useAll: useAllOnePasswordVaults,
+          saveLimit: saveOnePasswordVaults,
+          setLimit: (ids) => { _vaultUi.allowEdited = true; _vaultUi.allow = new Set(ids); },
+        })`, context, { filename: 'options.js' });
+      const settle = async () => {
+        for (let i = 0; i < 400; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+      };
+      const actions = () => sent.map((request) => request.action);
+      return { page, nodes: document.getElementById.bind(document), sent, toasts, tabsOpened, storage, settle, actions };
+    }
+
+    const DESKTOP = { configured: true, authKind: 'desktop', accountName: 'Acme', vaultScope: 'all', vaultIds: [], saveVaultId: 'v-personal', effectiveSaveVaultId: 'v-personal', vaults: [] };
+    const VAULTS = [
+      { id: 'v-personal', title: 'Personal', itemCount: 3, vaultType: 'personal' },
+      { id: 'v-work', title: 'Work', itemCount: 2, vaultType: 'userCreated' },
+      { id: 'v-transfer', title: 'Shared with me', itemCount: 1, vaultType: 'transfer' },
+    ];
+    // A local server holding `config` (null: nothing saved) whose list-vaults
+    // answers come from `lists` in order; the last one repeats.
+    function server({ config = null, lists = [{ success: true, vaults: VAULTS }], statusFails = null } = {}) {
+      let current = config ? { ...config } : null;
+      let listCalls = 0;
+      const statusOf = () => (current ? { ...current } : { configured: false, authKind: null, accountName: null, vaultScope: 'listed', vaultIds: [], saveVaultId: null, effectiveSaveVaultId: null, vaults: [] });
+      const answer = (request) => {
+        switch (request.action) {
+          case 'onePasswordStatus':
+            if (statusFails && (!request.pair || statusFails.always)) return { success: false, errorCode: statusFails.code, error: 'x' };
+            return { success: true, status: statusOf(), legacy: null };
+          case 'onePasswordConfigure': {
+            const next = { ...statusOf() };
+            if (request.authKind === 'desktop') {
+              Object.assign(next, { configured: true, authKind: 'desktop', accountName: request.accountName });
+            }
+            if (request.vaultScope === 'all') Object.assign(next, { vaultScope: 'all', vaultIds: [] });
+            if (Array.isArray(request.vaultIds) && request.vaultIds.length) Object.assign(next, { vaultScope: 'listed', vaultIds: request.vaultIds });
+            if ('saveVaultId' in request) Object.assign(next, { saveVaultId: request.saveVaultId, effectiveSaveVaultId: request.saveVaultId });
+            current = next;
+            return { success: true, status: statusOf() };
+          }
+          case 'onePasswordListVaults': {
+            const result = lists[Math.min(listCalls, lists.length - 1)];
+            listCalls += 1;
+            // Like the broker: reading every vault, the first list picks the Personal vault.
+            const personal = result.success && result.vaults.find((vault) => vault.vaultType === 'personal');
+            if (current && current.vaultScope === 'all' && !current.saveVaultId && personal) {
+              Object.assign(current, { saveVaultId: personal.id, effectiveSaveVaultId: personal.id });
+            }
+            return result;
+          }
+          case 'onePasswordListLogins':
+            return { success: true, logins: [{ id: 'v-work:l1', title: 'Example', username: 'me', domains: ['example.com'], vaultId: 'v-work' }] };
+          case 'onePasswordListCards':
+            return { success: true, cards: [{ id: 'v-personal:c1', title: 'Visa', cardBrand: 'visa', last4: '4242', vaultId: 'v-personal' }] };
+          case 'onePasswordDisconnect':
+            current = null;
+            return { success: true, status: statusOf() };
+          default:
+            return { success: false, error: 'unexpected ' + request.action };
+        }
+      };
+      return { answer, listCalls: () => listCalls };
+    }
+
+    await check('a guest opening the Vault page reads the status without pairing and asks 1Password nothing', async () => {
+      const srv = server({ statusFails: { code: 'onepassword_bridge_unpaired' } });
+      const env = makePage({ answer: srv.answer });
+      await env.page.load({ readItems: true });
+      assert.deepEqual(env.sent, [{ action: 'onePasswordStatus', pair: false }]);
+      assert.equal(env.page.view(), 'none', 'no error for a guest: the Log in button shows');
+      assert.equal(env.nodes('onePasswordSetup').hidden, false);
+      assert.equal(env.nodes('onePasswordLoginBtn').hidden, false);
+      assert.equal(env.nodes('onePasswordAccountRow').hidden, true, 'no account field until Log in needs one');
+      assert.equal(env.nodes('vaultAccessGroup').style.display, 'none');
+    });
+
+    await check('a saved desktop sign-in without Log in still lists nothing', async () => {
+      const srv = server({ config: DESKTOP });
+      const env = makePage({ answer: srv.answer });
+      await env.page.load({ readItems: true });
+      assert.deepEqual(env.actions(), ['onePasswordStatus']);
+      assert.equal(env.page.view(), 'none');
+      assert.equal(env.nodes('onePasswordAccountLine').hidden, false, 'the saved account is named next to Log in');
+      assert.deepEqual(env.nodes('onePasswordAccountText').i18n, { english: '1Password account: $ACCOUNT$', subs: { account: 'Acme' } });
+    });
+
+    await check('Log in with no saved account opens the account field, filled in with the last name used', async () => {
+      const srv = server();
+      const env = makePage({ answer: srv.answer, stored: { fsbOnePasswordAccountName: 'My Family' } });
+      await env.page.load({ readItems: true });
+      await env.page.logIn();
+      await env.settle();
+      assert.deepEqual(env.sent[1], { action: 'onePasswordStatus', pair: true }, 'the click pairs');
+      assert.deepEqual([...new Set(env.actions())], ['onePasswordStatus'], 'nothing configured or listed yet');
+      assert.equal(env.nodes('onePasswordAccountRow').hidden, false);
+      assert.equal(env.nodes('onePasswordLoginBtn').hidden, true);
+      assert.equal(env.nodes('onePasswordAccount').value, 'My Family');
+      assert.equal(env.nodes('onePasswordAccount').focused, true);
+    });
+
+    await check('Continue signs in to every vault, waits for approval, then lists logins and cards', async () => {
+      const srv = server();
+      const env = makePage({ answer: srv.answer });
+      await env.page.load({ readItems: true });
+      await env.page.logIn();
+      await env.settle();
+      env.nodes('onePasswordAccount').value = '  Acme  ';
+      await env.page.continueLogin();
+      await env.settle();
+      const configure = env.sent.find((request) => request.action === 'onePasswordConfigure');
+      assert.deepEqual(configure, { action: 'onePasswordConfigure', authKind: 'desktop', accountName: 'Acme', vaultScope: 'all' });
+      assert.equal(env.storage.fsbOnePasswordLoggedIn, true);
+      assert.equal(env.storage.fsbOnePasswordAccountName, 'Acme');
+      const after = env.actions().slice(env.actions().indexOf('onePasswordConfigure'));
+      assert.deepEqual(after.slice(0, 3), ['onePasswordConfigure', 'onePasswordListVaults', 'onePasswordStatus']);
+      assert.ok(after.includes('onePasswordListLogins') && after.includes('onePasswordListCards'), 'logins and cards list at once');
+      assert.ok(env.sent.slice(env.actions().indexOf('onePasswordConfigure')).some((request) => request.action === 'onePasswordStatus' && request.pair === true),
+        'logged in, the page pairs');
+      assert.equal(env.page.view(), 'ready');
+      assert.deepEqual(env.nodes('onePasswordStatusText').i18n, { english: 'Logged in · $ACCOUNT$', subs: { account: 'Acme' } });
+      assert.equal(env.nodes('onePasswordBody').textContent,
+        '1Password may ask you to approve FSB again after 10 idle minutes, a lock, or a local-server restart.');
+      assert.equal(env.nodes('onePasswordDisconnectBtn').hidden, false);
+      assert.equal(env.nodes('vaultAccessGroup').style.display, 'contents');
+      assert.equal(env.nodes('onePasswordAdvanced').open, false, 'the vault limit stays under Advanced');
+      assert.equal(env.nodes('onePasswordSaveVault').value, 'v-personal');
+      assert.equal(env.nodes('onePasswordSaveHint').hidden, true);
+      assert.equal(env.nodes('onePasswordAllVaultsBtn').hidden, true, 'already reading every vault');
+      assert.deepEqual(env.nodes('onePasswordScopeText').i18n.english, 'All vaults in your 1Password account');
+      assert.ok(!env.nodes('onePasswordVaultList').innerHTML.includes('Shared with me'), 'transfer vaults are left out');
+      assert.equal(env.nodes('credentialsList').hidden, false);
+      assert.ok(env.toasts.some((toast) => toast.message === '1Password connected'));
+    });
+
+    await check('with the 1Password setting off, FSB opens it once and keeps trying until it is on', async () => {
+      const off = { success: false, errorCode: 'onepassword_auth_failed', error: 'off', reason: 'integration_off' };
+      const srv = server({ config: DESKTOP, lists: [off, off, off, { success: true, vaults: VAULTS }] });
+      const env = makePage({ answer: srv.answer });
+      await env.page.load({ readItems: true });
+      const views = [];
+      const pending = env.page.logIn();
+      for (let i = 0; i < 400 && srv.listCalls() < 4; i += 1) {
+        views.push(env.page.view());
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      await pending;
+      await env.settle();
+      assert.ok(!env.actions().includes('onePasswordConfigure'), 'the saved account is reused as it is');
+      assert.deepEqual(env.tabsOpened, ['onepassword://settings/developers']);
+      assert.ok(views.includes('integration'), 'the page asks for the setting while it waits');
+      assert.equal(env.page.view(), 'ready');
+      assert.equal(env.storage.fsbOnePasswordLoggedIn, true);
+    });
+
+    await check('after 2 minutes with the setting still off, the page points at an admin', async () => {
+      const off = { success: false, errorCode: 'onepassword_auth_failed', error: 'off', reason: 'integration_off' };
+      const srv = server({ config: DESKTOP, lists: [off] });
+      const env = makePage({ answer: srv.answer });
+      await env.page.load({ readItems: true });
+      await env.page.logIn();
+      await env.settle();
+      assert.equal(env.page.view(), 'managed');
+      assert.equal(env.nodes('onePasswordBody').textContent, 'On a managed device? Ask your admin.');
+      assert.equal(env.nodes('onePasswordRetryBtn').hidden, false);
+      assert.equal(env.nodes('onePasswordOpenSettingsBtn').hidden, false);
+      assert.deepEqual(env.tabsOpened, ['onepassword://settings/developers'], 'the setting opens once per Log in');
+      // One try every 3 seconds for 2 minutes, plus the first.
+      assert.equal(srv.listCalls(), 41);
+      assert.notEqual(env.storage.fsbOnePasswordLoggedIn, true);
+    });
+
+    await check('each sign-in failure gets its own state and a way forward', async () => {
+      for (const [reason, view, extra] of [
+        ['app_missing', 'appmissing', 'onePasswordDownloadLink'],
+        ['locked', 'locked', null],
+        ['declined', 'declined', null],
+        ['unknown', 'signin', 'onePasswordEditAccountBtn'],
+      ]) {
+        const srv = server({ config: DESKTOP, lists: [{ success: false, errorCode: 'onepassword_auth_failed', error: '1Password sign-in failed: nope', reason }] });
+        const env = makePage({ answer: srv.answer });
+        await env.page.load({ readItems: true });
+        await env.page.logIn();
+        await env.settle();
+        assert.equal(env.page.view(), view, reason);
+        assert.equal(env.nodes('onePasswordRetryBtn').hidden, false, `${reason}: Try again`);
+        if (extra) assert.equal(env.nodes(extra).hidden, false, `${reason}: ${extra}`);
+        assert.notEqual(env.storage.fsbOnePasswordLoggedIn, true);
+        assert.ok(!env.actions().includes('onePasswordListLogins'), `${reason}: nothing listed`);
+      }
+      const timeout = server({ config: DESKTOP, lists: [{ success: false, errorCode: 'onepassword_timeout', error: 'slow' }] });
+      const env = makePage({ answer: timeout.answer });
+      await env.page.load({ readItems: true });
+      await env.page.logIn();
+      await env.settle();
+      assert.equal(env.page.view(), 'approve');
+      assert.equal(env.nodes('onePasswordStatusText').textContent, 'Approve FSB in 1Password');
+    });
+
+    await check('Try again after a failed Log in logs in again', async () => {
+      const srv = server({ config: DESKTOP, lists: [{ success: false, errorCode: 'onepassword_auth_failed', error: 'x', reason: 'locked' }, { success: true, vaults: VAULTS }] });
+      const env = makePage({ answer: srv.answer });
+      await env.page.load({ readItems: true });
+      await env.page.logIn();
+      await env.settle();
+      assert.equal(env.page.view(), 'locked');
+      env.page.retry();
+      await env.settle();
+      assert.equal(env.page.view(), 'ready');
+      assert.equal(env.storage.fsbOnePasswordLoggedIn, true);
+    });
+
+    await check('Disconnect clears the logged-in flag', async () => {
+      const srv = server({ config: DESKTOP });
+      const env = makePage({ answer: srv.answer, stored: { fsbOnePasswordLoggedIn: true } });
+      await env.page.load({ readItems: true });
+      assert.equal(env.page.view(), 'ready');
+      await env.page.disconnect();
+      await env.settle();
+      assert.equal(env.storage.fsbOnePasswordLoggedIn, false);
+      assert.ok(env.actions().includes('onePasswordDisconnect'));
+      assert.equal(env.page.view(), 'none');
+    });
+
+    await check('a logged-in flag with nothing saved on the server is cleared', async () => {
+      const srv = server();
+      const env = makePage({ answer: srv.answer, stored: { fsbOnePasswordLoggedIn: true } });
+      await env.page.load({ readItems: true });
+      assert.equal(env.storage.fsbOnePasswordLoggedIn, false);
+      assert.equal(env.page.view(), 'none');
+    });
+
+    await check('a service account set up in the terminal shows as connected, with Disconnect', async () => {
+      const service = { configured: true, authKind: 'service-account', accountName: null, tokenSource: 'config', vaultScope: 'listed', vaultIds: ['v-work'], saveVaultId: null, effectiveSaveVaultId: null, vaults: [{ id: 'v-work', title: 'Work' }] };
+      const srv = server({ config: service });
+      const env = makePage({ answer: srv.answer, stored: {} });
+      // Already paired by an earlier visit, so the passive read answers.
+      await env.page.load({ readItems: true });
+      assert.equal(env.page.view(), 'service');
+      assert.equal(env.nodes('onePasswordDisconnectBtn').hidden, false);
+      assert.equal(env.nodes('onePasswordSetup').hidden, true);
+      assert.ok(env.actions().includes('onePasswordListLogins'), 'a service account never prompts, so items list');
+      assert.equal(env.storage.fsbOnePasswordLoggedIn, true);
+    });
+
+    await check('no Personal vault: the save-vault picker asks for one', async () => {
+      const srv = server({ config: { ...DESKTOP, saveVaultId: null, effectiveSaveVaultId: null }, lists: [{ success: true, vaults: [VAULTS[1]] }] });
+      const env = makePage({ answer: srv.answer, stored: { fsbOnePasswordLoggedIn: true } });
+      await env.page.load({ readItems: true });
+      await env.settle();
+      assert.equal(env.page.view(), 'ready');
+      assert.equal(env.nodes('onePasswordSaveHint').hidden, false);
+      assert.equal(env.nodes('onePasswordSaveVault').value, '');
+      assert.deepEqual(env.nodes('onePasswordSaveVault').options.map((option) => option.value), ['', 'v-work']);
+    });
+
+    await check('limiting FSB to chosen vaults sends their ids; Use all vaults goes back', async () => {
+      const srv = server({ config: DESKTOP });
+      const env = makePage({ answer: srv.answer, stored: { fsbOnePasswordLoggedIn: true } });
+      await env.page.load({ readItems: true });
+      await env.settle();
+      env.page.setLimit(['v-work']);
+      await env.page.saveLimit();
+      await env.settle();
+      const limit = env.sent.find((request) => request.action === 'onePasswordConfigure');
+      assert.deepEqual(limit, { action: 'onePasswordConfigure', vaultIds: ['v-work'], saveVaultId: null }, 'the save vault goes when it is no longer readable');
+      assert.equal(env.page.ui.scope, 'listed');
+      assert.equal(env.nodes('onePasswordAllVaultsBtn').hidden, false);
+      assert.equal(env.nodes('onePasswordScopeText').i18n.english, 'Only the vaults turned on under Advanced');
+      await env.page.useAll();
+      await env.settle();
+      assert.deepEqual(env.sent.filter((request) => request.action === 'onePasswordConfigure').pop(), { action: 'onePasswordConfigure', vaultScope: 'all' });
+      assert.equal(env.page.ui.scope, 'all');
+    });
+
+    await check('the old vault and service-account copy are gone from the Vault page', () => {
+      const html = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ui', 'control_panel.html'), 'utf8');
+      const vault = html.slice(html.indexOf('<section class="content-section" id="vault">'), html.indexOf('<!-- Help Section -->'));
+      assert.ok(vault.includes('id="onePasswordLoginBtn"'));
+      assert.ok(!/Integrate with other apps|onepassword --service-account|onePasswordServiceBtn/.test(vault));
+      assert.ok(vault.includes('href="https://1password.com/downloads/"'));
+      assert.ok(!/Integrate with other apps/.test(options));
+    });
+  }
+
   console.log(`\nonepassword-client: ${passed} passed, 0 failed`);
 }
 

@@ -2838,8 +2838,7 @@ textarea.form-input {
 .vx-legacy .credential-vault-header { margin-bottom: var(--space-md); }
 .vx-items { grid-column: 1 / -1; }
 .vx-small { font-size: 0.85rem; }
-.vx-cmd, .vx-service { margin-top: var(--space-md); }
-.vx-service .credential-vault-helper + .onepassword-command { margin-top: 6px; }
+.vx-cmd { margin-top: var(--space-md); }
 
 /* where a secret goes: 1Password, the local server, this browser */
 .vx-path { display: flex; align-items: flex-start; }
@@ -2865,13 +2864,19 @@ textarea.form-input {
 .vx-conn .credential-vault-helper { max-width: 560px; }
 .vx-acts { display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-lg); flex-wrap: wrap; }
 .vx-linkbtn { border: 0; background: none; padding: 0 4px; color: var(--primary-color); font-weight: 600; font-size: 0.85rem; cursor: pointer; }
-.vx-setup { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; }
-.vx-setup .form-group { margin-bottom: var(--space-lg); }
-.vx-setup-b { padding-left: 32px; border-left: 1px solid var(--border-color); display: flex; flex-direction: column; gap: var(--space-md); }
-.vx-setup[hidden], .vx-conn[hidden], .vx-service[hidden] { display: none; }
+/* the Install 1Password link is styled as a button */
+#vault a.save-btn { display: inline-flex; align-items: center; font-size: 0.85rem; line-height: normal; text-decoration: none; }
+/* Log in: one button, then the account name field when FSB needs one */
+.vx-setup { max-width: 560px; }
+.vx-login { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); }
+.vx-login > .credential-vault-helper { margin: 0; }
+.vx-account { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); align-items: end; width: 100%; }
+.vx-account .form-group { margin: 0; }
+.vx-account label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: var(--text-primary); }
+.vx-account .save-btn { height: 46px; }
+.vx-setup[hidden], .vx-conn[hidden] { display: none; }
 @media (max-width: 900px) {
-  .vx-setup, .vx-conn { grid-template-columns: minmax(0, 1fr); }
-  .vx-setup-b { padding-left: 0; border-left: 0; }
+  .vx-conn, .vx-account { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* vault access rows: the panel's own .onepassword-vault-option, with its toggle in place of the checkbox and a plain-language tag */
@@ -2894,6 +2899,18 @@ textarea.form-input {
 .vx-save .form-group { margin: 0; }
 .vx-save label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.88rem; color: var(--text-primary); }
 .vx-save .save-btn { height: 46px; }
+.vx-save-one { grid-template-columns: minmax(0, 420px); margin-top: 0; }
+/* Advanced: limit FSB to chosen vaults */
+.vx-adv { margin-top: var(--space-lg); border-top: 1px solid var(--border-color); padding-top: var(--space-md); }
+.vx-adv summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-weight: 600; font-size: 0.88rem; color: var(--text-secondary); }
+.vx-adv summary::-webkit-details-marker { display: none; }
+.vx-adv summary i { font-size: 0.7rem; transition: transform var(--transition-fast); }
+.vx-adv[open] summary i { transform: rotate(90deg); }
+.vx-adv summary:hover { color: var(--text-primary); }
+.vx-adv-body { margin-top: var(--space-md); }
+.vx-adv-body h4 { margin: 0 0 4px; font-size: 0.92rem; font-weight: 600; color: var(--text-primary); }
+.vx-adv-body > .credential-vault-helper { margin: 0 0 var(--space-md); }
+.vx-adv-body .vx-acts { margin-top: var(--space-md); }
 .vx-card-focus { border-color: color-mix(in srgb, var(--primary-color) 55%, transparent) !important; box-shadow: var(--shadow-glow); }
 
 /* rule cards */

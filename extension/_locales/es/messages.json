@@ -4676,18 +4676,6 @@
   "panel_818962bda5": {
     "message": "Comprobando la conexión con 1Password..."
   },
-  "panel_b84510154a": {
-    "message": "Cuenta de 1Password"
-  },
-  "panel_a6f394d865": {
-    "message": "El nombre de la cuenta que aparece en la parte superior de la barra lateral de 1Password. En la app de 1Password, activa Settings > Developer > Integrate with other apps."
-  },
-  "panel_5dec08e310": {
-    "message": "Conectar 1Password"
-  },
-  "panel_e175b45390": {
-    "message": "¿Prefieres usar una cuenta de servicio? Ejecuta esto en una terminal y vuelve a cargar esta página:"
-  },
   "panel_5c0a336c67": {
     "message": "Elige las bóvedas que FSB puede leer. Lo más seguro es una bóveda que solo use FSB."
   },
@@ -5095,12 +5083,6 @@
   "panel_a55fac2bfd": {
     "message": "FSB rellena los formularios de pago con tarjetas de tu 1Password."
   },
-  "panel_a47c107d93": {
-    "message": "El token se guarda en este ordenador en ~/.fsb/onepassword.json. La extensión nunca lo recibe."
-  },
-  "panel_79761fb441": {
-    "message": "Usar una cuenta de servicio"
-  },
   "panel_caf0111717": {
     "message": "Servidor local"
   },
@@ -5218,15 +5200,6 @@
       }
     }
   },
-  "panel_009008e0d7": {
-    "message": "Conectado mediante la app de 1Password · $ACCOUNT$",
-    "placeholders": {
-      "account": {
-        "content": "$1",
-        "example": "my.1password.com"
-      }
-    }
-  },
   "panel_65c448bae4": {
     "message": "Conectado con una cuenta de servicio"
   },
@@ -5254,9 +5227,6 @@
   "panel_f83ab4c57f": {
     "message": "Elige las bóvedas que FSB puede leer."
   },
-  "panel_e5f973beb3": {
-    "message": "Todo se queda en este ordenador."
-  },
   "panel_b33cf191b9": {
     "message": "Configurada desde el terminal. Al desconectar se borra el token guardado, así que se pide confirmación."
   },
@@ -5268,9 +5238,6 @@
   },
   "panel_40647b20fa": {
     "message": "FSB no puede leer nada hasta que lo permitas. Vuelve a intentarlo y permite FSB en 1Password."
-  },
-  "panel_942c783692": {
-    "message": "Instálala, inicia sesión y activa Ajustes > Desarrollador > Integrar con otras apps."
   },
   "panel_0233589be3": {
     "message": "Este fsb-mcp-server es demasiado antiguo para 1Password o no puede cargar su SDK."
@@ -5396,5 +5363,100 @@
   },
   "panel_91fa9fd3cf": {
     "message": "¿Desconectar 1Password? FSB olvidará sus ajustes de 1Password y borrará el token de la cuenta de servicio. Para volver a conectar necesitarás de nuevo el terminal."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "Iniciar sesión en 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "Cambiar de cuenta"
+  },
+  "panel_61a5454aac": {
+    "message": "Nombre de la cuenta — aparece en la parte superior de la barra lateral de 1Password"
+  },
+  "panel_24f92b0c67": {
+    "message": "Usa la app de escritorio de 1Password. Necesita Settings > Developer > Integrate with 1Password SDKs activado (FSB abre esa página si está desactivado) y después te pide que apruebes FSB."
+  },
+  "panel_0db703c375": {
+    "message": "Instalar 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "Abrir los ajustes de 1Password"
+  },
+  "panel_af67e786b5": {
+    "message": "Aún no hay bóveda para guardar. Elige una para que FSB pueda guardar nuevos inicios de sesión en 1Password."
+  },
+  "panel_9f088dbebd": {
+    "message": "Avanzado"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "Limitar FSB a estas bóvedas"
+  },
+  "panel_104a4be90f": {
+    "message": "Usar todas las bóvedas"
+  },
+  "panel_65f5a87194": {
+    "message": "Settings > Developer en 1Password"
+  },
+  "panel_f287bb0de3": {
+    "message": "Activa Integrate with 1Password SDKs en 1Password y vuelve aquí. FSB lo seguirá comprobando durante 2 minutos."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs sigue desactivado"
+  },
+  "panel_3facf5a8dc": {
+    "message": "¿Usas un dispositivo administrado? Pregunta a tu administrador."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs está desactivado"
+  },
+  "panel_e5dab5535e": {
+    "message": "Activa Integrate with 1Password SDKs en 1Password y vuelve aquí."
+  },
+  "panel_55a8cd8239": {
+    "message": "Sesión iniciada"
+  },
+  "panel_06e7541e0b": {
+    "message": "Sesión iniciada · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "1Password puede volver a pedirte que apruebes FSB tras 10 minutos de inactividad, un bloqueo o un reinicio del servidor local."
+  },
+  "panel_41a0e0aead": {
+    "message": "No se pudo iniciar sesión en 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "Comprueba el nombre de la cuenta y vuelve a intentarlo."
+  },
+  "panel_bf74b77b3d": {
+    "message": "Comprueba el nombre de la cuenta y vuelve a intentarlo. Detalles: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "Instala la app de 1Password e inicia sesión; después vuelve a intentarlo."
+  },
+  "panel_e745c8fafe": {
+    "message": "Cuenta de 1Password: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "Todas las bóvedas de tu cuenta de 1Password"
+  },
+  "panel_7a9e047a27": {
+    "message": "Solo las bóvedas activadas en Avanzado"
   }
 }

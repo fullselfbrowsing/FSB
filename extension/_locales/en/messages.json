@@ -4676,18 +4676,6 @@
   "panel_818962bda5": {
     "message": "Checking 1Password connection..."
   },
-  "panel_b84510154a": {
-    "message": "1Password account"
-  },
-  "panel_a6f394d865": {
-    "message": "The account name shown at the top of the 1Password sidebar. In the 1Password app, turn on Settings > Developer > Integrate with other apps."
-  },
-  "panel_5dec08e310": {
-    "message": "Connect 1Password"
-  },
-  "panel_e175b45390": {
-    "message": "Using a service account instead? Run this in a terminal, then reload this page:"
-  },
   "panel_5c0a336c67": {
     "message": "Choose the vaults FSB may read. A vault used only by FSB is safest."
   },
@@ -5095,12 +5083,6 @@
   "panel_a55fac2bfd": {
     "message": "FSB fills checkout forms with cards from your 1Password."
   },
-  "panel_a47c107d93": {
-    "message": "The token is kept on this computer in ~/.fsb/onepassword.json. The extension never receives it."
-  },
-  "panel_79761fb441": {
-    "message": "Use a service account instead"
-  },
   "panel_caf0111717": {
     "message": "Local server"
   },
@@ -5218,15 +5200,6 @@
       }
     }
   },
-  "panel_009008e0d7": {
-    "message": "Connected through the 1Password app · $ACCOUNT$",
-    "placeholders": {
-      "account": {
-        "content": "$1",
-        "example": "my.1password.com"
-      }
-    }
-  },
   "panel_65c448bae4": {
     "message": "Connected with a service account"
   },
@@ -5254,9 +5227,6 @@
   "panel_f83ab4c57f": {
     "message": "Choose the vaults FSB may read."
   },
-  "panel_e5f973beb3": {
-    "message": "Everything stays on this computer."
-  },
   "panel_b33cf191b9": {
     "message": "Set up from the terminal. Disconnecting deletes the saved token, so it asks first."
   },
@@ -5268,9 +5238,6 @@
   },
   "panel_40647b20fa": {
     "message": "FSB can't read anything until you allow it. Try again, then allow FSB in 1Password."
-  },
-  "panel_942c783692": {
-    "message": "Install it, sign in, and turn on Settings > Developer > Integrate with other apps."
   },
   "panel_0233589be3": {
     "message": "This fsb-mcp-server is too old for 1Password, or can't load its SDK."
@@ -5396,5 +5363,100 @@
   },
   "panel_91fa9fd3cf": {
     "message": "Disconnect 1Password? FSB forgets its 1Password settings and deletes the saved service account token. Reconnecting needs the terminal again."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "Log in to 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "Change account"
+  },
+  "panel_61a5454aac": {
+    "message": "Account name — shown at the top of the 1Password sidebar"
+  },
+  "panel_24f92b0c67": {
+    "message": "Uses the 1Password desktop app. It needs Settings > Developer > Integrate with 1Password SDKs turned on (FSB opens that page if it is off), then asks you to approve FSB."
+  },
+  "panel_0db703c375": {
+    "message": "Install 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "Open 1Password settings"
+  },
+  "panel_af67e786b5": {
+    "message": "No save vault yet. Choose one so FSB can save new logins to 1Password."
+  },
+  "panel_9f088dbebd": {
+    "message": "Advanced"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "Limit FSB to these vaults"
+  },
+  "panel_104a4be90f": {
+    "message": "Use all vaults"
+  },
+  "panel_65f5a87194": {
+    "message": "Settings > Developer in 1Password"
+  },
+  "panel_f287bb0de3": {
+    "message": "Turn on Integrate with 1Password SDKs in 1Password, then come back. FSB keeps checking for 2 minutes."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs is still off"
+  },
+  "panel_3facf5a8dc": {
+    "message": "On a managed device? Ask your admin."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs is off"
+  },
+  "panel_e5dab5535e": {
+    "message": "Turn on Integrate with 1Password SDKs in 1Password, then come back."
+  },
+  "panel_55a8cd8239": {
+    "message": "Logged in"
+  },
+  "panel_06e7541e0b": {
+    "message": "Logged in · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "1Password may ask you to approve FSB again after 10 idle minutes, a lock, or a local-server restart."
+  },
+  "panel_41a0e0aead": {
+    "message": "Could not log in to 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "Check the account name, then try again."
+  },
+  "panel_bf74b77b3d": {
+    "message": "Check the account name, then try again. Details: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "Install the 1Password app and sign in, then try again."
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password account: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "All vaults in your 1Password account"
+  },
+  "panel_7a9e047a27": {
+    "message": "Only the vaults turned on under Advanced"
   }
 }

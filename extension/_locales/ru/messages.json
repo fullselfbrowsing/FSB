@@ -4676,18 +4676,6 @@
   "panel_818962bda5": {
     "message": "Проверка подключения к 1Password..."
   },
-  "panel_b84510154a": {
-    "message": "Аккаунт 1Password"
-  },
-  "panel_a6f394d865": {
-    "message": "Имя аккаунта, которое показано вверху боковой панели 1Password. В приложении 1Password включите Settings > Developer > Integrate with other apps."
-  },
-  "panel_5dec08e310": {
-    "message": "Подключить 1Password"
-  },
-  "panel_e175b45390": {
-    "message": "Хотите использовать сервисный аккаунт? Выполните это в терминале, затем перезагрузите страницу:"
-  },
   "panel_5c0a336c67": {
     "message": "Выберите сейфы, которые может читать FSB. Надёжнее всего сейф, который использует только FSB."
   },
@@ -5095,12 +5083,6 @@
   "panel_a55fac2bfd": {
     "message": "FSB заполняет формы оплаты картами из вашего 1Password."
   },
-  "panel_a47c107d93": {
-    "message": "Токен хранится на этом компьютере в ~/.fsb/onepassword.json. Расширение никогда его не получает."
-  },
-  "panel_79761fb441": {
-    "message": "Использовать сервисный аккаунт"
-  },
   "panel_caf0111717": {
     "message": "Локальный сервер"
   },
@@ -5218,15 +5200,6 @@
       }
     }
   },
-  "panel_009008e0d7": {
-    "message": "Подключено через приложение 1Password · $ACCOUNT$",
-    "placeholders": {
-      "account": {
-        "content": "$1",
-        "example": "my.1password.com"
-      }
-    }
-  },
   "panel_65c448bae4": {
     "message": "Подключено через сервисный аккаунт"
   },
@@ -5254,9 +5227,6 @@
   "panel_f83ab4c57f": {
     "message": "Выберите сейфы, которые может читать FSB."
   },
-  "panel_e5f973beb3": {
-    "message": "Всё остаётся на этом компьютере."
-  },
   "panel_b33cf191b9": {
     "message": "Настроено в терминале. При отключении сохранённый токен удаляется, поэтому FSB сначала спросит."
   },
@@ -5268,9 +5238,6 @@
   },
   "panel_40647b20fa": {
     "message": "Пока вы не разрешите, FSB ничего не прочитает. Повторите попытку и разрешите FSB в 1Password."
-  },
-  "panel_942c783692": {
-    "message": "Установите его, войдите и включите Настройки > Разработчик > Интеграция с другими приложениями."
   },
   "panel_0233589be3": {
     "message": "Этот fsb-mcp-server слишком старый для 1Password или не может загрузить SDK."
@@ -5396,5 +5363,100 @@
   },
   "panel_91fa9fd3cf": {
     "message": "Отключить 1Password? FSB забудет свои настройки 1Password и удалит сохранённый токен сервисного аккаунта. Для повторного подключения снова понадобится терминал."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "Войти в 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "Сменить аккаунт"
+  },
+  "panel_61a5454aac": {
+    "message": "Имя аккаунта — показано вверху боковой панели 1Password"
+  },
+  "panel_24f92b0c67": {
+    "message": "Использует настольное приложение 1Password. В нём должен быть включён параметр Settings > Developer > Integrate with 1Password SDKs (если он выключен, FSB откроет эту страницу), после чего 1Password попросит вас разрешить доступ FSB."
+  },
+  "panel_0db703c375": {
+    "message": "Установить 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "Открыть настройки 1Password"
+  },
+  "panel_af67e786b5": {
+    "message": "Сейф для сохранения ещё не выбран. Выберите его, чтобы FSB мог сохранять новые данные для входа в 1Password."
+  },
+  "panel_9f088dbebd": {
+    "message": "Дополнительно"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "Ограничить FSB этими сейфами"
+  },
+  "panel_104a4be90f": {
+    "message": "Использовать все сейфы"
+  },
+  "panel_65f5a87194": {
+    "message": "Settings > Developer в 1Password"
+  },
+  "panel_f287bb0de3": {
+    "message": "Включите Integrate with 1Password SDKs в 1Password и вернитесь сюда. FSB будет проверять ещё 2 минуты."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs всё ещё выключен"
+  },
+  "panel_3facf5a8dc": {
+    "message": "Устройство управляется организацией? Обратитесь к администратору."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs выключен"
+  },
+  "panel_e5dab5535e": {
+    "message": "Включите Integrate with 1Password SDKs в 1Password и вернитесь сюда."
+  },
+  "panel_55a8cd8239": {
+    "message": "Вход выполнен"
+  },
+  "panel_06e7541e0b": {
+    "message": "Вход выполнен · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "1Password может снова попросить разрешить доступ FSB после 10 минут бездействия, блокировки или перезапуска локального сервера."
+  },
+  "panel_41a0e0aead": {
+    "message": "Не удалось войти в 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "Проверьте имя аккаунта и повторите попытку."
+  },
+  "panel_bf74b77b3d": {
+    "message": "Проверьте имя аккаунта и повторите попытку. Подробности: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "Установите приложение 1Password, войдите в него и повторите попытку."
+  },
+  "panel_e745c8fafe": {
+    "message": "Аккаунт 1Password: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "Все сейфы в вашем аккаунте 1Password"
+  },
+  "panel_7a9e047a27": {
+    "message": "Только сейфы, включённые в разделе «Дополнительно»"
   }
 }
