@@ -1,8 +1,9 @@
 'use strict';
 
-// 1Password broker (mcp/src/onepassword): site matching, vault allowlist,
-// secret projection, card gating, saving, legacy import, error hygiene, and
-// the bridge rule that onepassword.* requests are answered by the hub only.
+// 1Password broker (mcp/src/onepassword): site matching, vault scope (every
+// vault, or the user's limit), secret projection, card gating, saving, legacy
+// import, sign-in failure reasons, error hygiene, the CLI, and the bridge rule
+// that onepassword.* requests are answered by the hub only.
 // Runs against the compiled build (npm --prefix mcp run build) with a fake SDK
 // shaped like @1password/sdk 0.5.x.
 
@@ -61,8 +62,13 @@ function cardItem(vaultId, id) {
   };
 }
 
+const DEFAULT_VAULTS = [
+  { id: 'vaultA', title: 'FSB', activeItemCount: 3, vaultType: 'userCreated' },
+  { id: 'vaultB', title: 'Private', activeItemCount: 1, vaultType: 'personal' },
+];
+
 function makeSdk(items, options = {}) {
-  const calls = { createClient: [], list: 0, get: [], create: [], created: [] };
+  const calls = { createClient: [], list: 0, vaultsList: 0, get: [], create: [], created: [] };
   let expireNext = options.expireOnce === true;
   // { at: n, error: 'expire' | 'rate' }: the nth create call fails once.
   let interruptCreate = options.interruptCreate ? { ...options.interruptCreate } : null;
@@ -81,11 +87,9 @@ function makeSdk(items, options = {}) {
       return {
         vaults: {
           async list() {
+            calls.vaultsList += 1;
             await lapse();
-            return [
-              { id: 'vaultA', title: 'FSB', activeItemCount: 3, vaultType: 'userCreated' },
-              { id: 'vaultB', title: 'Private', activeItemCount: 1, vaultType: 'personal' },
-            ];
+            return (options.vaults || DEFAULT_VAULTS).map((vault) => ({ ...vault }));
           },
         },
         items: {
@@ -148,7 +152,14 @@ async function rejects(promise, code) {
 
 async function run() {
   const match = await load('domain-match.js');
-  const { OnePasswordBroker, parseItemRef } = await load('broker.js');
+  const {
+    OnePasswordBroker,
+    parseItemRef,
+    signInFailureReason,
+    onePasswordIpcLibraryPaths,
+  } = await load('broker.js');
+  const { normalizeOnePasswordConfig } = await load('config.js');
+  const { runOnePasswordCommand } = await load('cli.js');
   const { handleOnePasswordRequest, isOnePasswordExtMethod, ONEPASSWORD_EXT_METHODS } = await load('ext-handler.js');
 
   console.log('\n--- site matching follows 1Password autofill rules ---');
@@ -214,7 +225,7 @@ async function run() {
     assert.equal(at('file:///etc/passwd'), null);
   });
 
-  console.log('\n--- configuration and allowlist ---');
+  console.log('\n--- configuration and vault limit ---');
   const items = [
     loginItem('vaultA', 'loginA', { title: 'Example', url: 'https://example.com', username: 'alice', password: 'pw-a', otp: '123456' }),
     loginItem('vaultA', 'loginA2', { title: 'Example work', url: 'https://example.com', username: 'alice@work', password: 'pw-a2', updatedAt: '2026-06-01T00:00:00Z' }),
@@ -234,13 +245,23 @@ async function run() {
   const fake = makeSdk(items);
   const broker = new OnePasswordBroker({ loadSdk: async () => fake.sdk, configPath, env: {} });
 
-  await check('desktop sign-in without vaults is not ready', async () => {
-    const status = broker.configure({ authKind: 'desktop', accountName: 'my.1password.com' });
+  await check('a desktop sign-in is ready at once and reads every vault', async () => {
+    const status = await broker.configure({ authKind: 'desktop', accountName: 'my.1password.com' });
     assert.equal(status.authKind, 'desktop');
-    assert.equal(status.configured, false);
-    await rejects(broker.listLogins(), 'onepassword_no_vaults');
+    assert.equal(status.configured, true, 'signing in is enough; no vault picking');
+    assert.equal(status.vaultScope, 'all');
+    assert.deepEqual(status.vaultIds, []);
+    const logins = await broker.listLogins();
+    assert.deepEqual(logins.map((login) => login.id).sort(),
+      ['vaultA:loginA', 'vaultA:loginA2', 'vaultA:loginShop', 'vaultB:loginPrivate']);
     assert.equal(fake.calls.createClient[0].auth.accountName, 'my.1password.com', 'desktop auth uses the account name');
     assert.equal(fake.calls.createClient[0].integrationName, 'FSB');
+  });
+  await check('the first vault list made the Personal vault the save vault', () => {
+    const status = broker.status();
+    assert.equal(status.saveVaultId, 'vaultB');
+    assert.equal(status.effectiveSaveVaultId, 'vaultB');
+    assert.deepEqual(status.vaults, [{ id: 'vaultA', title: 'FSB' }, { id: 'vaultB', title: 'Private' }]);
   });
 
   await check('config file is owner-only', () => {
@@ -253,13 +274,21 @@ async function run() {
     assert.deepEqual(vaults.map((vault) => vault.id), ['vaultA', 'vaultB']);
   });
 
-  await check('save vault must be one of the allowed vaults', () => {
-    assert.throws(() => broker.configure({ vaultIds: ['vaultA'], saveVaultId: 'vaultB' }), /allowed vaults/);
+  await check('with a vault limit, the save vault must be one of the listed vaults', async () => {
+    await assert.rejects(broker.configure({ vaultIds: ['vaultA'], saveVaultId: 'vaultB' }), /allowed vaults/);
   });
 
-  broker.configure({ vaultIds: ['vaultA'] });
+  await check('limiting FSB to some vaults keeps the session and drops a save vault outside the limit', async () => {
+    const signIns = fake.calls.createClient.length;
+    const status = await broker.configure({ vaultIds: ['vaultA'] });
+    assert.equal(status.vaultScope, 'listed');
+    assert.equal(status.saveVaultId, null);
+    assert.equal(status.effectiveSaveVaultId, null);
+    await broker.listLogins();
+    assert.equal(fake.calls.createClient.length, signIns, 'vault settings do not ask 1Password for a new approval');
+  });
 
-  await check('only allowlisted vaults are listed, without passwords', async () => {
+  await check('with a vault limit only those vaults are listed, without passwords', async () => {
     const logins = await broker.listLogins();
     assert.deepEqual(logins.map((login) => login.id).sort(), ['vaultA:loginA', 'vaultA:loginA2', 'vaultA:loginShop']);
     const serialized = JSON.stringify(logins);
@@ -363,7 +392,7 @@ async function run() {
   await check('saving needs a save vault', async () => {
     await rejects(broker.saveLogin({ url: 'https://new.test', username: 'u', password: 'p' }), 'onepassword_save_vault_missing');
   });
-  broker.configure({ saveVaultId: 'vaultA' });
+  await broker.configure({ saveVaultId: 'vaultA' });
   await check('saved logins are tagged and bound to the site', async () => {
     const saved = await broker.saveLogin({ url: 'https://new.test/login', username: 'u', password: 'p' });
     assert.equal(saved.id, 'vaultA:new1');
@@ -495,6 +524,7 @@ async function run() {
     assert.equal(cold.status().connection, 'connected');
   });
   await check('a declined first sign-in fails every waiting request, and the next one asks again', async () => {
+    // (The fake app is installed here, so the reason is "declined".)
     const flaky = makeSdk(items);
     const createClient = flaky.sdk.createClient;
     let declineNext = true;
@@ -504,11 +534,12 @@ async function run() {
       flaky.calls.createClient.push(config);
       throw new Error('declined in the 1Password app');
     };
-    const cold = new OnePasswordBroker({ loadSdk: slowLoad(flaky.sdk), configPath, env: {} });
-    await Promise.all([
+    const cold = new OnePasswordBroker({ loadSdk: slowLoad(flaky.sdk), configPath, env: {}, ipcLibraryPresent: () => true });
+    const [declined] = await Promise.all([
       rejects(cold.listVaults(), 'onepassword_auth_failed'),
       rejects(cold.listLogins(), 'onepassword_auth_failed'),
     ]);
+    assert.equal(declined.details.reason, 'declined');
     assert.equal(flaky.calls.createClient.length, 1, 'one approval request, not two');
     assert.ok((await cold.listLogins()).length > 0);
     assert.equal(flaky.calls.createClient.length, 2, 'the next request signs in again');
@@ -531,7 +562,7 @@ async function run() {
       configPath: tempConfigPath(),
       env: { OP_SERVICE_ACCOUNT_TOKEN: token },
     });
-    failing.configure({ vaultIds: ['vaultA'] });
+    await failing.configure({ vaultIds: ['vaultA'] });
     const error = await rejects(failing.listLogins(), 'onepassword_auth_failed');
     assert.ok(!error.message.includes(token));
     assert.ok(!JSON.stringify(error.details || {}).includes(token), 'the reason detail never carries the token');
@@ -544,15 +575,268 @@ async function run() {
       loadSdk: async () => makeSdk(items, { authError: 'Native library is not available.' }).sdk,
       configPath,
       env: {},
+      ipcLibraryPresent: () => false,
     });
     const error = await rejects(missing.listVaults(), 'onepassword_auth_failed');
-    assert.match(error.message, /Integrate with other apps/);
+    assert.match(error.message, /Settings > Developer > Integrate with 1Password SDKs/);
+    assert.doesNotMatch(error.message, /other apps/, 'the setting has its current name');
     assert.equal(error.details && error.details.reason, 'app_missing', 'the UI can tell a missing app from a lock');
+  });
+  await check('an installed app that refuses FSB is told apart from a missing one', async () => {
+    const refusing = new OnePasswordBroker({
+      loadSdk: async () => makeSdk(items, { authError: 'connection refused by the desktop app' }).sdk,
+      configPath,
+      env: {},
+      ipcLibraryPresent: () => true,
+    });
+    const error = await rejects(refusing.listVaults(), 'onepassword_auth_failed');
+    assert.equal(error.details.reason, 'integration_off');
+    assert.match(error.message, /turn on Settings > Developer > Integrate with 1Password SDKs/);
+    assert.match(error.message, /connection refused by the desktop app/, 'what 1Password said is kept, since the reason is a guess');
+    assert.equal(refusing.status().lastError.code, 'onepassword_auth_failed');
+  });
+  await check('sign-in failure reasons', () => {
+    const present = () => true;
+    const absent = () => false;
+    const cases = [
+      ['desktop', 'Native library is not available.', absent, 'app_missing'],
+      ['desktop', 'anything at all', absent, 'app_missing'],
+      // A library that is there but fails to load is not a missing app.
+      ['desktop', 'Native library is not available.', present, 'unknown'],
+      ['desktop', 'IPC channel closed', present, 'integration_off'],
+      ['desktop', 'The desktop app integration is not enabled', present, 'integration_off'],
+      ['desktop', 'could not connect to 1Password', present, 'integration_off'],
+      ['desktop', 'The user declined the authorization request', present, 'declined'],
+      ['desktop', 'request was cancelled', present, 'declined'],
+      ['desktop', '1Password is locked', present, 'locked'],
+      ['desktop', 'no account found matching "work" (could not connect)', present, 'unknown'],
+      ['desktop', 'something new', present, 'unknown'],
+      ['service-account', 'connection refused', absent, 'unknown'],
+      ['service-account', 'session expired', absent, 'locked'],
+    ];
+    for (const [kind, message, library, expected] of cases) {
+      assert.equal(signInFailureReason(kind, message, library), expected, `${kind}: ${message}`);
+    }
+    let looked = false;
+    signInFailureReason('service-account', 'x', () => { looked = true; return false; });
+    assert.equal(looked, false, 'service accounts never need the desktop app');
+  });
+  await check('the 1Password app library paths match the installed SDK', () => {
+    // The SDK keeps this list private, so FSB carries a copy; this catches an
+    // SDK update that moves it.
+    const source = fs.readFileSync(path.join(__dirname, '..', 'mcp', 'node_modules', '@1password', 'sdk', 'dist', 'shared_lib_core.js'), 'utf8');
+    const slash = (value) => value.replace(/\\/g, '/');
+    for (const [platform, home] of [['darwin', '/Users/u'], ['linux', '/home/u'], ['win32', 'C:\\Users\\u']]) {
+      const start = source.indexOf(`case "${platform}"`);
+      assert.ok(start >= 0, `SDK has a ${platform} case`);
+      const block = source.slice(start, source.indexOf('break;', start));
+      const join = platform === 'win32' ? path.win32.join : path.posix.join;
+      const expected = [...block.matchAll(/(path\.join\(os\.homedir\(\),\s*)?"([^"]*op_sdk_ipc_client[^"]*)"/g)]
+        .map((found) => slash(found[1] ? join(home, found[2]) : found[2]));
+      assert.ok(expected.length > 0, `SDK lists ${platform} paths`);
+      assert.deepEqual(onePasswordIpcLibraryPaths(platform, home).map(slash), expected, platform);
+    }
+    assert.deepEqual(onePasswordIpcLibraryPaths('aix', '/home/u'), [], 'no app on other platforms');
   });
   await check('item refs are strict', () => {
     assert.deepEqual(parseItemRef('abc:def'), { vaultId: 'abc', itemId: 'def' });
     assert.equal(parseItemRef('abc:def:ghi'), null);
     assert.equal(parseItemRef('../x:y'), null);
+  });
+
+  console.log('\n--- vault scope ---');
+  const scopedItems = [
+    loginItem('vaultA', 'loginA', { title: 'Example', url: 'https://example.com', username: 'alice', password: 'pw-a' }),
+    loginItem('vaultB', 'loginPrivate', { title: 'Bank', url: 'https://bank.test', username: 'carol', password: 'pw-bank' }),
+    loginItem('vaultT', 'loginSent', { title: 'Sent', url: 'https://sent.test', username: 'dan', password: 'pw-sent' }),
+    loginItem('vaultU', 'loginOdd', { title: 'Odd', url: 'https://odd.test', username: 'erin', password: 'pw-odd' }),
+    cardItem('vaultB', 'cardB'),
+    cardItem('vaultT', 'cardT'),
+  ];
+  const scopedVaults = [
+    { id: 'vaultA', title: 'Shared', activeItemCount: 1, vaultType: 'userCreated' },
+    { id: 'vaultB', title: 'Personal', activeItemCount: 2, vaultType: 'personal' },
+    { id: 'vaultT', title: 'Transfer', activeItemCount: 2, vaultType: 'transfer' },
+    { id: 'vaultU', title: 'Odd', activeItemCount: 1, vaultType: 'unsupported' },
+  ];
+  async function scopedBroker(options = {}) {
+    const sdkFake = makeSdk(scopedItems, { vaults: options.vaults || scopedVaults });
+    const scopedPath = options.configPath || tempConfigPath();
+    const made = new OnePasswordBroker({
+      loadSdk: async () => sdkFake.sdk,
+      configPath: scopedPath,
+      env: {},
+      now: options.now,
+      ipcLibraryPresent: () => true,
+    });
+    if (options.signIn !== false) await made.configure({ authKind: 'desktop', accountName: 'me' });
+    return { broker: made, calls: sdkFake.calls, configPath: scopedPath };
+  }
+  const writeRaw = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value)}\n`, { mode: 0o600 });
+  const readRaw = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+
+  await check('every vault is read except transfer and unsupported vaults', async () => {
+    const { broker: all } = await scopedBroker();
+    assert.deepEqual((await all.listLogins()).map((login) => login.id).sort(), ['vaultA:loginA', 'vaultB:loginPrivate']);
+    assert.deepEqual((await all.listCards()).map((card) => card.id), ['vaultB:cardB']);
+    await rejects(all.resolveLogin({ url: 'https://sent.test' }), 'credential_not_found');
+    await rejects(all.resolveLogin({ url: 'https://sent.test', itemId: 'vaultT:loginSent' }), 'invalid_request');
+    await rejects(all.resolveCard({ itemId: 'vaultT:cardT' }), 'invalid_request');
+    assert.deepEqual(all.status().vaults.map((vault) => vault.id), ['vaultA', 'vaultB'], 'status names the vaults in scope');
+    assert.equal((await all.listVaults()).length, 4, 'the settings page still sees every vault');
+  });
+  await check('an item from any vault in scope can be addressed', async () => {
+    const { broker: all } = await scopedBroker();
+    const login = await all.resolveLogin({ url: 'https://bank.test', itemId: 'vaultB:loginPrivate' });
+    assert.equal(login.password, 'pw-bank');
+    assert.equal((await all.resolveCard({ itemId: 'vaultB:cardB' })).last4, '1111');
+  });
+  await check('the vault list is reused for a short while, not fetched for every lookup', async () => {
+    let clock = 5_000_000;
+    const { broker: all, calls } = await scopedBroker({ now: () => clock });
+    await all.listLogins();
+    await all.resolveLogin({ url: 'https://example.com' });
+    await all.resolveLogin({ url: 'https://bank.test' });
+    assert.equal(calls.vaultsList, 1);
+    clock += 31_000;
+    await all.resolveLogin({ url: 'https://example.com' });
+    assert.equal(calls.vaultsList, 2, 'a stale list is fetched again');
+  });
+  await check('a stored allowlist from before vault scopes stays a limit', async () => {
+    const legacyPath = tempConfigPath();
+    writeRaw(legacyPath, { version: 1, auth: { kind: 'desktop', accountName: 'me' }, vaultIds: ['vaultA'], saveVaultId: 'vaultA', updatedAt: 1 });
+    const { broker: legacy } = await scopedBroker({ configPath: legacyPath, signIn: false });
+    const status = legacy.status();
+    assert.equal(status.vaultScope, 'listed');
+    assert.deepEqual(status.vaultIds, ['vaultA']);
+    assert.equal(status.configured, true);
+    assert.equal(status.effectiveSaveVaultId, 'vaultA');
+    assert.deepEqual((await legacy.listLogins()).map((login) => login.id), ['vaultA:loginA']);
+    await legacy.configure({ authKind: 'desktop', accountName: 'me' });
+    assert.equal(legacy.status().vaultScope, 'listed', 'signing in again to the same account keeps the limit');
+    assert.equal(readRaw(legacyPath).saveVaultId, 'vaultA');
+  });
+  await check('the save vault is kept with every vault in scope', () => {
+    const all = normalizeOnePasswordConfig({ version: 1, auth: null, vaultScope: 'all', vaultIds: [], saveVaultId: 'vaultB', updatedAt: 1 });
+    assert.equal(all.saveVaultId, 'vaultB');
+    assert.equal(all.vaultScope, 'all');
+    const stray = normalizeOnePasswordConfig({ version: 1, vaultScope: 'all', vaultIds: ['vaultA'], saveVaultId: 'vaultB' });
+    assert.deepEqual(stray.vaultIds, [], 'every vault in scope means no allowlist');
+    assert.equal(stray.saveVaultId, 'vaultB');
+    const listed = normalizeOnePasswordConfig({ version: 1, vaultIds: ['vaultA'], saveVaultId: 'vaultB' });
+    assert.equal(listed.vaultScope, 'listed', 'no scope on file means the old allowlist');
+    assert.equal(listed.saveVaultId, null, 'with a limit the save vault must be inside it');
+  });
+  await check('the Personal vault becomes the save vault on the first list, and only then', async () => {
+    const { broker: all, configPath: allPath } = await scopedBroker();
+    assert.equal(all.status().effectiveSaveVaultId, null, 'nothing is chosen before 1Password lists vaults');
+    await all.listVaults();
+    assert.equal(all.status().saveVaultId, 'vaultB');
+    assert.equal(all.status().effectiveSaveVaultId, 'vaultB');
+    assert.equal(readRaw(allPath).saveVaultId, 'vaultB', 'the choice is saved for the next server start');
+    await all.configure({ saveVaultId: null });
+    await all.listVaults();
+    await all.listLogins();
+    assert.equal(all.status().saveVaultId, null, 'the user turning saving off is not undone');
+  });
+  await check('the first save on a fresh sign-in goes to the Personal vault', async () => {
+    const { broker: all, calls } = await scopedBroker();
+    const saved = await all.saveLogin({ url: 'https://new.test', username: 'u', password: 'p' });
+    assert.equal(saved.id, 'vaultB:new1');
+    assert.equal(calls.create[0].vaultId, 'vaultB');
+  });
+  await check('with no Personal vault the save vault stays unset', async () => {
+    const { broker: all } = await scopedBroker({ vaults: scopedVaults.filter((vault) => vault.vaultType !== 'personal') });
+    await all.listVaults();
+    assert.equal(all.status().saveVaultId, null);
+    await rejects(all.saveLogin({ url: 'https://new.test', username: 'u', password: 'p' }), 'onepassword_save_vault_missing');
+  });
+  await check('choosing a save vault is checked against the vaults 1Password lists', async () => {
+    const { broker: all, calls } = await scopedBroker();
+    await all.listVaults();
+    await assert.rejects(all.configure({ saveVaultId: 'vaultT' }), /can use/, 'a transfer vault is not in scope');
+    await assert.rejects(all.configure({ saveVaultId: 'missing1' }), /can use/);
+    await assert.rejects(all.configure({ saveVaultId: '../x' }), /invalid/);
+    assert.equal((await all.configure({ saveVaultId: 'vaultA' })).effectiveSaveVaultId, 'vaultA');
+    assert.equal(calls.createClient.length, 1, 'checking reuses the sign-in');
+  });
+  await check('without a signed-in client a save vault is accepted and checked on use', async () => {
+    const { broker: first, configPath: sharedPath } = await scopedBroker();
+    await first.configure({ saveVaultId: 'gone1' });
+    const { broker: cold, calls } = await scopedBroker({ configPath: sharedPath, signIn: false });
+    const status = await cold.configure({ saveVaultId: 'gone1' });
+    assert.equal(calls.createClient.length, 0, 'setting it never starts a sign-in');
+    assert.equal(status.effectiveSaveVaultId, 'gone1', 'trusted until a vault list says otherwise');
+    await rejects(cold.saveLogin({ url: 'https://new.test', username: 'u', password: 'p' }), 'onepassword_save_vault_missing');
+    assert.equal(cold.status().saveVaultId, 'gone1');
+    assert.equal(cold.status().effectiveSaveVaultId, null);
+  });
+  await check('vault scope settings', async () => {
+    const { broker: all, calls } = await scopedBroker();
+    await all.listLogins();
+    assert.equal((await all.configure({ vaultIds: ['vaultA'] })).vaultScope, 'listed');
+    assert.deepEqual((await all.listLogins()).map((login) => login.id), ['vaultA:loginA']);
+    const back = await all.configure({ vaultScope: 'all' });
+    assert.equal(back.vaultScope, 'all');
+    assert.deepEqual(back.vaultIds, []);
+    assert.equal((await all.listLogins()).length, 2);
+    await assert.rejects(all.configure({ vaultScope: 'all', vaultIds: ['vaultA'] }), /not both/);
+    await assert.rejects(all.configure({ vaultScope: 'everything' }), /scope/);
+    assert.equal((await all.configure({ vaultScope: 'listed' })).vaultScope, 'listed');
+    await rejects(all.listLogins(), 'onepassword_no_vaults');
+    assert.equal(calls.createClient.length, 1, 'none of this asks for a new approval');
+  });
+  await check('signing in to another account starts over with every vault', async () => {
+    const otherPath = tempConfigPath();
+    writeRaw(otherPath, { version: 1, auth: { kind: 'desktop', accountName: 'old' }, vaultIds: ['vaultA'], saveVaultId: 'vaultA', updatedAt: 1 });
+    const { broker: switched } = await scopedBroker({ configPath: otherPath, signIn: false });
+    const status = await switched.configure({ authKind: 'desktop', accountName: 'new' });
+    assert.equal(status.vaultScope, 'all');
+    assert.deepEqual(status.vaultIds, []);
+    assert.equal(status.saveVaultId, null);
+    await switched.listVaults();
+    assert.equal(switched.status().saveVaultId, 'vaultB');
+  });
+  await check('a sign-in that cannot see any readable vault says so', async () => {
+    const { broker: empty } = await scopedBroker({ vaults: [scopedVaults[2]] });
+    await rejects(empty.listLogins(), 'onepassword_no_vaults');
+  });
+
+  console.log('\n--- command line ---');
+  async function cli(flags, cliBroker) {
+    const out = [];
+    const err = [];
+    const write = process.stdout.write;
+    const writeErr = process.stderr.write;
+    process.stdout.write = (chunk) => { out.push(String(chunk)); return true; };
+    process.stderr.write = (chunk) => { err.push(String(chunk)); return true; };
+    try {
+      await runOnePasswordCommand(flags, cliBroker);
+    } finally {
+      process.stdout.write = write;
+      process.stderr.write = writeErr;
+    }
+    const failed = process.exitCode === 1;
+    process.exitCode = 0;
+    return { out: out.join(''), err: err.join(''), failed };
+  }
+  await check('the status names the vault scope', async () => {
+    const { broker: cliBroker } = await scopedBroker();
+    assert.match((await cli({}, cliBroker)).out, /Vaults: All vaults/);
+    assert.match((await cli({ allow: 'vaultA' }, cliBroker)).out, /Vaults: only vaultA\. Use --all-vaults/);
+    assert.equal(cliBroker.status().vaultScope, 'listed');
+    assert.match((await cli({ 'all-vaults': true }, cliBroker)).out, /Vaults: All vaults/);
+    assert.equal(cliBroker.status().vaultScope, 'all');
+    const both = await cli({ allow: 'vaultA', 'all-vaults': true }, cliBroker);
+    assert.equal(both.failed, true);
+    assert.match(both.err, /not both/);
+  });
+  await check('--vaults marks the vaults FSB uses and where it saves', async () => {
+    const { broker: cliBroker } = await scopedBroker();
+    const { out } = await cli({ vaults: true }, cliBroker);
+    assert.match(out, /^\* vaultA {2}Shared/m);
+    assert.match(out, /^\* vaultB {2}Personal \(2 items\) {2}\(new logins are saved here\)$/m);
+    assert.match(out, /^ {2}vaultT {2}Transfer/m, 'a transfer vault is not used');
   });
 
   console.log('\n--- ext request handler ---');
@@ -564,6 +848,17 @@ async function run() {
     assert.equal((await handleOnePasswordRequest(broker, { method: 'onepassword.export', payload: {} })).errorCode, 'invalid_request');
     const tokenAttempt = await handleOnePasswordRequest(broker, { method: 'onepassword.configure', payload: { authKind: 'service-account', token: 'ops_x' } });
     assert.equal(tokenAttempt.errorCode, 'invalid_request', 'tokens cannot be set over the bridge');
+  });
+  await check('the vault scope can be set over the bridge', async () => {
+    const { broker: bridged } = await scopedBroker();
+    const limited = await handleOnePasswordRequest(bridged, { method: 'onepassword.configure', payload: { vaultIds: ['vaultA'] } });
+    assert.equal(limited.ok, true);
+    assert.equal(limited.status.vaultScope, 'listed');
+    const all = await handleOnePasswordRequest(bridged, { method: 'onepassword.configure', payload: { vaultScope: 'all' } });
+    assert.equal(all.status.vaultScope, 'all');
+    assert.ok('effectiveSaveVaultId' in all.status);
+    const bad = await handleOnePasswordRequest(bridged, { method: 'onepassword.configure', payload: { vaultScope: 'all', vaultIds: ['vaultA'] } });
+    assert.equal(bad.errorCode, 'invalid_request');
   });
   await check('broker errors map to codes with candidates intact', async () => {
     const response = await handleOnePasswordRequest(broker, { method: 'onepassword.resolve-login', payload: { url: 'https://example.com', requireUnique: true } });

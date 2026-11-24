@@ -36,11 +36,27 @@ export type OnePasswordAuthConfig =
   | { kind: 'desktop'; accountName: string }
   | { kind: 'service-account'; token: string | null };
 
+/**
+ * Which vaults FSB reads. 'all' covers every vault the sign-in can see except
+ * transfer and unsupported ones. 'listed' covers vaultIds only. A config
+ * written before this setting existed has an allowlist and stays 'listed'.
+ */
+export type OnePasswordVaultScope = 'all' | 'listed';
+
 export interface OnePasswordConfig {
   version: 1;
   auth: OnePasswordAuthConfig | null;
+  vaultScope: OnePasswordVaultScope;
+  /** The allowlist. Always empty when vaultScope is 'all'. */
   vaultIds: string[];
   saveVaultId: string | null;
+  /**
+   * True before any sign-in and after a sign-in to a new desktop account. The
+   * first time the broker lists vaults with every vault in scope and no save
+   * vault, it picks the Personal vault and clears this, so a later "Do not
+   * save" from the user is never overridden.
+   */
+  pickPersonalSaveVault: boolean;
   updatedAt: number;
 }
 
@@ -52,8 +68,21 @@ export function getOnePasswordConfigPath(homeDir = homedir()): string {
   return join(homeDir, '.fsb', 'onepassword.json');
 }
 
+/** Settings for someone who has never connected: every vault, nothing saved yet. */
 export function emptyOnePasswordConfig(now = Date.now()): OnePasswordConfig {
-  return { version: 1, auth: null, vaultIds: [], saveVaultId: null, updatedAt: now };
+  return {
+    version: 1,
+    auth: null,
+    vaultScope: 'all',
+    vaultIds: [],
+    saveVaultId: null,
+    pickPersonalSaveVault: true,
+    updatedAt: now,
+  };
+}
+
+export function isVaultScope(value: unknown): value is OnePasswordVaultScope {
+  return value === 'all' || value === 'listed';
 }
 
 export function isValidVaultId(value: unknown): value is string {
@@ -98,15 +127,21 @@ export function normalizeOnePasswordConfig(value: unknown): OnePasswordConfig | 
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (record.version !== 1) return null;
-  const vaultIds = normalizeVaultIds(record.vaultIds);
-  const saveVaultId = isValidVaultId(record.saveVaultId) && vaultIds.includes(record.saveVaultId)
+  const vaultScope: OnePasswordVaultScope = record.vaultScope === 'all' ? 'all' : 'listed';
+  const vaultIds = vaultScope === 'all' ? [] : normalizeVaultIds(record.vaultIds);
+  // With every vault in scope there is no allowlist to check the save vault
+  // against here; the broker checks it against the vaults 1Password lists.
+  const saveVaultId = isValidVaultId(record.saveVaultId)
+    && (vaultScope === 'all' || vaultIds.includes(record.saveVaultId))
     ? record.saveVaultId
     : null;
   return {
     version: 1,
     auth: normalizeAuth(record.auth),
+    vaultScope,
     vaultIds,
     saveVaultId,
+    pickPersonalSaveVault: record.pickPersonalSaveVault === true,
     updatedAt: Number.isFinite(record.updatedAt) ? Number(record.updatedAt) : 0,
   };
 }

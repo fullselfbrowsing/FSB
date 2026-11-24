@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { posix, win32 } from 'node:path';
 import { FSB_MCP_VERSION } from '../version.js';
 import {
   bestWebsiteMatch,
@@ -16,10 +19,12 @@ import {
   isPlausibleServiceAccountToken,
   ONEPASSWORD_ACCOUNT_ENV,
   ONEPASSWORD_TOKEN_ENV,
+  isVaultScope,
   readOnePasswordConfig,
   removeOnePasswordConfig,
   writeOnePasswordConfig,
   type OnePasswordConfig,
+  type OnePasswordVaultScope,
 } from './config.js';
 
 /**
@@ -32,13 +37,19 @@ import {
  * what the extension chooses to project (ids, titles, hosts, usernames, last4).
  *
  * Guard rails:
- *   - Only vaults on the allowlist (configured by the user) are ever read.
+ *   - Only vaults in scope are read: every vault the sign-in can see except
+ *     transfer and unsupported ones, or the user's allowlist when they set one.
  *   - Logins are released only for a host one of their websites matches.
  *   - Item ids are composite "<vaultId>:<itemId>" and re-checked per call.
  */
 
 const INTEGRATION_NAME = 'FSB';
 const OVERVIEW_CACHE_TTL_MS = 30_000;
+// Reads with every vault in scope need the vault list; this keeps a burst of
+// lookups (list, resolve, fill) from asking 1Password for it each time.
+const VAULT_LIST_CACHE_TTL_MS = 30_000;
+// Vault types that never hold the user's logins or cards.
+const UNREADABLE_VAULT_TYPES = new Set(['transfer', 'unsupported']);
 const GET_ALL_CHUNK = 25;
 const MAX_LISTED_ITEMS = 500;
 const MAX_IMPORT_ENTRIES = 1000;
@@ -172,12 +183,23 @@ export interface ResolvedCard {
 }
 
 export interface BrokerStatus {
+  /** A sign-in is set. Which vaults it may read is vaultScope's job. */
   configured: boolean;
   authKind: 'desktop' | 'service-account' | null;
   accountName: string | null;
   tokenSource: 'env' | 'config' | null;
+  vaultScope: OnePasswordVaultScope;
+  /** The allowlist; empty when vaultScope is 'all'. */
   vaultIds: string[];
+  /** The stored choice, which may name a vault that is gone. */
   saveVaultId: string | null;
+  /**
+   * Where a new login would be saved: saveVaultId while it is still in scope.
+   * With every vault in scope this is checked against the last vault list; a
+   * server that has not listed vaults yet trusts the stored choice.
+   */
+  effectiveSaveVaultId: string | null;
+  /** Vaults in scope, with titles once 1Password has listed them. */
   vaults: Array<{ id: string; title: string }>;
   connection: 'idle' | 'connected' | 'error';
   lastError: { code: string; message: string } | null;
@@ -228,7 +250,11 @@ export interface OnePasswordBrokerOptions {
   configPath?: string;
   env?: NodeJS.ProcessEnv;
   now?: () => number;
+  /** Whether the 1Password app's SDK library is installed. Tests replace it. */
+  ipcLibraryPresent?: () => boolean;
 }
+
+export interface VaultSummary { id: string; title: string; itemCount: number; vaultType: string }
 
 async function defaultLoadSdk(): Promise<SdkModule> {
   // Indirect specifier keeps TypeScript from requiring the SDK's types at build
@@ -273,23 +299,104 @@ export function sanitizeSdkMessage(error: unknown): string {
     .slice(0, 240) || 'Unknown 1Password error';
 }
 
-function describeSignInFailure(kind: 'desktop' | 'service-account', message: string): string {
-  if (kind === 'desktop' && /native library|desktop app(lication)? (is )?not (found|running)|not available/i.test(message)) {
-    return 'The 1Password desktop app was not found. Install it, sign in, and turn on Settings > Developer > Integrate with other apps.';
+/**
+ * Where @1password/sdk 0.5.x looks for the 1Password app's SDK library
+ * (find1PasswordLibPath in dist/shared_lib_core.js, which it does not
+ * export). When none is there the SDK reports only "Native library is not
+ * available.", the same words it uses when the library fails to load, so the
+ * broker checks these paths itself to tell "1Password is not installed" from
+ * "1Password refused FSB". tests/onepassword-broker.test.js compares this list
+ * with the installed SDK, so an SDK update that moves the library fails there.
+ */
+export function onePasswordIpcLibraryPaths(platform: string = process.platform, home: string = homedir()): string[] {
+  switch (platform) {
+    case 'darwin':
+      return [
+        '/Applications/1Password.app/Contents/Frameworks/libop_sdk_ipc_client.dylib',
+        posix.join(home, '/Applications/1Password.app/Contents/Frameworks/libop_sdk_ipc_client.dylib'),
+      ];
+    case 'linux':
+      return [
+        '/usr/bin/1password/libop_sdk_ipc_client.so',
+        '/opt/1Password/libop_sdk_ipc_client.so',
+        '/snap/bin/1password/libop_sdk_ipc_client.so',
+      ];
+    case 'win32':
+      return [
+        win32.join(home, '/AppData/Local/1Password/op_sdk_ipc_client.dll'),
+        'C:/Program Files/1Password/app/8/op_sdk_ipc_client.dll',
+        'C:/Program Files (x86)/1Password/app/8/op_sdk_ipc_client.dll',
+        win32.join(home, '/AppData/Local/1Password/app/8/op_sdk_ipc_client.dll'),
+      ];
+    default:
+      return [];
   }
-  if (kind === 'desktop' && /denied|declined|rejected|cancel/i.test(message)) {
-    return 'The request was declined in the 1Password app.';
-  }
-  return message;
 }
 
-// Why a sign-in failed, for the UI: the code stays onepassword_auth_failed and
-// this detail tells "locked", "declined" and "app not found" apart.
-function signInFailureReason(kind: 'desktop' | 'service-account', message: string): 'app_missing' | 'declined' | 'locked' | 'other' {
-  if (kind === 'desktop' && /native library|desktop app(lication)? (is )?not (found|running)|not available/i.test(message)) return 'app_missing';
-  if (kind === 'desktop' && /denied|declined|rejected|cancel/i.test(message)) return 'declined';
-  if (/locked|session expired|unlock/i.test(message)) return 'locked';
-  return 'other';
+export function isOnePasswordIpcLibraryPresent(): boolean {
+  return onePasswordIpcLibraryPaths().some((candidate) => existsSync(candidate));
+}
+
+/**
+ * Why a sign-in failed, for the UI. The code stays onepassword_auth_failed and
+ * this detail picks the next step:
+ *   app_missing     no 1Password app on this computer: offer the download.
+ *   integration_off the app is installed but refused or closed the channel,
+ *                   which is what it does while "Integrate with 1Password
+ *                   SDKs" is off: open Settings > Developer.
+ *   declined        the user said no in the approval prompt.
+ *   locked          1Password is locked or the session ended.
+ *   unknown         anything else; the message says what 1Password said.
+ */
+export type SignInFailureReason = 'app_missing' | 'integration_off' | 'declined' | 'locked' | 'unknown';
+
+export const ONEPASSWORD_SDK_TOGGLE = 'Settings > Developer > Integrate with 1Password SDKs';
+
+// 1Password does not document its refusal messages, so these lean toward
+// matching. A wrong guess only changes which hint the user sees first.
+const DECLINED_TEXT = /denied|declined|rejected|cancel/i;
+const LOCKED_TEXT = /locked|session expired|unlock/i;
+const INTEGRATION_OFF_TEXT = /integrat|not enabled|disabled|turn(ed)? on|refus|closed|connect|channel|\bipc\b|pipe|socket|not running|unreachable/i;
+// A wrong account name is not a closed channel, even if the words overlap.
+const UNKNOWN_ACCOUNT_TEXT = /no (such |matching )?account|account[^.]*\b(not found|unknown|does not exist|not recogni[sz]ed)/i;
+
+export function signInFailureReason(
+  kind: 'desktop' | 'service-account',
+  message: string,
+  ipcLibraryPresent: () => boolean = isOnePasswordIpcLibraryPresent,
+): SignInFailureReason {
+  if (kind === 'desktop' && !ipcLibraryPresent()) return 'app_missing';
+  if (kind === 'desktop' && DECLINED_TEXT.test(message)) return 'declined';
+  if (LOCKED_TEXT.test(message)) return 'locked';
+  if (kind === 'desktop' && !UNKNOWN_ACCOUNT_TEXT.test(message) && INTEGRATION_OFF_TEXT.test(message)) {
+    return 'integration_off';
+  }
+  return 'unknown';
+}
+
+function describeSignInFailure(reason: SignInFailureReason, message: string): string {
+  switch (reason) {
+    case 'app_missing':
+      return `The 1Password desktop app was not found. Install it, sign in, and turn on ${ONEPASSWORD_SDK_TOGGLE}.`;
+    case 'integration_off':
+      // The raw text stays at the end because the reason is a best guess.
+      return `The 1Password app did not let FSB connect. In 1Password, turn on ${ONEPASSWORD_SDK_TOGGLE}, then try again. 1Password said: ${message}`;
+    case 'declined':
+      return 'The request was declined in the 1Password app.';
+    default:
+      return message;
+  }
+}
+
+function sessionKeyOf(config: OnePasswordConfig): string | null {
+  if (!config.auth) return null;
+  return config.auth.kind === 'desktop'
+    ? `desktop:${config.auth.accountName}`
+    : `service:${(config.auth.token || '').slice(-12)}`;
+}
+
+function isReadableVault(vault: { vaultType: string }): boolean {
+  return !UNREADABLE_VAULT_TYPES.has(vault.vaultType.toLowerCase());
 }
 
 function errorName(error: unknown): string {
@@ -424,25 +531,35 @@ export class OnePasswordBroker {
   private readonly configPath: string;
   private readonly env: NodeJS.ProcessEnv;
   private readonly now: () => number;
+  private readonly ipcLibraryPresent: () => boolean;
   private sdk: SdkModule | null = null;
   private client: Promise<SdkClient> | null = null;
   private clientKey: string | null = null;
+  /** The signed-in client once its sign-in finished, so checks can skip waiting on one. */
+  private liveClient: SdkClient | null = null;
   private connection: BrokerStatus['connection'] = 'idle';
   private lastError: BrokerStatus['lastError'] = null;
   private vaultTitles = new Map<string, string>();
   private overviewCache = new Map<string, { at: number; items: SdkItemOverview[] }>();
+  /** The last vault list 1Password returned, and for which sign-in. */
+  private vaultList: { key: string; at: number; vaults: VaultSummary[] } | null = null;
 
   constructor(options: OnePasswordBrokerOptions = {}) {
     this.loadSdk = options.loadSdk ?? defaultLoadSdk;
     this.configPath = options.configPath ?? getOnePasswordConfigPath();
     this.env = options.env ?? process.env;
     this.now = options.now ?? Date.now;
+    this.ipcLibraryPresent = options.ipcLibraryPresent ?? isOnePasswordIpcLibraryPresent;
   }
 
   // ----- configuration ------------------------------------------------------
 
   readConfig(): OnePasswordConfig {
-    const stored = readOnePasswordConfig(this.configPath) ?? emptyOnePasswordConfig(0);
+    return this.withEnvironment(readOnePasswordConfig(this.configPath) ?? emptyOnePasswordConfig(0));
+  }
+
+  /** A stored config with the sign-in the environment supplies, if any. */
+  private withEnvironment(stored: OnePasswordConfig): OnePasswordConfig {
     const envAccount = this.env[ONEPASSWORD_ACCOUNT_ENV];
     const envToken = this.env[ONEPASSWORD_TOKEN_ENV];
     if (isPlausibleServiceAccountToken(envToken)) {
@@ -468,37 +585,69 @@ export class OnePasswordBroker {
 
   status(): BrokerStatus {
     const config = this.readConfig();
+    const listed = this.lastVaultList(config);
+    const readable = listed ? listed.filter(isReadableVault) : null;
     return {
-      configured: this.authReady(config) && config.vaultIds.length > 0,
+      configured: this.authReady(config),
       authKind: config.auth?.kind ?? null,
       accountName: config.auth?.kind === 'desktop' ? config.auth.accountName : null,
       tokenSource: config.auth?.kind === 'service-account' ? this.tokenSource() : null,
+      vaultScope: config.vaultScope,
       vaultIds: [...config.vaultIds],
       saveVaultId: config.saveVaultId,
-      vaults: config.vaultIds.map((id) => ({ id, title: this.vaultTitles.get(id) ?? '' })),
+      effectiveSaveVaultId: this.effectiveSaveVaultId(config, readable ? readable.map((vault) => vault.id) : null),
+      vaults: config.vaultScope === 'all'
+        ? (readable ?? []).map((vault) => ({ id: vault.id, title: vault.title }))
+        : config.vaultIds.map((id) => ({ id, title: this.vaultTitles.get(id) ?? '' })),
       connection: this.connection,
       lastError: this.lastError,
     };
   }
 
   /**
+   * The save vault while it is still in scope. `readableIds` is the vault
+   * list for scope 'all', or null when this server has not listed vaults yet
+   * (the stored choice is then trusted and checked again on use).
+   */
+  private effectiveSaveVaultId(config: OnePasswordConfig, readableIds: string[] | null): string | null {
+    const id = config.saveVaultId;
+    if (!id) return null;
+    if (config.vaultScope === 'listed') return config.vaultIds.includes(id) ? id : null;
+    return readableIds && !readableIds.includes(id) ? null : id;
+  }
+
+  /**
    * Update non-secret settings. Service-account tokens are deliberately not
    * accepted here: they are set from the CLI or the environment only.
+   *
+   * Vault scope: a non-empty vaultIds limits FSB to those vaults ('listed');
+   * vaultScope 'all' clears the list. A sign-in to a different desktop account
+   * starts over with every vault in scope and the Personal vault as the save
+   * vault, because vault ids belong to one account.
    */
-  configure(input: {
+  async configure(input: {
     authKind?: unknown;
     accountName?: unknown;
     vaultIds?: unknown;
     saveVaultId?: unknown;
-  }): BrokerStatus {
+    vaultScope?: unknown;
+  }): Promise<BrokerStatus> {
     const stored = readOnePasswordConfig(this.configPath) ?? emptyOnePasswordConfig();
-    const next: OnePasswordConfig = { ...stored, updatedAt: this.now() };
+    const next: OnePasswordConfig = { ...stored, vaultIds: [...stored.vaultIds], updatedAt: this.now() };
 
     if (input.authKind === 'desktop') {
       if (!isValidAccountName(input.accountName)) {
         throw new BrokerError('invalid_request', 'Enter the 1Password account name shown in the desktop app sidebar');
       }
-      next.auth = { kind: 'desktop', accountName: input.accountName.trim() };
+      const accountName = input.accountName.trim();
+      const sameAccount = stored.auth?.kind === 'desktop' && stored.auth.accountName === accountName;
+      next.auth = { kind: 'desktop', accountName };
+      if (!sameAccount) {
+        next.vaultScope = 'all';
+        next.vaultIds = [];
+        next.saveVaultId = null;
+        next.pickPersonalSaveVault = true;
+      }
     } else if (input.authKind === 'service-account') {
       const token = stored.auth?.kind === 'service-account' ? stored.auth.token : null;
       next.auth = { kind: 'service-account', token };
@@ -506,25 +655,56 @@ export class OnePasswordBroker {
       throw new BrokerError('invalid_request', 'Unknown 1Password sign-in method');
     }
 
+    if (input.vaultScope !== undefined && !isVaultScope(input.vaultScope)) {
+      throw new BrokerError('invalid_request', 'Unknown 1Password vault scope');
+    }
     if (input.vaultIds !== undefined) {
       if (!Array.isArray(input.vaultIds) || !input.vaultIds.every(isValidVaultId)) {
         throw new BrokerError('invalid_request', 'Vault ids are invalid');
       }
-      next.vaultIds = [...new Set(input.vaultIds as string[])].slice(0, 32);
+      const ids = [...new Set(input.vaultIds as string[])].slice(0, 32);
+      if (ids.length > 0 && input.vaultScope === 'all') {
+        throw new BrokerError('invalid_request', 'Choose every vault or a list of vaults, not both');
+      }
+      next.vaultIds = ids;
+      if (ids.length > 0) next.vaultScope = 'listed';
     }
+    if (input.vaultScope === 'all') {
+      next.vaultScope = 'all';
+      next.vaultIds = [];
+    } else if (input.vaultScope === 'listed') {
+      next.vaultScope = 'listed';
+    }
+
     if (input.saveVaultId !== undefined) {
+      next.pickPersonalSaveVault = false;
       if (input.saveVaultId === null || input.saveVaultId === '') {
         next.saveVaultId = null;
-      } else if (isValidVaultId(input.saveVaultId) && next.vaultIds.includes(input.saveVaultId)) {
+      } else if (!isValidVaultId(input.saveVaultId)) {
+        throw new BrokerError('invalid_request', 'Vault ids are invalid');
+      } else if (next.vaultScope === 'listed') {
+        if (!next.vaultIds.includes(input.saveVaultId)) {
+          throw new BrokerError('invalid_request', 'The save vault must be one of the allowed vaults');
+        }
         next.saveVaultId = input.saveVaultId;
       } else {
-        throw new BrokerError('invalid_request', 'The save vault must be one of the allowed vaults');
+        const visible = await this.visibleVaultIdsNow(this.withEnvironment(next));
+        if (visible && !visible.includes(input.saveVaultId)) {
+          throw new BrokerError('invalid_request', 'The save vault must be a vault this 1Password sign-in can use');
+        }
+        next.saveVaultId = input.saveVaultId;
       }
     }
-    if (next.saveVaultId && !next.vaultIds.includes(next.saveVaultId)) next.saveVaultId = null;
+    if (next.vaultScope === 'listed' && next.saveVaultId && !next.vaultIds.includes(next.saveVaultId)) {
+      next.saveVaultId = null;
+    }
 
     writeOnePasswordConfig(next, this.configPath);
-    this.resetClient();
+    // Vault settings change what is read, not who signs in, so the session
+    // (and the user's approval of it) survives them.
+    if (sessionKeyOf(this.withEnvironment(stored)) !== sessionKeyOf(this.withEnvironment(next))) {
+      this.resetClient();
+    }
     return this.status();
   }
 
@@ -539,7 +719,10 @@ export class OnePasswordBroker {
       auth: { kind: 'service-account', token: token.trim() },
       updatedAt: this.now(),
     };
-    if (vaultIds) next.vaultIds = vaultIds.filter(isValidVaultId);
+    if (vaultIds) {
+      next.vaultIds = vaultIds.filter(isValidVaultId);
+      if (next.vaultIds.length > 0) next.vaultScope = 'listed';
+    }
     writeOnePasswordConfig(next, this.configPath);
     this.resetClient();
   }
@@ -555,19 +738,19 @@ export class OnePasswordBroker {
   private resetClient(): void {
     this.client = null;
     this.clientKey = null;
+    this.liveClient = null;
     this.overviewCache.clear();
+    this.vaultList = null;
   }
 
   // ----- client lifecycle ---------------------------------------------------
 
   /** The shared sign-in for this config, started if none is running. */
   private session(config: OnePasswordConfig): Promise<SdkClient> {
-    if (!this.authReady(config) || !config.auth) {
+    const key = sessionKeyOf(config);
+    if (!this.authReady(config) || !config.auth || !key) {
       return Promise.reject(new BrokerError('onepassword_not_configured', 'Connect 1Password in FSB settings first'));
     }
-    const key = config.auth.kind === 'desktop'
-      ? `desktop:${config.auth.accountName}`
-      : `service:${(config.auth.token || '').slice(-12)}`;
     if (this.client && this.clientKey === key) return this.client;
 
     // Stored before the first await, so requests that arrive while the SDK
@@ -577,7 +760,10 @@ export class OnePasswordBroker {
     this.clientKey = key;
     this.client = pending;
     // A failed sign-in is not reused. Callers still see the rejection.
-    pending.catch(() => this.dropSession(pending));
+    pending.then(
+      (client) => { if (this.client === pending) this.liveClient = client; },
+      () => this.dropSession(pending),
+    );
     return pending;
   }
 
@@ -611,11 +797,10 @@ export class OnePasswordBroker {
       return client;
     } catch (error) {
       const raw = sanitizeSdkMessage(error);
-      const message = describeSignInFailure(auth.kind, raw);
+      const reason = signInFailureReason(auth.kind, raw, this.ipcLibraryPresent);
+      const message = describeSignInFailure(reason, raw);
       this.noteError('onepassword_auth_failed', message);
-      throw new BrokerError('onepassword_auth_failed', `1Password sign-in failed: ${message}`, {
-        reason: signInFailureReason(auth.kind, raw),
-      });
+      throw new BrokerError('onepassword_auth_failed', `1Password sign-in failed: ${message}`, { reason });
     }
   }
 
@@ -656,16 +841,112 @@ export class OnePasswordBroker {
     throw new BrokerError('onepassword_auth_failed', '1Password session expired', { reason: 'locked' });
   }
 
-  private requireVaults(config: OnePasswordConfig): string[] {
-    if (config.vaultIds.length === 0) {
-      throw new BrokerError('onepassword_no_vaults', 'Choose which 1Password vaults FSB may use');
-    }
-    return config.vaultIds;
+  // ----- vaults in scope ----------------------------------------------------
+
+  /** Ask 1Password for the vault list and remember it for this sign-in. */
+  private async fetchVaults(client: SdkClient, config: OnePasswordConfig): Promise<VaultSummary[]> {
+    const vaults = await client.vaults.list({ decryptDetails: true });
+    const list = (Array.isArray(vaults) ? vaults : []).map((vault) => ({
+      id: String(vault.id),
+      title: clip(vault.title, 200),
+      itemCount: Number.isFinite(vault.activeItemCount) ? Number(vault.activeItemCount) : 0,
+      // personal, everyone, transfer, userCreated: tells the UI which vault
+      // is the user's own and which are shared before access is granted.
+      vaultType: typeof vault.vaultType === 'string' ? clip(vault.vaultType, 40) : '',
+    })).filter((vault) => isValidVaultId(vault.id));
+    for (const vault of list) this.vaultTitles.set(vault.id, vault.title);
+    const key = sessionKeyOf(config);
+    if (key) this.vaultList = { key, at: this.now(), vaults: list };
+    return list;
   }
 
-  private requireAllowedRef(config: OnePasswordConfig, ref: unknown): { vaultId: string; itemId: string } {
+  /** The last vault list for this config's sign-in, however old. */
+  private lastVaultList(config: OnePasswordConfig): VaultSummary[] | null {
+    const key = sessionKeyOf(config);
+    return key && this.vaultList?.key === key ? this.vaultList.vaults : null;
+  }
+
+  /**
+   * The vault ids FSB reads for this config: the allowlist, or with every
+   * vault in scope each vault 1Password lists except transfer and unsupported
+   * ones. May set the save vault (see adoptPersonalSaveVault).
+   */
+  private async vaultsFor(client: SdkClient, config: OnePasswordConfig): Promise<string[]> {
+    if (config.vaultScope === 'listed') {
+      if (config.vaultIds.length === 0) {
+        throw new BrokerError('onepassword_no_vaults', 'Choose which 1Password vaults FSB may use');
+      }
+      return config.vaultIds;
+    }
+    const cached = this.vaultList;
+    const list = cached && cached.key === sessionKeyOf(config) && this.now() - cached.at < VAULT_LIST_CACHE_TTL_MS
+      ? cached.vaults
+      : await this.fetchVaults(client, config);
+    this.adoptPersonalSaveVault(config, list);
+    const ids = list.filter(isReadableVault).map((vault) => vault.id);
+    if (ids.length === 0) {
+      throw new BrokerError('onepassword_no_vaults', 'This 1Password sign-in has no vault FSB can read');
+    }
+    return ids;
+  }
+
+  /**
+   * After a new desktop sign-in with every vault in scope, the first vault
+   * list sets the save vault to the user's Personal vault, once. With no
+   * Personal vault (a service account, or a business policy) it stays unset
+   * and the settings page asks. `config` is the caller's own copy and is
+   * updated so the rest of the request sees the choice.
+   */
+  private adoptPersonalSaveVault(config: OnePasswordConfig, vaults: VaultSummary[]): void {
+    if (config.vaultScope !== 'all' || config.saveVaultId || !config.pickPersonalSaveVault) return;
+    try {
+      const stored = readOnePasswordConfig(this.configPath) ?? emptyOnePasswordConfig(this.now());
+      const current = this.withEnvironment(stored);
+      // The settings changed since this request started: leave them alone.
+      if (current.vaultScope !== 'all' || !current.pickPersonalSaveVault
+        || sessionKeyOf(current) !== sessionKeyOf(config)) {
+        config.pickPersonalSaveVault = false;
+        if (current.saveVaultId && sessionKeyOf(current) === sessionKeyOf(config)) config.saveVaultId = current.saveVaultId;
+        return;
+      }
+      const personal = vaults.find((vault) => vault.vaultType.toLowerCase() === 'personal');
+      writeOnePasswordConfig({
+        ...stored,
+        saveVaultId: personal ? personal.id : null,
+        pickPersonalSaveVault: false,
+        updatedAt: this.now(),
+      }, this.configPath);
+      config.saveVaultId = personal ? personal.id : null;
+      config.pickPersonalSaveVault = false;
+    } catch {
+      // Not saved; the next vault list tries again.
+    }
+  }
+
+  /**
+   * Vault ids to check a save-vault choice against, without starting a
+   * sign-in or waiting on one: the cached list, or a fresh one from a client
+   * that is already signed in for this config. Null means "cannot tell now";
+   * the choice is then checked again when something is saved.
+   */
+  private async visibleVaultIdsNow(config: OnePasswordConfig): Promise<string[] | null> {
+    const key = sessionKeyOf(config);
+    if (!key) return null;
+    const cached = this.vaultList;
+    if (cached && cached.key === key && this.now() - cached.at < VAULT_LIST_CACHE_TTL_MS) {
+      return cached.vaults.filter(isReadableVault).map((vault) => vault.id);
+    }
+    if (!this.liveClient || this.clientKey !== key) return null;
+    try {
+      return (await this.fetchVaults(this.liveClient, config)).filter(isReadableVault).map((vault) => vault.id);
+    } catch {
+      return null;
+    }
+  }
+
+  private requireAllowedRef(vaultIds: string[], ref: unknown): { vaultId: string; itemId: string } {
     const parsed = parseItemRef(ref);
-    if (!parsed || !config.vaultIds.includes(parsed.vaultId)) {
+    if (!parsed || !vaultIds.includes(parsed.vaultId)) {
       throw new BrokerError('invalid_request', 'Unknown item id');
     }
     return parsed;
@@ -694,18 +975,11 @@ export class OnePasswordBroker {
 
   // ----- operations ---------------------------------------------------------
 
-  async listVaults(): Promise<Array<{ id: string; title: string; itemCount: number; vaultType: string }>> {
-    return this.withClient(async (client) => {
-      const vaults = await client.vaults.list({ decryptDetails: true });
-      const list = (Array.isArray(vaults) ? vaults : []).map((vault) => ({
-        id: String(vault.id),
-        title: clip(vault.title, 200),
-        itemCount: Number.isFinite(vault.activeItemCount) ? Number(vault.activeItemCount) : 0,
-        // personal, everyone, transfer, userCreated: tells the UI which vault
-        // is the user's own and which are shared before access is granted.
-        vaultType: typeof vault.vaultType === 'string' ? clip(vault.vaultType, 40) : '',
-      })).filter((vault) => isValidVaultId(vault.id));
-      for (const vault of list) this.vaultTitles.set(vault.id, vault.title);
+  /** Every vault the sign-in can see, in scope or not, for the settings page. */
+  async listVaults(): Promise<VaultSummary[]> {
+    return this.withClient(async (client, config) => {
+      const list = await this.fetchVaults(client, config);
+      this.adoptPersonalSaveVault(config, list);
       return list;
     });
   }
@@ -713,7 +987,7 @@ export class OnePasswordBroker {
   async listLogins(): Promise<LoginSummary[]> {
     return this.withClient(async (client, config) => {
       const results: LoginSummary[] = [];
-      for (const vaultId of this.requireVaults(config)) {
+      for (const vaultId of await this.vaultsFor(client, config)) {
         const logins = (await this.overviews(client, vaultId)).filter((item) => item.category === 'Login');
         const items = await this.getMany(client, vaultId, logins.slice(0, MAX_LISTED_ITEMS).map((item) => item.id));
         for (const item of items) {
@@ -742,9 +1016,9 @@ export class OnePasswordBroker {
     const target = parseHostTarget(input.url);
     if (!target) throw new BrokerError('invalid_request', 'A page URL is required');
     return this.withClient(async (client, config) => {
-      const vaults = this.requireVaults(config);
+      const vaults = await this.vaultsFor(client, config);
       const requested = input.itemId !== undefined && input.itemId !== null && input.itemId !== ''
-        ? this.requireAllowedRef(config, input.itemId)
+        ? this.requireAllowedRef(vaults, input.itemId)
         : null;
 
       const candidates: Array<{ overview: SdkItemOverview; vaultId: string; match: MatchStrength }> = [];
@@ -829,7 +1103,7 @@ export class OnePasswordBroker {
   async listCards(): Promise<CardSummary[]> {
     return this.withClient(async (client, config) => {
       const results: CardSummary[] = [];
-      for (const vaultId of this.requireVaults(config)) {
+      for (const vaultId of await this.vaultsFor(client, config)) {
         const cards = (await this.overviews(client, vaultId)).filter((item) => item.category === 'CreditCard');
         for (const item of await this.getMany(client, vaultId, cards.slice(0, MAX_LISTED_ITEMS).map((card) => card.id))) {
           const fields = extractCardFields(item);
@@ -855,8 +1129,7 @@ export class OnePasswordBroker {
     item: SdkItem;
     fields: Omit<ResolvedCard, 'id' | 'title'>;
   }> {
-    this.requireVaults(config);
-    const ref = this.requireAllowedRef(config, itemId);
+    const ref = this.requireAllowedRef(await this.vaultsFor(client, config), itemId);
     let item: SdkItem;
     try {
       item = await client.items.get(ref.vaultId, ref.itemId);
@@ -907,7 +1180,7 @@ export class OnePasswordBroker {
     const password = clip(input.password);
     if (!username && !password) throw new BrokerError('invalid_request', 'Nothing to save');
     return this.withClient(async (client, config) => {
-      const vaultId = this.requireSaveVault(config);
+      const vaultId = await this.requireSaveVault(client, config);
       const created = await client.items.create(this.loginCreateParams(vaultId, {
         // Record the page's own scheme: an http page saved as https:// would
         // never be offered this login again.
@@ -931,7 +1204,7 @@ export class OnePasswordBroker {
     const startedAt = this.now();
     const outOfTime = (): boolean => this.now() - startedAt >= IMPORT_TIME_LIMIT_MS;
     return this.withClient(async (client, config, retire) => {
-      const vaultId = this.requireSaveVault(config);
+      const vaultId = await this.requireSaveVault(client, config);
       const result: LegacyImportResult = {
         logins: { imported: 0, failed: 0 },
         cards: { imported: 0, failed: 0 },
@@ -1019,12 +1292,13 @@ export class OnePasswordBroker {
     });
   }
 
-  private requireSaveVault(config: OnePasswordConfig): string {
-    this.requireVaults(config);
-    if (!config.saveVaultId || !config.vaultIds.includes(config.saveVaultId)) {
+  private async requireSaveVault(client: SdkClient, config: OnePasswordConfig): Promise<string> {
+    const readable = await this.vaultsFor(client, config);
+    const vaultId = this.effectiveSaveVaultId(config, readable);
+    if (!vaultId) {
       throw new BrokerError('onepassword_save_vault_missing', 'Choose a 1Password vault for FSB to save new items into');
     }
-    return config.saveVaultId;
+    return vaultId;
   }
 
   private loginCreateParams(vaultId: string, entry: {

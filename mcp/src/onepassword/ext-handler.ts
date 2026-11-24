@@ -53,10 +53,10 @@ export async function handleOnePasswordRequest(
         return { ok: true, status: broker.status() };
 
       case 'onepassword.configure':
-        if (!onlyKeys(payload, ['authKind', 'accountName', 'vaultIds', 'saveVaultId'])) {
+        if (!onlyKeys(payload, ['authKind', 'accountName', 'vaultIds', 'saveVaultId', 'vaultScope'])) {
           return fail('invalid_request', 'Unexpected 1Password settings');
         }
-        return { ok: true, status: broker.configure(payload) };
+        return { ok: true, status: await broker.configure(payload) };
 
       case 'onepassword.list-vaults':
         return { ok: true, vaults: await broker.listVaults() };

@@ -8,7 +8,8 @@ export const ONEPASSWORD_HELP = `  fsb-mcp-server onepassword                   
   fsb-mcp-server onepassword --service-account   Use a service account token (prompted, or ${ONEPASSWORD_TOKEN_ENV})
   fsb-mcp-server onepassword --vaults            List vaults the signed-in account can see
   fsb-mcp-server onepassword --allow <id,id>     Limit FSB to these vaults
-  fsb-mcp-server onepassword --save-vault <id>   Vault where FSB saves new logins
+  fsb-mcp-server onepassword --all-vaults        Let FSB use every vault again (the default)
+  fsb-mcp-server onepassword --save-vault <id>   Vault where FSB saves new logins ("none" to stop saving)
   fsb-mcp-server onepassword --reset             Forget FSB's 1Password settings`;
 
 function describeStatus(status: BrokerStatus): string {
@@ -20,10 +21,20 @@ function describeStatus(status: BrokerStatus): string {
   } else {
     lines.push(`Sign-in: service account (${status.tokenSource ? `token from ${status.tokenSource}` : 'no token stored'})`);
   }
-  lines.push(status.vaultIds.length
-    ? `Allowed vaults: ${status.vaultIds.join(', ')}`
-    : 'Allowed vaults: none yet. Run --vaults, then --allow <id>.');
-  lines.push(`Save vault: ${status.saveVaultId ?? 'not set (FSB will not save new logins)'}`);
+  if (status.vaultScope === 'all') {
+    lines.push('Vaults: All vaults this sign-in can see, except transfer vaults. Use --allow <id,id> to limit FSB.');
+  } else if (status.vaultIds.length) {
+    lines.push(`Vaults: only ${status.vaultIds.join(', ')}. Use --all-vaults to allow every vault.`);
+  } else {
+    lines.push('Vaults: none allowed. Run --vaults, then --allow <id>, or use --all-vaults.');
+  }
+  if (status.saveVaultId) {
+    lines.push(`Save vault: ${status.saveVaultId}`);
+  } else if (status.vaultScope === 'all' && status.authKind === 'desktop') {
+    lines.push('Save vault: not set. FSB picks your Personal vault the first time it lists your vaults, or use --save-vault <id>.');
+  } else {
+    lines.push('Save vault: not set (FSB will not save new logins)');
+  }
   lines.push(`Ready: ${status.configured ? 'yes' : 'no'}`);
   return `${lines.join('\n')}\n`;
 }
@@ -79,8 +90,12 @@ export async function runOnePasswordCommand(
       return;
     }
 
+    if (flags.allow !== undefined && flags['all-vaults'] !== undefined) {
+      throw new BrokerError('invalid_request', 'Pass --allow <id,id> or --all-vaults, not both');
+    }
+
     if (typeof flags.desktop === 'string') {
-      broker.configure({ authKind: 'desktop', accountName: flags.desktop });
+      await broker.configure({ authKind: 'desktop', accountName: flags.desktop });
     } else if (flags.desktop === true) {
       throw new BrokerError('invalid_request', 'Pass the account name shown at the top of the 1Password sidebar: --desktop <account>');
     }
@@ -96,12 +111,18 @@ export async function runOnePasswordCommand(
     if (flags.allow !== undefined) {
       const ids = parseVaultList(flags.allow);
       if (!ids) throw new BrokerError('invalid_request', 'Pass vault ids separated by commas: --allow <id,id>');
-      broker.configure({ vaultIds: ids });
+      await broker.configure({ vaultIds: ids });
+    }
+
+    if (flags['all-vaults'] === true) {
+      await broker.configure({ vaultScope: 'all' });
+    } else if (flags['all-vaults'] !== undefined) {
+      throw new BrokerError('invalid_request', '--all-vaults takes no value');
     }
 
     if (flags['save-vault'] !== undefined) {
       const id = typeof flags['save-vault'] === 'string' ? flags['save-vault'].trim() : '';
-      broker.configure({ saveVaultId: id === 'none' ? null : id });
+      await broker.configure({ saveVaultId: id === 'none' ? null : id });
     }
 
     if (flags.vaults === true) {
@@ -111,11 +132,15 @@ export async function runOnePasswordCommand(
       } else if (vaults.length === 0) {
         process.stdout.write('No vaults are visible to this 1Password sign-in.\n');
       } else {
-        const allowed = new Set(broker.status().vaultIds);
+        const status = broker.status();
+        const allowed = new Set(status.vaultScope === 'all' ? status.vaults.map((vault) => vault.id) : status.vaultIds);
         for (const vault of vaults) {
-          process.stdout.write(`${allowed.has(vault.id) ? '*' : ' '} ${vault.id}  ${vault.title} (${vault.itemCount} items)\n`);
+          const saves = vault.id === status.effectiveSaveVaultId ? '  (new logins are saved here)' : '';
+          process.stdout.write(`${allowed.has(vault.id) ? '*' : ' '} ${vault.id}  ${vault.title} (${vault.itemCount} items)${saves}\n`);
         }
-        process.stdout.write('* = allowed for FSB\n');
+        process.stdout.write(status.vaultScope === 'all'
+          ? '* = used by FSB (all vaults except transfer vaults)\n'
+          : '* = allowed for FSB\n');
       }
       return;
     }
