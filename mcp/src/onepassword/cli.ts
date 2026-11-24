@@ -35,7 +35,9 @@ function describeStatus(status: BrokerStatus): string {
   } else {
     lines.push('Save vault: not set (FSB will not save new logins)');
   }
-  lines.push(`Ready: ${status.configured ? 'yes' : 'no'}`);
+  // Signed in is not enough: FSB also needs at least one vault it may read.
+  const readable = status.vaultScope === 'all' || status.vaultIds.length > 0;
+  lines.push(`Ready: ${status.configured && readable ? 'yes' : 'no'}`);
   return `${lines.join('\n')}\n`;
 }
 

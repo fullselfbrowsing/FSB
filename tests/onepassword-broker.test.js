@@ -831,6 +831,19 @@ async function run() {
     assert.equal(both.failed, true);
     assert.match(both.err, /not both/);
   });
+  await check('the status is not ready while no vault may be read', async () => {
+    const { broker: cliBroker } = await scopedBroker();
+    assert.match((await cli({}, cliBroker)).out, /^Ready: yes$/m);
+    await cliBroker.configure({ vaultScope: 'listed' });
+    const empty = (await cli({}, cliBroker)).out;
+    assert.match(empty, /Vaults: none allowed/);
+    assert.match(empty, /^Ready: no$/m, 'a sign-in with an empty vault limit cannot list or fill anything');
+    const legacyPath = tempConfigPath();
+    writeRaw(legacyPath, { version: 1, auth: { kind: 'desktop', accountName: 'me' }, vaultIds: [], updatedAt: 1 });
+    const { broker: legacy } = await scopedBroker({ configPath: legacyPath, signIn: false });
+    assert.match((await cli({}, legacy)).out, /^Ready: no$/m, 'a sign-in from before vault scopes with no allowlist');
+    assert.match((await cli({ allow: 'vaultA' }, legacy)).out, /^Ready: yes$/m);
+  });
   await check('--vaults marks the vaults FSB uses and where it saves', async () => {
     const { broker: cliBroker } = await scopedBroker();
     const { out } = await cli({ vaults: true }, cliBroker);
