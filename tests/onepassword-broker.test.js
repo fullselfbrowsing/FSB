@@ -89,6 +89,8 @@ function makeSdk(items, options = {}) {
           async list() {
             calls.vaultsList += 1;
             await lapse();
+            // beforeVaultsList: runs while a vault list is in flight.
+            if (typeof options.beforeVaultsList === 'function') await options.beforeVaultsList();
             return (options.vaults || DEFAULT_VAULTS).map((vault) => ({ ...vault }));
           },
         },
@@ -770,6 +772,55 @@ async function run() {
     await rejects(cold.saveLogin({ url: 'https://new.test', username: 'u', password: 'p' }), 'onepassword_save_vault_missing');
     assert.equal(cold.status().saveVaultId, 'gone1');
     assert.equal(cold.status().effectiveSaveVaultId, null);
+  });
+  async function stalledBroker() {
+    let clock = 9_000_000;
+    const stall = { run: null };
+    const sdkFake = makeSdk(scopedItems, {
+      vaults: scopedVaults,
+      beforeVaultsList: async () => {
+        const run = stall.run;
+        stall.run = null;
+        if (run) await run();
+      },
+    });
+    const stalledPath = tempConfigPath();
+    const made = new OnePasswordBroker({
+      loadSdk: async () => sdkFake.sdk,
+      configPath: stalledPath,
+      env: {},
+      now: () => clock,
+      ipcLibraryPresent: () => true,
+    });
+    await made.configure({ authKind: 'desktop', accountName: 'me' });
+    await made.listVaults();
+    // The vault list is stale, so checking a save vault asks 1Password again.
+    clock += 31_000;
+    return { broker: made, stall, configPath: stalledPath };
+  }
+  await check('a vault limit saved elsewhere while a save vault is checked is not written over', async () => {
+    const { broker: all, stall, configPath: stalledPath } = await stalledBroker();
+    stall.run = () => {
+      writeRaw(stalledPath, { ...readRaw(stalledPath), vaultScope: 'listed', vaultIds: ['vaultA'], saveVaultId: null });
+    };
+    await assert.rejects(all.configure({ saveVaultId: 'vaultB' }), /allowed vaults/,
+      'the save vault is checked against the limit saved meanwhile');
+    const after = readRaw(stalledPath);
+    assert.equal(after.vaultScope, 'listed', 'the limit is not reverted to every vault');
+    assert.deepEqual(after.vaultIds, ['vaultA']);
+    assert.equal(all.status().vaultScope, 'listed');
+  });
+  await check('overlapping changes from the Vault page run in turn', async () => {
+    const { broker: all, stall, configPath: stalledPath } = await stalledBroker();
+    stall.run = () => new Promise((resolve) => setTimeout(resolve, 5));
+    const first = all.configure({ saveVaultId: 'vaultA' });
+    const second = all.configure({ vaultIds: ['vaultB'] });
+    assert.equal((await first).saveVaultId, 'vaultA');
+    const status = await second;
+    assert.equal(status.vaultScope, 'listed');
+    assert.deepEqual(status.vaultIds, ['vaultB']);
+    assert.equal(status.saveVaultId, null, 'a save vault outside the limit goes');
+    assert.equal(readRaw(stalledPath).vaultScope, 'listed', 'the later change is the one on disk');
   });
   await check('vault scope settings', async () => {
     const { broker: all, calls } = await scopedBroker();

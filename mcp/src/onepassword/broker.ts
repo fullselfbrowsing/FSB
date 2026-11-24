@@ -256,6 +256,15 @@ export interface OnePasswordBrokerOptions {
 
 export interface VaultSummary { id: string; title: string; itemCount: number; vaultType: string }
 
+/** Non-secret settings configure() accepts, unchecked: it validates each one. */
+export interface ConfigureInput {
+  authKind?: unknown;
+  accountName?: unknown;
+  vaultIds?: unknown;
+  saveVaultId?: unknown;
+  vaultScope?: unknown;
+}
+
 async function defaultLoadSdk(): Promise<SdkModule> {
   // Indirect specifier keeps TypeScript from requiring the SDK's types at build
   // time and keeps the multi-megabyte WASM core off the startup path.
@@ -543,6 +552,8 @@ export class OnePasswordBroker {
   private overviewCache = new Map<string, { at: number; items: SdkItemOverview[] }>();
   /** The last vault list 1Password returned, and for which sign-in. */
   private vaultList: { key: string; at: number; vaults: VaultSummary[] } | null = null;
+  /** configure() calls run one at a time, in the order they arrived. */
+  private configureQueue: Promise<unknown> = Promise.resolve();
 
   constructor(options: OnePasswordBrokerOptions = {}) {
     this.loadSdk = options.loadSdk ?? defaultLoadSdk;
@@ -625,14 +636,55 @@ export class OnePasswordBroker {
    * starts over with every vault in scope and the Personal vault as the save
    * vault, because vault ids belong to one account.
    */
-  async configure(input: {
-    authKind?: unknown;
-    accountName?: unknown;
-    vaultIds?: unknown;
-    saveVaultId?: unknown;
-    vaultScope?: unknown;
-  }): Promise<BrokerStatus> {
-    const stored = readOnePasswordConfig(this.configPath) ?? emptyOnePasswordConfig();
+  async configure(input: ConfigureInput): Promise<BrokerStatus> {
+    // Extension requests are dispatched without waiting for the one before,
+    // so two changes can overlap. Run them in turn.
+    const run = this.configureQueue.then(() => this.configureNow(input));
+    this.configureQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async configureNow(input: ConfigureInput): Promise<BrokerStatus> {
+    // Checking a save vault against every vault may wait on 1Password. That
+    // wait happens on a draft. What is written is rebuilt from a fresh read
+    // with no wait in between, so a change saved meanwhile by another process
+    // (a vault limit from the CLI, say) is not written over.
+    const draft = this.configured(this.readStoredConfig(), input, null);
+    const visible = this.checksSaveVaultAgainstVisible(draft, input)
+      ? await this.visibleVaultIdsNow(this.withEnvironment(draft))
+      : null;
+    const stored = this.readStoredConfig();
+    let next = this.configured(stored, input, visible);
+    // That vault list belongs to the sign-in it was read for. If the sign-in
+    // changed meanwhile, the choice is trusted and checked again on use.
+    if (visible && sessionKeyOf(this.withEnvironment(next)) !== sessionKeyOf(this.withEnvironment(draft))) {
+      next = this.configured(stored, input, null);
+    }
+
+    writeOnePasswordConfig(next, this.configPath);
+    // Vault settings change what is read, not who signs in, so the session
+    // (and the user's approval of it) survives them.
+    if (sessionKeyOf(this.withEnvironment(stored)) !== sessionKeyOf(this.withEnvironment(next))) {
+      this.resetClient();
+    }
+    return this.status();
+  }
+
+  private readStoredConfig(): OnePasswordConfig {
+    return readOnePasswordConfig(this.configPath) ?? emptyOnePasswordConfig();
+  }
+
+  /** A save vault chosen while every vault is in scope is checked against 1Password's list. */
+  private checksSaveVaultAgainstVisible(next: OnePasswordConfig, input: ConfigureInput): boolean {
+    return typeof input.saveVaultId === 'string' && input.saveVaultId !== '' && next.vaultScope !== 'listed';
+  }
+
+  /**
+   * The config `input` makes of `stored`, without reading or writing
+   * anything. `visible` is the readable vault list for the sign-in, or null
+   * to accept a save vault and check it on use.
+   */
+  private configured(stored: OnePasswordConfig, input: ConfigureInput, visible: string[] | null): OnePasswordConfig {
     const next: OnePasswordConfig = { ...stored, vaultIds: [...stored.vaultIds], updatedAt: this.now() };
 
     if (input.authKind === 'desktop') {
@@ -688,7 +740,6 @@ export class OnePasswordBroker {
         }
         next.saveVaultId = input.saveVaultId;
       } else {
-        const visible = await this.visibleVaultIdsNow(this.withEnvironment(next));
         if (visible && !visible.includes(input.saveVaultId)) {
           throw new BrokerError('invalid_request', 'The save vault must be a vault this 1Password sign-in can use');
         }
@@ -698,14 +749,7 @@ export class OnePasswordBroker {
     if (next.vaultScope === 'listed' && next.saveVaultId && !next.vaultIds.includes(next.saveVaultId)) {
       next.saveVaultId = null;
     }
-
-    writeOnePasswordConfig(next, this.configPath);
-    // Vault settings change what is read, not who signs in, so the session
-    // (and the user's approval of it) survives them.
-    if (sessionKeyOf(this.withEnvironment(stored)) !== sessionKeyOf(this.withEnvironment(next))) {
-      this.resetClient();
-    }
-    return this.status();
+    return next;
   }
 
   /** Store a service-account token (CLI only). */
