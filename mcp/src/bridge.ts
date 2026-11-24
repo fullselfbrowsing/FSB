@@ -20,6 +20,7 @@ import type {
   RelayWelcome,
 } from './types.js';
 import { FSB_ERROR_MESSAGES } from './errors.js';
+import { createOnePasswordExtHandler, isOnePasswordExtMethod } from './onepassword/ext-handler.js';
 import {
   FSB_EXT_PROTOCOL,
   authenticateBridgeProtocols,
@@ -28,7 +29,6 @@ import {
 } from './bridge-auth.js';
 import { logBridgeEvent } from './bridge-events.js';
 import { makeExtError, parseExtFrame } from './ext-protocol.js';
-import { createOnePasswordExtHandler, isOnePasswordExtMethod } from './onepassword/ext-handler.js';
 
 interface PendingRequest {
   resolve: (value: MCPResponse) => void;
@@ -55,11 +55,6 @@ interface ActiveExtRequest {
 interface ActiveRelayedExtRequest {
   hubSocket: WebSocket;
   abortController: AbortController;
-}
-
-/** onepassword.* handler; defaults to the shared broker, null disables it. */
-export interface OnePasswordBridgeOptions {
-  handleOnePasswordRequest?: ExtRequestHandler | null;
 }
 
 // The three error messages this file's disconnect paths reject in-flight
@@ -106,6 +101,16 @@ export function bridgeDisconnectReason(err: unknown): string | null {
   return typeof reason === 'string' && BRIDGE_DISCONNECT_REASON_PATTERN.test(reason)
     ? reason
     : null;
+}
+
+// The onepassword.* handler is declared here, next to the code that uses it,
+// and merged into BridgeOptions, so every option type built on BridgeOptions
+// carries it without having to name it.
+declare module './types.js' {
+  interface BridgeOptions {
+    /** onepassword.* handler; defaults to the shared broker, null disables it. */
+    handleOnePasswordRequest?: ExtRequestHandler | null;
+  }
 }
 
 export class WebSocketBridge {
@@ -161,7 +166,7 @@ export class WebSocketBridge {
   private lastDisconnectReason: string | null = null;
   private extensionAttachment: ExtensionAttachmentState | null = null;
 
-  constructor(options: BridgeOptions & OnePasswordBridgeOptions = {}) {
+  constructor(options: BridgeOptions = {}) {
     this.port = options.port ?? 7225;
     this.host = options.host ?? '127.0.0.1';
     if (!WebSocketBridge.isLoopbackBindHost(this.host)) {
