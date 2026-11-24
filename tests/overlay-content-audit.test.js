@@ -454,6 +454,68 @@ console.log('\n--- Test: a new call during the exit morphs the pill straight bac
   o.destroy();
 }
 
+console.log('\n--- Test: a trigger pulse during the exit does not bring the pill back ---');
+{
+  const scheduled = [];
+  const realSetTimeout = sandbox.setTimeout;
+  const realClearTimeout = sandbox.clearTimeout;
+  sandbox.setTimeout = function(fn, delay) {
+    const timer = { fn, delay, cleared: false };
+    scheduled.push(timer);
+    return timer;
+  };
+  sandbox.clearTimeout = function(timer) {
+    if (timer) timer.cleared = true;
+  };
+  const live = (delay) => scheduled.find((timer) => timer.delay === delay && !timer.cleared);
+
+  setNow(5500);
+  const o = buildOverlay();
+  o.update(makeState({ phase: 'acting', detail: 'Clicking' }));
+  o.update(makeState({ lifecycle: 'final', result: 'success', detail: 'Done' }));
+  live(3000).fn();
+  assertEq(o._leaving, 1, 'the hold has ended and the exit is running');
+  // The update messaging.js sends for triggerPulseStart.
+  o.update({ lifecycle: 'running', phase: 'trigger-watch', mode: 'trigger-watch',
+    display: { title: 'FSB Trigger', subtitle: '', detail: 'Watching DOM for change' },
+    progress: { mode: 'indeterminate', percent: null, label: 'Watching', eta: null } });
+  assert(o._leaving > 0, 'the pill keeps leaving');
+  assertEq(o._frozen, true, 'the finished pill stays frozen');
+  assertEq(o.container.querySelector('.pl-in').textContent, 'Done', 'the pill does not take the watch caption');
+  const remove = live(1080);
+  assert(!!remove, 'the removal at the end of the exit is still scheduled');
+  remove.fn();
+  assertEq(o.container, null, 'the pill is removed as planned');
+
+  sandbox.setTimeout = realSetTimeout;
+  sandbox.clearTimeout = realClearTimeout;
+}
+
+console.log('\n--- Test: with reduced motion the orbit bead holds still ---');
+{
+  setNow(5800);
+  const startedAt = 1000000;
+  const beadOffsets = (reduced) => {
+    const o = buildOverlay();
+    o._reduced = reduced;
+    o.update(makeState({ phase: 'acting', detail: 'Reading page' }));
+    o.setMotion({ form: 'orbit', startedAt });
+    const bead = o.container.querySelector('.pl-bead');
+    o._paintMotion(startedAt + 1000);
+    const first = bead.style.strokeDashoffset;
+    o._paintMotion(startedAt + 2500);
+    const second = bead.style.strokeDashoffset;
+    const shown = bead.style.opacity;
+    o.destroy();
+    return { first, second, shown };
+  };
+  const moving = beadOffsets(false);
+  assert(moving.first !== moving.second, 'without reduced motion the bead travels (' + moving.first + ' -> ' + moving.second + ')');
+  const still = beadOffsets(true);
+  assertEq(still.shown, '1', 'with reduced motion the orbit still shows its bead');
+  assertEq(still.second, still.first, 'with reduced motion the bead stays where it is');
+}
+
 console.log('\n--- Test: reset() lets a new session take over a finished pill ---');
 {
   setNow(6000);
@@ -964,6 +1026,50 @@ console.log('\n--- Test: ordinary sessions retain agent identity and stop contro
   assert(o.container.classList.contains('stoppable'),
     'ordinary stoppable session retains the stop control');
   o.destroy();
+}
+
+console.log('\n--- Test: only the pointer leaving the page closes the hover row ---');
+{
+  // A capture listener on <html> would also hear the mouseleave of every page element. The pill
+  // takes no pointer events, so the page under it would close the row whenever it scrolled or
+  // re-rendered beneath a resting cursor.
+  const adds = [];
+  const removes = [];
+  const realAdd = documentElement.addEventListener;
+  const realRemove = documentElement.removeEventListener;
+  documentElement.addEventListener = function (type, listener, opts) {
+    adds.push({ type, listener, opts });
+    return realAdd.call(this, type, listener, opts);
+  };
+  documentElement.removeEventListener = function (type, listener, opts) {
+    removes.push({ type, listener, opts });
+    const list = this._listeners[type] || [];
+    this._listeners[type] = list.filter(fn => fn !== listener);
+  };
+  try {
+    setNow(107500);
+    const o = buildOverlay();
+    o.update(makeState({ phase: 'acting', detail: 'Clicking submit', clientLabel: 'Codex', agentIdShort: 'agent_abc123', stoppable: true }));
+    await sleep(500);
+    o._trackPointer(true);
+    const leave = adds.find(call => call.type === 'mouseleave');
+    assert(!!leave, 'the pill listens for the pointer leaving the page');
+    const capture = !!leave && (leave.opts === true || !!(leave.opts && leave.opts.capture));
+    assert(!capture, 'the leave listener is not capture-phase, so a page element it leaves cannot close the row');
+    o._pointerAt(50, 20);
+    assert(o.container.classList.contains('more'), 'hover opens the agent id row');
+    documentElement.dispatchEvent({ type: 'mouseleave', target: documentElement });
+    assert(!o.container.classList.contains('more'), 'the pointer leaving the page closes the agent id row');
+    o._trackPointer(false);
+    const off = removes.find(call => call.type === 'mouseleave');
+    assert(!!off && !!leave && off.listener === leave.listener, 'the leave listener is removed');
+    assert(!!off && !!leave && off.opts === leave.opts, 'it is removed with the options it was added with');
+    o.destroy();
+  } finally {
+    documentElement.addEventListener = realAdd;
+    if (realRemove) documentElement.removeEventListener = realRemove;
+    else delete documentElement.removeEventListener;
+  }
 }
 
 console.log('\n--- Test: FSB autopilot carries no name ---');

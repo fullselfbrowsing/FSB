@@ -855,8 +855,9 @@
       var ended = !!PILL_ENDED[v.tone];
       var still = ended || v.tone === 'waiting';
       var form = !still && this._motion && PILL_FORMS[this._motion.form] ? this._motion.form : null;
+      // Reduced motion holds every form at its first frame, the orbit's bead included.
       var p = 0;
-      if (form) {
+      if (form && !this._reduced) {
         var period = PILL_FORMS[form];
         var into = (now - this._motion.startedAt) % period;
         p = (into < 0 ? into + period : into) / period;
@@ -1030,12 +1031,14 @@
         this._onPointerLeave = function () { self._pointerAt(-1, -1); };
         try {
           window.addEventListener('pointermove', this._onPointerMove, { capture: true, passive: true });
-          document.documentElement.addEventListener('mouseleave', this._onPointerLeave, true);
+          // Not capture: on the way down it would also hear every page element the pointer
+          // leaves. Without it, <html> only hears the pointer leaving the page.
+          document.documentElement.addEventListener('mouseleave', this._onPointerLeave);
         } catch (e) { /* hover is optional */ }
       } else if (!on && this._onPointerMove) {
         try {
           window.removeEventListener('pointermove', this._onPointerMove, { capture: true });
-          document.documentElement.removeEventListener('mouseleave', this._onPointerLeave, true);
+          document.documentElement.removeEventListener('mouseleave', this._onPointerLeave);
         } catch (e) { /* ignore */ }
         this._onPointerMove = null;
         this._onPointerLeave = null;
@@ -1154,8 +1157,12 @@
         return;
       }
 
-      // A new call while the pill is leaving morphs it straight back.
-      if (this._leaving && (!state || !state.lifecycle || state.lifecycle === 'running')) this._revive();
+      // A new call while the pill is leaving morphs it straight back. A trigger pulse is
+      // not a call: it only relabels a pill that is up, so a leaving pill keeps leaving.
+      if (this._leaving) {
+        if (state && state.mode === 'trigger-watch') return;
+        if (!state || !state.lifecycle || state.lifecycle === 'running') this._revive();
+      }
 
       // Once frozen (lifecycle=final received), ignore further updates
       // to prevent post-completion status messages from altering the display
