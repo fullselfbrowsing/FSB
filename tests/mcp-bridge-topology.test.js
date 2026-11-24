@@ -1745,6 +1745,33 @@ async function runBridgeIdleProbe(WebSocketBridge, auth) {
       );
       await waitFor(() => hub.isIdle() && relay.isIdle(), 'both sides settle the ext request', 1000, 10);
       assert(hub.isIdle() && relay.isIdle(), 'a settled extension request leaves both sides idle');
+
+      // The extension goes away while a hub call and a relayed call wait for
+      // it. Neither can be answered now, so nothing of them may keep the hub
+      // looking busy.
+      const strandedHubCall = hub.sendAndWait({ type: 'mcp:idle-probe', payload: { from: 'hub' } }, { timeout: 5000 });
+      strandedHubCall.catch(() => {});
+      const strandedRelayCall = relay.sendAndWait({ type: 'mcp:idle-probe', payload: { from: 'relay' } }, { timeout: 300 });
+      strandedRelayCall.catch(() => {});
+      await waitFor(
+        () => messages.filter((message) => message.type === 'mcp:idle-probe').length === 4,
+        'both calls reach the extension',
+        1000,
+        10,
+      );
+      assert(!hub.isIdle(), 'the hub is busy with both calls');
+      const closed = waitForSocketClose(extension, 1000);
+      extension.close();
+      await closed;
+      await strandedHubCall.then(
+        () => assert(false, 'a hub call cannot succeed without the extension'),
+        (error) => assertEqual(error.message, 'Extension disconnected', 'the hub call fails with the disconnect'),
+      );
+      await waitFor(() => hub.isIdle(), 'the hub to drop the stranded calls', 1000, 10);
+      assert(hub.isIdle(), 'an extension that left mid-call leaves the hub idle');
+      assertEqual(hub.messageOrigin.size, 0, 'no routing entry outlives the extension socket');
+      await strandedRelayCall.catch(() => undefined);
+      await waitFor(() => relay.isIdle(), 'the relay call to time out', 1000, 10);
     } finally {
       await cleanup(resources);
     }
@@ -3118,25 +3145,24 @@ async function runHandoffDrainsLateRequests(WebSocketBridge, httpModule, auth) {
       assertEqual(extension.readyState, WebSocket.OPEN, 'the extension is not cut off mid-request');
       assert(!daemon.isIdle(), 'the service counts the call it sent before taking over as in flight');
 
-      // The old hub still routes extension requests to the service over the
-      // old socket, and the service answers there.
+      // A delegated run started now could not reach the browser (the service
+      // holds the port but not the extension yet) and its open route would
+      // hold the drain, so the draining hub refuses it as retryable instead
+      // of routing it to the service.
       extension.send(JSON.stringify({
         id: 'drain-delegate',
         type: 'ext:request',
         method: 'delegate.start',
         payload: { adapterId: 'claude-code', task: 'drain' },
       }));
-      await waitFor(() => daemonRequests.length === 1, 'the service receives a request routed by the draining hub');
-      daemonRequests[0].resolve({ status: 'succeeded' });
       await waitFor(
         () => messages.some((message) => message.id === 'drain-delegate' && message.type === 'ext:response'),
-        "the service's answer reaches the extension through the draining hub",
+        'the draining hub answers a new extension request itself',
       );
-      assertEqual(
-        messages.find((message) => message.id === 'drain-delegate' && message.type === 'ext:response').payload?.status,
-        'succeeded',
-        'the routed request settles with the service result',
-      );
+      const refusal = messages.find((message) => message.id === 'drain-delegate' && message.type === 'ext:response');
+      assertEqual(refusal.error?.code, 'agent_provider_offline', 'a new delegated run is refused while the hub drains');
+      assertEqual(refusal.error?.retryable, true, 'the refusal tells the extension to retry');
+      assertEqual(daemonRequests.length, 0, 'the refused run never reaches the service');
       assertEqual(stdioHub.currentMode, 'hub', 'the two calls still in flight keep the old hub draining');
 
       const extensionClosed = waitForSocketClose(extension, 3000);
@@ -3356,6 +3382,177 @@ async function runPreviousReleaseHubIgnoresTakeover(WebSocketBridge, httpModule,
   });
 }
 
+// A stdio hub that has released the port to the service and is draining a
+// call of its own that the extension has not answered.
+async function startDrainingHandoff(WebSocketBridge, httpModule, auth, home, label, hubOptions = {}) {
+  const hubPort = await getFreePort();
+  const healthPort = await getFreePort();
+  const { extensionOptions } = pairHandoffExtension(auth, home, 34_000);
+  const stdioHub = new WebSocketBridge({
+    port: hubPort,
+    host: '127.0.0.1',
+    instanceId: `${label}-stdio-hub`,
+    daemonHealthPort: healthPort,
+    handshakeTimeoutMs: 25,
+    promotionJitterMs: 1,
+    maxReconnectDelayMs: 100,
+    hubHandoffPollMs: 20,
+    ...hubOptions,
+  });
+  const daemon = new WebSocketBridge({
+    port: hubPort,
+    host: '127.0.0.1',
+    instanceId: `${label}-daemon`,
+    daemon: true,
+    handshakeTimeoutMs: 25,
+    maxReconnectDelayMs: 100,
+  });
+  const resources = { sockets: [], bridges: [daemon, stdioHub], health: null };
+  await stdioHub.connect();
+  const extension = await createBrowserSocket(hubPort, extensionOptions);
+  resources.sockets.push(extension);
+  const messages = collectSocketMessages(extension);
+  await daemon.connect();
+  resources.health = await startDaemonHealth(httpModule, daemon, healthPort);
+  await waitFor(() => daemon.topology.extensionConnected, 'the service sees the extension through the stdio hub');
+  const bindStartAsHub = daemon._startAsHub.bind(daemon);
+  let openBind = null;
+  const bindGate = new Promise((resolve) => { openBind = resolve; });
+  let bindRequested = false;
+  daemon._startAsHub = async () => {
+    bindRequested = true;
+    await bindGate;
+    return bindStartAsHub();
+  };
+  daemon.claimHub();
+  await waitFor(() => bindRequested, 'the idle stdio hub releases the port');
+  const hubCall = stdioHub.sendAndWait({ type: 'mcp:handoff-probe', payload: { from: 'late-hub' } }, { timeout: 5000 });
+  hubCall.catch(() => {});
+  await waitFor(() => messages.some((message) => message.type === 'mcp:handoff-probe'), 'the late call reaches the extension');
+  openBind();
+  await waitFor(() => daemon.currentMode === 'hub', 'the service binds the released port');
+  await waitFor(() => stdioHub.hubHandoff?.phase === 'draining', 'the old hub drains');
+  return { stdioHub, daemon, extension, messages, hubCall, resources };
+}
+
+async function cleanupDrainingHandoff(resources) {
+  if (resources.health) await resources.health.close().catch(() => {});
+  await cleanup(resources);
+}
+
+async function runDrainEndsWithoutExtension(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-drain-no-extension', async (home) => {
+    const run = await startDrainingHandoff(WebSocketBridge, httpModule, auth, home, 'drain-gone');
+    try {
+      await sleep(80);
+      assertEqual(run.stdioHub.currentMode, 'hub', 'the unanswered call keeps the old hub draining');
+      run.extension.close();
+      await run.hubCall.then(
+        () => assert(false, 'the call cannot succeed without the extension'),
+        () => assert(true, 'the call fails once the extension has gone'),
+      );
+      await waitFor(
+        () => run.stdioHub.currentMode === 'relay' && run.stdioHub.topology.activeHubInstanceId === 'drain-gone-daemon',
+        'the old hub hands over as soon as the extension is gone',
+        2000,
+      );
+      assert(true, 'a drain without the extension ends at once');
+    } finally {
+      await cleanupDrainingHandoff(run.resources);
+    }
+  });
+}
+
+async function runDrainEndsAtDeadline(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-drain-deadline', async (home) => {
+    const run = await startDrainingHandoff(WebSocketBridge, httpModule, auth, home, 'drain-late', {
+      hubHandoffDrainMs: 300,
+    });
+    try {
+      assertEqual(run.stdioHub.currentMode, 'hub', 'the old hub starts draining');
+      await waitFor(
+        () => run.stdioHub.currentMode === 'relay' && run.stdioHub.topology.activeHubInstanceId === 'drain-late-daemon',
+        'the old hub hands over once the drain deadline passes',
+        3000,
+      );
+      assert(true, 'a call that never settles cannot hold the drain past its deadline');
+      await run.hubCall.catch(() => undefined);
+      await waitFor(() => run.daemon.topology.extensionConnected === false || run.daemon.currentMode === 'hub', 'the service keeps the port', 1000);
+      assertEqual(run.daemon.currentMode, 'hub', 'the service is the hub after the cut-off drain');
+    } finally {
+      await cleanupDrainingHandoff(run.resources);
+    }
+  });
+}
+
+async function runDrainAbortsWhenServiceIsLost(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-drain-service-lost', async (home) => {
+    const run = await startDrainingHandoff(WebSocketBridge, httpModule, auth, home, 'drain-lost');
+    try {
+      run.daemon.disconnect();
+      await waitFor(() => run.stdioHub.hubHandoff === null, 'the old hub gives up the handover');
+      await waitFor(() => run.stdioHub.httpServer?.listening === true, 'the old hub listens on the port again');
+      assertEqual(run.stdioHub.currentMode, 'hub', 'the old hub stays hub when the service is lost mid-drain');
+      assertEqual(run.extension.readyState, WebSocket.OPEN, 'the extension stays attached to the old hub');
+      const probe = run.messages.find((message) => message.type === 'mcp:handoff-probe');
+      answerProbe(run.extension, probe);
+      assertEqual((await run.hubCall).answered, 'late-hub', 'the late call still completes');
+    } finally {
+      await cleanupDrainingHandoff(run.resources);
+    }
+  });
+}
+
+async function runServiceAsksAgainAfterPassingRefusal(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-claim-retry', async (home) => {
+    const hubPort = await getFreePort();
+    const healthPort = await getFreePort();
+    const { extensionOptions } = pairHandoffExtension(auth, home, 35_000);
+    const stdioHub = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'retry-stdio-hub',
+      daemonHealthPort: healthPort,
+      daemonProbeTimeoutMs: 100,
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+      hubHandoffPollMs: 20,
+    });
+    const daemon = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'retry-daemon',
+      daemon: true,
+      handshakeTimeoutMs: 25,
+      maxReconnectDelayMs: 100,
+      hubClaimRetryMs: 100,
+    });
+    const resources = { sockets: [], bridges: [daemon, stdioHub] };
+    let health = null;
+    try {
+      await stdioHub.connect();
+      const extension = await createBrowserSocket(hubPort, extensionOptions);
+      resources.sockets.push(extension);
+      await daemon.connect();
+      assertEqual(daemon.currentMode, 'relay', 'the service joins the stdio hub as a relay');
+      // /health is not up yet, so the hub cannot confirm the request.
+      daemon.claimHub();
+      await waitFor(
+        () => readBridgeJournal(home).some((entry) => entry.event === 'hub_yield_refused' && entry.reason === 'daemon_unconfirmed'),
+        'the hub refuses a request it cannot confirm',
+      );
+      assertEqual(stdioHub.currentMode, 'hub', 'the refusing hub keeps the port');
+      health = await startDaemonHealth(httpModule, daemon, healthPort);
+      await waitFor(() => daemon.currentMode === 'hub', 'the service asks again and takes the port over', 3000);
+      assert(true, 'a passing refusal is retried instead of leaving the stdio hub in place for good');
+    } finally {
+      if (health) await health.close().catch(() => {});
+      await cleanup(resources);
+    }
+  });
+}
+
 async function run() {
   const WebSocketBridge = await loadBridgeClass();
   const bridgeModule = await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'bridge.js')).href);
@@ -3394,6 +3591,10 @@ async function run() {
   await runCase('stdio defers to a running daemon', () => runStdioDefersToReadyDaemon(WebSocketBridge, httpModule));
   await runCase('daemon takes over from a stdio hub only when idle', () => runDaemonTakesOverIdleStdioHub(WebSocketBridge, httpModule, auth));
   await runCase('in-flight requests survive the port release', () => runHandoffDrainsLateRequests(WebSocketBridge, httpModule, auth));
+  await runCase('a drain ends once the extension is gone', () => runDrainEndsWithoutExtension(WebSocketBridge, httpModule, auth));
+  await runCase('a drain ends at its deadline', () => runDrainEndsAtDeadline(WebSocketBridge, httpModule, auth));
+  await runCase('a drain is abandoned when the service is lost', () => runDrainAbortsWhenServiceIsLost(WebSocketBridge, httpModule, auth));
+  await runCase('the service asks again after a passing refusal', () => runServiceAsksAgainAfterPassingRefusal(WebSocketBridge, httpModule, auth));
   await runCase('hub refuses an unproven takeover', () => runHubRefusesUnprovenTakeover(WebSocketBridge, httpModule, auth));
   await runCase('previous-release hub ignores the takeover request', () => runPreviousReleaseHubIgnoresTakeover(WebSocketBridge, httpModule, auth));
 

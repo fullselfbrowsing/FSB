@@ -88,6 +88,13 @@ export interface DaemonHandoffOptions {
   hubHandoffPollMs?: number;
   /** How long a hub waits for the service to bind after releasing the port. */
   hubHandoffTimeoutMs?: number;
+  /**
+   * How long a hub that has released the port keeps draining what it still
+   * carries before it hands everyone over regardless.
+   */
+  hubHandoffDrainMs?: number;
+  /** First wait before the service asks a hub again after a passing refusal. */
+  hubClaimRetryMs?: number;
 }
 
 export type WebSocketBridgeOptions = BridgeOptions & DaemonHandoffOptions;
@@ -107,6 +114,8 @@ interface HubHandoff {
   socket: WsWebSocket;
   phase: 'verifying' | 'waiting' | 'released' | 'draining';
   timer: ReturnType<typeof setTimeout> | null;
+  /** Set on entering `draining`: past it the hub hands over regardless. */
+  drainDeadline: number | null;
 }
 
 // Relays are not authenticated -- relay:hello carries only an instance id --
@@ -121,6 +130,21 @@ const HUB_HANDOFF_NONCE_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 const HUB_HANDOFF_PROOF_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const DEFAULT_HUB_HANDOFF_POLL_MS = 100;
 const DEFAULT_HUB_HANDOFF_TIMEOUT_MS = 5_000;
+// While draining, the service already holds the port but has no extension, so
+// every call to it fails until the drain ends. Cut a long one short.
+const DEFAULT_HUB_HANDOFF_DRAIN_MS = 30_000;
+// The service asks again after a refusal that may pass, backing off to the cap.
+const DEFAULT_HUB_CLAIM_RETRY_MS = 5_000;
+const HUB_CLAIM_RETRY_MAX_MS = 5 * 60_000;
+// Refusals worth asking again after; the others will not change.
+const TRANSIENT_HUB_REFUSALS = new Set([
+  'daemon_unconfirmed',
+  'proof_mismatch',
+  'pairing_unavailable',
+  'handoff_in_progress',
+  'bind_timeout',
+  'bind_failed',
+]);
 // A relay that was told which process takes over reconnects this soon; the
 // new hub is already listening by the time the old one closes its sockets.
 const HUB_HANDOFF_RECONNECT_MS = 50;
@@ -244,6 +268,10 @@ export class WebSocketBridge {
   private daemonProbeTimeoutMs: number;
   private hubHandoffPollMs: number;
   private hubHandoffTimeoutMs: number;
+  private hubHandoffDrainMs: number;
+  private hubClaimRetryMs: number;
+  private hubClaimRetryDelayMs: number;
+  private hubClaimRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private hubHandoff: HubHandoff | null = null;
   private hubClaimed = false;
   private takeoverInFlight = false;
@@ -297,6 +325,9 @@ export class WebSocketBridge {
     this.daemonProbeTimeoutMs = options.daemonProbeTimeoutMs ?? NATIVE_HOST_HEALTH_TIMEOUT_MS;
     this.hubHandoffPollMs = options.hubHandoffPollMs ?? DEFAULT_HUB_HANDOFF_POLL_MS;
     this.hubHandoffTimeoutMs = options.hubHandoffTimeoutMs ?? DEFAULT_HUB_HANDOFF_TIMEOUT_MS;
+    this.hubHandoffDrainMs = options.hubHandoffDrainMs ?? DEFAULT_HUB_HANDOFF_DRAIN_MS;
+    this.hubClaimRetryMs = options.hubClaimRetryMs ?? DEFAULT_HUB_CLAIM_RETRY_MS;
+    this.hubClaimRetryDelayMs = this.hubClaimRetryMs;
   }
 
   private static isLoopbackBindHost(host: string): boolean {
@@ -378,6 +409,7 @@ export class WebSocketBridge {
     }
     this.retiredRequestIds.clear();
     this.handoffNoticeSocket = null;
+    this._cancelHubClaimRetry();
 
     // Phase 239 plan 03 -- IMPORTANT: do NOT change the rejection of pendingRequests
     // on disconnect (lines below). The MCP server's run_task tool catches
@@ -1036,14 +1068,11 @@ export class WebSocketBridge {
 
       this._abortRoutesForOrigin(ws);
 
-      // Notify relay clients about pending requests that can't be fulfilled
-      // (they'll get errors when they timeout)
-      // Clean up messageOrigin entries for non-local origins
-      for (const [msgId, origin] of this.messageOrigin) {
-        if (origin !== 'local') {
-          this.messageOrigin.delete(msgId);
-        }
-      }
+      // Nothing sent to the extension can be answered any more: relays find
+      // out when their calls time out, and every local call was rejected
+      // above. A local entry left here would keep isIdle() false for good,
+      // blocking step-down, uninstall and hub handover.
+      this.messageOrigin.clear();
       this._broadcastRelayState();
     });
 
@@ -1313,13 +1342,14 @@ export class WebSocketBridge {
 
     // Final result
     if (origin === 'local' || !origin) {
-      // Handle locally (same as original logic)
+      // Handle locally (same as original logic). A late answer to a call that
+      // already gave up still clears its routing entry.
+      this.messageOrigin.delete(resp.id);
       const pending = this.pendingRequests.get(resp.id);
       if (pending) {
         clearTimeout(pending.timeout);
         this.pendingRequests.delete(resp.id);
         this.progressListeners.delete(resp.id);
-        this.messageOrigin.delete(resp.id);
         pending.resolve(resp);
       }
     } else {
@@ -1428,6 +1458,20 @@ export class WebSocketBridge {
       };
       this.activeExtRequests.set(request.id, route);
       void this._invokeLocalExtHandler(request, route);
+      return;
+    }
+
+    // While draining, the service holds the port but has no extension yet,
+    // so a delegated run started now could not reach the browser, and its
+    // open route would hold the drain. The extension retries once it has
+    // moved to the service.
+    if (this.hubHandoff?.phase === 'draining') {
+      this._sendExtResponse(ws, makeExtError(
+        request.id,
+        'agent_provider_offline',
+        'The local agent service is taking over the connection; retry shortly',
+        true,
+      ));
       return;
     }
 
@@ -1720,7 +1764,12 @@ export class WebSocketBridge {
           welcomed = true;
           console.error(`[FSB Bridge ${this.instanceId}] Relay mode: handshake complete, ready`);
           settleResolve();
-          if (this.hubClaimed) this._requestHubHandoff(hubSocket);
+          if (this.hubClaimed) {
+            // A new hub: forget any retry meant for the previous one.
+            this._cancelHubClaimRetry();
+            this.hubClaimRetryDelayMs = this.hubClaimRetryMs;
+            this._requestHubHandoff(hubSocket);
+          }
           return;
         }
 
@@ -2045,6 +2094,36 @@ export class WebSocketBridge {
     console.error(`[FSB Bridge ${this.instanceId}] Asked hub ${hubInstanceId} to hand the port over`);
   }
 
+  /**
+   * Relay side, local service only: ask the same hub again later after a
+   * refusal that may pass, such as a /health check that timed out while this
+   * process was busy starting, backing off up to a few minutes. Without it a
+   * long-lived stdio hub would keep the port for its whole life.
+   */
+  private _scheduleHubClaimRetry(hubSocket: WebSocket): void {
+    if (!this.isDaemon || !this.hubClaimed || this.hubClaimRetryTimer) return;
+    const delay = this.hubClaimRetryDelayMs;
+    this.hubClaimRetryDelayMs = Math.min(HUB_CLAIM_RETRY_MAX_MS, delay * 2);
+    const timer = setTimeout(() => {
+      this.hubClaimRetryTimer = null;
+      if (
+        this.hubConnection === hubSocket
+        && this.mode === 'relay'
+        && this.hubClaimed
+        && !this.retiredHubSockets.has(hubSocket)
+      ) {
+        this._requestHubHandoff(hubSocket);
+      }
+    }, delay);
+    timer.unref?.();
+    this.hubClaimRetryTimer = timer;
+  }
+
+  private _cancelHubClaimRetry(): void {
+    if (this.hubClaimRetryTimer) clearTimeout(this.hubClaimRetryTimer);
+    this.hubClaimRetryTimer = null;
+  }
+
   /** Relay side: control frames from the hub. Unknown ones are ignored. */
   private _handleHubControlFrame(hubSocket: WebSocket, frame: Record<string, unknown>): void {
     if (this.hubConnection !== hubSocket) return;
@@ -2057,6 +2136,7 @@ export class WebSocketBridge {
           ? frame.reason
           : 'unspecified';
         console.error(`[FSB Bridge ${this.instanceId}] Hub kept the port (${reason})`);
+        if (TRANSIENT_HUB_REFUSALS.has(reason)) this._scheduleHubClaimRetry(hubSocket);
         return;
       }
       case 'relay:hub-released':
@@ -2096,6 +2176,7 @@ export class WebSocketBridge {
         // _startAsHub clears this on a failed bind; the old hub is still here.
         this.hubConnected = true;
         hubSocket.send(JSON.stringify({ type: 'relay:hub-bind-failed' }));
+        this._scheduleHubClaimRetry(hubSocket);
       } else if (this.hubConnection === null && this.mode === 'relay') {
         // The old hub went away while the bind was failing.
         void this._attemptPromotion();
@@ -2121,6 +2202,8 @@ export class WebSocketBridge {
     this.extensionHeartbeatCount = 0;
     this.reconnectDelay = 0;
     this.daemonDeferrals = 0;
+    this._cancelHubClaimRetry();
+    this.hubClaimRetryDelayMs = this.hubClaimRetryMs;
     logBridgeEvent({ event: 'hub_taken_over', instanceId: this.instanceId });
     console.error(`[FSB Bridge ${this.instanceId}] Took the hub port over`);
     if (hubSocket.readyState === WebSocket.OPEN) {
@@ -2176,6 +2259,7 @@ export class WebSocketBridge {
           if (handoff.timer) clearTimeout(handoff.timer);
           handoff.timer = null;
           handoff.phase = 'draining';
+          handoff.drainDeadline = Date.now() + this.hubHandoffDrainMs;
           this._advanceHubHandoff(handoff);
         }
         return;
@@ -2243,7 +2327,13 @@ export class WebSocketBridge {
       return;
     }
 
-    const handoff: HubHandoff = { successorId: clientId, socket: ws, phase: 'verifying', timer: null };
+    const handoff: HubHandoff = {
+      successorId: clientId,
+      socket: ws,
+      phase: 'verifying',
+      timer: null,
+      drainDeadline: null,
+    };
     this.hubHandoff = handoff;
     void this._confirmDaemonRelay(clientId).then((confirmed) => {
       if (this.hubHandoff !== handoff) return;
@@ -2272,9 +2362,23 @@ export class WebSocketBridge {
       && health.activeHubInstanceId === this.instanceId;
   }
 
-  /** Hub side: move the handover on once nothing is in flight. */
+  /**
+   * Hub side: move the handover on once nothing is in flight. A drain also
+   * ends without the extension, since nothing still tracked here can then
+   * complete, and at its deadline, cutting off whatever is left.
+   */
   private _advanceHubHandoff(handoff: HubHandoff): void {
     if (this.hubHandoff !== handoff || this.mode !== 'hub') return;
+    if (
+      handoff.phase === 'draining'
+      && (
+        this.extensionClient === null
+        || (handoff.drainDeadline !== null && Date.now() >= handoff.drainDeadline)
+      )
+    ) {
+      this._finishHubHandoff(handoff);
+      return;
+    }
     if (!this.isIdle()) {
       const timer = setTimeout(() => {
         handoff.timer = null;
@@ -2323,6 +2427,10 @@ export class WebSocketBridge {
     if (this.hubHandoff !== handoff) return;
     this._clearHubHandoff();
     logBridgeEvent({ event: 'hub_yield_failed', instanceId: this.instanceId, reason });
+    // Tells a service that is still connected that it may ask again later.
+    if (handoff.socket.readyState === WebSocket.OPEN) {
+      handoff.socket.send(JSON.stringify({ type: 'relay:yield-refused', reason }));
+    }
     console.error(`[FSB Bridge ${this.instanceId}] Hub handover to ${handoff.successorId} failed (${reason}); keeping the port`);
     const server = this.httpServer;
     if (this.mode !== 'hub' || !server || server.listening) return;
@@ -2353,14 +2461,18 @@ export class WebSocketBridge {
     void this._startAsRelay().catch(() => undefined);
   }
 
-  /** Hub side: the relay that asked for the port disconnected. */
+  /**
+   * Hub side: the relay that asked for the port disconnected. Once the port
+   * was released, that most likely means the service is gone and nothing
+   * listens, so this hub listens again; if the service does still hold the
+   * port, the listener's error handler competes for it the usual way.
+   */
   private _onHandoffSuccessorClosed(handoff: HubHandoff): void {
     if (this.hubHandoff !== handoff) return;
-    if (handoff.phase === 'released') {
+    if (handoff.phase === 'released' || handoff.phase === 'draining') {
       this._abortHubHandoff(handoff, 'successor_lost');
-    } else if (handoff.phase !== 'draining') {
-      // Still verifying or waiting: nothing has changed yet. Once draining,
-      // the service already holds the port, so the handover carries on.
+    } else {
+      // Still verifying or waiting: nothing has changed yet.
       this._clearHubHandoff();
     }
   }
