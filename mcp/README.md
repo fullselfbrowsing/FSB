@@ -249,7 +249,7 @@ FSB keeps no passwords or cards of its own. `fill_credential`, `use_payment_meth
 3. **Your account name**, if FSB asks for it: the name at the top of the 1Password sidebar, such as `my.1password.com`.
 4. **Your approval** in the 1Password app. 1Password asks again after 10 idle minutes, after the app locks, and after this server restarts.
 
-After you approve, the Vault page lists the logins and cards FSB can use: titles, usernames, sites, card brand, and last 4 digits. It is read-only; add, edit, and delete items in 1Password.
+After you approve, the Vault page lists the logins and cards FSB can use: titles, usernames, and sites, and for cards the brand, last 4 digits, cardholder name, and expiry. It is read-only; add, edit, and delete items in 1Password.
 
 **Which vaults FSB reads.** By default, every vault the account can see, except transfer vaults and vault types the SDK does not support. To narrow it to some vaults, choose them under **Advanced** on the Vault page, or run `npx fsb-mcp-server onepassword --allow <id,id>`; **Use all vaults** there, or `--all-vaults`, goes back to every vault. "Save to 1Password" writes new logins to your Personal vault unless you choose another save vault. If 1Password reports no Personal vault, the Vault page asks you to pick one; `--save-vault <id>` sets it from a terminal. FSB offers "Save to 1Password" only while it has a save vault it can read.
 
@@ -645,7 +645,7 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 |------|---------|
 | `list_credentials` | List the 1Password logins FSB may use: id, title, site domains, username. |
 | `fill_credential` | Fill username, password, and one-time code from the 1Password login saved for the tab's site. With none saved, FSB asks the user to type one on the page. |
-| `list_payment_methods` | List 1Password credit cards: id, title, brand, last 4, expiry. |
+| `list_payment_methods` | List 1Password credit cards: id, title, brand, last 4, cardholder name, expiry. |
 | `use_payment_method` | Fill a checkout form with a 1Password card on an `https` page. FSB shows no prompt of its own, so ask the user first. |
 
 These tools read the user's 1Password once it is connected, usually with **Log in to 1Password** on the extension's Vault page (see [1Password](#1password-for-logins-and-cards)). Responses expose metadata only. Passwords, one-time codes, full card numbers, and CVV values go from 1Password to this server to the extension to the page, and are never returned to the MCP client.

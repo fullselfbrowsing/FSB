@@ -1,6 +1,6 @@
 # Vault boundary
 
-FSB has no password vault of its own. Logins and credit cards come from the user's 1Password account: every vault FSB can see, unless the user limited it to some. Passwords, one-time codes, card numbers, and CVVs never cross into chat, tool arguments, or tool results. The model only ever sees ids, titles, site domains, usernames, and card brand plus last 4 digits.
+FSB has no password vault of its own. Logins and credit cards come from the user's 1Password account: every vault FSB can see, unless the user limited it to some. Passwords, one-time codes, card numbers, and CVVs never cross into chat, tool arguments, or tool results. The model only ever sees ids, titles, site domains, usernames, vault names, and for cards the brand, last 4 digits, cardholder name, and expiry month and year. Cards in shared vaults are listed too, so the cardholder names can be other people's.
 
 ## The rule
 
@@ -52,7 +52,8 @@ The values are never returned to the MCP client, the agent host, or the model.
 
 - No 1Password login is saved for the site: `fill_credential` already asks the user on the page. If it still fails with `credential_not_found` (FSB could not show the sheet there), ask the user to add a login in 1Password. Do not type credentials yourself.
 - `credential_not_provided`: the user declined or did not answer the on-page sheet. Do not call `fill_credential` again on your own; ask the user how they want to continue.
-- 1Password is not connected (`onepassword_not_configured`) or FSB can read no vaults (`onepassword_no_vaults`): ask the user to open FSB's Vault page and press Log in to 1Password. Do not retry until they say it is done.
+- 1Password is not connected (`onepassword_not_configured`): ask the user to open FSB's Vault page and press Log in to 1Password. Do not retry until they say it is done.
+- FSB can read no vaults (`onepassword_no_vaults`): FSB is signed in, but its vault limit is empty or the sign-in can see no vault FSB reads (transfer vaults are skipped). Ask the user to open FSB's Vault page and, under Advanced, turn on at least one vault or press Use all vaults. Do not retry until they say it is done.
 - `onepassword_auth_failed`: 1Password refused the sign-in, and the result's `reason` says why when FSB can tell.
   - `app_missing`: the 1Password desktop app is not installed. Ask the user to install it, then log in from the Vault page.
   - `integration_off`: the app's Settings > Developer > Integrate with 1Password SDKs setting is off, or the app closed the connection. Ask the user to press Log in to 1Password on the Vault page, which opens that setting. On a managed device, an administrator may have to allow it.

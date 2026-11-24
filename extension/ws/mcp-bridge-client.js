@@ -3122,7 +3122,8 @@ class MCPBridgeClient {
 
   // --------------------------------------------------------------------------
   // Credential handlers -- 1Password via the FSB local server.
-  // Results carry ids, titles, hosts, usernames, and card brand/last4 only.
+  // Results carry ids, titles, hosts, usernames, vault names, and card brand,
+  // last 4, cardholder name, and expiry only.
   // Passwords, one-time codes, card numbers, and CVVs go from the server to
   // the page fill and are never part of a reply on this socket.
   // --------------------------------------------------------------------------

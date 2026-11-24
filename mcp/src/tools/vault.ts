@@ -69,8 +69,9 @@ export function multipleCredentialsResult(
  * can read, or only the vaults the user limited FSB to. The FSB server's
  * 1Password broker resolves items for the extension over the paired loopback
  * bridge; the extension fills them into the page. Tool results carry only
- * ids, titles, hosts, usernames, and card brand/last4 -- never passwords,
- * one-time codes, card numbers, or CVVs.
+ * ids, titles, hosts, usernames, vault names, and card brand, last 4,
+ * cardholder name, and expiry -- never passwords, one-time codes, card
+ * numbers, or CVVs.
  *
  * SECURITY: registered directly (not via TOOL_REGISTRY) to keep an explicit
  * security boundary around everything that ends in a secret being typed.
