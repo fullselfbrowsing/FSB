@@ -3920,6 +3920,87 @@ async function runProductionEnsure() {
   }
 
   const production = await importBuild('native-host-production.js');
+  {
+    // The real port and listener probes, pointed at a port this test owns.
+    // Nothing here is ever signalled.
+    const net = require('node:net');
+    const server = net.createServer();
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address();
+    const probeHome = require('node:fs').realpathSync(require('node:os').tmpdir());
+    const probes = production.createProductionNativeHostDaemonStopAdapter({
+      homeDirectory: probeHome,
+      environment: {
+        PATH: process.env.PATH,
+        FSB_NATIVE_HOST_TEST_MODE: '1',
+        FSB_NATIVE_HOST_TEST_SERVICE_PORT: String(port),
+      },
+    });
+    check(await probes.isOnline(), 'the port probe sees a listening test port');
+    const listener = await probes.identifyListener();
+    check(
+      listener.status === 'other' || listener.status === 'unknown',
+      'a listener that is not the stable-root serve is never identified as it',
+    );
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      equal(listener.status, 'other', 'the listener lookup finds this test process and rules it out');
+    }
+    equal(await probes.waitForOffline(0), false, 'a listening port is not offline');
+    await new Promise((resolve) => server.close(resolve));
+    check(!await probes.isOnline(), 'the port probe sees the closed test port as offline');
+    equal(await probes.waitForOffline(100), true, 'waiting for a closed port returns at once');
+    deepEqual(await probes.identifyListener(), { status: 'none' }, 'a closed port has no listener');
+  }
+  if (process.platform === 'darwin' || process.platform === 'linux') {
+    // A stand-in for an older daemon: a process this test starts from a
+    // temporary stable root's serve path, so only it can match.
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const net = require('node:net');
+    const { spawn } = require('node:child_process');
+    const fakeRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-native-legacy-')));
+    const fakeHome = path.join(fakeRoot, 'home');
+    const buildIndex = path.join(fakeHome, '.fsb', 'native-host', 'runtime', 'package', 'build', 'index.js');
+    fs.mkdirSync(path.dirname(buildIndex), { recursive: true });
+    fs.writeFileSync(buildIndex, [
+      "const server = require('node:net').createServer();",
+      "server.listen(Number(process.env.FSB_TEST_PORT), '127.0.0.1', () => process.stdout.write('ready\\n'));",
+      "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
+      '',
+    ].join('\n'));
+    const portProbe = net.createServer();
+    await new Promise((resolve) => portProbe.listen(0, '127.0.0.1', resolve));
+    const { port } = portProbe.address();
+    await new Promise((resolve) => portProbe.close(resolve));
+    const daemon = spawn(process.execPath, [buildIndex, 'serve', '--port', String(port)], {
+      env: { PATH: process.env.PATH, FSB_TEST_PORT: String(port) },
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const exited = new Promise((resolve) => daemon.once('exit', (code, signal) => resolve({ code, signal })));
+    try {
+      await new Promise((resolve, reject) => {
+        daemon.stdout.once('data', resolve);
+        daemon.once('error', reject);
+      });
+      const probes = production.createProductionNativeHostDaemonStopAdapter({
+        homeDirectory: fakeHome,
+        environment: {
+          PATH: process.env.PATH,
+          FSB_NATIVE_HOST_TEST_MODE: '1',
+          FSB_NATIVE_HOST_TEST_SERVICE_PORT: String(port),
+        },
+      });
+      const listener = await probes.identifyListener();
+      equal(listener.status, 'stable-root', 'a serve started from the stable root is identified by its command line');
+      equal(listener.pid, daemon.pid, 'the identified pid is the listening serve process');
+      check(await probes.terminate(listener.pid), 'the confirmed stable-root serve is sent a terminate signal');
+      equal(await probes.waitForOffline(5000), true, 'the terminated serve releases the port');
+      equal((await exited).code, 0, 'the serve ran its own graceful shutdown');
+    } finally {
+      if (daemon.exitCode === null && daemon.signalCode === null) daemon.kill('SIGKILL');
+      fs.rmSync(fakeRoot, { recursive: true, force: true });
+    }
+  }
   check(
     production.isStableRootServeCommand(
       'linux',

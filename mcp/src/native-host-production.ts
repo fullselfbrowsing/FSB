@@ -1673,12 +1673,19 @@ function captureProcessOutput(executable: string, argv: readonly string[]): Prom
         env: sanitizedEnvironment({}, false),
       },
       (error, stdout) => {
-        const status = error ? Number((error as { code?: unknown }).code) : 0;
-        if (error && !Number.isInteger(status)) {
+        if (!error) {
+          resolveCapture(Object.freeze({ status: 0, stdout: String(stdout) }));
+          return;
+        }
+        // A killed probe (timeout or output cap) carries no exit code; its
+        // partial output is never trusted.
+        const code = (error as { code?: unknown }).code;
+        const failed = error as { killed?: boolean; signal?: unknown };
+        if (failed.killed || failed.signal || typeof code !== 'number' || !Number.isInteger(code)) {
           resolveCapture(null);
           return;
         }
-        resolveCapture(Object.freeze({ status, stdout: String(stdout) }));
+        resolveCapture(Object.freeze({ status: code, stdout: String(stdout) }));
       },
     );
   });
@@ -1888,6 +1895,17 @@ function createProductionDaemonStopAdapter(
       }
     },
   });
+}
+
+/**
+ * The production local-service probes on their own, for diagnostics and
+ * tests. Outside test mode they always watch the real service port.
+ */
+export function createProductionNativeHostDaemonStopAdapter(
+  options: NativeHostProductionOptions = {},
+): NativeHostDaemonStopAdapter {
+  const context = resolveContextSync(options);
+  return createProductionDaemonStopAdapter(context, contextLayout(context, 'chrome').stableRoot);
 }
 
 /**
