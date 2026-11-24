@@ -4593,13 +4593,11 @@ function createSessionHooks(sessionId) {
     pipeline.register(LIFECYCLE_EVENTS.AFTER_ITERATION, stuckHook);
   }
 
-  // Progress hook: sends iteration progress to content script overlay
-  if (typeof createToolProgressHook === 'function') {
-    const progressHook = createToolProgressHook(function(tabId, statusData) {
-      sendSessionStatus(tabId, statusData);
-    });
-    pipeline.register(LIFECYCLE_EVENTS.AFTER_TOOL_EXECUTION, progressHook);
-  }
+  // No tool progress hook. createToolProgressHook expects an emitter and calls
+  // .emit on it, and the worker has none since SessionStateEmitter was removed.
+  // Registered with a plain callback, it logged "emitter.emit is not a
+  // function" on every tool call and sent nothing. The overlay's status comes
+  // from agent-loop.js, which sends it directly.
 
   // Permission hook: pre-checks tool permissions before execution
   if (typeof createPermissionHook === 'function' && typeof PermissionContext === 'function') {

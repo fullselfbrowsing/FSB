@@ -173,6 +173,39 @@ test('#157 filling five different fields is not mistaken for a stuck loop', asyn
   }
 });
 
+test('a tool call through the session hooks logs no progress-hook error', async () => {
+  const { HookPipeline, LIFECYCLE_EVENTS } = require('../extension/ai/hook-pipeline.js');
+  const { createSafetyBreakerHook, createStuckDetectionHook } = require('../extension/ai/hooks/safety-hooks.js');
+  const { createToolProgressHook } = require('../extension/ai/hooks/progress-hook.js');
+  const { detectStuck, checkSafetyBreakers } = require('../extension/ai/agent-loop.js');
+  const sent = [];
+  // Every global the worker has when createSessionHooks runs, the progress hook included.
+  const createSessionHooks = vm.runInNewContext(
+    sliceFunction(background, 'function createSessionHooks(') + '\ncreateSessionHooks',
+    {
+      HookPipeline, LIFECYCLE_EVENTS, createSafetyBreakerHook, createStuckDetectionHook, createToolProgressHook,
+      detectStuck, checkSafetyBreakers, automationLogger: { debug() {} },
+      sendSessionStatus: (tabId, data) => sent.push({ tabId, data })
+    }
+  );
+  const pipeline = createSessionHooks('s-progress');
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.map(String).join(' '));
+  try {
+    for (let i = 1; i <= 3; i++) {
+      const r = await pipeline.emit(LIFECYCLE_EVENTS.AFTER_TOOL_EXECUTION, {
+        toolName: 'click', toolResult: { success: true }, session: { tabId: 7 }, sessionId: 's-progress', iteration: i
+      });
+      assert.equal(r.stopped, false);
+    }
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.deepEqual(warnings, [], 'warnings logged: ' + warnings.join(' | '));
+  assert.deepEqual(sent, [], 'no status is sent from this hook point');
+});
+
 // The meta-cognitive attempt counter, loaded the way meta-cognitive-tracker.test.js
 // loads it: agent-loop.js needs chrome globals to require in full, but this
 // section stands alone.
