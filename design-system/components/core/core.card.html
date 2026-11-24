@@ -1,0 +1,83 @@
+<!-- @dsCard group="Components" viewport="700x520" subtitle="Buttons, badges, cards and stats" name="Core" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); letter-spacing: .04em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+/* The bundle publishes one global namespace object; find it by a known export. */
+function resolveNS(probe) {
+  for (const k of Object.keys(window)) {
+    const v = window[k];
+    if (v && typeof v === 'object' && typeof v[probe] === 'function') return v;
+  }
+  return {};
+}
+const NS = resolveNS('Button');
+const { FsbMark, VersionTag, Button, Badge, Card, SectionHeader, StatBlock, Field, Input, Textarea, Select, Toggle, Checkbox, SearchField, NavBar, Footer, Toast } = NS;
+
+function Demo() {
+  return (
+    <div className="col">
+      <span className="lbl">Buttons</span>
+      <div className="row">
+        <Button icon={<i className="fa-brands fa-chrome" />}>Get Started</Button>
+        <Button variant="outline" icon={<i className="fa-solid fa-play" />}>See it in Action</Button>
+        <Button variant="github" icon={<i className="fa-brands fa-github" />}>GitHub</Button>
+        <Button size="sm">Small</Button>
+        <Button disabled>Disabled</Button>
+      </div>
+
+      <span className="lbl">Badges</span>
+      <div className="row" style={{ gap: 10 }}>
+        <Badge icon={<i className="fa-solid fa-bolt" />}>Native API handlers</Badge>
+        <Badge variant="fsb" icon={<i className="fa-solid fa-code" />}>DOM-Based</Badge>
+        <Badge variant="competitor" icon={<i className="fa-solid fa-eye" />}>Vision</Badge>
+        <Badge variant="recommended">Recommended</Badge>
+        <Badge variant="nav" meta="/issues">Linear</Badge>
+        <Badge variant="selector">button.submit</Badge>
+        <Badge variant="tool">scroll_to</Badge>
+      </div>
+
+      <span className="lbl">Cards</span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <Card icon={<i className="fa-solid fa-bolt" />} title="Direct API Execution">
+          Calls an app's own authenticated API through your session, with DOM automation as the fallback.
+        </Card>
+        <Card icon={<i className="fa-solid fa-sitemap" />} title="Smart DOM Analysis">
+          Incremental diffing, multi-strategy selectors and element identification.
+        </Card>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+        <Card variant="provider" recommended icon={<i className="fa-solid fa-bolt" />} title="xAI Grok">Grok 4.1 Fast, Grok 4</Card>
+        <Card variant="provider" icon={<i className="fa-solid fa-robot" />} title="Anthropic">Claude Opus, Sonnet, Haiku</Card>
+        <Card variant="competitor" icon={<i className="fa-solid fa-eye" />} title="Operator" badge={<Badge variant="competitor" icon={<i className="fa-solid fa-eye" />}>Vision</Badge>} />
+      </div>
+      <Card variant="highlight">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 10, color: 'var(--text-primary)' }}>
+          <FsbMark size="1.4rem" />
+          <Badge variant="fsb" icon={<i className="fa-solid fa-code" />}>DOM-Based</Badge>
+        </div>
+        <StatBlock stats={[{ value: '50-200ms', label: 'per step' }, { value: '~$0.03', label: 'per 100 steps' }]} />
+      </Card>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

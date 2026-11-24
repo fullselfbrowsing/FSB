@@ -1,0 +1,55 @@
+/* Site palette: the showcase (every route, including /dashboard) and the
+   extension's onboarding page. Dark first; [data-theme="light"] flips surfaces
+   and text, and the accent never changes.
+
+   Mirrors showcase/angular/src/styles.scss. scripts/verify-design-system.mjs
+   fails when the two disagree. A name marked "proposed" exists only here: it is
+   the system's vocabulary for a value that ships as a literal today. */
+:root {
+  --primary: #ff6b35;
+  --primary-hover: #e55a2b;
+  --primary-tint: #ff8c42; /* proposed */
+  --primary-gradient: linear-gradient(135deg, #ff6b35, #ff8c42);
+  --primary-glow: rgba(255, 107, 53, 0.3);
+  --primary-wash: rgba(255, 107, 53, 0.1); /* proposed */
+  --primary-wash-border: rgba(255, 107, 53, 0.28); /* proposed */
+
+  --bg-body: #000000;
+  --bg-card: #0a0a0a;
+  --bg-elevated: #141414;
+  --bg-nav: rgba(0, 0, 0, 0.5);
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+
+  --danger: #ef4444; /* proposed */
+  --danger-wash: rgba(239, 68, 68, 0.1); /* proposed */
+
+  /* The site re-declares four product names with its own values. Naming gap:
+     these should become site names; see DESIGN.md, Known gaps. */
+  --fsb-primary-soft: rgba(255, 107, 53, 0.12);
+  --fsb-border-subtle: rgba(255, 241, 232, 0.1);
+  --fsb-border-accent: rgba(255, 140, 66, 0.28);
+  --fsb-focus-ring: 0 0 0 3px rgba(255, 107, 53, 0.14);
+}
+
+[data-theme="light"] {
+  --bg-body: #ffffff;
+  --bg-card: #f8f9fa;
+  --bg-elevated: #f1f5f9;
+  --bg-nav: rgba(255, 255, 255, 0.5);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+
+  --fsb-border-subtle: rgba(41, 29, 20, 0.1);
+  --fsb-border-accent: rgba(255, 107, 53, 0.24);
+}

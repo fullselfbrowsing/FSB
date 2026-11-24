@@ -1,0 +1,27 @@
+<!-- @dsCard group="Brand" viewport="700x195" subtitle="Three parts, one inherited color" name="Construction" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.p{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;padding:20px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-primary)}
+.g{font-size:2.6rem;line-height:1;font-family:var(--font-brand);letter-spacing:-.02em}
+.p b{font-size:.8rem}
+.p .lbl{text-align:center}
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="p"><span class="g" style="font-weight:100">F</span><b>Hairline F</b><span class="lbl">Poppins · weight 100</span></div>
+<div class="p"><span class="g" style="font-weight:900">S</span><b>Heavy S</b><span class="lbl">Poppins · weight 900</span></div>
+<div class="p"><svg viewBox="-3 -3 78 103" style="height:2.35rem;fill:currentColor"><path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path></svg><b>Custom B</b><span class="lbl">SVG path · fill:currentColor</span></div>
+</div>
+</body>
+</html>

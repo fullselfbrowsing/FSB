@@ -1,0 +1,25 @@
+<!-- @dsCard group="Type" viewport="700x148" subtitle="Platform mono at 0.4em tracking" name="Mono & version tag" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.box{display:flex;align-items:center;gap:30px;flex-wrap:wrap;padding:22px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card)}
+.i{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.mono{font-family:var(--font-mono);color:var(--text-secondary)}
+</style>
+</head>
+<body>
+<div class="box">
+<div class="i"><span class="mono" style="font-size:.85rem" translate="no">npx -y fsb-mcp-server install</span><span class="lbl">command · 0.85rem</span></div>
+<div class="i"><span class="mono" style="font-size:.9rem;letter-spacing:var(--tracking-version);color:var(--text-muted)" translate="no">▽X.Y.Z</span><span class="lbl">version tag · 0.4em tracking</span></div>
+<div class="i"><span class="mono" style="font-size:.72rem;letter-spacing:var(--tracking-eyebrow);text-transform:uppercase;color:var(--primary)">Visual Language</span><span class="lbl">eyebrow · 0.22em</span></div>
+</div>
+</body>
+</html>

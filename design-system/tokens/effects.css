@@ -1,0 +1,30 @@
+/* Site radii, shadows and motion. Mirrors showcase/angular/src/styles.scss.
+   Product surfaces have their own radii and shadows in product-surface.css. */
+:root {
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-pill: 999px; /* proposed */
+  --radius-tag: 10px; /* proposed */
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(255, 107, 53, 0.15);
+
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+
+  --blur-nav: 16px; /* proposed */
+  --lift-card: -4px; /* proposed */
+  --lift-button: -2px; /* proposed */
+}
+
+[data-theme="light"] {
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 20px rgba(255, 107, 53, 0.1);
+}

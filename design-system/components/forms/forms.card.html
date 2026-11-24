@@ -1,0 +1,52 @@
+<!-- @dsCard group="Components" viewport="700x420" subtitle="Field, input, select, textarea, toggle, checkbox, search" name="Forms" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); letter-spacing: .04em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+/* The bundle publishes one global namespace object; find it by a known export. */
+function resolveNS(probe) {
+  for (const k of Object.keys(window)) {
+    const v = window[k];
+    if (v && typeof v === 'object' && typeof v[probe] === 'function') return v;
+  }
+  return {};
+}
+const NS = resolveNS('Input');
+const { FsbMark, VersionTag, Button, Badge, Card, SectionHeader, StatBlock, Field, Input, Textarea, Select, Toggle, Checkbox, SearchField, NavBar, Footer, Toast } = NS;
+
+function Demo() {
+  const [auto, setAuto] = React.useState(true);
+  const [remember, setRemember] = React.useState(true);
+  return (
+    <div className="col" style={{ maxWidth: 460 }}>
+      <Field label="Text input"><Input placeholder="Book a flight from SF to NYC" /></Field>
+      <Field label="Select"><Select options={['xAI Grok', 'Claude', 'Gemini']} /></Field>
+      <Field label="Textarea"><Textarea placeholder="Describe your task in natural language…" /></Field>
+      <div className="row" style={{ gap: 24 }}>
+        <Toggle checked={auto} onChange={setAuto} label="Autopilot" />
+        <Checkbox checked={remember} onChange={setRemember} label="Remember session" />
+      </div>
+      <Field label="Search"><SearchField placeholder="Search 130+ site guides" /></Field>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

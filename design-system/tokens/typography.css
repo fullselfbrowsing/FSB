@@ -1,0 +1,28 @@
+/* Site type scale. No shipped stylesheet declares these yet: the values are the
+   literals styles.scss and the shell use today (headings in styles.scss, tracking
+   in showcase-shell.component.scss). Product pages keep their own scale; see
+   foundations/typography.md. */
+:root {
+  --text-h1: clamp(2rem, 5vw, 3.5rem); /* proposed */
+  --text-h2: clamp(1.5rem, 3.5vw, 2.5rem); /* proposed */
+  --text-h3: clamp(1.125rem, 2.5vw, 1.5rem); /* proposed */
+  --text-body: 1rem; /* proposed */
+  --text-sm: 0.9rem; /* proposed */
+  --text-xs: 0.8rem; /* proposed */
+  --text-micro: 0.72rem; /* proposed */
+
+  --leading-tight: 1.2; /* proposed */
+  --leading-body: 1.6; /* proposed */
+  --leading-relaxed: 1.7; /* proposed */
+
+  --tracking-tight: -0.02em; /* proposed */
+  --tracking-label: 0.05em; /* proposed */
+  --tracking-eyebrow: 0.22em; /* proposed */
+  --tracking-version: 0.4em; /* proposed */
+
+  --weight-hairline: 100; /* proposed */
+  --weight-medium: 500; /* proposed */
+  --weight-semibold: 600; /* proposed */
+  --weight-bold: 700; /* proposed */
+  --weight-black: 900; /* proposed */
+}

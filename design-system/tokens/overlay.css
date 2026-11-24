@@ -1,0 +1,54 @@
+/* In-page overlay palette: the progress card, viewport glow, action glow,
+   replay player, trigger badge and crawl card that FSB draws on web pages.
+
+   These colours live inside the shadow-root stylesheets that
+   extension/content/visual-feedback.js writes; there are no shared variables
+   there yet. Each token below names its source as a same-line comment
+   "<selector> <property>", and scripts/verify-design-system.mjs fails when that
+   selector's property no longer holds the token's value.
+
+   The overlay accent is #ff8c00, not the panel and site orange #ff6b35; see
+   decisions/0003-overlay-accent-ff8c00.md. data-surface exists only in this folder. */
+[data-surface="overlay"] {
+  /* Viewport glow, one pair per state (bead gradient). */
+  --fsb-ov-thinking-1: #ff8c00; /* .viewport-glow-root.state-thinking --glow-color-1 */
+  --fsb-ov-thinking-2: #f59e0b; /* .viewport-glow-root.state-thinking --glow-color-2 */
+  --fsb-ov-acting-1: #ff6600; /* .viewport-glow-root.state-acting --glow-color-1 */
+  --fsb-ov-acting-2: #ff8c00; /* .viewport-glow-root.state-acting --glow-color-2 */
+  --fsb-ov-watching-1: #ff8c00; /* .viewport-glow-root.state-watching --glow-color-1 */
+  --fsb-ov-watching-2: #ffa500; /* .viewport-glow-root.state-watching --glow-color-2 */
+  --fsb-ov-calling-1: #8b5cf6; /* .viewport-glow-root.state-calling --glow-color-1 */
+  --fsb-ov-calling-2: #a78bfa; /* .viewport-glow-root.state-calling --glow-color-2 */
+
+  /* Progress card. */
+  --fsb-ov-card-surface: #000000; /* .fsb-overlay background */
+  --fsb-ov-card-text: #ffffff; /* .fsb-overlay color */
+  --fsb-ov-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 140, 0, 0.3); /* .fsb-overlay box-shadow */
+  --fsb-ov-accent: #ff8c00; /* .fsb-step-number color */
+  --fsb-ov-progress-fill: linear-gradient(90deg, #ff8c00, #ff6600); /* .fsb-progress-fill background */
+  --fsb-ov-done: #34d399; /* .fsb-progress-fill.complete background */
+  --fsb-ov-guarded: #f5a524; /* .fsb-progress-fill.guarded background */
+  --fsb-ov-guarded-text: #f5b942; /* .fsb-step-number.guarded color */
+  --fsb-ov-guarded-note: #f5cf8f; /* .fsb-note color */
+  --fsb-ov-calling-text: #b79dfb; /* .fsb-step-number.calling color */
+
+  /* Replay player. */
+  --fsb-ov-replay-surface: rgba(8, 8, 8, 0.94); /* .fsb-replay-controls background */
+  --fsb-ov-replay-accent: #ff9f2e; /* .fsb-replay-toggle color */
+  --fsb-ov-replay-hover: #ffb45c; /* .fsb-replay-speed:hover:not(:disabled) color */
+  --fsb-ov-replay-fill: #ff8c00; /* .fsb-replay-progress-fill background */
+
+  /* Trigger watch badge. */
+  --fsb-ov-badge-surface: rgba(20, 16, 12, 0.88); /* .badge-root background */
+  --fsb-ov-badge-text: #fff5e6; /* .badge-root color */
+  --fsb-ov-badge-dot: rgba(255, 166, 0, 0.95); /* .badge-dot background */
+
+  /* Action glow (the box drawn around the element FSB acts on). */
+  --fsb-ov-target-border: 2.5px solid rgba(255, 140, 0, 0.8); /* .box-overlay border */
+  --fsb-ov-target-fill: rgba(255, 140, 0, 0.04); /* .box-overlay background */
+
+  /* Crawl card. Blue on purpose: crawling is not acting on the page. */
+  --fsb-ov-crawl: #38bdf8; /* .fsb-crawl-title color */
+  --fsb-ov-crawl-fill: linear-gradient(90deg, #0ea5e9, #38bdf8); /* .fsb-crawl-progress-fill background */
+  --fsb-ov-crawl-surface: rgba(15, 23, 42, 0.92); /* .fsb-crawl-overlay background */
+}

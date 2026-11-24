@@ -1,0 +1,20 @@
+/* Font families. Body text uses the native system stack, Poppins is only for the
+   wordmark (weights 100 and 900), and technical text (code, selectors, tool
+   names, version tags, eyebrows) uses the platform monospace stack, which is
+   the stack the control panel ships. No web font is loaded for technical text;
+   see decisions/0012-platform-mono-for-technical-text.md.
+
+   Specimen pages load Poppins from Google Fonts so the wordmark renders when
+   opened straight from disk (browsers refuse file:// fonts). Shipped surfaces do
+   not use Google Fonts:
+     - the extension bundles extension/assets/onboarding/fonts/*.ttf;
+     - the showcase's Content-Security-Policy (font-src 'self' data:) blocks
+       Google Fonts, so the wordmark's Poppins never loads there today. See
+       DESIGN.md, Known gaps. */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100;900&display=swap");
+
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; /* proposed */
+  --font-brand: 'Poppins', system-ui, sans-serif; /* proposed */
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; /* proposed */
+}
