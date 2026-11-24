@@ -218,9 +218,6 @@ Top level deploy and validation files:
 #### API Configuration
 <img src="extension/assets/screenshots/api-configuration.png" alt="API configuration panel with provider selection and key entry" width="100%" />
 
-#### Passwords Manager
-<img src="extension/assets/screenshots/passwords-manager.png" alt="Passwords manager for storing site credentials used during automation" width="100%" />
-
 #### Memory and Site Explorer
 <img src="extension/assets/screenshots/memory-site-explorer.png" alt="Memory viewer and site explorer showing crawled site structure" width="100%" />
 
@@ -281,6 +278,14 @@ For an unpacked build, record the ID on `chrome://extensions/`. A different inst
 
 If a site uses heavy client rendering, custom canvas controls, or unusual shadow DOM, start by asking FSB to read the page and identify available controls. That gives the model a better first snapshot and makes failures easier to debug.
 
+### Connect 1Password (Optional)
+
+FSB has no password vault of its own. To let it sign in and fill checkouts from your 1Password, open the control panel's **Vault** page and press **Log in to 1Password**. This needs the 1Password desktop app and the FSB local server (`fsb-mcp-server`), which holds the 1Password connection.
+
+One button does not remove 1Password's own steps. 1Password needs its **Settings > Developer > Integrate with 1Password SDKs** setting turned on (FSB opens that pane for you), possibly your account name, and your approval. It asks for that approval again after 10 idle minutes, after the app locks, and after the local server restarts.
+
+FSB reads all of your vaults by default; you can limit it to some under **Advanced** on the Vault page. Logins you choose to save go to your Personal vault unless you pick another one. Passwords, one-time codes, and card numbers are typed into the page and never reach the model. For a headless machine, set up a 1Password service account from the terminal instead; see [1Password for logins and cards](mcp/README.md#1password-for-logins-and-cards).
+
 ### Quick Troubleshooting
 
 | Problem | Check |
@@ -292,6 +297,7 @@ If a site uses heavy client rendering, custom canvas controls, or unusual shadow
 | Typed text does not stick | Prefer `type_text` over JavaScript value assignment on controlled inputs. |
 | MCP tools are missing | Restart the host client and run `npx -y fsb-mcp-server@latest doctor`. |
 | MCP tools time out | Check `status --watch`, active tab readiness, and whether another task is queued. |
+| 1Password does not connect | Unlock the 1Password app, check **Settings > Developer > Integrate with 1Password SDKs**, then press **Log in to 1Password** on the Vault page again. |
 
 Most failures are recoverable by inspecting the current page, refreshing selectors, or restarting the local MCP bridge. Reinstalling the MCP config should be the last step, not the first.
 
