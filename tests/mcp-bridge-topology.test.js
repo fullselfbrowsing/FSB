@@ -345,6 +345,9 @@ function makeLifecycleFakes(overrides = {}) {
       state.disconnectCalls++;
       order.push('bridge.disconnect');
     },
+    claimHub() {
+      order.push('bridge.claimHub');
+    },
   };
   const httpServer = {
     endpoint: 'http://127.0.0.1:6015/mcp',
@@ -516,6 +519,17 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     'serve bridge has the single closed spawn capability',
   );
   assertEqual(typeof success.state.bridgeOptions.handleExtRequest, 'function', 'serve bridge receives the supervisor handler closure');
+  assertEqual(success.state.bridgeOptions.daemon, true, 'serve bridge is the long-lived service that may claim the hub port');
+  assertEqual(
+    success.order[9],
+    'bridge.claimHub',
+    'serve claims the hub port only once it is ready, right after marking readiness',
+  );
+  assertEqual(
+    success.order.filter((entry) => entry === 'bridge.claimHub').length,
+    1,
+    'serve claims the hub port exactly once',
+  );
   assert(success.state.httpOptions.bridge === success.bridge, 'HTTP receives the same not-yet-connected capable bridge');
   assertEqual(success.state.connectCalls, 1, 'capable bridge connects exactly once after recovery');
   assertEqual(success.state.prepareCalls, 1, 'bridge auth is prepared exactly once after recovery');
@@ -848,6 +862,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     }
     assert(error instanceof lifecycleModule.ServeDelegationStartupError, `${name} failure is a typed startup failure`);
     assertEqual(failure.order.slice(0, expectedPrefix.split(' > ').length).join(' > '), expectedPrefix, `${name} failure preserves startup order`);
+    assert(!failure.order.includes('bridge.claimHub'), `${name} failure never claims the hub port`);
     assertEqual(
       failure.state.prepareCalls,
       ['bridge auth preparation', 'bridge connect', 'inventory push'].includes(name) ? 1 : 0,
@@ -878,6 +893,11 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   const runtimeSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'runtime.ts'), 'utf8');
   const stdioSource = source.slice(source.indexOf('async function runStdioServer'), source.indexOf('async function runHttpMode'));
   assert(!/SpawnSupervisor|handleExtRequest|agent-spawn|startServeDelegation/.test(stdioSource), 'stdio source contains no supervisor, handler, or spawn capability');
+  assert(
+    /new WebSocketBridge\(\{ daemonHealthPort: DEFAULT_HTTP_PORT \}\)/.test(stdioSource),
+    'the stdio bridge gives way to the local service on its health port',
+  );
+  assert(!/daemon: true|claimHub/.test(stdioSource), 'a stdio server never claims the hub port');
   assert(!/SpawnSupervisor|handleExtRequest|agent-spawn|startServeDelegation/.test(runtimeSource), 'shared MCP runtime contains no supervisor, handler, or spawn capability');
   assertEqual((source.match(/startServeDelegation\(/g) || []).length, 1, 'only serve mode starts the delegation lifecycle');
   const serveModeSource = source.slice(source.indexOf('async function runHttpMode'), source.indexOf('export function runPair'));
@@ -2608,11 +2628,715 @@ async function runHubExitPromotion(WebSocketBridge) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// The long-lived local service owns the hub
+// ---------------------------------------------------------------------------
+
+const HANDOFF_EXTENSION_ORIGIN = 'chrome-extension://handoff-test-extension';
+
+async function loadHttpModule() {
+  return import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'http.js')).href);
+}
+
+async function loadDaemonHealthModule() {
+  return import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'daemon-health.js')).href);
+}
+
+// The service's real /health endpoint, answered for the given bridge.
+async function startDaemonHealth(httpModule, bridge, port, { ready = true } = {}) {
+  const running = await httpModule.startHttpServer({
+    host: '127.0.0.1',
+    port,
+    bridge,
+    queue: { isRunning: false },
+  });
+  if (ready) running.markServeReady();
+  return running;
+}
+
+function countHubBinds(bridge) {
+  const original = bridge._startAsHub.bind(bridge);
+  const counter = { binds: 0 };
+  bridge._startAsHub = () => {
+    counter.binds++;
+    return original();
+  };
+  return counter;
+}
+
+function handoffProof(sessionSecret, hubInstanceId, relayInstanceId, nonce) {
+  return crypto.createHmac('sha256', Buffer.from(sessionSecret, 'base64url'))
+    .update(`fsb-relay-yield-to-daemon-v1\n${hubInstanceId}\n${relayInstanceId}\n${nonce}`)
+    .digest('base64url');
+}
+
+function readBridgeJournal(home) {
+  try {
+    return fs.readFileSync(path.join(home, '.fsb', 'agent-runtime', 'bridge-events.jsonl'), 'utf8')
+      .trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  } catch (_error) {
+    return [];
+  }
+}
+
+function pairHandoffExtension(auth, home, rotatedAt) {
+  const authPath = auth.getBridgeAuthPath(home);
+  auth.rotateBridgeSessionSecret(authPath, rotatedAt);
+  const state = auth.bindAllowedExtensionOrigin(HANDOFF_EXTENSION_ORIGIN, authPath);
+  return {
+    state,
+    extensionOptions: { origin: HANDOFF_EXTENSION_ORIGIN, pairingCode: auth.formatPairingCode(state) },
+  };
+}
+
+function answerProbe(socket, message) {
+  socket.send(JSON.stringify({
+    id: message.id,
+    type: 'mcp:response',
+    payload: { success: true, answered: message.payload?.from ?? message.type },
+  }));
+}
+
+async function runDaemonHealthProbe(healthModule, httpModule, WebSocketBridge) {
+  const { probeDaemonHealth } = healthModule;
+  const servers = [];
+  const serveBody = async (statusCode, body) => {
+    const server = require('node:http').createServer((_req, res) => {
+      res.writeHead(statusCode, { 'content-type': 'application/json' });
+      res.end(body);
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    servers.push(server);
+    return server.address().port;
+  };
+  const valid = {
+    ok: true,
+    service: 'fsb-mcp-server',
+    version: '0.0.0',
+    nativeHostProtocol: 1,
+    serveReady: true,
+    bridgeMode: 'relay',
+    activeHubInstanceId: 'probe-hub',
+    bridgeTopology: { instanceId: 'probe-service' },
+  };
+  try {
+    const health = await probeDaemonHealth(await serveBody(200, JSON.stringify(valid)), 500);
+    assertEqual(health?.serveReady, true, 'the FSB service health contract is accepted');
+    assertEqual(health?.bridgeInstanceId, 'probe-service', 'the service bridge instance id is read from its topology');
+    assertEqual(health?.bridgeMode, 'relay', 'the service bridge mode is read');
+    assertEqual(health?.activeHubInstanceId, 'probe-hub', 'the hub the service relays through is read');
+
+    assertEqual(await probeDaemonHealth(await getFreePort(), 500), null, 'nothing listening is no service');
+    assertEqual(
+      await probeDaemonHealth(await serveBody(200, JSON.stringify({ ...valid, service: 'something-else' })), 500),
+      null,
+      'another program on the port is no service',
+    );
+    assertEqual(
+      await probeDaemonHealth(await serveBody(200, JSON.stringify({ ...valid, nativeHostProtocol: 2 })), 500),
+      null,
+      'a different native-host protocol is no service',
+    );
+    assertEqual(
+      await probeDaemonHealth(await serveBody(200, JSON.stringify({ ...valid, serveReady: 'yes' })), 500),
+      null,
+      'a non-boolean readiness is no service',
+    );
+    assertEqual(
+      await probeDaemonHealth(await serveBody(503, JSON.stringify(valid)), 500),
+      null,
+      'a non-200 answer is no service',
+    );
+    assertEqual(
+      await probeDaemonHealth(await serveBody(200, JSON.stringify({ ...valid, pad: 'x'.repeat(5000) })), 500),
+      null,
+      'an oversized body is no service',
+    );
+    const silent = net.createServer(() => {});
+    await new Promise((resolve) => silent.listen(0, '127.0.0.1', resolve));
+    servers.push(silent);
+    const startedAt = Date.now();
+    assertEqual(await probeDaemonHealth(silent.address().port, 100), null, 'a peer that never answers is no service');
+    assert(Date.now() - startedAt < 1000, 'the probe gives up at its timeout');
+
+    // The real endpoint: false until serve marks itself ready.
+    const bridge = new WebSocketBridge({ port: await getFreePort(), host: '127.0.0.1', instanceId: 'probe-real-service', daemon: true });
+    const realPort = await getFreePort();
+    const real = await startDaemonHealth(httpModule, bridge, realPort, { ready: false });
+    try {
+      assertEqual((await probeDaemonHealth(realPort, 500))?.serveReady, false, 'the real endpoint reports a starting service as not ready');
+      real.markServeReady();
+      const ready = await probeDaemonHealth(realPort, 500);
+      assertEqual(ready?.serveReady, true, 'the real endpoint reports a ready service');
+      assertEqual(ready?.bridgeInstanceId, 'probe-real-service', 'the real endpoint names the service bridge');
+    } finally {
+      await real.close();
+    }
+  } finally {
+    for (const server of servers) {
+      server.close();
+    }
+  }
+}
+
+async function runStdioDefersToReadyDaemon(WebSocketBridge, httpModule) {
+  await withTempHome('bridge-defer-daemon', async () => {
+    const hubPort = await getFreePort();
+    const healthPort = await getFreePort();
+    const daemon = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'defer-daemon',
+      daemon: true,
+      handshakeTimeoutMs: 25,
+      maxReconnectDelayMs: 100,
+    });
+    const stdio = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'defer-stdio',
+      daemonHealthPort: healthPort,
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+    });
+    const stdioBinds = countHubBinds(stdio);
+    const resources = { sockets: [], bridges: [daemon, stdio] };
+    const healthServers = [];
+    try {
+      await daemon.connect();
+      healthServers.push(await startDaemonHealth(httpModule, daemon, healthPort));
+      await stdio.connect();
+      assertEqual(stdio.currentMode, 'relay', 'a stdio bridge joins a ready local service as a relay');
+      assertEqual(stdioBinds.binds, 0, 'it never tries to bind the hub port while the service is ready');
+      assertEqual(stdio.topology.activeHubInstanceId, 'defer-daemon', 'its hub is the local service');
+
+      // The service's bridge stops while its /health still reports ready. The
+      // relay leaves the port to it a bounded number of times, then binds.
+      const lostAt = Date.now();
+      daemon.disconnect();
+      await waitFor(() => stdio.currentMode === 'hub', 'stdio binds once the service never takes the port', 5000, 20);
+      assert(Date.now() - lostAt >= 700, 'the relay first left the port to the service several times');
+      assertEqual(stdioBinds.binds, 1, 'the bounded deferral ends in exactly one bind');
+
+      // A service that is still starting does not hold anyone back.
+      const startingHubPort = await getFreePort();
+      const startingHealthPort = await getFreePort();
+      const startingService = new WebSocketBridge({ port: await getFreePort(), host: '127.0.0.1', instanceId: 'defer-starting', daemon: true });
+      healthServers.push(await startDaemonHealth(httpModule, startingService, startingHealthPort, { ready: false }));
+      const early = new WebSocketBridge({ port: startingHubPort, host: '127.0.0.1', instanceId: 'defer-early', daemonHealthPort: startingHealthPort });
+      resources.bridges.push(early);
+      await early.connect();
+      assertEqual(early.currentMode, 'hub', 'a stdio bridge binds when the service is not ready yet');
+
+      // No service at all: the ordinary race.
+      const offline = new WebSocketBridge({ port: await getFreePort(), host: '127.0.0.1', instanceId: 'defer-offline', daemonHealthPort: await getFreePort() });
+      resources.bridges.push(offline);
+      await offline.connect();
+      assertEqual(offline.currentMode, 'hub', 'a stdio bridge binds when no service answers');
+
+      // A ready service but no hub on the port: one bind, and no second
+      // attempt from the failed relay connection.
+      const emptyHubPort = await getFreePort();
+      const readyHealthPort = await getFreePort();
+      const idleService = new WebSocketBridge({ port: await getFreePort(), host: '127.0.0.1', instanceId: 'defer-idle-service', daemon: true });
+      healthServers.push(await startDaemonHealth(httpModule, idleService, readyHealthPort));
+      const lonely = new WebSocketBridge({
+        port: emptyHubPort,
+        host: '127.0.0.1',
+        instanceId: 'defer-lonely',
+        daemonHealthPort: readyHealthPort,
+        promotionJitterMs: 1,
+      });
+      const lonelyBinds = countHubBinds(lonely);
+      resources.bridges.push(lonely);
+      await lonely.connect();
+      assertEqual(lonely.currentMode, 'hub', 'with nobody on the hub port the stdio bridge binds it');
+      await sleep(300);
+      assertEqual(lonelyBinds.binds, 1, 'the unanswered relay attempt does not start a second bind');
+      assertEqual(lonely.currentMode, 'hub', 'the bridge stays hub');
+    } finally {
+      for (const server of healthServers) await server.close().catch(() => {});
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runDaemonTakesOverIdleStdioHub(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-daemon-takeover', async (home) => {
+    const hubPort = await getFreePort();
+    const healthPort = await getFreePort();
+    const { extensionOptions } = pairHandoffExtension(auth, home, 31_000);
+    const daemonRequests = [];
+    const stdioHub = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'takeover-stdio-hub',
+      daemonHealthPort: healthPort,
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+      hubHandoffPollMs: 20,
+    });
+    const stdioRelay = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'takeover-stdio-relay',
+      daemonHealthPort: healthPort,
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+    });
+    // A relay from before the handover: no health port, and it drops hub
+    // control frames it does not know. Zero jitter makes it race hard.
+    const legacyRelay = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'takeover-legacy-relay',
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+    });
+    legacyRelay._handleHubControlFrame = () => {};
+    const daemon = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'takeover-daemon',
+      daemon: true,
+      handshakeTimeoutMs: 25,
+      maxReconnectDelayMs: 100,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: (request) => new Promise((resolve) => {
+        daemonRequests.push({ request, resolve });
+      }),
+    });
+    const stdioRelayBinds = countHubBinds(stdioRelay);
+    const legacyBinds = countHubBinds(legacyRelay);
+    const resources = { sockets: [], bridges: [daemon, legacyRelay, stdioRelay, stdioHub] };
+    let health = null;
+    try {
+      await stdioHub.connect();
+      await stdioRelay.connect();
+      await legacyRelay.connect();
+      const first = await createBrowserSocket(hubPort, extensionOptions);
+      resources.sockets.push(first);
+      const firstMessages = collectSocketMessages(first);
+      await waitFor(
+        () => stdioRelay.topology.extensionConnected && legacyRelay.topology.extensionConnected,
+        'relays see the extension',
+      );
+
+      await daemon.connect();
+      assertEqual(daemon.currentMode, 'relay', 'the service finds the stdio hub and joins as a relay');
+      health = await startDaemonHealth(httpModule, daemon, healthPort);
+
+      // Work in flight in every direction before the service asks.
+      const hubCall = stdioHub.sendAndWait({ type: 'mcp:handoff-probe', payload: { from: 'hub' } }, { timeout: 5000 });
+      const legacyCall = legacyRelay.sendAndWait({ type: 'mcp:handoff-probe', payload: { from: 'legacy' } }, { timeout: 5000 });
+      first.send(JSON.stringify({
+        id: 'takeover-delegate',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'handoff' },
+      }));
+      await waitFor(
+        () => firstMessages.filter((message) => message.type === 'mcp:handoff-probe').length === 2
+          && daemonRequests.length === 1,
+        'work reaches the extension and the service',
+      );
+
+      // Each relay already tried the port once while connecting.
+      const stdioRelayBindsBefore = stdioRelayBinds.binds;
+      const legacyBindsBefore = legacyBinds.binds;
+      daemon.claimHub();
+      await waitFor(() => stdioHub.hubHandoff?.phase === 'waiting', 'the stdio hub agrees and waits until idle');
+      await sleep(150);
+      assertEqual(stdioHub.currentMode, 'hub', 'a busy stdio hub keeps the port');
+      assertEqual(stdioHub.httpServer?.listening, true, 'a busy stdio hub keeps listening');
+      assertEqual(daemon.currentMode, 'relay', 'the service waits as a relay');
+
+      // A request the hub answers itself never leaves it, even while it waits.
+      first.send(JSON.stringify({ id: 'takeover-auth-status', type: 'ext:request', method: 'bridge.auth-status', payload: {} }));
+      await waitFor(
+        () => firstMessages.some((message) => message.id === 'takeover-auth-status' && message.type === 'ext:response'),
+        'auth status is answered',
+      );
+      assertEqual(
+        firstMessages.find((message) => message.id === 'takeover-auth-status').payload?.authorized,
+        true,
+        'the waiting hub answers auth status itself',
+      );
+      assertEqual(daemonRequests.length, 1, 'the hub-local request never reached the service');
+
+      for (const message of firstMessages.filter((entry) => entry.type === 'mcp:handoff-probe')) {
+        answerProbe(first, message);
+      }
+      const [hubResult, legacyResult] = await Promise.all([hubCall, legacyCall]);
+      assertEqual(hubResult.answered, 'hub', "the hub's own in-flight call completes");
+      assertEqual(legacyResult.answered, 'legacy', "a legacy relay's in-flight call completes");
+      await sleep(60);
+      assertEqual(stdioHub.currentMode, 'hub', 'an unsettled extension request still holds the handover');
+
+      const firstClosed = waitForSocketClose(first, 3000);
+      firstClosed.catch(() => {});
+      daemonRequests[0].resolve({ status: 'succeeded' });
+      await waitFor(
+        () => firstMessages.some((message) => message.id === 'takeover-delegate' && message.type === 'ext:response'),
+        'the in-flight extension request is answered before the handover',
+      );
+      await waitFor(() => daemon.currentMode === 'hub', 'the service becomes hub once the stdio hub is idle', 3000);
+      await firstClosed;
+      assert(true, 'the extension socket on the old hub closes so the extension reconnects to the service');
+      assertEqual(daemon.topology.activeHubInstanceId, 'takeover-daemon', 'the service reports itself as hub');
+
+      await waitFor(
+        () => stdioHub.currentMode === 'relay' && stdioHub.topology.activeHubInstanceId === 'takeover-daemon',
+        'the old hub rejoins as a relay of the service',
+        3000,
+      );
+      await waitFor(
+        () => stdioRelay.currentMode === 'relay' && stdioRelay.topology.activeHubInstanceId === 'takeover-daemon',
+        'a current relay follows the handover',
+        3000,
+      );
+      await waitFor(
+        () => legacyRelay.currentMode === 'relay' && legacyRelay.topology.activeHubInstanceId === 'takeover-daemon',
+        'a legacy relay ends up attached to the service',
+        5000,
+      );
+      assertEqual(stdioRelayBinds.binds - stdioRelayBindsBefore, 0, 'a relay told about the handover never competes for the port');
+      assert(legacyBinds.binds > legacyBindsBefore, 'the legacy relay did race for the port');
+      assertEqual(daemon.currentMode, 'hub', 'the racing legacy relay did not win the port');
+
+      const second = await createBrowserSocket(hubPort, extensionOptions);
+      resources.sockets.push(second);
+      const secondMessages = collectSocketMessages(second);
+      answerBridgeRequests(second);
+      await waitFor(
+        () => stdioHub.topology.extensionConnected && legacyRelay.topology.extensionConnected,
+        'every relay sees the extension on the new hub',
+      );
+      const viaOldHub = await stdioHub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }, { timeout: 1000 });
+      assertEqual(viaOldHub.answered, 'mcp:get-tabs', 'the old hub reaches the extension through the service');
+      const viaLegacy = await legacyRelay.sendAndWait({ type: 'mcp:get-tabs', payload: {} }, { timeout: 1000 });
+      assertEqual(viaLegacy.answered, 'mcp:get-tabs', 'a legacy relay keeps working through the service');
+
+      second.send(JSON.stringify({
+        id: 'after-takeover-delegate',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'after handoff' },
+      }));
+      await waitFor(() => daemonRequests.length === 2, 'the service handles extension requests itself');
+      daemonRequests[1].resolve({ status: 'succeeded' });
+      await waitFor(
+        () => secondMessages.some((message) => message.id === 'after-takeover-delegate' && message.type === 'ext:response'),
+        'the service answers on the extension socket directly',
+      );
+      await waitFor(() => daemon.isIdle() && stdioHub.isIdle(), 'nothing is left in flight on either side');
+
+      const journal = readBridgeJournal(home).map((record) => record.event);
+      for (const event of ['hub_yield_accepted', 'hub_yielded', 'hub_taken_over']) {
+        assert(journal.includes(event), `the bridge journal records ${event}`);
+      }
+    } finally {
+      if (health) await health.close().catch(() => {});
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runHandoffDrainsLateRequests(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-handoff-drain', async (home) => {
+    const hubPort = await getFreePort();
+    const healthPort = await getFreePort();
+    const { extensionOptions } = pairHandoffExtension(auth, home, 32_000);
+    const stdioHub = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'drain-stdio-hub',
+      daemonHealthPort: healthPort,
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+      hubHandoffPollMs: 20,
+    });
+    const daemon = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'drain-daemon',
+      daemon: true,
+      handshakeTimeoutMs: 25,
+      maxReconnectDelayMs: 100,
+    });
+    const resources = { sockets: [], bridges: [daemon, stdioHub] };
+    let health = null;
+    try {
+      await stdioHub.connect();
+      const extension = await createBrowserSocket(hubPort, extensionOptions);
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+      await daemon.connect();
+      health = await startDaemonHealth(httpModule, daemon, healthPort);
+      await waitFor(() => daemon.topology.extensionConnected, 'the service sees the extension through the stdio hub');
+
+      // Hold the service's bind so work can arrive after the old hub has
+      // already released the port.
+      const bindStartAsHub = daemon._startAsHub.bind(daemon);
+      let openBind = null;
+      const bindGate = new Promise((resolve) => { openBind = resolve; });
+      let bindRequested = false;
+      daemon._startAsHub = async () => {
+        bindRequested = true;
+        await bindGate;
+        return bindStartAsHub();
+      };
+
+      daemon.claimHub();
+      await waitFor(() => bindRequested, 'the idle stdio hub releases the port');
+      assertEqual(stdioHub.hubHandoff?.phase, 'released', 'the stdio hub is in the released phase');
+      assertEqual(stdioHub.httpServer?.listening, false, 'only the listening socket is closed');
+      assertEqual(extension.readyState, WebSocket.OPEN, 'the extension stays connected to the old hub');
+
+      const lateHubCall = stdioHub.sendAndWait({ type: 'mcp:handoff-probe', payload: { from: 'late-hub' } }, { timeout: 5000 });
+      const carriedCall = daemon.sendAndWait({ type: 'mcp:handoff-probe', payload: { from: 'carried' } }, { timeout: 5000 });
+      await waitFor(
+        () => messages.filter((message) => message.type === 'mcp:handoff-probe').length === 2,
+        'late work reaches the extension through the old hub',
+      );
+
+      openBind();
+      await waitFor(() => daemon.currentMode === 'hub', 'the service binds the released port');
+      await waitFor(() => stdioHub.hubHandoff?.phase === 'draining', 'the old hub drains instead of closing');
+      await sleep(80);
+      assertEqual(stdioHub.currentMode, 'hub', 'the old hub keeps its sockets while work is in flight');
+      assertEqual(extension.readyState, WebSocket.OPEN, 'the extension is not cut off mid-request');
+      assert(!daemon.isIdle(), 'the service counts the call it sent before taking over as in flight');
+
+      const extensionClosed = waitForSocketClose(extension, 3000);
+      extensionClosed.catch(() => {});
+      for (const message of messages.filter((entry) => entry.type === 'mcp:handoff-probe')) {
+        answerProbe(extension, message);
+      }
+      const [lateResult, carriedResult] = await Promise.all([lateHubCall, carriedCall]);
+      assertEqual(lateResult.answered, 'late-hub', 'a call made after the port was released completes');
+      assertEqual(carriedResult.answered, 'carried', "the service's own call through the old hub completes");
+      await extensionClosed;
+      assert(true, 'the old hub closes the extension socket once drained');
+      await waitFor(
+        () => stdioHub.currentMode === 'relay' && stdioHub.topology.activeHubInstanceId === 'drain-daemon',
+        'the old hub rejoins the service as a relay',
+        3000,
+      );
+      assert(daemon.isIdle(), 'the service is idle once the carried call settled');
+    } finally {
+      if (health) await health.close().catch(() => {});
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runHubRefusesUnprovenTakeover(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-takeover-refused', async (home) => {
+    const hubPort = await getFreePort();
+    const healthPort = await getFreePort();
+    const plainHubPort = await getFreePort();
+    const { state, extensionOptions } = pairHandoffExtension(auth, home, 33_000);
+    const stdioHub = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'refuse-stdio-hub',
+      daemonHealthPort: healthPort,
+      handshakeTimeoutMs: 200,
+      hubHandoffPollMs: 20,
+    });
+    // A hub not set up to give way, as every bridge is unless told otherwise.
+    const plainHub = new WebSocketBridge({
+      port: plainHubPort,
+      host: '127.0.0.1',
+      instanceId: 'refuse-plain-hub',
+      handshakeTimeoutMs: 200,
+    });
+    // /health belongs to some other service bridge, not the asking relay.
+    const otherService = new WebSocketBridge({ port: await getFreePort(), host: '127.0.0.1', instanceId: 'refuse-other-service', daemon: true });
+    const resources = { sockets: [], bridges: [stdioHub, plainHub] };
+    let health = null;
+    try {
+      await stdioHub.connect();
+      await plainHub.connect();
+      health = await startDaemonHealth(httpModule, otherService, healthPort);
+      const extension = await createBrowserSocket(hubPort, extensionOptions);
+      resources.sockets.push(extension);
+      const extensionMessages = collectSocketMessages(extension);
+
+      const relay = await createOriginlessSocket(hubPort);
+      resources.sockets.push(relay);
+      const relayMessages = collectSocketMessages(relay);
+      relay.send(JSON.stringify({ type: 'relay:hello', instanceId: 'refuse-relay' }));
+      await waitFor(() => relayMessages.some((message) => message.type === 'relay:welcome'), 'relay welcome');
+      const refusals = () => relayMessages.filter((message) => message.type === 'relay:yield-refused').map((message) => message.reason);
+
+      const nonce = crypto.randomBytes(16).toString('base64url');
+      relay.send(JSON.stringify({
+        type: 'relay:yield-to-daemon',
+        nonce,
+        proof: handoffProof(crypto.randomBytes(32).toString('base64url'), 'refuse-stdio-hub', 'refuse-relay', nonce),
+      }));
+      await waitFor(() => refusals().length === 1, 'forged proof is answered');
+      assertEqual(refusals()[0], 'proof_mismatch', 'a proof made without the pairing secret is refused');
+
+      relay.send(JSON.stringify({
+        type: 'relay:yield-to-daemon',
+        nonce,
+        proof: handoffProof(state.sessionSecret, 'some-other-hub', 'refuse-relay', nonce),
+      }));
+      await waitFor(() => refusals().length === 2, 'proof for another hub is answered');
+      assertEqual(refusals()[1], 'proof_mismatch', 'a proof bound to another hub is refused');
+
+      relay.send(JSON.stringify({
+        id: 'yield-with-id',
+        type: 'relay:yield-to-daemon',
+        nonce,
+        proof: handoffProof(state.sessionSecret, 'refuse-stdio-hub', 'refuse-relay', nonce),
+      }));
+      await waitFor(() => refusals().length === 3, 'malformed request is answered');
+      assertEqual(refusals()[2], 'invalid_request', 'a request with extra fields is refused');
+
+      relay.send(JSON.stringify({
+        type: 'relay:yield-to-daemon',
+        nonce,
+        proof: handoffProof(state.sessionSecret, 'refuse-stdio-hub', 'refuse-relay', nonce),
+      }));
+      await waitFor(() => refusals().length === 4, 'unconfirmed request is answered', 2000);
+      assertEqual(refusals()[3], 'daemon_unconfirmed', 'a valid proof from a relay the service does not name is refused');
+      assertEqual(stdioHub.hubHandoff, null, 'no handover is left pending');
+
+      relay.send(JSON.stringify({ id: 'future-control-frame', type: 'relay:future-frame' }));
+      await sleep(100);
+
+      const plainRelay = await createOriginlessSocket(plainHubPort);
+      resources.sockets.push(plainRelay);
+      const plainMessages = collectSocketMessages(plainRelay);
+      plainRelay.send(JSON.stringify({ type: 'relay:hello', instanceId: 'refuse-plain-relay' }));
+      await waitFor(() => plainMessages.some((message) => message.type === 'relay:welcome'), 'plain relay welcome');
+      plainRelay.send(JSON.stringify({
+        type: 'relay:yield-to-daemon',
+        nonce,
+        proof: handoffProof(state.sessionSecret, 'refuse-plain-hub', 'refuse-plain-relay', nonce),
+      }));
+      await waitFor(() => plainMessages.some((message) => message.type === 'relay:yield-refused'), 'plain hub answers');
+      assertEqual(
+        plainMessages.find((message) => message.type === 'relay:yield-refused').reason,
+        'not_offered',
+        'a hub not set up to give way refuses even a valid proof',
+      );
+
+      assertEqual(stdioHub.currentMode, 'hub', 'the stdio hub keeps the port after every refusal');
+      assertEqual(stdioHub.httpServer?.listening, true, 'the stdio hub keeps listening');
+      assertEqual(plainHub.currentMode, 'hub', 'the plain hub keeps the port');
+      assert(
+        !extensionMessages.some((message) => typeof message.type === 'string' && message.type.startsWith('relay:')),
+        'no relay control frame, known or unknown, ever reaches the extension',
+      );
+    } finally {
+      if (health) await health.close().catch(() => {});
+      await cleanup(resources);
+    }
+  });
+}
+
+// A hub from the previous release has no relay control frames: anything that
+// is not an ext frame goes to the extension, or comes back as an error when
+// none is attached. The patch reproduces exactly that for relay:* frames.
+function emulatePreviousReleaseHub(hub) {
+  const handleCurrent = hub._handleRelayClientMessage.bind(hub);
+  hub._handleRelayClientMessage = (clientId, raw) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_error) {
+      return handleCurrent(clientId, raw);
+    }
+    if (typeof parsed.type !== 'string' || !parsed.type.startsWith('relay:')) {
+      return handleCurrent(clientId, raw);
+    }
+    if (!hub.extensionClient) {
+      hub.relayClients.get(clientId)?.send(JSON.stringify({
+        id: parsed.id,
+        type: 'mcp:error',
+        payload: { success: false, error: 'extension_not_connected' },
+      }));
+      return undefined;
+    }
+    hub.messageOrigin.set(parsed.id, clientId);
+    hub.extensionClient.send(raw);
+    return undefined;
+  };
+}
+
+async function runPreviousReleaseHubIgnoresTakeover(WebSocketBridge, httpModule, auth) {
+  await withTempHome('bridge-takeover-legacy-hub', async (home) => {
+    const hubPort = await getFreePort();
+    const healthPort = await getFreePort();
+    const { extensionOptions } = pairHandoffExtension(auth, home, 34_000);
+    const legacyHub = new WebSocketBridge({ port: hubPort, host: '127.0.0.1', instanceId: 'legacy-hub', handshakeTimeoutMs: 25 });
+    emulatePreviousReleaseHub(legacyHub);
+    const daemon = new WebSocketBridge({
+      port: hubPort,
+      host: '127.0.0.1',
+      instanceId: 'legacy-hub-daemon',
+      daemon: true,
+      handshakeTimeoutMs: 25,
+      maxReconnectDelayMs: 100,
+    });
+    const resources = { sockets: [], bridges: [daemon, legacyHub] };
+    let health = null;
+    try {
+      await legacyHub.connect();
+      await daemon.connect();
+      health = await startDaemonHealth(httpModule, daemon, healthPort);
+
+      daemon.claimHub();
+      await sleep(150);
+      assertEqual(legacyHub.currentMode, 'hub', 'a previous-release hub with no extension keeps the port');
+      assertEqual(daemon.currentMode, 'relay', 'the service stays its relay');
+      assert(daemon.isIdle(), "the old hub's id-less error leaves nothing pending on the service");
+
+      const extension = await createBrowserSocket(hubPort, extensionOptions);
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+      answerBridgeRequests(extension);
+      await waitFor(() => daemon.topology.extensionConnected, 'the service sees the extension through the old hub');
+
+      // Reconnecting makes the service ask again, now with an extension attached.
+      daemon.claimHub();
+      await waitFor(() => messages.some((message) => message.type === 'relay:yield-to-daemon'), 'the old hub passes the request on');
+      const forwarded = messages.find((message) => message.type === 'relay:yield-to-daemon');
+      assertEqual(forwarded.id, undefined, 'the request carries no id');
+      assert(
+        fs.readFileSync(path.join(repoRoot, 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8')
+          .includes('if (!id || !type) return;'),
+        'the extension drops any inbound frame without an id',
+      );
+      await sleep(100);
+      assertEqual(legacyHub.currentMode, 'hub', 'the previous-release hub keeps the port');
+      assertEqual(daemon.currentMode, 'relay', 'the service keeps working as its relay');
+      const response = await daemon.sendAndWait({ type: 'mcp:get-tabs', payload: {} }, { timeout: 1000 });
+      assertEqual(response.answered, 'mcp:get-tabs', 'requests from the service still reach the extension');
+    } finally {
+      if (health) await health.close().catch(() => {});
+      await cleanup(resources);
+    }
+  });
+}
+
 async function run() {
   const WebSocketBridge = await loadBridgeClass();
   const bridgeModule = await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'bridge.js')).href);
   const auth = await loadAuthModule();
   const lifecycleModule = await loadServeDelegationModule();
+  const httpModule = await loadHttpModule();
+  const daemonHealthModule = await loadDaemonHealthModule();
 
   await runCase('serve-only delegation startup and shutdown lifecycle', () => runServeDelegationLifecycle(lifecycleModule));
   await runCase('rejects non-loopback bind before port use', () => runRejectsNonLoopbackBind(WebSocketBridge));
@@ -2640,6 +3364,12 @@ async function run() {
   await runCase('hub that loses its listener tears down and re-binds', () => runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule));
   await runCase('stdio server exits when the host closes stdin', () => runStdinShutdownHelper());
   await runCase('hub-exit-promotion', () => runHubExitPromotion(WebSocketBridge));
+  await runCase('daemon health probe accepts only the FSB service', () => runDaemonHealthProbe(daemonHealthModule, httpModule, WebSocketBridge));
+  await runCase('stdio defers to a running daemon', () => runStdioDefersToReadyDaemon(WebSocketBridge, httpModule));
+  await runCase('daemon takes over from a stdio hub only when idle', () => runDaemonTakesOverIdleStdioHub(WebSocketBridge, httpModule, auth));
+  await runCase('in-flight requests survive the port release', () => runHandoffDrainsLateRequests(WebSocketBridge, httpModule, auth));
+  await runCase('hub refuses an unproven takeover', () => runHubRefusesUnprovenTakeover(WebSocketBridge, httpModule, auth));
+  await runCase('previous-release hub ignores the takeover request', () => runPreviousReleaseHubIgnoresTakeover(WebSocketBridge, httpModule, auth));
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
