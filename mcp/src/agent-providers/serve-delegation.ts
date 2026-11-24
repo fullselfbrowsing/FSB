@@ -821,7 +821,7 @@ export async function startServeDelegation(
 
   // A refresh or uninstall of the installed helper asks a serve process running
   // from it to leave by writing `<stable root>.stop-requested` before it
-  // touches the runtime. This process honours a request written after it
+  // touches the runtime. This process honors a request written after it
   // started, waits until it is idle, and then shuts down the same way SIGTERM
   // does. It never removes the file and never signals any other process; the
   // writer removes the file once it is done or gives up, which also cancels a
