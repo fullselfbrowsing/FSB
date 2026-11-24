@@ -507,7 +507,7 @@ async function runInstallHelperStep(flags, operations) {
             // A refresh still only updates a helper that is already installed.
         }
         console.log('\u25CB Skipped ' + HELPER_LABEL
-            + ' (--no-native-host). It is not set up or refreshed until you run install without that flag.');
+            + ': --no-native-host was given. It is not set up or refreshed until you run install without that flag.');
         return;
     }
     const extensionId = flags['extension-id'];
