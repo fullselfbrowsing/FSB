@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
@@ -216,11 +217,30 @@ function collectExplicitVersions(text) {
   return matches;
 }
 
-function runCommand(command) {
+function runCommand(command, env) {
   return execSync(command, {
     cwd: repoRoot,
     encoding: 'utf8',
+    ...(env ? { env } : {}),
   });
+}
+
+// Runs a command with a throwaway home directory, so a CLI command that
+// writes per-user state never touches this machine's own ~/.fsb or client
+// configs.
+function runCommandInTemporaryHome(command) {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-version-parity-'));
+  try {
+    return runCommand(command, {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      APPDATA: path.join(home, 'AppData', 'Roaming'),
+      LOCALAPPDATA: path.join(home, 'AppData', 'Local'),
+    });
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 }
 
 async function run() {
@@ -392,7 +412,9 @@ async function run() {
 
   console.log('\n--- cli output parity ---');
   const helpOutput = runCommand('node mcp/build/index.js help');
-  const installOutput = runCommand('node mcp/build/index.js install');
+  // A bare install also sets up FSB's local helper (native messaging host).
+  // Its dry run prints the same banner and usage and changes nothing.
+  const installOutput = runCommandInTemporaryHome('node mcp/build/index.js install --dry-run');
   assert(helpOutput.includes(`FSB MCP Server ${canonicalVersion}`), 'help output prints canonical MCP version');
   assert(installOutput.includes(`FSB MCP Server ${canonicalVersion}`), 'install output prints canonical MCP version');
 
