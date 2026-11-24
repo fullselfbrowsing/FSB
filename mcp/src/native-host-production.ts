@@ -49,6 +49,8 @@ import {
   NATIVE_HOST_PACKAGE_NAME,
   NATIVE_HOST_PACKAGE_RELATIVE_PATH,
   NATIVE_HOST_SERVICE_PORT,
+  NATIVE_HOST_DAEMON_START_TIMEOUT_MS,
+  NATIVE_HOST_START_LOCK_STALE_MS,
   NATIVE_HOST_WINDOWS_CONFIG_RELATIVE_PATH,
   NATIVE_HOST_WINDOWS_REGISTRY_HELPER_RELATIVE_PATH,
   isNativeHostExtensionId,
@@ -115,6 +117,7 @@ import type {
   NativeHostSecurePathFact,
   NativeHostUninstallRuntimeAdapter,
   NativeHostUninstallRequest,
+  NativeHostWakeLockHold,
 } from './native-host-install/types.js';
 import type { NativeHostCliOperations } from './install.js';
 
@@ -1518,6 +1521,177 @@ async function renameWithRetry(source: string, destination: string): Promise<voi
   }
 }
 
+// The native host's own wake lock inside the stable root: a directory named
+// `wake.lock` holding `owner.json` = {schema: 1, token, createdAt}. Every
+// native host, earlier versions included, starts no serve process while a
+// fresh one exists; it waits for the service to come up and then gives up.
+const WAKE_LOCK_NAME = 'wake.lock';
+const WAKE_LOCK_OWNER_NAME = 'owner.json';
+// Rewritten well inside the native host's stale window.
+const WAKE_LOCK_REFRESH_MS = 10_000;
+// A wake in progress finishes or gives up within its start timeout.
+const WAKE_LOCK_WAIT_MS = NATIVE_HOST_DAEMON_START_TIMEOUT_MS + 2_000;
+
+function wakeLockOwner(token: string): string {
+  return JSON.stringify({ schema: 1, token, createdAt: Date.now() });
+}
+
+async function readWakeLockOwner(lockPath: string): Promise<
+  Readonly<{ token: string | null; createdAt: number | null }> | null
+> {
+  let raw: string | null;
+  try {
+    raw = await readSmallFile(join(lockPath, WAKE_LOCK_OWNER_NAME));
+  } catch {
+    raw = null;
+  }
+  try {
+    await lstat(lockPath);
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') return null;
+  }
+  try {
+    const value = ordinaryRecord(JSON.parse(raw ?? '') as unknown);
+    return Object.freeze({
+      token: typeof value?.token === 'string' && TOKEN_PATTERN.test(value.token) ? value.token : null,
+      createdAt: Number.isSafeInteger(value?.createdAt) ? value?.createdAt as number : null,
+    });
+  } catch {
+    return Object.freeze({ token: null, createdAt: null });
+  }
+}
+
+/**
+ * Holds the native host's wake lock in `stableRoot` so no browser can start a
+ * serve process from the tree while it is being stopped and moved. A wake
+ * already in progress is waited for; a lock left behind by a wake that died is
+ * moved aside and deleted. Resolves null when a live wake keeps the lock past
+ * the wait.
+ */
+async function holdWakeLock(stableRoot: string, token: string): Promise<NativeHostWakeLockHold | null> {
+  if (!TOKEN_PATTERN.test(token)) throw new Error('invalid-token');
+  const lockPath = join(stableRoot, WAKE_LOCK_NAME);
+  const ownerPath = join(lockPath, WAKE_LOCK_OWNER_NAME);
+  const deadline = Date.now() + WAKE_LOCK_WAIT_MS;
+  for (;;) {
+    const attempt = `${lockPath}.pending-${token}`;
+    await rm(attempt, { recursive: true, force: true });
+    await mkdir(attempt, { mode: 0o700 });
+    let published = false;
+    try {
+      const handle = await open(
+        join(attempt, WAKE_LOCK_OWNER_NAME),
+        fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL
+          | (process.platform === 'win32' ? 0 : fsConstants.O_NOFOLLOW),
+        0o600,
+      );
+      try {
+        await handle.writeFile(wakeLockOwner(token), 'utf8');
+      } finally {
+        await handle.close();
+      }
+      // A rename onto an existing empty directory would succeed on POSIX, so
+      // the canonical name is checked first, as the native host does.
+      try {
+        await lstat(lockPath);
+      } catch (error) {
+        if (errorCode(error) !== 'ENOENT') throw error;
+        try {
+          await rename(attempt, lockPath);
+          published = true;
+        } catch (renameError) {
+          if (!['EEXIST', 'ENOTEMPTY', 'EPERM', 'EACCES', 'EBUSY'].includes(errorCode(renameError) ?? '')) {
+            throw renameError;
+          }
+        }
+      }
+    } finally {
+      if (!published) await rm(attempt, { recursive: true, force: true }).catch(() => undefined);
+    }
+    if (published) break;
+    const owner = await readWakeLockOwner(lockPath);
+    if (owner === null) continue;
+    let fresh = true;
+    if (owner.createdAt !== null) {
+      fresh = Date.now() - owner.createdAt < NATIVE_HOST_START_LOCK_STALE_MS;
+    } else {
+      try {
+        fresh = Date.now() - (await lstat(lockPath)).mtimeMs < NATIVE_HOST_START_LOCK_STALE_MS;
+      } catch {
+        continue;
+      }
+    }
+    if (!fresh) {
+      const aside = `${lockPath}.quarantine-${randomBytes(16).toString('hex')}`;
+      try {
+        await rename(lockPath, aside);
+      } catch {
+        continue;
+      }
+      await rm(aside, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+        .catch(() => undefined);
+      continue;
+    }
+    if (Date.now() >= deadline) return null;
+    await wait(LOCK_POLL_MS);
+  }
+
+  let refreshing = true;
+  let writing: Promise<void> | null = null;
+  const refresh = async (): Promise<void> => {
+    if (!refreshing) return;
+    const owner = await readWakeLockOwner(lockPath);
+    if (!refreshing || owner?.token !== token) return;
+    const temporary = `${stableRoot}.wake-owner-${randomBytes(16).toString('hex')}.tmp`;
+    await writeFileExclusive(temporary, wakeLockOwner(token));
+    try {
+      await rename(temporary, ownerPath);
+    } finally {
+      await unlink(temporary).catch(() => undefined);
+    }
+  };
+  const timer = setInterval(() => {
+    if (writing) return;
+    writing = refresh().catch(() => undefined).finally(() => { writing = null; });
+  }, WAKE_LOCK_REFRESH_MS);
+  timer.unref?.();
+  const stopRefreshing = async (): Promise<void> => {
+    refreshing = false;
+    clearInterval(timer);
+    if (writing) await writing;
+  };
+  return Object.freeze({
+    stopRefreshing,
+    release: async (): Promise<void> => {
+      await stopRefreshing();
+      const owner = await readWakeLockOwner(lockPath);
+      if (owner?.token !== token) return;
+      const releasing = `${lockPath}.release-${token}`;
+      try {
+        await rename(lockPath, releasing);
+      } catch {
+        return;
+      }
+      await rm(releasing, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+        .catch(() => undefined);
+    },
+  });
+}
+
+async function writeFileExclusive(pathname: string, contents: string): Promise<void> {
+  const handle = await open(
+    pathname,
+    fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL
+      | (process.platform === 'win32' ? 0 : fsConstants.O_NOFOLLOW),
+    0o600,
+  );
+  try {
+    await handle.writeFile(contents, 'utf8');
+  } finally {
+    await handle.close();
+  }
+}
+
 async function requireAbsent(pathname: string): Promise<void> {
   try {
     await lstat(pathname);
@@ -1558,6 +1732,7 @@ function createEnsureStateAdapter(
     writeStamp: async (stamp: NativeHostEnsureStamp) => {
       await replaceFileAtomic(stampPath, `${JSON.stringify(stamp)}\n`);
     },
+    holdWakeLock: (token: string) => holdWakeLock(stableRoot, token),
     writeStopRequest: async (token: string, reason: 'refresh' | 'uninstall') => {
       if (!TOKEN_PATTERN.test(token)) throw new Error('invalid-token');
       await replaceFileAtomic(stopPath, `${JSON.stringify({
@@ -1978,6 +2153,14 @@ function createProductionDaemonStopAdapter(
       }
     },
   });
+}
+
+/** The wake-lock hold refreshes and uninstalls use, for diagnostics and tests. */
+export function holdNativeHostWakeLock(
+  stableRoot: string,
+  token: string,
+): Promise<NativeHostWakeLockHold | null> {
+  return holdWakeLock(stableRoot, token);
 }
 
 /**

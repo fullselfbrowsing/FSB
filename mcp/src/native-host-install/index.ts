@@ -35,6 +35,7 @@ import type {
   NativeHostUninstallRequest,
   NativeHostUninstallTransactionDependencies,
   NativeHostUninstallResult,
+  NativeHostWakeLockHold,
 } from './types.js';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
@@ -1458,6 +1459,75 @@ async function stopStableRootDaemon(
     : stepFailure('deferred', 'daemon-busy', true);
 }
 
+/**
+ * Takes the native host's wake lock in the stable root, so a browser cannot
+ * start a serve process from the tree between the stop request and the move.
+ * Such a process would start after the request and never honor it.
+ */
+async function takeWakeLock(
+  dependencies: NativeHostEnsureDependencies,
+  token: string,
+): Promise<Readonly<{ ok: true; hold: NativeHostWakeLockHold }> | StepFailure> {
+  let hold: NativeHostWakeLockHold | null;
+  try {
+    hold = await dependencies.state.holdWakeLock(token);
+  } catch {
+    return stepFailure('deferred', 'wake-lock-failed', true);
+  }
+  return hold
+    ? Object.freeze({ ok: true as const, hold })
+    : stepFailure('deferred', 'wake-in-progress', true);
+}
+
+async function stopRefreshingWakeLock(hold: NativeHostWakeLockHold | null): Promise<void> {
+  try {
+    await hold?.stopRefreshing();
+  } catch {
+    // The lock stays fresh for the native host's stale window regardless.
+  }
+}
+
+async function releaseWakeLock(hold: NativeHostWakeLockHold | null): Promise<void> {
+  try {
+    await hold?.release();
+  } catch {
+    // A lock left behind goes stale and the native host clears it.
+  }
+}
+
+/**
+ * Second net after a swap: a serve process the browser started from the old
+ * tree before it could see the wake lock ignores the earlier stop request and
+ * keeps running the old code. It is told apart from one started from the new
+ * tree by the version it reports, and asked again with a fresh request. False
+ * when such a process may still be running from the old tree.
+ */
+async function settleDaemonAfterSwap(
+  dependencies: NativeHostEnsureDependencies,
+  token: string,
+  version: string,
+): Promise<boolean> {
+  let online = true;
+  try {
+    online = await dependencies.daemon.isOnline();
+  } catch {
+    online = true;
+  }
+  if (!online) return true;
+  let listener;
+  try {
+    listener = await dependencies.daemon.identifyListener();
+  } catch {
+    listener = Object.freeze({ status: 'unknown' as const });
+  }
+  if (listener.status === 'none' || listener.status === 'other') return true;
+  if (listener.status === 'stable-root') {
+    const health = await readServiceHealth(dependencies);
+    if (health?.version === version) return true;
+  }
+  return (await stopStableRootDaemon(dependencies, token, 'refresh')).ok;
+}
+
 async function removeStopRequest(
   dependencies: NativeHostEnsureDependencies,
   token: string,
@@ -1553,9 +1623,10 @@ type RefreshContext = Readonly<{
 
 /**
  * Replaces an exact, older (or interpreter-orphaned) runtime: publish beside
- * it, stop its daemon, swap with two renames, re-verify, then delete the
- * retired tree. Any failure before the swap leaves the old runtime serving;
- * a failed re-verification swaps the old runtime back.
+ * it, take the native host's wake lock in it, stop its daemon, swap with two
+ * renames, re-verify, then delete the retired tree. Any failure before the
+ * swap leaves the old runtime serving; a failed re-verification swaps the old
+ * runtime back.
  */
 async function refreshRuntime(
   dependencies: NativeHostEnsureDependencies,
@@ -1588,50 +1659,69 @@ async function refreshRuntime(
     return stepFailure(lease.lost() ? 'deferred' : 'refused', lease.lost() ? 'lock-lost' : 'ownership-mismatch', !lease.lost());
   }
 
-  const stopped = await stopStableRootDaemon(dependencies, token, 'refresh');
-  const abandon = async (failure: StepFailure): Promise<StepFailure> => {
+  const wake = await takeWakeLock(dependencies, token);
+  if (!wake.ok) {
     await removeSiblingQuietly(dependencies, 'next', token);
+    return wake;
+  }
+  try {
+    const stopped = await stopStableRootDaemon(dependencies, token, 'refresh');
+    const abandon = async (failure: StepFailure): Promise<StepFailure> => {
+      await releaseWakeLock(wake.hold);
+      await removeSiblingQuietly(dependencies, 'next', token);
+      await removeStopRequest(dependencies, token);
+      return failure;
+    };
+    if (!stopped.ok) return abandon(stopped);
+
+    let unchanged = false;
+    try {
+      unchanged = !lease.lost() && await dependencies.runtime.recheckExactRuntime(context.receipt);
+    } catch {
+      unchanged = false;
+    }
+    if (!unchanged) return abandon(stepFailure('refused', 'boundary-changed', false));
+
+    // The lock moves with the old tree; it stays fresh long enough for that.
+    await stopRefreshingWakeLock(wake.hold);
+    try {
+      await dependencies.state.moveStableToSibling('retired', token);
+    } catch {
+      return abandon(stepFailure('deferred', 'swap-failed', true));
+    }
+    try {
+      await dependencies.state.moveSiblingToStable('next', token);
+    } catch {
+      try {
+        await dependencies.state.moveSiblingToStable('retired', token);
+      } catch {
+        // Recovery under the next lock restores or completes the swap.
+      }
+      return abandon(stepFailure('deferred', 'swap-failed', true));
+    }
+
+    if (!await verifyStableRoot(dependencies, next, extensionId, context.registered)) {
+      try {
+        await dependencies.state.moveStableToSibling('next', token);
+        await dependencies.state.moveSiblingToStable('retired', token);
+      } catch {
+        // Recovery under the next lock restores or completes the swap.
+      }
+      return abandon(stepFailure('refused', 'boundary-changed', false));
+    }
+    if (!await settleDaemonAfterSwap(dependencies, token, next.packageVersion)) {
+      // The new tree is in place. The old one and the fresh stop request stay
+      // until that process has gone: one that honors requests leaves once
+      // idle, later processes ignore the request, and the next run deletes
+      // the old tree.
+      return Object.freeze({ ok: true, receipt: next });
+    }
+    await removeSiblingQuietly(dependencies, 'retired', token);
     await removeStopRequest(dependencies, token);
-    return failure;
-  };
-  if (!stopped.ok) return abandon(stopped);
-
-  let unchanged = false;
-  try {
-    unchanged = !lease.lost() && await dependencies.runtime.recheckExactRuntime(context.receipt);
-  } catch {
-    unchanged = false;
+    return Object.freeze({ ok: true, receipt: next });
+  } finally {
+    await releaseWakeLock(wake.hold);
   }
-  if (!unchanged) return abandon(stepFailure('refused', 'boundary-changed', false));
-
-  try {
-    await dependencies.state.moveStableToSibling('retired', token);
-  } catch {
-    return abandon(stepFailure('deferred', 'swap-failed', true));
-  }
-  try {
-    await dependencies.state.moveSiblingToStable('next', token);
-  } catch {
-    try {
-      await dependencies.state.moveSiblingToStable('retired', token);
-    } catch {
-      // Recovery under the next lock restores or completes the swap.
-    }
-    return abandon(stepFailure('deferred', 'swap-failed', true));
-  }
-
-  if (!await verifyStableRoot(dependencies, next, extensionId, context.registered)) {
-    try {
-      await dependencies.state.moveStableToSibling('next', token);
-      await dependencies.state.moveSiblingToStable('retired', token);
-    } catch {
-      // Recovery under the next lock restores or completes the swap.
-    }
-    return abandon(stepFailure('refused', 'boundary-changed', false));
-  }
-  await removeSiblingQuietly(dependencies, 'retired', token);
-  await removeStopRequest(dependencies, token);
-  return Object.freeze({ ok: true, receipt: next });
 }
 
 /**
@@ -1657,6 +1747,23 @@ async function rebuildQuarantinedRuntime(
   });
   if (!publisher) return stepFailure('refused', 'unavailable', true);
 
+  const wake = await takeWakeLock(dependencies, token);
+  if (!wake.ok) return wake;
+  try {
+    return await rebuildWithWakeLock(dependencies, context, publisher, wake.hold);
+  } finally {
+    await releaseWakeLock(wake.hold);
+  }
+}
+
+async function rebuildWithWakeLock(
+  dependencies: NativeHostEnsureDependencies,
+  context: RefreshContext,
+  publisher: NativeHostInstallRuntimeAdapter,
+  wake: NativeHostWakeLockHold,
+): Promise<Readonly<{ ok: true; receipt: Readonly<NativeHostRuntimeReceipt> }> | StepFailure> {
+  const { lease, extensionId } = context;
+  const token = lease.token;
   const stopped = await stopStableRootDaemon(dependencies, token, 'refresh');
   if (!stopped.ok) {
     await removeStopRequest(dependencies, token);
@@ -1677,6 +1784,7 @@ async function rebuildQuarantinedRuntime(
     await removeStopRequest(dependencies, token);
     return stepFailure('refused', 'boundary-changed', false);
   }
+  await stopRefreshingWakeLock(wake);
   try {
     await dependencies.state.moveStableToSibling('quarantine', token);
   } catch {
@@ -2263,9 +2371,16 @@ export async function uninstallNativeHostBrowser(
           ? browserUninstallResult(dependencies, browser, 'not-installed', 'absent', receipt.origin, receipt.packageVersion)
           : browserUninstallResult(dependencies, browser, 'refused', 'split-state', receipt.origin, receipt.packageVersion);
       }
+      let wake: NativeHostWakeLockHold | null = null;
       if (remaining.length === 0) {
+        const held = await takeWakeLock(dependencies, lease.token);
+        if (!held.ok) {
+          return browserUninstallResult(dependencies, browser, 'refused', held.reason, receipt.origin, receipt.packageVersion);
+        }
+        wake = held.hold;
         const stopped = await stopStableRootDaemon(dependencies, lease.token, 'uninstall');
         if (!stopped.ok) {
+          await releaseWakeLock(wake);
           await removeStopRequest(dependencies, lease.token);
           return browserUninstallResult(dependencies, browser, 'refused', stopped.reason, receipt.origin, receipt.packageVersion);
         }
@@ -2299,6 +2414,7 @@ export async function uninstallNativeHostBrowser(
         if (!unchanged) {
           return browserUninstallResult(dependencies, browser, 'refused', 'boundary-changed', receipt.origin, receipt.packageVersion);
         }
+        await stopRefreshingWakeLock(wake);
         try {
           await dependencies.runtime.removeExactRuntime(receipt);
         } catch {
@@ -2306,7 +2422,10 @@ export async function uninstallNativeHostBrowser(
         }
         return browserUninstallResult(dependencies, browser, 'removed', 'removed', receipt.origin, receipt.packageVersion);
       } finally {
-        if (remaining.length === 0) await removeStopRequest(dependencies, lease.token);
+        if (remaining.length === 0) {
+          await releaseWakeLock(wake);
+          await removeStopRequest(dependencies, lease.token);
+        }
       }
     } finally {
       await releaseLease(lease);
@@ -2383,6 +2502,9 @@ export async function uninstallAllNativeHost(
       if (onlyAuto && provenance !== 'auto') {
         return uninstallAllResult('kept', { reason: 'explicit-provenance', provenance });
       }
+      const held = await takeWakeLock(dependencies, lease.token);
+      if (!held.ok) return uninstallAllResult('refused', { reason: held.reason, provenance });
+      const wake = held.hold;
       const stopped = await stopStableRootDaemon(dependencies, lease.token, 'uninstall');
       const removedBrowsers: NativeHostBrowser[] = [];
       try {
@@ -2418,6 +2540,7 @@ export async function uninstallAllNativeHost(
             provenance,
           });
         }
+        await stopRefreshingWakeLock(wake);
         try {
           await dependencies.runtime.removeExactRuntime(receipt);
         } catch {
@@ -2429,6 +2552,7 @@ export async function uninstallAllNativeHost(
         }
         return uninstallAllResult('removed', { removedBrowsers, provenance });
       } finally {
+        await releaseWakeLock(wake);
         await removeStopRequest(dependencies, lease.token);
       }
     } finally {

@@ -3384,6 +3384,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
   let stopRequest = null;
   let lockHeld = Boolean(options.lockHeld);
   let daemonOnline = Boolean(options.daemonOnline);
+  let healthOverride;
   let rewrites = 0;
   const published = [];
 
@@ -3546,7 +3547,35 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     },
   });
 
+  // What a browser asking the native host to start the service would do: a
+  // fresh wake lock in the tree makes it wait, otherwise it starts a serve
+  // process from whatever tree is in place.
+  function browserWake() {
+    if (stable && stable.wakeLock) {
+      trace.push('browser:wake-refused');
+      return;
+    }
+    trace.push('browser:wake-started');
+    daemonOnline = true;
+    healthOverride = { version: stable ? stable.receipt.packageVersion : null, stopRequests: true };
+  }
+
   const state = Object.freeze({
+    holdWakeLock: async (token) => {
+      trace.push('wake:hold');
+      if (options.wakeLockThrows) throw new Error('sensitive:wake');
+      if (options.wakeLockBusy || !stable) return null;
+      stable.wakeLock = token;
+      return Object.freeze({
+        stopRefreshing: async () => {
+          trace.push('wake:stop-refreshing');
+        },
+        release: async () => {
+          trace.push('wake:release');
+          if (stable && stable.wakeLock === token) delete stable.wakeLock;
+        },
+      });
+    },
     acquireLock: async (waitMs) => {
       trace.push(`lock:acquire:${waitMs}`);
       if (lockHeld) return null;
@@ -3590,6 +3619,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
       });
     })),
     moveStableToSibling: async (kind, token) => {
+      if (options.browserWakeBeforeMove) browserWake();
       trace.push(`move:stable->${kind}`);
       if (options.failMove === `stable->${kind}`) throw new Error('sensitive:EBUSY');
       if (!stable || siblings.has(`${kind}-${token}`)) throw new Error('sensitive:move');
@@ -3603,6 +3633,11 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
       if (!entry || stable) throw new Error('sensitive:move');
       stable = entry.tree;
       siblings.delete(`${kind}-${token}`);
+      if (options.rewakeAfterSwap && kind === 'next') {
+        trace.push('browser:old-tree-serve-running');
+        daemonOnline = true;
+        healthOverride = options.rewakeAfterSwap.health;
+      }
       if (typeof options.afterMoveToStable === 'function') {
         options.afterMoveToStable({ kind, files, registry, layouts });
       }
@@ -3620,7 +3655,9 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     },
     waitForOffline: async (timeoutMs) => {
       trace.push(`daemon:wait:${timeoutMs}`);
-      if (options.daemonHonorsStop && stopRequest) daemonOnline = false;
+      const health = healthOverride !== undefined ? healthOverride : options.health;
+      const honors = healthOverride !== undefined ? Boolean(health && health.stopRequests) : options.daemonHonorsStop;
+      if (honors && stopRequest) daemonOnline = false;
       return !daemonOnline;
     },
     identifyListener: async () => {
@@ -3633,13 +3670,14 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     readHealth: async () => {
       trace.push('daemon:health');
       if (!daemonOnline) return null;
-      if (options.health === null) return null;
+      const health = healthOverride !== undefined ? healthOverride : options.health;
+      if (health === null) return null;
       return Object.freeze({
         version: '0.9.0',
         stopRequests: false,
         sessions: 0,
         queuedMutationTools: false,
-        ...(options.health || {}),
+        ...(health || {}),
       });
     },
     hasChildProcesses: async (pid) => {
@@ -3650,6 +3688,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
       trace.push(`daemon:terminate:${pid}`);
       if (options.terminateWorks === false) return false;
       daemonOnline = false;
+      healthOverride = undefined;
       return true;
     },
   });
@@ -3737,6 +3776,8 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     stamp: () => stamp,
     optOut: () => optOut,
     stopRequest: () => stopRequest,
+    wakeLockInStable: () => (stable && stable.wakeLock) || null,
+    browserWake,
     publishCount: () => publishCount,
     rewrites: () => rewrites,
     advance: (milliseconds) => { clock += milliseconds; },
@@ -4203,6 +4244,150 @@ async function runEnsureTransaction() {
       'daemon:children:4242',
       'daemon:terminate:4242',
     ], 'an older daemon is signalled only after its health and children prove it idle');
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        browserWakeBeforeMove: true,
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} the refresh completes while holding the wake lock`);
+      traceOrder(harness.trace, [
+        'publish:next',
+        'wake:hold',
+        'stop:write:refresh',
+        'daemon:terminate:4242',
+        'wake:stop-refreshing',
+        'browser:wake-refused',
+        'move:stable->retired',
+        'move:next->stable',
+        'remove:retired',
+      ], `${platformName} the wake lock is taken before the stop request and held until the old tree moves`);
+      check(!harness.trace.includes('browser:wake-started'), `${platformName} no browser starts a serve process from the tree being replaced`);
+      equal(harness.wakeLockInStable(), null, `${platformName} the new tree carries no wake lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        wakeLockBusy: true,
+      });
+      const before = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'deferred', `${platformName} a wake in progress defers the refresh`);
+      equal(result.reason, 'wake-in-progress', `${platformName} the deferral names the wake in progress`);
+      check(!harness.trace.some((entry) => entry.startsWith('stop:write')), `${platformName} no stop request is written without the wake lock`);
+      equal(harness.stable(), before, `${platformName} the old runtime keeps serving`);
+      equal(harness.siblings.size, 0, `${platformName} the unused replacement is deleted`);
+      equal(harness.stamp().failures, 1, `${platformName} the deferral backs off`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        listener: { status: 'unknown' },
+      });
+      await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(harness.wakeLockInStable(), null, `${platformName} a deferred refresh releases the wake lock it took`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        failMove: 'next->stable',
+      });
+      await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(harness.wakeLockInStable(), null, `${platformName} a swap rolled back releases the wake lock in the restored tree`);
+    }
+    {
+      // A serve process started from the old tree in the moment before the
+      // lock was seen ignores the first request; after the swap it is found
+      // by the version it reports and asked again.
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        rewakeAfterSwap: { health: { version: '0.9.0', stopRequests: true } },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} the refresh completes with a stray old-tree serve`);
+      const afterSwap = harness.trace.slice(harness.trace.indexOf('browser:old-tree-serve-running'));
+      traceOrder(afterSwap, [
+        'daemon:health',
+        'stop:write:refresh',
+        'daemon:wait:50',
+        'remove:retired',
+        'stop:remove',
+      ], `${platformName} the stray old-tree serve gets a fresh stop request before the old tree is deleted`);
+      equal(harness.trace.filter((entry) => entry === 'stop:write:refresh').length, 2, `${platformName} the stray serve is asked with a second, later request`);
+      equal(harness.siblings.size, 0, `${platformName} the old tree is deleted once the stray serve has gone`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        rewakeAfterSwap: { health: { version: '0.9.0', stopRequests: false, sessions: 1 } },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} the new tree stays in place beside a busy stray serve`);
+      equal(harness.stable().receipt.packageVersion, PACKAGE_VERSION, `${platformName} the stable root holds the new runtime`);
+      check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} a busy stray serve is never signalled`);
+      check([...harness.siblings.keys()].some((name) => name.startsWith('retired-')), `${platformName} the old tree is kept while the stray serve may still run from it`);
+      check(harness.stopRequest() !== null, `${platformName} the fresh stop request stays for the stray serve`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        rewakeAfterSwap: { health: { version: PACKAGE_VERSION, stopRequests: true } },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} a serve already running the new tree is left alone`);
+      equal(harness.trace.filter((entry) => entry === 'stop:write:refresh').length, 1, `${platformName} a serve from the new tree gets no second request`);
+      equal(harness.siblings.size, 0, `${platformName} the old tree is deleted when the running serve is the new one`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome'],
+        daemonOnline: true,
+      });
+      const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+      equal(result.outcome, 'removed', `${platformName} uninstall-all removes the helper under the wake lock`);
+      traceOrder(harness.trace, [
+        'wake:hold',
+        'stop:write:uninstall',
+        /^(?:file:delete:|registry:delete:)/u,
+        'wake:stop-refreshing',
+        'runtime:remove',
+      ], `${platformName} uninstall-all keeps browsers from restarting the service until the runtime is gone`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome'],
+        wakeLockBusy: true,
+      });
+      const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} a wake in progress refuses uninstall-all`);
+      equal(result.reason, 'wake-in-progress', `${platformName} the refusal names the wake in progress`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} nothing is removed without the wake lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        daemonOnline: true,
+        children: true,
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.status, 'refused', `${platformName} a busy service refuses the last per-browser uninstall`);
+      equal(harness.wakeLockInStable(), null, `${platformName} the refused uninstall releases the wake lock`);
+      check(harness.trace.indexOf('wake:hold') < harness.trace.indexOf('stop:write:uninstall'), `${platformName} the last per-browser uninstall takes the wake lock first`);
+    }
   }
   {
     const harness = fakeEnsureHarness(modules, 'darwin', {
@@ -4804,6 +4989,7 @@ async function runProductionEnsure() {
       deepEqual(siblings(), [], 'production refresh leaves no sibling directories');
       check(!fs.existsSync(`${stableRoot}.stop-requested`), 'production refresh removes its stop request');
       check(!fs.existsSync(`${stableRoot}.lock`), 'production refresh releases its lock');
+      check(!fs.existsSync(path.join(stableRoot, 'wake.lock')), 'the refreshed tree carries no wake lock');
     }
     {
       lowerVersion();
@@ -5049,6 +5235,86 @@ async function runProductionEnsure() {
   );
 }
 
+async function runWakeLockCompatibility() {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const production = await importBuild('native-host-production.js');
+  const daemon = await importBuild('native-host/daemon.js');
+  const nativePlatform = await importBuild('native-host/platform.js');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-native-wake-')));
+  const stableRoot = path.join(root, 'native-host');
+  const lockPath = path.join(stableRoot, 'wake.lock');
+  fs.mkdirSync(stableRoot, { recursive: true });
+  const token = hexToken(0xabc);
+  try {
+    const hold = await production.holdNativeHostWakeLock(stableRoot, token);
+    check(hold !== null, 'the wake lock is taken in an idle stable root');
+    const ownerText = fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8');
+    const owner = JSON.parse(ownerText);
+    deepEqual(Object.keys(owner), ['schema', 'token', 'createdAt'], 'the lock owner uses the native host\'s exact fields and order');
+    equal(owner.schema, 1, 'the lock owner schema is the native host\'s');
+    equal(owner.token, token, 'the lock owner names this holder');
+    check(Buffer.byteLength(ownerText, 'utf8') <= 256, 'the lock owner fits the native host\'s size cap');
+
+    // The native host's own wake, against the real lock directory: while the
+    // lock is fresh it never spawns serve and gives up waiting for health.
+    let clock = Date.now();
+    let spawned = 0;
+    const base = nativePlatform.createNativeHostDaemonDependencies({ PATH: process.env.PATH }, { startLeasePort: 1 });
+    const dependencies = Object.freeze({
+      ...base,
+      now: () => clock,
+      wait: async (milliseconds) => { clock += milliseconds; },
+      requestHealth: async () => { throw new Error('offline'); },
+      acquireStartLease: async () => Object.freeze({ release: async () => undefined }),
+      spawn: () => {
+        spawned += 1;
+        throw new Error('spawn must not run');
+      },
+    });
+    const runtime = Object.freeze({
+      stableRuntimeRoot: stableRoot,
+      absoluteNode: process.execPath,
+      absoluteStableBuildIndex: path.join(stableRoot, 'runtime', 'package', 'build', 'index.js'),
+    });
+    const woken = await daemon.wakeServeDaemon({ runtime, dependencies });
+    deepEqual(woken, { outcome: 'failed', reason: 'wake_lock_timeout' }, 'a browser wake waits on the held lock instead of starting serve');
+    equal(spawned, 0, 'no serve process is started while the lock is held');
+
+    await hold.stopRefreshing();
+    check(fs.existsSync(lockPath), 'stopping the refresh leaves the lock in place');
+    await hold.release();
+    check(!fs.existsSync(lockPath), 'releasing removes this holder\'s lock');
+
+    fs.mkdirSync(lockPath);
+    fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({
+      schema: 1,
+      token: hexToken(0xdead),
+      createdAt: Date.now() - 60_000,
+    }));
+    const recovered = await production.holdNativeHostWakeLock(stableRoot, token);
+    check(recovered !== null, 'a lock left by a wake that died is cleared');
+    equal(JSON.parse(fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8')).token, token, 'the cleared lock is replaced by this holder\'s');
+    await recovered.release();
+
+    fs.mkdirSync(lockPath);
+    fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({
+      schema: 1,
+      token: hexToken(0xbeef),
+      createdAt: Date.now(),
+    }));
+    const foreign = await production.holdNativeHostWakeLock(stableRoot, hexToken(0xabd));
+    check(foreign === null, 'a live wake keeps its lock past the wait');
+    equal(JSON.parse(fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8')).token, hexToken(0xbeef), 'a live wake\'s lock is never touched');
+    check(
+      fs.readdirSync(root).every((name) => name === 'native-host'),
+      'no pending or quarantined lock directory is left beside the tree',
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
@@ -5085,6 +5351,8 @@ async function main() {
   if (!requestedSection || requestedSection === 'production-ensure') {
     console.log('\n=== Production ensure in a temporary home ===');
     await runProductionEnsure();
+    console.log('\n=== Wake lock shared with the native host ===');
+    await runWakeLockCompatibility();
   }
   console.log(`\nNative host install tests: ${passed} passed, 0 failed`);
 }

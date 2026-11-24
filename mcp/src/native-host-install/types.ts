@@ -521,9 +521,23 @@ export interface NativeHostLockLease {
   release(): Promise<void>;
 }
 
+/** The native host's wake lock, held inside the stable root by a transaction. */
+export interface NativeHostWakeLockHold {
+  /** Stops keeping the lock fresh, leaving it in place; call before the tree moves. */
+  stopRefreshing(): Promise<void>;
+  /** Stops keeping it fresh and removes it if it is still this holder's. */
+  release(): Promise<void>;
+}
+
 export interface NativeHostEnsureStateAdapter {
   /** Resolves null when a live holder keeps the lock past `waitMs`. */
   acquireLock(waitMs: number): Promise<NativeHostLockLease | null>;
+  /**
+   * Takes the native host's wake lock inside the stable root, so no browser
+   * starts a serve process from it until the tree has moved. Resolves null
+   * when a wake in progress keeps it.
+   */
+  holdWakeLock(token: string): Promise<NativeHostWakeLockHold | null>;
   readOptOut(): Promise<NativeHostOptOutRecord | null>;
   clearOptOut(): Promise<void>;
   readStamp(): Promise<NativeHostEnsureStamp | null>;
