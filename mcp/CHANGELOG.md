@@ -2,6 +2,32 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+## Unreleased
+
+Not published yet. The package version is still 0.11.5 and needs a bump before these ship.
+
+### Added
+
+- **`install` sets up the native messaging host.** `install --<client>`, `install --all`, and a bare `install` with no client flag now register FSB's local helper, `io.github.fullselfbrowsing.fsb_native_host`, once the client configs are written. A separate `install --native-host` is no longer needed before the extension can start the local agent service. The helper is registered in each browser whose user profile has FSB installed, or in Chrome when FSB is found in none of them. `--extension-id` passes through, `--dry-run` previews the step, and a helper problem is printed as a warning without failing the client install. A bare `install` sets up the helper and then prints the usage.
+- **`--no-native-host`** writes only the client config and stops the automatic refresh. A later `install` without the flag turns both back on.
+- **FSB's server keeps the helper current.** When an MCP client starts the server from a published package, the server runs `install --native-host --ensure --quiet` in a detached process that writes nothing to the client's stdio. It refreshes a registered helper that is older than the running package or whose pinned Node.js is gone, and keeps the extension ID the helper was registered with. It never registers a helper that is not installed and does nothing after you removed the helper or passed `--no-native-host`. A server started from a source checkout never touches the installed helper, and `FSB_NATIVE_HOST_AUTO=0` in the client's MCP server environment turns the check off. A stamp next to the helper's directory limits the full republish to changes of package version, Node.js path or browser set, and failed attempts back off.
+- **Refreshes swap the helper without a broken window.** The new copy is published beside the old one, the local agent service is asked to stop and does so only while idle, and the two directories are then swapped. A local agent service from an earlier version cannot see that request, so it is stopped with SIGTERM once the process listening on port 7226 is confirmed to be the installed helper's. A lock with a heartbeat lets only one install, refresh or uninstall run at a time, and the next run cleans up whatever an interrupted one left behind.
+- **One helper can serve several browsers.** A current helper can gain a registration for another browser with the same extension ID. `uninstall --native-host --browser <name>` removes only that browser's registration, and the helper's files go with its last registration.
+
+### Changed
+
+- **`uninstall` removes a helper nothing needs.** After removing the client entries, `uninstall --<client>` also removes the helper when it was set up by `install`, no other FSB client config can be found, and no delegation provider is configured under `~/.fsb/agent-providers`. Otherwise the helper stays and the command says why. A client config that cannot be read counts as still using FSB, and clients that only print setup instructions are listed as unchecked. `uninstall --all` removes the helper when it was set up by `install` and no delegation provider is configured.
+- `uninstall --native-host` and `uninstall --all` record that you removed the helper, so the automatic refresh stays off until the next `install`.
+- The install receipt records whether the helper came from `install` (`auto`) or `install --native-host` (`explicit`). Receipts written by earlier versions count as explicit, so uninstalling a client never removes a helper you installed yourself.
+- An installed helper older than the running package is now refreshed instead of being refused as a version mismatch. A helper whose files fail their integrity check is refreshed only when its marker and receipt agree and only the launcher differs. Helpers FSB does not own, and split or invalid installs, are still never changed; `doctor` reports them.
+- An `install --native-host` for a second browser adds that browser's registration instead of being refused as a cross-target request.
+
+### Compatibility and update
+
+- `install --native-host` and `uninstall --native-host` keep working as the explicit install, repair and removal commands. The extension's repair command, which passes `--extension-id` for unpacked builds, is unchanged.
+- The first server start after updating refreshes a helper staged by an earlier package version. That version's local agent service cannot see the stop request, so the refresh stops it with SIGTERM, which it handles with its normal shutdown.
+- Removing FSB in a client's own settings, or by editing its config by hand, is invisible to the installer, so the helper stays until `uninstall --native-host` removes it.
+
 <a id="v0.11.5"></a>
 
 ## 0.11.5 (2026-10-18)

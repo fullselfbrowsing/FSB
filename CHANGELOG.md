@@ -6,6 +6,11 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Changed
+
+- **Installing FSB into an MCP client also sets up the local helper.** `fsb-mcp-server install` for any client now registers the native messaging host the extension uses to start its local agent service, in each browser where FSB is installed, and FSB's server keeps that helper current when it starts. `--no-native-host` skips it, uninstalling the last client removes a helper that `install` set up unless a delegation provider still uses it, and `uninstall --native-host` removes it outright. The extension's repair command, `install --native-host` with the extension ID, is unchanged. See [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for the installer details.
+- **The privacy policy says how the helper gets registered.** The Local Agent Service section now says the messaging host is registered only when you run `fsb-mcp-server install`, either for an MCP client or with `--native-host`, by default in each browser where FSB is installed, with one permitted extension origin per registration. It also says that FSB's local server only refreshes a host that is already registered and never registers one, that the extension cannot install it, and how to skip or remove it. The policy is dated November 24, 2026, and the September 29, 2026 text is archived under Policy History in all eight site languages.
+
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline and Antigravity installer fixes, Grok Build capability checks, and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.

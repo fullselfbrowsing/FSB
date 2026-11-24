@@ -95,6 +95,8 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 
 Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
 
+The install also registers FSB's local helper in each browser where FSB is installed. The helper is the native messaging host the extension uses to start its local agent service for delegated Claude Code and Grok Build runs, and FSB's server keeps it current when it starts. Add `--no-native-host` to skip it. Uninstalling the last client removes a helper that `install` set up, unless a delegation provider still uses it, and `uninstall --native-host` removes it outright. See [Native Messaging Host](./mcp/README.md#native-messaging-host).
+
 **Then install the browser side** (the MCP bridge talks to the extension):
 
 1. Get **FSB** from the [Chrome Web Store](https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk).

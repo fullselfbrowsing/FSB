@@ -215,9 +215,41 @@ npx -y fsb-mcp-server@latest uninstall --cursor
 
 `install --list` shows all supported platform flags and whether the target config was detected.
 
+Installing into a client also sets up FSB's local helper, described in [Native Messaging Host](#native-messaging-host) below. Add `--no-native-host` to write only the client config.
+
 ### Native Messaging Host
 
-The native messaging host targets one browser per owned runtime. Chrome is the default, so existing commands and Chrome registrations continue to work:
+The native messaging host, `io.github.fullselfbrowsing.fsb_native_host`, is FSB's local helper. It lets the extension start the local agent service that delegated Claude Code and Grok Build runs use. The extension cannot install it. The helper's files live in `~/.fsb/native-host` on macOS and Linux and in `%LOCALAPPDATA%\FSB\NativeMessagingHost` on Windows.
+
+**`install` sets it up.** `install --<client>`, `install --all`, and a bare `install` with no client flag set up the helper after the client configs are written. A bare `install` then prints the usage.
+
+- The helper is registered in each supported browser (Chrome, Edge, Brave, Chromium) whose user profile has FSB installed, or in Chrome when FSB is found in none of them.
+- Each registration names one permitted extension origin: the published Chrome Web Store ID unless you pass `--extension-id`.
+- A helper that is already current is left alone, so running `install` again reports it as already installed.
+- A helper problem never fails the client install. It is printed as a warning, `doctor` reports it, and `install --native-host` repairs it.
+- `--dry-run` previews the helper step together with the config writes.
+- `--no-native-host` skips the helper and stops the automatic refresh described below. A later `install` without the flag turns both back on.
+
+**FSB's server keeps it current.** When an MCP client starts a published `fsb-mcp-server`, for example through `npx -y fsb-mcp-server@latest`, the server checks the helper in a detached background process that writes nothing to the client's stdio.
+
+- It refreshes a registered helper that is older than the running package, or whose pinned Node.js no longer exists, and keeps the extension ID that helper was registered with.
+- The local agent service is stopped only while it is idle, and it starts from the refreshed copy the next time it is needed.
+- It never registers a helper you have not installed. After `--no-native-host`, `uninstall --native-host`, or `uninstall --all`, it does nothing until you next run `install`.
+- A helper it cannot verify as its own is never changed, and `doctor` reports it.
+- A server started from a source checkout never touches the installed helper.
+- Set `FSB_NATIVE_HOST_AUTO=0` in the client's MCP server environment to turn the check off.
+
+**`uninstall` removes it when nothing needs it.** `uninstall --<client>` also removes the helper when all of these hold:
+
+- the helper was set up by `install` rather than `install --native-host`;
+- no other FSB client config can be found;
+- no delegation provider is configured under `~/.fsb/agent-providers`.
+
+Otherwise the helper stays, and the command prints why. A client config that cannot be read counts as still using FSB, and clients that only print setup instructions cannot be checked. `uninstall --all` removes every client entry, stops the automatic refresh, and removes the helper when it was set up by `install` and no delegation provider is configured. Removing FSB in a client's own settings, or by editing its config by hand, is invisible to FSB, so the helper stays until you remove it.
+
+`uninstall --native-host` removes the helper however it was installed, including one installed by an earlier version, and stops the automatic refresh until you next run `install`.
+
+**`install --native-host` installs and repairs it explicitly.** Without `--browser` it uses Chrome, so existing commands and Chrome registrations continue to work. Without `--browser`, `uninstall --native-host` removes every registration along with the helper's files:
 
 ```bash
 npx -y fsb-mcp-server@latest install --native-host
@@ -236,7 +268,7 @@ npx -y fsb-mcp-server@latest uninstall --native-host --browser edge
 
 Extension IDs are browser-installation-specific. Omitted `--extension-id` uses the published Chrome Web Store ID, `badgafnfchcihdfnjneklogedcdkmjfk`. For Edge, Brave, Chromium, or an unpacked build, copy the 32-character lowercase ID shown on that browser's extensions page and pass it with `--extension-id`.
 
-The browser selector controls the user-scoped native-messaging registration location. To switch browsers, uninstall the browser target reported by `doctor` first; cross-target install and uninstall requests refuse without changing either registration.
+`--browser` selects one browser's user-scoped native-messaging registration. One helper can be registered in several browsers with the same extension ID. `uninstall --native-host --browser <name>` removes only that browser's registration, and the helper's files go with its last registration. To add a browser where you have since installed FSB, run `install` again.
 
 ### Grok Build as the extension's AI provider
 
@@ -248,7 +280,7 @@ The private profile stays under `~/.fsb/agent-providers/grok/`. Upgrading the in
 
 If the CLI refuses its strict sandbox, FSB reports `sandbox_unavailable` rather than a version error. For example, a Docker socket symlink can prevent Grok from constructing its sandbox. Resolve the reported environment problem before retrying; FSB does not switch to a weaker sandbox automatically.
 
-The native helper stages its own package runtime. Updating an extension or source checkout does not update that installed copy. After a fixed package is published, rerun the native-host installation command above with the same browser and extension ID, then restart the local FSB service and retry the connection test. Before publication, `@latest` still installs the previously published runtime.
+The native helper stages its own copy of the package. Updating the extension or a source checkout does not update it. When an MCP client next starts a newer published `fsb-mcp-server`, the server refreshes that copy in the background, as described under [Native Messaging Host](#native-messaging-host). To refresh it by hand, rerun `install --native-host` with the same browser and extension ID, then retry the connection test. Before publication, `@latest` still installs the previously published runtime.
 
 Maintainers can build the MCP package and run `node scripts/check-grok-compatibility.mjs --binary /absolute/path/to/grok` from the repository root. It uses a disposable unauthenticated profile, prints a bounded JSON verdict, and makes no inference requests. The weekly/manual **Grok CLI compatibility** workflow runs the same check against the official stable CLI on macOS and Linux.
 
