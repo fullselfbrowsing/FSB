@@ -171,8 +171,8 @@ function createHarness(initialStore, options) {
   );
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),
-    '7a0eb64796f07ee1f702dc3ddb71ce20ecca9c8abe715926245d8f542b5113bf',
-    'onboarding.css hash rolled: the step rail keeps its own lane, and its names left its flow so a hidden name never takes a click meant for a step'
+    'c82125be8b8689ce82a339e3d0ab7207115cb4f0a9d0834de678a5ef072040ec',
+    'onboarding.css hash rolled: the wordmark B is 0.74em tall, level with the black S, as in the showcase fsb-wordmark.css'
   );
 
   console.log('--- durable count, timestamps, and sibling preservation ---');

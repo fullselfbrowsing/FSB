@@ -189,8 +189,10 @@ a:hover {
   font-weight: 900;
 }
 
+/* Mirrors .fsb-b in showcase/angular/src/styles/fsb-wordmark.css: at 0.74em the B's top sits
+   level with the black S. tests/fsb-wordmark-parity.test.js keeps the two in step. */
 .fsb-b {
-  height: 0.68em;
+  height: 0.74em;
   width: auto;
   fill: currentColor;
   display: inline-block;

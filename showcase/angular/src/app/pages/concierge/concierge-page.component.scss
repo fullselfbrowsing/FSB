@@ -1082,39 +1082,6 @@
   font-size: 1.32rem;
 }
 
-.fsb-row {
-  align-items: baseline;
-  display: inline-flex;
-  font-family: 'Poppins', system-ui, sans-serif;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.fsb-f {
-  font-weight: 100;
-}
-
-.fsb-f::before {
-  content: 'F';
-}
-
-.fsb-s {
-  font-weight: 900;
-}
-
-.fsb-s::before {
-  content: 'S';
-}
-
-.fsb-b {
-  display: inline-block;
-  fill: currentColor;
-  height: 0.74em;
-  margin-left: 0.01em;
-  vertical-align: baseline;
-  width: auto;
-}
-
 .footer-links {
   display: flex;
   flex-wrap: wrap;

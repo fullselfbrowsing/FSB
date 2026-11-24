@@ -67,6 +67,10 @@ const SHOWCASE_CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://unpkg.com",
   "style-src 'self' 'unsafe-inline'",
+  // The FSB wordmark's F and S are data: fonts (angular/src/styles/fsb-wordmark.css). Dropping
+  // data: turns the logo into the system font with no error anywhere, so
+  // tests/fsb-wordmark-parity.test.js checks it. Third-party font hosts stay refused; that is
+  // why the site never loads Poppins from Google Fonts.
   "font-src 'self' data:",
   // i.ytimg.com is the /about YouTube thumbnails.
   "img-src 'self' data: blob: https://i.ytimg.com",

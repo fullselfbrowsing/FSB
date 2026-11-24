@@ -252,8 +252,6 @@
   to { background-position: 10px 0; }
 }
 
-/* The shell and home wordmark rules are view-encapsulated, so the flow strip
-   carries its own copy. */
 .fsb-highlight-wordmark {
   color: var(--text-primary);
   display: inline-block;
@@ -262,37 +260,11 @@
   margin: 0;
 }
 
+/* Highlight copies set the letters on their raw advances, the way wordmark() in
+   scripts/build-benchmark-assets.mjs draws the mark in the benchmark charts. Everything
+   else about the mark comes from src/styles/fsb-wordmark.css. */
 .fsb-highlight-wordmark .fsb-row {
-  align-items: baseline;
-  display: inline-flex;
-  font-family: 'Poppins', system-ui, sans-serif;
   letter-spacing: 0;
-  line-height: 1;
-}
-
-.fsb-highlight-wordmark .fsb-f {
-  font-weight: 100;
-}
-
-.fsb-highlight-wordmark .fsb-f::before {
-  content: 'F';
-}
-
-.fsb-highlight-wordmark .fsb-s {
-  font-weight: 900;
-}
-
-.fsb-highlight-wordmark .fsb-s::before {
-  content: 'S';
-}
-
-.fsb-highlight-wordmark .fsb-b {
-  display: inline-block;
-  fill: currentColor;
-  height: 0.74em;
-  margin-left: 0.01em;
-  vertical-align: baseline;
-  width: auto;
 }
 
 /* --- Works With --- */

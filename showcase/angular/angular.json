@@ -81,6 +81,7 @@
             ],
             "styles": [
               "src/styles/icons/icons.generated.css",
+              "src/styles/fsb-wordmark.css",
               "src/styles.scss",
               "src/styles/depth.scss"
             ],
@@ -162,6 +163,7 @@
             ],
             "styles": [
               "src/styles/icons/icons.generated.css",
+              "src/styles/fsb-wordmark.css",
               "src/styles.scss",
               "src/styles/depth.scss"
             ]

@@ -243,12 +243,10 @@
 .rn-onboard-mock-cta { height: 11px; width: 44%; border-radius: 999px; background: var(--ac); opacity: 0.85; }
 
 /* ---------- FSB wordmark ----------
-   The letters come from CSS the way the shell's own .fsb-mark does, so the mark
-   never lands in the DOM as stray one-letter text nodes. */
-.rn-fsb-f { font-weight: 100; }
-.rn-fsb-f::before { content: 'F'; }
-.rn-fsb-s { font-weight: 900; }
-.rn-fsb-s::before { content: 'S'; }
+   Wordmarks in this page use the shared .fsb-row / .fsb-f / .fsb-s / .fsb-b markup from
+   src/styles/fsb-wordmark.css; only the wrapper's font-size and colour go inline. A copy
+   pasted from a design handoff with its own inline geometry fails
+   tests/fsb-wordmark-parity.test.js. */
 
 /* ---------- Ported from the handoff's page stylesheet ---------- */
 img[src*="xai"] { filter: invert(1); }

@@ -1,0 +1,92 @@
+/*
+ * FSB wordmark: the one definition every copy on the site renders with.
+ *
+ * Markup. Every copy is exactly this, inside an element that sets font-size and color:
+ *
+ *   <span class="fsb-row">
+ *     <span class="fsb-f"></span><span class="fsb-s"></span>
+ *     <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true"><path d="M0 0 L40 0 C58 0 ..."></path></svg>
+ *   </span>
+ *
+ * Size and colour belong to that wrapper. Nothing else restyles the parts; the one allowed
+ * override is letter-spacing on .fsb-row. The F and S come from ::before, so templates hold no
+ * one-letter text for the i18n lint to flag.
+ *
+ * Geometry. F is Poppins Thin, S is Poppins Black, B is the hand-drawn path. The B is 0.74em
+ * tall: its viewBox pads 3 of 103 units, so its ink top lands at 0.718em, level with the top of
+ * Poppins Black's S at 0.720em. A shorter B reads as a different logo.
+ *
+ * Fonts. The F and S faces are inlined as data: URIs because the site's CSP allows fonts only
+ * from 'self' and data: (font-src in showcase/server/server.js). Poppins requested from Google
+ * Fonts is refused there, and the browser then falls back to the system font with no visible
+ * error, so the logo silently turns into SF, Segoe UI or Roboto. Each face carries one glyph,
+ * scoped with unicode-range, under its own family name, so it never mixes into other text set
+ * in Poppins. Rebuild them from the fonts the extension bundles (needs fonttools and brotli):
+ *
+ *   python3 -I -m fontTools.subset extension/assets/onboarding/fonts/poppins-100.ttf
+ *     --unicodes=U+0046 --flavor=woff2 --layout-features='' --no-hinting --desubroutinize
+ *     --name-IDs=0,1,2,3,4,5,6,13,14 --output-file=poppins-100-F.woff2
+ *
+ * then the same with poppins-900.ttf and --unicodes=U+0053 for the S. Base64 each file into its
+ * src below and update the hashes in tests/fsb-wordmark-parity.test.js.
+ *
+ * Poppins is Copyright 2020 The Poppins Project Authors, under the SIL Open Font License 1.1,
+ * served at /licenses/poppins.txt. The subsets keep the font's copyright and license records.
+ *
+ * tests/fsb-wordmark-parity.test.js keeps these in step with this file:
+ *   - every wordmark in the showcase templates and in the extension onboarding;
+ *   - extension/ui/onboarding.css, the extension's own copy of these rules (it bundles full Poppins);
+ *   - wordmark() in scripts/build-benchmark-assets.mjs, which outlines the mark into the charts;
+ *   - the font-src directive in showcase/server/server.js.
+ */
+
+@font-face {
+  font-display: swap;
+  font-family: 'FSB Wordmark';
+  font-style: normal;
+  font-weight: 100;
+  src: url('data:font/woff2;base64,d09GMgABAAAAAAIQAAwAAAAABEQAAAHEAAQBBgAAAAAAAAAAAAAAAAAAAAAAAAAAGyAcMAZgADQKLEMBNgIkAwgLBgAEIAWDPAcgG4QDCC4OzPM3RREGCE1Ey5LNy4/Gw3/7/X6fuYOYrE7SRBSrUEWrRkIjRKJYJeKl4CX/+N+9WtMNkYvOnAqjAkD5AORsdY2orFKdjq9qm9hcNevd8Px+VftvttNRF8mD0EAi3Q2z0S7VgWYDDqzzzhMLRIPqlus/XLKy9pEqL1BvUIZvdn53g6gMZYCnjKkKeDK9u2c3ZRbCrGQOcjHyr4p0ll7ACpvFumbMAgoAAgCWVhdH+DJvkfsrF3bzQToBAtJgesWoIBIKdAoIdAoaBbIsMF8efyifBIAEMgL1aARkQNQLkikFjSke+nxrn81l26nzHQjkCP9MfrfRMvOvNhD4he+r+wf46/b/la1/5wTUSCB4qtVPWzUYr61M8Ud8WONDcq7RqbAAAIWEWvsCIseACxRCrw8kzR5RmPbts4sq9Sqo1hu1uWbTMWpKofLoOAyWCWmqzxFyw6IgJ7SKIzN0r1PwKEQYjVlMLIXuyTyWyazIMFRTw+CILbgqgkJS2x3TFBYZSeepOUlGBc23sbrfBYVhEWF0azcLRyMoPBtB2qrq6tpwfSxKxf7nQQaCjqMyGaoMHFGVQseoOVrYCQAl4xoA') format('woff2');
+  unicode-range: U+0046;
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'FSB Wordmark';
+  font-style: normal;
+  font-weight: 900;
+  src: url('data:font/woff2;base64,d09GMgABAAAAAAJsAAwAAAAABJgAAAIeAAQBBgAAAAAAAAAAAAAAAAAAAAAAAAAAGyAcMAZgADQKeIEQATYCJAMICwYABCAFg0IHIBvXAwguCmNjZvTDUIyTiyZ2QjRe+T0evvZjf+6+RSXh1SKexSJkEkMUzWQ8ZEqmVDwU8y/qw+/vPV8anWSkT90Hpylt2U0oZZFKeUmae9yNjsLi+h+g1rXlTsMsoQORgAJ80BZmTy3AjNoegyQLJAksjCLNdUb/6EwmPWZm8wKV2hRQjU1MLsIow38BWaBPNU3mpy36hHoULMrFNWOQi+1iCzrSrnoVzPKwWFAf80AlAAEA0/PDM7jDnIWc8++EN5PEgoDUnx7QRYuEAs00As20ukCWBeb+w2KjApBARqAbjALIgOg+O1+2HFt2blXrj+O/Qivrf3+2/rNkProxb19h7WHsR87Gzve3+VKCnnmcrEtZS8m2bw5krlb1rGBwfNip1E1tHIia6IuttISUhqzp3f6s5aqeue6+Hr/ctghAIEfpXuA/R2Lnl1FT3MLl2fUbcJPRfP/Xv1RwmYAyCQQfchXhSP+4QAU7U3yS1uRRITmG1TK9AACFhHJLNCJX4ARwCC1OkNQ6RWHYY5pTlKiMhFItYZ2rNRjFBhAUGSMkIIhTpF7tlIosCvIpMsuQEhLH+phBhPl4SqkPjxNEMBmVCkKLQ2G1q1EjIESZ51bNg4ip2b3yI3hxXgxZzcl82Q3tflEuHhHzfAJ4fy9jzKJhMzoUtTbqNKpWq1Yjt1aWq00V/qkPsTwYIRQOqxorJKoawQioMWPYJA3w/+oJAAA=') format('woff2');
+  unicode-range: U+0053;
+}
+
+.fsb-row {
+  align-items: baseline;
+  display: inline-flex;
+  font-family: 'FSB Wordmark', 'Poppins', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.fsb-f {
+  font-weight: 100;
+}
+
+.fsb-f::before {
+  content: 'F';
+}
+
+.fsb-s {
+  font-weight: 900;
+}
+
+.fsb-s::before {
+  content: 'S';
+}
+
+.fsb-b {
+  display: inline-block;
+  fill: currentColor;
+  height: 0.74em;
+  margin-left: 0.01em;
+  vertical-align: baseline;
+  width: auto;
+}
