@@ -3061,6 +3061,7 @@ async function runHandoffDrainsLateRequests(WebSocketBridge, httpModule, auth) {
       maxReconnectDelayMs: 100,
       hubHandoffPollMs: 20,
     });
+    const daemonRequests = [];
     const daemon = new WebSocketBridge({
       port: hubPort,
       host: '127.0.0.1',
@@ -3068,6 +3069,10 @@ async function runHandoffDrainsLateRequests(WebSocketBridge, httpModule, auth) {
       daemon: true,
       handshakeTimeoutMs: 25,
       maxReconnectDelayMs: 100,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: (request) => new Promise((resolve) => {
+        daemonRequests.push({ request, resolve });
+      }),
     });
     const resources = { sockets: [], bridges: [daemon, stdioHub] };
     let health = null;
@@ -3112,6 +3117,27 @@ async function runHandoffDrainsLateRequests(WebSocketBridge, httpModule, auth) {
       assertEqual(stdioHub.currentMode, 'hub', 'the old hub keeps its sockets while work is in flight');
       assertEqual(extension.readyState, WebSocket.OPEN, 'the extension is not cut off mid-request');
       assert(!daemon.isIdle(), 'the service counts the call it sent before taking over as in flight');
+
+      // The old hub still routes extension requests to the service over the
+      // old socket, and the service answers there.
+      extension.send(JSON.stringify({
+        id: 'drain-delegate',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'drain' },
+      }));
+      await waitFor(() => daemonRequests.length === 1, 'the service receives a request routed by the draining hub');
+      daemonRequests[0].resolve({ status: 'succeeded' });
+      await waitFor(
+        () => messages.some((message) => message.id === 'drain-delegate' && message.type === 'ext:response'),
+        "the service's answer reaches the extension through the draining hub",
+      );
+      assertEqual(
+        messages.find((message) => message.id === 'drain-delegate' && message.type === 'ext:response').payload?.status,
+        'succeeded',
+        'the routed request settles with the service result',
+      );
+      assertEqual(stdioHub.currentMode, 'hub', 'the two calls still in flight keep the old hub draining');
 
       const extensionClosed = waitForSocketClose(extension, 3000);
       extensionClosed.catch(() => {});
