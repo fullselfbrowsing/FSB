@@ -1640,6 +1640,97 @@ function answerBridgeRequests(socket) {
   });
 }
 
+// isIdle() is what lets a serve process exit without cutting a call short, so
+// every kind of in-flight work on either side of a hub and relay must hold it.
+async function runBridgeIdleProbe(WebSocketBridge, auth) {
+  await withTempHome('bridge-idle', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 25_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://idle-probe-extension', authPath);
+    const relayPending = [];
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'idle-probe-hub',
+      handshakeTimeoutMs: 25,
+    });
+    const relay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'idle-probe-relay',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: () => new Promise((resolve) => {
+        relayPending.push(resolve);
+      }),
+    });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    try {
+      assert(hub.isIdle(), 'an unconnected bridge is idle');
+      await hub.connect();
+      await relay.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://idle-probe-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+      await waitFor(() => relay.topology.extensionConnected, 'relay sees the extension', 1000, 10);
+      assert(hub.isIdle() && relay.isIdle(), 'a connected hub and relay with no traffic are idle');
+
+      // A relay's call waits at the relay and is remembered by the hub.
+      const relayCall = relay.sendAndWait({ type: 'mcp:idle-probe', payload: { from: 'relay' } });
+      await waitFor(() => messages.length === 1, 'relayed call reaches the extension', 1000, 10);
+      assert(!relay.isIdle(), 'a relay with a pending call is busy');
+      assert(!hub.isIdle(), 'a hub holding a relayed message is busy');
+      extension.send(JSON.stringify({
+        id: messages[0].id,
+        type: 'mcp:response',
+        payload: { success: true },
+      }));
+      await relayCall;
+      await waitFor(() => hub.isIdle(), 'hub releases the answered relayed message', 1000, 10);
+      assert(relay.isIdle() && hub.isIdle(), 'an answered relayed call leaves both sides idle');
+
+      // A hub's own call.
+      const hubCall = hub.sendAndWait({ type: 'mcp:idle-probe', payload: { from: 'hub' } });
+      await waitFor(() => messages.length === 2, 'hub call reaches the extension', 1000, 10);
+      assert(!hub.isIdle(), 'a hub with a pending call is busy');
+      assert(relay.isIdle(), 'the relay is not made busy by the hub call');
+      extension.send(JSON.stringify({
+        id: messages[1].id,
+        type: 'mcp:response',
+        payload: { success: true },
+      }));
+      await hubCall;
+      assert(hub.isIdle(), 'an answered hub call leaves the hub idle');
+
+      // An extension request the hub routes to the capable relay.
+      extension.send(JSON.stringify({
+        id: 'idle-probe-ext-request',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'idle probe' },
+      }));
+      await waitFor(() => relayPending.length === 1, 'relay handler receives the ext request', 1000, 10);
+      assert(!hub.isIdle(), 'a hub routing an extension request is busy');
+      assert(!relay.isIdle(), 'a relay handling an extension request is busy');
+      relayPending[0]({ status: 'succeeded' });
+      await waitFor(
+        () => messages.some((message) => message.id === 'idle-probe-ext-request' && message.type === 'ext:response'),
+        'ext response reaches the extension',
+        1000,
+        10,
+      );
+      await waitFor(() => hub.isIdle() && relay.isIdle(), 'both sides settle the ext request', 1000, 10);
+      assert(hub.isIdle() && relay.isIdle(), 'a settled extension request leaves both sides idle');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 // Node keeps a server listening after an accept failure such as EMFILE, so an
 // 'error' event on a listening hub is not an outage and must not become one.
 async function runHubSurvivesAcceptError(WebSocketBridge) {
@@ -2536,6 +2627,7 @@ async function run() {
   await runCase('secret-free bridge auth-status probe', () => runAuthStatusProbe(WebSocketBridge, auth));
   await runCase('local reverse routing precedence and settlement', () => runLocalReverseRouting(WebSocketBridge, auth));
   await runCase('first capable relay routing and settlement', () => runRelayReverseRouting(WebSocketBridge, auth));
+  await runCase('bridge idle probe covers every kind of in-flight work', () => runBridgeIdleProbe(WebSocketBridge, auth));
   await runCase('active socket revocation after external rotation', () => runActiveSocketRevocation(WebSocketBridge, auth, false));
   await runCase('active socket revocation and new-ID rebind after reset', () => runActiveSocketRevocation(WebSocketBridge, auth, true));
   await runCase('hub exits with an active ext request', () => runHubExitWithActiveExtRequest(WebSocketBridge, auth));
