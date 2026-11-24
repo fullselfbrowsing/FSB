@@ -3012,7 +3012,24 @@ async function runEnsureTransaction() {
         detected: ['chrome', 'edge'],
       });
       const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
-      equal(result.outcome, 'registered', `${platformName} a browser with the extension but no registration is registered`);
+      equal(result.outcome, 'current', `${platformName} an automatic refresh never registers a newly detected browser`);
+      deepEqual(result.addedBrowsers, [], `${platformName} an automatic refresh reports no added browser`);
+      deepEqual(result.browsers, ['chrome'], `${platformName} an automatic refresh reports only the existing registration`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the new browser stays unregistered after a refresh`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} a refresh that only sees a new browser performs zero mutation`);
+      check(!harness.trace.some((entry) => entry.startsWith('lock:')), `${platformName} a refresh that only sees a new browser never takes the lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        detected: ['chrome', 'edge'],
+      });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'auto' },
+        harness.dependencies,
+      );
+      equal(result.outcome, 'registered', `${platformName} install registers a browser with the extension but no registration`);
       deepEqual(result.addedBrowsers, ['edge'], `${platformName} registration reports only the added browser`);
       deepEqual(result.browsers, ['chrome', 'edge'], `${platformName} registration reports every registered browser`);
       equal(harness.publishCount(), 0, `${platformName} adding a registration never republishes the runtime`);

@@ -1109,7 +1109,12 @@ async function planEnsure(
     }));
   }
   const targets = await targetBrowsers(request, dependencies, extensionId, registered);
-  const additions = targets.filter((browser) => surfaceFor(surfaces, browser).state === 'absent');
+  // Registering a browser is an explicit user action: a server-start refresh
+  // keeps the existing registrations current but never adds one. Running
+  // `install` again picks up a browser where the extension appeared later.
+  const additions = request.mode === 'refresh-only'
+    ? []
+    : targets.filter((browser) => surfaceFor(surfaces, browser).state === 'absent');
 
   if (integrityFailure) {
     // Only a tree whose marker and receipt agree, and whose launcher alone
@@ -1966,12 +1971,12 @@ async function ensureTransaction(
 }
 
 /**
- * Makes the helper present and current. `install` creates it when absent;
- * `refresh-only` never does, skips when the user opted out, and backs off
+ * Makes the helper present and current. `install` creates it when absent and
+ * registers browsers that have the extension but no registration;
+ * `refresh-only` does neither, skips when the user opted out, and backs off
  * after failures. Both refresh an exact older runtime (keeping the extension
  * id its marker records, never the store default), replace one whose pinned
- * interpreter is gone, rebuild one whose launcher alone fails its hash, and
- * register browsers that have the extension but no registration.
+ * interpreter is gone, and rebuild one whose launcher alone fails its hash.
  */
 export async function ensureNativeHost(
   requestValue: NativeHostEnsureRequest,
