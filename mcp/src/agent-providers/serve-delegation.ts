@@ -1,4 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { posix, win32 } from 'node:path';
+import { performance } from 'node:perf_hooks';
+import { NATIVE_HOST_ENTRY_RELATIVE_PATH } from '../native-host/constants.js';
+import {
+  resolveNativeHostWakeRuntimeLayout,
+  type NativeHostPlatform,
+} from '../native-host/runtime-layout.js';
+import { resolveNativeHostPlatformLayout } from '../native-host-install/platform.js';
 import type {
   BridgeMode,
   BridgeOptions,
@@ -51,6 +61,7 @@ const GROK_LOGIN_SENSITIVE_QUERY_KEY =
 export interface ServeDelegationBridge {
   connect(): Promise<void>;
   disconnect(): void;
+  isIdle(): boolean;
   readonly currentMode: BridgeMode;
   readonly topology: BridgeTopologyState;
 }
@@ -59,6 +70,7 @@ export interface ServeDelegationHttpServer {
   readonly endpoint: string;
   readonly healthEndpoint: string;
   markServeReady(): void;
+  activeRequestCount(): number;
   close(): Promise<void>;
 }
 
@@ -67,13 +79,31 @@ export interface ServeDelegationShutdownResult {
   readonly exitCode: 0 | 1;
 }
 
+/** Why an idle serve process left on its own; recorded in the delegation log. */
+export type ServeDelegationShutdownReason = 'refresh_requested' | 'uninstall_requested';
+
 export interface RunningServeDelegation {
   readonly bridge: ServeDelegationBridge;
   readonly httpServer: ServeDelegationHttpServer;
   readonly supervisor: SpawnSupervisor;
   readonly endpoint: string;
   readonly healthEndpoint: string;
-  shutdown(): Promise<ServeDelegationShutdownResult>;
+  shutdown(reason?: ServeDelegationShutdownReason): Promise<ServeDelegationShutdownResult>;
+}
+
+/** The facts that decide whether a serve process runs from the installed helper. */
+export interface ServeStableRootInput {
+  readonly platform: NativeHostPlatform;
+  readonly entryScript: string;
+  readonly homeDirectory: string;
+  readonly localAppData?: string;
+  readonly execPath: string;
+}
+
+/** A stop request as the refresh and uninstall steps write it. */
+export interface ServeStopRequest {
+  readonly requestedAt: number;
+  readonly reason: 'refresh' | 'uninstall';
 }
 
 export interface ServeDelegationDependencies {
@@ -114,6 +144,14 @@ export interface ServeDelegationDependencies {
     handler: () => void,
   ) => void;
   readonly exit?: (code: 0 | 1) => void;
+  /** The native-host stable root when this process was started from it, else null. */
+  readonly resolveStableRoot?: () => string | null;
+  /** The parsed stop-request file, or null when it is absent or unreadable. */
+  readonly readStopRequest?: (path: string) => unknown;
+  /** Epoch milliseconds at which this process started. */
+  readonly processStartedAt?: () => number;
+  /** Arms one later stop-request check and returns a function that disarms it. */
+  readonly scheduleStopRequestCheck?: (run: () => void, delayMs: number) => () => void;
 }
 
 export interface StartServeDelegationOptions {
@@ -163,6 +201,11 @@ const GROK_AUTH_BEGIN_REASONS: readonly string[] = Object.freeze([
 ]);
 const MAX_COMPATIBILITY_ADAPTERS = 16;
 const DEGRADED_SHUTDOWN_FLUSH_MS = 250;
+// How often a serve process started from the installed helper looks for a stop
+// request, and, once it has seen one, how often it re-checks whether it is idle.
+export const SERVE_STOP_REQUEST_POLL_MS = 2_000;
+export const SERVE_STOP_REQUEST_SUFFIX = '.stop-requested';
+const STOP_REQUEST_MAX_BYTES = 4_096;
 
 function defaultDependencies(): Required<ServeDelegationDependencies> {
   return {
@@ -206,7 +249,110 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
     scheduleDegradedShutdown: (run) => { setTimeout(run, DEGRADED_SHUTDOWN_FLUSH_MS).unref?.(); },
     registerSignal: (signal, handler) => process.on(signal, handler),
     exit: (code) => process.exit(code),
+    resolveStableRoot: () => stableRootOfThisProcess(),
+    readStopRequest: (path) => readStopRequestFile(path),
+    processStartedAt: () => Math.floor(performance.timeOrigin),
+    scheduleStopRequestCheck: (run, delayMs) => {
+      const timer = setTimeout(run, delayMs);
+      timer.unref?.();
+      return () => clearTimeout(timer);
+    },
   };
+}
+
+function pathApiFor(platform: NativeHostPlatform): typeof posix | typeof win32 {
+  return platform === 'win32' ? win32 : posix;
+}
+
+/**
+ * Returns the native-host stable root when `entryScript` is that root's
+ * runtime/package/build/index.js, and null otherwise. Both sides are compared
+ * after symlinks are resolved, so a workspace build, an npx copy, or a
+ * leftover runtime somewhere else never answers stop requests meant for the
+ * installed helper.
+ */
+export function stableRootForServeEntry(input: ServeStableRootInput): string | null {
+  try {
+    const { platform } = input;
+    const { stableRoot } = resolveNativeHostPlatformLayout({
+      platform,
+      homeDirectory: input.homeDirectory,
+      ...(platform === 'win32' ? { localAppData: input.localAppData } : {}),
+    });
+    const runtime = resolveNativeHostWakeRuntimeLayout({
+      platform,
+      absoluteEntryPath: pathApiFor(platform).join(
+        stableRoot,
+        ...NATIVE_HOST_ENTRY_RELATIVE_PATH.split('/'),
+      ),
+      absoluteNode: input.execPath,
+    });
+    const started = realpathSync(input.entryScript);
+    const installed = realpathSync(runtime.absoluteStableBuildIndex);
+    const same = platform === 'win32'
+      ? started.toLowerCase() === installed.toLowerCase()
+      : started === installed;
+    return same ? stableRoot : null;
+  } catch {
+    return null;
+  }
+}
+
+function stableRootOfThisProcess(): string | null {
+  const platform = process.platform;
+  if (platform !== 'darwin' && platform !== 'linux' && platform !== 'win32') return null;
+  const entryScript = process.argv[1];
+  if (typeof entryScript !== 'string' || entryScript.length === 0) return null;
+  try {
+    // The installer derives the stable root from the resolved home directory,
+    // so the stop-request path has to be derived the same way to match.
+    return stableRootForServeEntry({
+      platform,
+      entryScript,
+      homeDirectory: realpathSync(homedir()),
+      ...(process.env.LOCALAPPDATA ? { localAppData: process.env.LOCALAPPDATA } : {}),
+      execPath: process.execPath,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function readStopRequestFile(path: string): unknown {
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.size > STOP_REQUEST_MAX_BYTES) return null;
+    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Accepts {version: 1, token, requestedAt, reason} and returns the two fields
+ * this process acts on. Anything else is treated as no request at all.
+ */
+export function parseServeStopRequest(value: unknown): ServeStopRequest | null {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+    || Object.getPrototypeOf(value) !== Object.prototype
+  ) return null;
+  const version = ownDataValue(value, 'version');
+  const token = ownDataValue(value, 'token');
+  const requestedAt = ownDataValue(value, 'requestedAt');
+  const reason = ownDataValue(value, 'reason');
+  if (
+    version !== 1
+    || typeof token !== 'string'
+    || token.length === 0
+    || typeof requestedAt !== 'number'
+    || !Number.isFinite(requestedAt)
+    || requestedAt <= 0
+    || (reason !== 'refresh' && reason !== 'uninstall')
+  ) return null;
+  return Object.freeze({ requestedAt, reason });
 }
 
 function isExactEmptyPayload(value: unknown): value is Record<string, never> {
@@ -606,8 +752,13 @@ export async function startServeDelegation(
   const readySupervisor = supervisor;
   const readyHttpServer = httpServer;
   let shutdownPromise: Promise<ServeDelegationShutdownResult> | null = null;
-  const shutdown = (): Promise<ServeDelegationShutdownResult> => {
+  let stopWatchingForStopRequest: (() => void) | null = null;
+  const shutdown = (
+    reason?: ServeDelegationShutdownReason,
+  ): Promise<ServeDelegationShutdownResult> => {
     if (shutdownPromise) return shutdownPromise;
+    stopWatchingForStopRequest?.();
+    stopWatchingForStopRequest = null;
     shutdownPromise = (async () => {
       let failed = degraded;
       let supervisorResult = EMPTY_CLOSE_RESULT;
@@ -630,7 +781,12 @@ export async function startServeDelegation(
       const exitCode = failed ? 1 : 0;
       // Written before exit so a degraded shutdown leaves a reason behind; the
       // daemon runs with stdio ignored, so this file is its only voice.
-      logDelegationEvent({ event: 'daemon_shutdown', exitCode, degraded });
+      logDelegationEvent({
+        event: 'daemon_shutdown',
+        exitCode,
+        degraded,
+        ...(reason ? { reason } : {}),
+      });
       dependencies.exit(exitCode);
       if (failed) throw new ServeDelegationShutdownError();
       return Object.freeze({ supervisor: supervisorResult, exitCode });
@@ -647,6 +803,64 @@ export async function startServeDelegation(
 
   dependencies.registerSignal('SIGTERM', () => { void shutdown().catch(() => undefined); });
   dependencies.registerSignal('SIGINT', () => { void shutdown().catch(() => undefined); });
+
+  // Idle means nothing would be cut short by exiting: no extension request or
+  // relayed message in flight, no delegated run (held runs included), and no
+  // MCP call over HTTP. A bridge, supervisor or listener without the probe is
+  // treated as busy, so it can never be closed by mistake.
+  const serveIsIdle = (): boolean => {
+    const bridgeIdle = typeof bridge.isIdle === 'function' && bridge.isIdle() === true;
+    const runs = typeof readySupervisor.activeCount === 'function'
+      ? readySupervisor.activeCount()
+      : Number.NaN;
+    const calls = typeof readyHttpServer.activeRequestCount === 'function'
+      ? readyHttpServer.activeRequestCount()
+      : Number.NaN;
+    return bridgeIdle && runs === 0 && calls === 0;
+  };
+
+  // A refresh or uninstall of the installed helper asks a serve process running
+  // from it to leave by writing `<stable root>.stop-requested` before it
+  // touches the runtime. This process honours a request written after it
+  // started, waits until it is idle, and then shuts down the same way SIGTERM
+  // does. It never removes the file and never signals any other process; the
+  // writer removes the file once it is done or gives up, which also cancels a
+  // step-down that is still waiting for work to finish.
+  let stableRoot: string | null = null;
+  try {
+    stableRoot = dependencies.resolveStableRoot();
+  } catch {
+    stableRoot = null;
+  }
+  if (stableRoot) {
+    const stopRequestPath = `${stableRoot}${SERVE_STOP_REQUEST_SUFFIX}`;
+    const startedAt = dependencies.processStartedAt();
+    const checkStopRequest = (): void => {
+      stopWatchingForStopRequest = null;
+      if (shutdownPromise) return;
+      let reason: ServeDelegationShutdownReason | null = null;
+      try {
+        const request = parseServeStopRequest(dependencies.readStopRequest(stopRequestPath));
+        if (request && request.requestedAt >= startedAt && serveIsIdle()) {
+          reason = request.reason === 'uninstall' ? 'uninstall_requested' : 'refresh_requested';
+        }
+      } catch {
+        // A failed read or probe is "not now"; the next check tries again.
+      }
+      if (reason) {
+        void shutdown(reason).catch(() => undefined);
+        return;
+      }
+      stopWatchingForStopRequest = dependencies.scheduleStopRequestCheck(
+        checkStopRequest,
+        SERVE_STOP_REQUEST_POLL_MS,
+      );
+    };
+    stopWatchingForStopRequest = dependencies.scheduleStopRequestCheck(
+      checkStopRequest,
+      SERVE_STOP_REQUEST_POLL_MS,
+    );
+  }
 
   return Object.freeze({
     bridge,

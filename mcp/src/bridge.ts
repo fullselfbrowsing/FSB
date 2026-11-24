@@ -325,6 +325,20 @@ export class WebSocketBridge {
     return this.mode;
   }
 
+  /**
+   * True when this bridge carries no work in either direction: no extension
+   * request is being handled here or routed to a relay, no relay's message is
+   * still waiting for the extension's answer, and no local sendAndWait call is
+   * pending. A process that wants to exit without cutting a call short waits
+   * for this.
+   */
+  isIdle(): boolean {
+    return this.activeExtRequests.size === 0
+      && this.relayActiveExtRequests.size === 0
+      && this.messageOrigin.size === 0
+      && this.pendingRequests.size === 0;
+  }
+
   get topology(): BridgeTopologyState {
     const extensionConnected = this.mode === 'hub' ? this.connected : this.relayExtensionConnected;
     return {
