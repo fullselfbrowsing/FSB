@@ -681,7 +681,14 @@ graph TD
     B --- Surface
 ```
 
-Multiple MCP clients can connect at once. The first server instance becomes the hub on port 7225; later instances become relay clients. If the hub exits, a relay can promote to hub.
+Multiple MCP clients can connect at once. One server instance is the hub on port 7225 and the others are relay clients. If the hub exits, a relay promotes itself to hub.
+
+When the local agent service (`fsb-mcp-server serve`, which the browser starts through the native messaging host) is running, it is the preferred hub, because it outlives the MCP clients that come and go:
+
+- A stdio server checks `http://127.0.0.1:7226/health` before binding 7225. If the service reports ready, the stdio server joins as a relay.
+- If a stdio server already holds 7225, the service joins as a relay and asks it to hand the port over. The request is signed with the bridge pairing secret in `~/.fsb/bridge-auth.json`, and the hub also checks that the service's own `/health` names the asking relay.
+- The stdio hub hands over only while nothing is in flight. It closes its listening socket so the service can bind, finishes anything that arrived in the meantime, and then closes the extension and relay sockets. The extension reconnects to the service and the relays follow, so none of them competes with the service for the port.
+- A hub from an earlier version ignores the request and keeps the port.
 
 The server also exposes live resources:
 
