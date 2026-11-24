@@ -2287,7 +2287,9 @@
     }
 
     setState(state) {
-      this._cancelFade();
+      // A glow fading out stays on its way out: an action that ends after the
+      // session has, changing only the speed, must not bring it back. show() does.
+      if (this._fadeTimer !== null) return;
       if (!this.shadow || this.state === state) return;
       // Preserve visual position across speed change
       if (this._startTime !== null) {

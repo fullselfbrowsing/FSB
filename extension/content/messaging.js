@@ -1322,7 +1322,8 @@
                   ? 'acting'
                   : 'thinking';
               FSB.viewportGlow.show(glowState);
-            } else {
+            } else if (overlayState.lifecycle !== 'final') {
+              // A final status fades the glow out below instead of cutting it here.
               FSB.viewportGlow.destroy();
             }
 

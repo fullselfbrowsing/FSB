@@ -471,6 +471,164 @@ console.log('\n--- Test: reset() lets a new session take over a finished pill --
   o.destroy();
 }
 
+console.log('\n--- Test: a final sessionStatus fades the viewport glow out instead of cutting it ---');
+{
+  // Run messaging.js's real sessionStatus case against the real ViewportGlow
+  // and the real overlay-state builder. Timers are captured, never fired.
+  const caseStart = messagingSrc.indexOf("      case 'sessionStatus':");
+  const caseEnd = messagingSrc.indexOf("      case 'getDOM':", caseStart);
+  assert(caseStart !== -1 && caseEnd > caseStart, 'located the sessionStatus case in messaging.js');
+
+  const scheduled = [];
+  const fakeSetTimeout = function(fn, delay) {
+    const timer = { fn, delay, cleared: false };
+    scheduled.push(timer);
+    return timer;
+  };
+  const fakeClearTimeout = function(timer) { if (timer) timer.cleared = true; };
+  const liveTimer = (delay) => scheduled.find((timer) => timer.delay === delay && !timer.cleared);
+  const realSetTimeout = sandbox.setTimeout;
+  const realClearTimeout = sandbox.clearTimeout;
+  const previousMatchMedia = matchMediaResult;
+  sandbox.setTimeout = fakeSetTimeout;
+  sandbox.clearTimeout = fakeClearTimeout;
+  setMatchMedia(false);
+
+  const calls = [];
+  function buildGlow() {
+    scheduled.length = 0;
+    const glow = new sandbox.window.FSB.ViewportGlow();
+    glow.host = makeElement('div');
+    glow.shadow = glow.host.attachShadow({ mode: 'open' });
+    const root = makeElement('div');
+    root.classList.add('viewport-glow-root', 'state-thinking');
+    glow.shadow.appendChild(root);
+    documentElement.appendChild(glow.host);
+    glow.state = 'thinking';
+    ['show', 'setState', 'dismiss', 'destroy'].forEach((name) => {
+      const real = glow[name].bind(glow);
+      glow[name] = function(...args) {
+        calls.push({ name, hostAlive: !!glow.host });
+        return real(...args);
+      };
+    });
+    return { glow, root };
+  }
+
+  function makeHandler(glow) {
+    const noop = () => {};
+    const fsb = {
+      overlayState: null,
+      progressOverlay: { reset: noop, setMotion: noop, create: noop, update: noop, show: noop, dismiss: noop },
+      replayPlayerOverlay: { create: noop, update: noop, show: noop, destroy: noop },
+      actionGlowOverlay: { destroy: noop, hide: noop },
+      viewportGlow: glow
+    };
+    const handlerContext = {
+      window: { FSBOverlayStateUtils: overlayStateExports },
+      FSB: fsb,
+      setTimeout: fakeSetTimeout,
+      clearTimeout: fakeClearTimeout,
+      console, Object, Boolean
+    };
+    vm.createContext(handlerContext);
+    vm.runInContext(
+      declarationSource(messagingSrc, 'fsbShouldReplaceFinalOverlay') + '\n' +
+        'this.handleSessionStatus = function(request, sendResponse) {\n' +
+        '  switch (request.action) {\n' + messagingSrc.slice(caseStart, caseEnd) + '  }\n' +
+        '};',
+      handlerContext,
+      { filename: 'extension/content/messaging.js' }
+    );
+    return function send(statusData) {
+      let response = null;
+      handlerContext.handleSessionStatus({
+        action: 'sessionStatus',
+        overlayState: overlayStateExports.buildOverlayState(statusData, null)
+      }, (value) => { response = value; });
+      return response;
+    };
+  }
+
+  // The status finalizeMcpVisualSession sends: lifecycle final, highlights off.
+  const finalStatus = {
+    phase: 'complete', lifecycle: 'final', result: 'success',
+    sessionToken: 'tok', version: 2, animatedHighlights: false, statusText: 'Task completed'
+  };
+  assertEq(overlayStateExports.buildOverlayState(finalStatus, null).highlight.animated, false,
+    'a final overlay state never carries animated highlights');
+
+  {
+    const { glow, root } = buildGlow();
+    const send = makeHandler(glow);
+    send({ phase: 'acting', lifecycle: 'running', sessionToken: 'tok', version: 1, statusText: 'Clicking checkout' });
+    assertEq(glow.state, 'acting', 'a running animated status shows the glow');
+
+    calls.length = 0;
+    const response = send(finalStatus);
+    assert(response && response.success === true && !response.ignored, 'the final status is applied');
+    const firstDestroy = calls.findIndex((call) => call.name === 'destroy');
+    const firstDismiss = calls.findIndex((call) => call.name === 'dismiss');
+    assert(firstDismiss !== -1 && (firstDestroy === -1 || firstDismiss < firstDestroy),
+      'a final status does not destroy the glow before dismissing it');
+    assert(calls.some((call) => call.name === 'dismiss' && call.hostAlive),
+      'dismiss() runs while the glow is still on the page');
+    assert(glow.host !== null, 'the glow is still on the page after the final status');
+    assert(root.classList.contains('out'), 'the glow starts its fade-out');
+    const fade = liveTimer(500);
+    assert(!!fade, 'the glow schedules its 500ms fade');
+    if (fade) fade.fn();
+    assertEq(glow.host, null, 'the glow is removed when the fade ends');
+  }
+
+  {
+    const { glow, root } = buildGlow();
+    const send = makeHandler(glow);
+    send({ phase: 'acting', lifecycle: 'running', sessionToken: 'tok', version: 1, statusText: 'Clicking checkout' });
+    send(finalStatus);
+    const fade = liveTimer(500);
+    send({ phase: 'thinking', lifecycle: 'running', sessionToken: 'tok-2', version: 1, statusText: 'Reading the page' });
+    assert(glow.host !== null, 'a new session during the fade keeps the glow');
+    assert(!root.classList.contains('out'), 'a new session during the fade cancels it');
+    assert(!!fade && fade.cleared, 'the pending fade timer is cleared');
+    glow.destroy();
+  }
+
+  {
+    const { glow } = buildGlow();
+    const send = makeHandler(glow);
+    send({ phase: 'acting', lifecycle: 'running', sessionToken: 'tok', version: 1, statusText: 'Clicking checkout' });
+    send({ phase: 'acting', lifecycle: 'running', sessionToken: 'tok', version: 2, animatedHighlights: false, statusText: 'Paused' });
+    assertEq(glow.host, null, 'a running status with highlights off still removes the glow at once');
+  }
+
+  // An action still in flight when the session ends finishes inside the fade and
+  // calls setState() on the glow (messaging.js, after executeContentAction). Only
+  // show() may bring a fading glow back; a speed change must let the fade finish.
+  [
+    { label: 'final', status: finalStatus },
+    { label: 'cleared', status: { phase: 'ended', lifecycle: 'cleared', sessionToken: 'tok', version: 2, statusText: 'Stopped' } }
+  ].forEach(({ label, status }) => {
+    const { glow, root } = buildGlow();
+    const send = makeHandler(glow);
+    send({ phase: 'acting', lifecycle: 'running', sessionToken: 'tok', version: 1, statusText: 'Clicking checkout' });
+    send(status);
+    const fade = liveTimer(500);
+    assert(!!fade, 'a ' + label + ' status starts the 500ms fade');
+    glow.setState('thinking');
+    glow.setState('acting');
+    assert(!!fade && !fade.cleared, 'a straggling action does not cancel the fade after a ' + label + ' status');
+    assert(root.classList.contains('out'), 'the glow keeps fading after a ' + label + ' status');
+    // A cancelled timer never fires, so only a fade still pending can remove the glow.
+    if (fade && !fade.cleared) fade.fn();
+    assert(glow.host === null, 'the glow is gone once the fade ends after a ' + label + ' status');
+  });
+
+  sandbox.setTimeout = realSetTimeout;
+  sandbox.clearTimeout = realClearTimeout;
+  setMatchMedia(previousMatchMedia);
+}
+
 // ===========================================================================
 // describe('thinking suppression in ProgressOverlay.update()')
 // ===========================================================================
