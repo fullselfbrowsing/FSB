@@ -71,9 +71,17 @@ function makeSdk(items, options = {}) {
     async createClient(config) {
       calls.createClient.push(config);
       if (options.authError) throw new Error(options.authError);
+      // expireClient: n -- the nth client's session has expired, so every
+      // read through it fails, the way one lapsed desktop session does.
+      const expired = options.expireClient === calls.createClient.length;
+      const lapse = async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        if (expired) throw new DesktopSessionExpiredError('session expired');
+      };
       return {
         vaults: {
           async list() {
+            await lapse();
             return [
               { id: 'vaultA', title: 'FSB', activeItemCount: 3 },
               { id: 'vaultB', title: 'Private', activeItemCount: 1 },
@@ -83,6 +91,7 @@ function makeSdk(items, options = {}) {
         items: {
           async list(vaultId) {
             calls.list += 1;
+            await lapse();
             if (expireNext) {
               expireNext = false;
               throw new DesktopSessionExpiredError('session expired');
@@ -485,6 +494,13 @@ async function run() {
     assert.equal(flaky.calls.createClient.length, 1, 'one approval request, not two');
     assert.ok((await cold.listLogins()).length > 0);
     assert.equal(flaky.calls.createClient.length, 2, 'the next request signs in again');
+  });
+  await check('requests that hit the same expired session share one new sign-in', async () => {
+    const lapsed = makeSdk(items, { expireClient: 1 });
+    const broker = new OnePasswordBroker({ loadSdk: async () => lapsed.sdk, configPath, env: {} });
+    const [vaults, logins] = await Promise.all([broker.listVaults(), broker.listLogins()]);
+    assert.ok(vaults.length > 0 && logins.length > 0, 'both requests succeed after signing in again');
+    assert.equal(lapsed.calls.createClient.length, 2, 'one sign-in to replace the expired one, not one per request');
   });
   await check('rate limits surface as their own code', async () => {
     const limited = new OnePasswordBroker({ loadSdk: async () => makeSdk(items, { rateLimited: true }).sdk, configPath, env: {} });

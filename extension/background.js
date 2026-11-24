@@ -14942,7 +14942,9 @@ async function fsbHandleOnePasswordUiAction(request) {
   if (!op) return { success: false, errorCode: 'onepassword_unavailable', error: '1Password support did not load' };
   switch (request.action) {
     case 'onePasswordStatus': {
-      const [result, legacy] = await Promise.all([op.status(), fsbLegacyVaultSummary()]);
+      // pair: false comes from a passive settings load, which must not
+      // reconnect the bridge just to read the status.
+      const [result, legacy] = await Promise.all([op.status({ pair: request.pair !== false }), fsbLegacyVaultSummary()]);
       if (!result || !result.ok) return { ...fsbOnePasswordFailure(result), legacy };
       return { success: true, status: result.status, legacy };
     }

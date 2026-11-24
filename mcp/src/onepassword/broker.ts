@@ -543,9 +543,10 @@ export class OnePasswordBroker {
 
   // ----- client lifecycle ---------------------------------------------------
 
-  private async getClient(config: OnePasswordConfig): Promise<SdkClient> {
+  /** The shared sign-in for this config, started if none is running. */
+  private session(config: OnePasswordConfig): Promise<SdkClient> {
     if (!this.authReady(config) || !config.auth) {
-      throw new BrokerError('onepassword_not_configured', 'Connect 1Password in FSB settings first');
+      return Promise.reject(new BrokerError('onepassword_not_configured', 'Connect 1Password in FSB settings first'));
     }
     const key = config.auth.kind === 'desktop'
       ? `desktop:${config.auth.accountName}`
@@ -558,16 +559,18 @@ export class OnePasswordBroker {
     const pending = this.connect(config.auth);
     this.clientKey = key;
     this.client = pending;
-    try {
-      return await pending;
-    } catch (error) {
-      // A newer sign-in may have replaced this one; leave that in place.
-      if (this.client === pending) {
-        this.client = null;
-        this.clientKey = null;
-      }
-      throw error;
-    }
+    // A failed sign-in is not reused. Callers still see the rejection.
+    pending.catch(() => this.dropSession(pending));
+    return pending;
+  }
+
+  /**
+   * Forget one sign-in. Another request may already have replaced it with a
+   * fresh one (after the same session expiry, say); that one stays and is
+   * shared, so the desktop app asks for approval once.
+   */
+  private dropSession(session: Promise<SdkClient>): void {
+    if (this.client === session) this.resetClient();
   }
 
   private async connect(auth: NonNullable<OnePasswordConfig['auth']>): Promise<SdkClient> {
@@ -601,16 +604,24 @@ export class OnePasswordBroker {
     this.lastError = { code, message };
   }
 
-  private async withClient<T>(fn: (client: SdkClient, config: OnePasswordConfig) => Promise<T>): Promise<T> {
+  /**
+   * Run fn with a signed-in client. `retire` drops the sign-in fn was given
+   * (and only that one), for callers that end early on an expired session.
+   */
+  private async withClient<T>(
+    fn: (client: SdkClient, config: OnePasswordConfig, retire: () => void) => Promise<T>,
+  ): Promise<T> {
     const config = this.readConfig();
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const client = await this.getClient(config);
+      const session = this.session(config);
+      const client = await session;
+      const retire = (): void => this.dropSession(session);
       try {
-        return await fn(client, config);
+        return await fn(client, config, retire);
       } catch (error) {
         if (error instanceof BrokerError) throw error;
         if (isSessionExpiry(error) && attempt === 0) {
-          this.resetClient();
+          retire();
           continue;
         }
         if (isRateLimit(error)) {
@@ -879,7 +890,7 @@ export class OnePasswordBroker {
     // keeps the same start.
     const startedAt = this.now();
     const outOfTime = (): boolean => this.now() - startedAt >= IMPORT_TIME_LIMIT_MS;
-    return this.withClient(async (client, config) => {
+    return this.withClient(async (client, config, retire) => {
       const vaultId = this.requireSaveVault(config);
       const result: LegacyImportResult = {
         logins: { imported: 0, failed: 0 },
@@ -900,7 +911,7 @@ export class OnePasswordBroker {
           this.noteError('onepassword_rate_limited', 'Rate limited by 1Password');
         } else {
           // The next request signs in again.
-          this.resetClient();
+          retire();
         }
         result.stopped = {
           code: isRateLimit(error) ? 'onepassword_rate_limited' : 'onepassword_auth_failed',

@@ -27,8 +27,17 @@ async function check(name, fn) {
   }
 }
 
-function makeEnv({ tabUrls = ['https://example.com/login?next=/home'], responses = {}, connected = true, transportError = null } = {}) {
+function makeEnv({
+  tabUrls = ['https://example.com/login?next=/home'],
+  responses = {},
+  connected = true,
+  transportError = null,
+  pairingStatus = 'paired',
+  // Stands in for background.js's fsbEnsureAgentBridgeReady; null leaves it out.
+  ensureReady = null,
+} = {}) {
   const requests = [];
+  const pairing = { status: pairingStatus, ensureCalls: 0 };
   const listeners = new Set();
   const runtimeSent = [];
   let tabCall = 0;
@@ -54,6 +63,7 @@ function makeEnv({ tabUrls = ['https://example.com/login?next=/home'], responses
   };
   const mcpBridgeClient = {
     isConnected: connected,
+    getState: () => ({ connected, pairingStatus: pairing.status }),
     async sendExtRequest(method, payload) {
       requests.push({ method, payload: JSON.parse(JSON.stringify(payload)) });
       if (transportError) throw transportError;
@@ -65,6 +75,12 @@ function makeEnv({ tabUrls = ['https://example.com/login?next=/home'], responses
     chrome,
     mcpBridgeClient,
     armMcpBridge: () => {},
+    ...(ensureReady ? {
+      fsbEnsureAgentBridgeReady: async () => {
+        pairing.ensureCalls += 1;
+        return ensureReady(pairing);
+      },
+    } : {}),
     URL,
     console,
     // Bridge polling sleeps collapse to 0ms; the 2-minute approval timeout stays real.
@@ -78,7 +94,7 @@ function makeEnv({ tabUrls = ['https://example.com/login?next=/home'], responses
   const deliver = (message, sender) => {
     for (const listener of [...listeners]) listener(message, sender, () => {});
   };
-  return { api: context.fsbOnePassword, requests, runtimeSent, deliver, listeners };
+  return { api: context.fsbOnePassword, requests, runtimeSent, deliver, listeners, pairing };
 }
 
 // The service worker loads mcp-bridge-client.js, which declares the client as
@@ -103,6 +119,7 @@ async function statusThroughDeclaredBridge() {
   vm.runInContext(`
     const mcpBridgeClient = {
       isConnected: true,
+      getState() { return { connected: true, pairingStatus: 'paired' }; },
       async sendExtRequest(method, payload) { return recordBridgeRequest(method, payload); },
     };
     function armMcpBridge() {}
@@ -692,6 +709,102 @@ async function run() {
     assert.equal(result.errorCode, 'onepassword_bridge_offline');
     assert.match(result.error, /fsb-mcp-server/);
     assert.equal(env.requests.length, 0);
+  });
+  // The local server closes an unpaired extension's socket (1008) on any
+  // 1Password request, and MCP tool calls share that socket. Nothing may be
+  // sent until the bridge is paired.
+  const pairsOnRequest = (pairing) => {
+    pairing.status = 'paired';
+    return { ok: true };
+  };
+  await check('an unpaired extension that cannot pair sends nothing', async () => {
+    const env = makeEnv({ pairingStatus: 'unpaired' });
+    const result = await env.api.status();
+    assert.equal(result.errorCode, 'onepassword_bridge_unpaired');
+    assert.equal(env.requests.length, 0);
+  });
+  await check('an unpaired extension pairs first, then asks', async () => {
+    const env = makeEnv({
+      pairingStatus: 'unpaired',
+      ensureReady: pairsOnRequest,
+      responses: { 'onepassword.list-logins': { ok: true, logins: [] } },
+    });
+    const result = await env.api.listLogins();
+    assert.equal(result.ok, true, `expected the list after pairing, got ${result.errorCode}`);
+    assert.equal(env.pairing.ensureCalls, 1);
+    assert.deepEqual(env.requests.map((entry) => entry.method), ['onepassword.list-logins']);
+  });
+  await check('a passive status read never starts pairing', async () => {
+    const env = makeEnv({ pairingStatus: 'unpaired', ensureReady: pairsOnRequest });
+    const result = await env.api.status({ pair: false });
+    assert.equal(result.errorCode, 'onepassword_bridge_unpaired');
+    assert.equal(env.pairing.ensureCalls, 0, 'opening settings must not reconnect the bridge');
+    assert.equal(env.requests.length, 0);
+  });
+  await check('a passive status read still answers once paired', async () => {
+    const env = makeEnv({ responses: { 'onepassword.status': { ok: true, status: { configured: true } } } });
+    assert.equal((await env.api.status({ pair: false })).ok, true);
+    assert.equal(env.requests.length, 1);
+  });
+  await check('a pairing check already under way is waited for, not repeated', async () => {
+    const env = makeEnv({
+      pairingStatus: 'configured',
+      ensureReady: pairsOnRequest,
+      responses: { 'onepassword.status': { ok: true, status: { configured: true } } },
+    });
+    let reads = 0;
+    Object.defineProperty(env.pairing, 'status', {
+      get: () => (reads++ < 3 ? 'configured' : 'paired'),
+      set: () => {},
+    });
+    assert.equal((await env.api.status()).ok, true);
+    assert.equal(env.pairing.ensureCalls, 0);
+    assert.equal(env.requests.length, 1);
+  });
+  await check('pairing that does not finish sends nothing', async () => {
+    const env = makeEnv({ pairingStatus: 'unpaired', ensureReady: () => ({ ok: false, code: 'bridge_not_ready' }) });
+    assert.equal((await env.api.listCards()).errorCode, 'onepassword_bridge_unpaired');
+    assert.equal(env.requests.length, 0);
+  });
+  await check('a missing native helper is reported as how to install the local server', async () => {
+    const env = makeEnv({ pairingStatus: 'unpaired', ensureReady: () => ({ ok: false, code: 'native_host_missing' }) });
+    const result = await env.api.listLogins();
+    assert.equal(result.errorCode, 'onepassword_bridge_offline');
+    assert.match(result.error, /fsb-mcp-server install --native-host/);
+    assert.equal(env.requests.length, 0);
+  });
+  await check('the settings page pairs only when Passwords or Payments is open', async () => {
+    const options = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ui', 'options.js'), 'utf8');
+    assert.match(options, /const pair = options\.pair === true \|\| readItems;/);
+    assert.match(options, /sendMessage\(\{ action: 'onePasswordStatus', pair \}\)/);
+    assert.match(options, /loadOnePasswordStatus\(\{ readItems: false \}\);/, 'the passive load at startup stays passive');
+    assert.match(options, /await loadOnePasswordStatus\(\{ readItems: false, pair: true \}\);/, 'Payments pairs');
+  });
+  await check('the status request carries the page\'s pairing choice to the client', async () => {
+    const start = background.indexOf('function fsbOnePasswordClient() {');
+    const handlerStart = background.indexOf('async function fsbHandleOnePasswordUiAction(');
+    const handlerEnd = background.indexOf('\n}\n', handlerStart) + 3;
+    assert.ok(start > 0 && handlerStart > start && handlerEnd > handlerStart, 'status handler found in background.js');
+    const seen = [];
+    const context = {
+      console,
+      fsbOnePassword: {
+        async status(options) {
+          seen.push(options);
+          return { ok: true, status: {} };
+        },
+      },
+      secureConfig: { async getLegacyVaultSummary() { return null; } },
+    };
+    const api = vm.runInNewContext(
+      `${background.slice(start, background.indexOf('const FSB_LEGACY_IMPORT_BATCH'))}\n${background.slice(handlerStart, handlerEnd)}\n({ fsbHandleOnePasswordUiAction })`,
+      context,
+      { filename: 'background.js' },
+    );
+    await api.fsbHandleOnePasswordUiAction({ action: 'onePasswordStatus', pair: false });
+    await api.fsbHandleOnePasswordUiAction({ action: 'onePasswordStatus', pair: true });
+    await api.fsbHandleOnePasswordUiAction({ action: 'onePasswordStatus' });
+    assert.deepEqual(JSON.parse(JSON.stringify(seen)), [{ pair: false }, { pair: true }, { pair: true }]);
   });
   await check('an older local server is reported as outdated', async () => {
     const error = Object.assign(new Error('No extension request handler is available'), { code: 'agent_provider_offline' });

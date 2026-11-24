@@ -25,6 +25,8 @@
   };
   var BRIDGE_WAIT_STEPS = 40;
   var BRIDGE_WAIT_MS = 50;
+  // As long as the bridge client's own pairing check may take.
+  var PAIRING_PROBE_WAIT_MS = 5000;
 
   function failure(errorCode, error) {
     return { ok: false, errorCode: errorCode, error: error };
@@ -35,6 +37,10 @@
       'onepassword_bridge_offline',
       'FSB connects to 1Password through the FSB local server. Install it with "npx fsb-mcp-server install --native-host", then try again.'
     );
+  }
+
+  function unpaired() {
+    return failure('onepassword_bridge_unpaired', 'Pair FSB with the local server again, then retry.');
   }
 
   function sleep(ms) {
@@ -70,15 +76,52 @@
     if (code === 'agent_provider_offline' || (code === 'invalid_ext_request' && /handler/i.test(message))) {
       return failure('onepassword_server_outdated', 'Update the FSB local server (fsb-mcp-server) to use 1Password.');
     }
-    if (code === 'ext_unauthorized') {
-      return failure('onepassword_bridge_unpaired', 'Pair FSB with the local server again, then retry.');
-    }
+    if (code === 'ext_unauthorized') return unpaired();
     if (code === 'bridge_topology_changed') return offline();
     return failure(code || 'onepassword_request_failed', message || '1Password request failed');
   }
 
-  async function request(method, payload, timeout) {
+  function pairingStatusOf(client) {
+    try {
+      var state = client && typeof client.getState === 'function' ? client.getState() : null;
+      return state && typeof state.pairingStatus === 'string' ? state.pairingStatus : 'unknown';
+    } catch (_e) {
+      return 'unknown';
+    }
+  }
+
+  // A socket that opened with a pairing code is checked right after it opens;
+  // wait for that answer instead of racing it.
+  async function settledPairingStatus(client) {
+    for (var waited = 0; pairingStatusOf(client) === 'configured' && waited < PAIRING_PROBE_WAIT_MS; waited += BRIDGE_WAIT_MS) {
+      await sleep(BRIDGE_WAIT_MS);
+    }
+    return pairingStatusOf(client);
+  }
+
+  // The FSB local server answers a 1Password request from an unpaired
+  // extension by closing the extension's socket, and that socket also carries
+  // every MCP tool call. So nothing is sent until the bridge is paired. Pairing
+  // goes through the native host the way delegation does it; it reconnects the
+  // socket once, and lasts for the browser session. Returns null when paired,
+  // otherwise the failure to report.
+  async function ensurePaired(client, allowPairing) {
+    if ((await settledPairingStatus(client)) === 'paired') return null;
+    if (!allowPairing || typeof root.fsbEnsureAgentBridgeReady !== 'function') return unpaired();
+    var readiness;
+    try {
+      readiness = await root.fsbEnsureAgentBridgeReady();
+    } catch (_e) {
+      return unpaired();
+    }
+    if (readiness && readiness.ok === true && pairingStatusOf(client) === 'paired') return null;
+    return readiness && readiness.code === 'native_host_missing' ? offline() : unpaired();
+  }
+
+  async function request(method, payload, timeout, options) {
     if (!(await ensureBridge())) return offline();
+    var refused = await ensurePaired(bridgeClient(), !(options && options.pair === false));
+    if (refused) return refused;
     try {
       var response = await bridgeClient().sendExtRequest(METHOD_PREFIX + method, payload || {}, { timeout: timeout });
       if (!response || typeof response !== 'object') {
@@ -102,7 +145,11 @@
   }
 
   var api = {
-    status: function () { return request('status', {}, TIMEOUTS.status); },
+    // { pair: false } reads the status only if FSB is already paired, so a
+    // passive look (opening settings) never reconnects the bridge.
+    status: function (options) {
+      return request('status', {}, TIMEOUTS.status, { pair: !(options && options.pair === false) });
+    },
 
     // Non-secret settings only. Service-account tokens are set from the CLI.
     configure: function (settings) {

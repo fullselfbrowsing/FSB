@@ -5084,6 +5084,9 @@ function setOnePasswordStatusText(english, subs) {
 
 async function loadOnePasswordStatus(options = {}) {
   const readItems = options.readItems === true || (options.readItems !== false && onePasswordSectionVisible());
+  // Pairing FSB with the local server reconnects the bridge (and any MCP call
+  // in flight on it), so only a look at Passwords or Payments may start it.
+  const pair = options.pair === true || readItems;
   const setupPanel = document.getElementById('onePasswordSetup');
   const vaultsPanel = document.getElementById('onePasswordVaults');
   const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
@@ -5091,7 +5094,7 @@ async function loadOnePasswordStatus(options = {}) {
 
   let response;
   try {
-    response = await chrome.runtime.sendMessage({ action: 'onePasswordStatus' });
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordStatus', pair });
   } catch (error) {
     response = { success: false, error: error.message };
   }
@@ -5472,7 +5475,7 @@ function updatePaymentsAvailability() {
 
 async function loadPaymentMethods() {
   if (!_onePasswordStatus) {
-    await loadOnePasswordStatus({ readItems: false });
+    await loadOnePasswordStatus({ readItems: false, pair: true });
   }
   updatePaymentsAvailability();
   if (!onePasswordIsReady(_onePasswordStatus)) return;
