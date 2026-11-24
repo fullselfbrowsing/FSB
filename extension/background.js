@@ -845,7 +845,6 @@ const CONTENT_SCRIPT_FILES = [
   'content/utils.js',
   'content/dom-state.js',
   'content/selectors.js',
-  'content/badge-combine.js',
   'utils/ui-locale.js',
   'content/visual-feedback.js',
   'content/phantom-stream-capture.js',

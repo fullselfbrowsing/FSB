@@ -7,8 +7,7 @@
  *   - buildOverlayState threads agentIdShort (6 hex chars) when statusData.agentId
  *     is provided, sourced via formatAgentIdForDisplay (NEVER sliced locally).
  *   - buildOverlayState yields agentIdShort = null (or absent) when no agentId.
- *   - Badge combine helper renders 'clientLabel / agentIdShort' when both present,
- *     either alone when only one is set, and '' when neither.
+ *   - The status pill reads agentIdShort for its hover row.
  *
  * Run: node tests/badge-agent-id.test.js
  */
@@ -83,36 +82,6 @@ ok(overlayStateSrc.indexOf('formatAgentIdForDisplay') >= 0,
   'Test 3a: overlay-state.js references formatAgentIdForDisplay (NEVER local slice)');
 ok(overlayStateSrc.indexOf('agentIdShort') >= 0,
   'Test 3b: overlay-state.js threads agentIdShort field');
-
-console.log('\n--- visual-feedback combine helper: clientLabel / agentIdShort ---');
-
-// Test 4: pure combine helper exposed for testability.
-// We require a small extracted helper module so the renderer logic is testable
-// without a DOM. The helper lives at extension/content/badge-combine.js and is
-// referenced from visual-feedback.js's badge update block.
-const badgeCombine = require('../extension/content/badge-combine.js');
-
-ok(typeof badgeCombine.combineBadgeText === 'function',
-  'Test 4a: extension/content/badge-combine.js exports combineBadgeText');
-
-ok(badgeCombine.combineBadgeText('Claude', 'agent_a3f1ab') === 'Claude / agent_a3f1ab',
-  'Test 4b: combineBadgeText("Claude", "agent_a3f1ab") === "Claude / agent_a3f1ab"');
-
-ok(badgeCombine.combineBadgeText('Claude', '') === 'Claude',
-  'Test 4c: combineBadgeText("Claude", "") === "Claude"');
-
-ok(badgeCombine.combineBadgeText('', 'agent_a3f1ab') === 'agent_a3f1ab',
-  'Test 4d: combineBadgeText("", "agent_a3f1ab") === "agent_a3f1ab"');
-
-ok(badgeCombine.combineBadgeText('', '') === '',
-  'Test 4e: combineBadgeText("", "") === ""');
-
-ok(badgeCombine.combineBadgeText(null, null) === '',
-  'Test 4f: combineBadgeText(null, null) === ""');
-
-// Whitespace normalisation: trim incoming.
-ok(badgeCombine.combineBadgeText('  Claude  ', '  agent_a3f1ab  ') === 'Claude / agent_a3f1ab',
-  'Test 4g: combineBadgeText trims whitespace on both inputs');
 
 console.log('\n--- visual-feedback.js consumes agentIdShort ---');
 

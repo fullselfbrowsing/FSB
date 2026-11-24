@@ -37,7 +37,6 @@ const required = [
   'content/utils.js',
   'content/dom-state.js',
   'content/selectors.js',
-  'content/badge-combine.js',
   'content/visual-feedback.js',
   'content/accessibility.js',
   'utils/google-sheets-ui.js',

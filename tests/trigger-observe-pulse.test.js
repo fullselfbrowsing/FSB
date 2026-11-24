@@ -165,7 +165,6 @@ const sandbox = {
       sanitizeActionText(value) { return value == null ? '' : String(value); },
       firstSentence(value) { return value == null ? '' : String(value); }
     },
-    FSBBadgeCombine: { combineBadgeText(a, b) { return a && b ? a + ' / ' + b : (a || b || ''); } },
     __FSB_SKIP_INIT__: false,
     innerWidth: 1280,
     innerHeight: 800,
