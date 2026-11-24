@@ -749,7 +749,7 @@ export class OnePasswordBroker {
   private session(config: OnePasswordConfig): Promise<SdkClient> {
     const key = sessionKeyOf(config);
     if (!this.authReady(config) || !config.auth || !key) {
-      return Promise.reject(new BrokerError('onepassword_not_configured', 'Connect 1Password in FSB settings first'));
+      return Promise.reject(new BrokerError('onepassword_not_configured', 'Log in to 1Password on the Vault page in FSB first'));
     }
     if (this.client && this.clientKey === key) return this.client;
 

@@ -57,11 +57,12 @@ export function multipleCredentialsResult(
  * Register the credential tools: list_credentials, fill_credential,
  * list_payment_methods, use_payment_method.
  *
- * Credentials come from the user's 1Password account, limited to the vaults
- * they allowed FSB to use. The FSB server's 1Password broker resolves items
- * for the extension over the paired loopback bridge; the extension fills them
- * into the page. Tool results carry only ids, titles, hosts, usernames, and
- * card brand/last4 -- never passwords, one-time codes, card numbers, or CVVs.
+ * Credentials come from the user's 1Password account: every vault the sign-in
+ * can read, or only the vaults the user limited FSB to. The FSB server's
+ * 1Password broker resolves items for the extension over the paired loopback
+ * bridge; the extension fills them into the page. Tool results carry only
+ * ids, titles, hosts, usernames, and card brand/last4 -- never passwords,
+ * one-time codes, card numbers, or CVVs.
  *
  * SECURITY: registered directly (not via TOOL_REGISTRY) to keep an explicit
  * security boundary around everything that ends in a secret being typed.
@@ -77,7 +78,7 @@ export function registerVaultTools(
   // gate enforces ownership). The list tools stay tab-agnostic.
   server.tool(
     'list_credentials',
-    'List the 1Password logins FSB may use (only vaults the user allowed in FSB settings). Returns id, title, saved website domains, and username for each login -- passwords and one-time codes are never included. Use fill_credential to sign in.',
+    'List the 1Password logins FSB may use (every vault the user\'s 1Password sign-in can read, unless the user limited FSB to some vaults). Returns id, title, saved website domains, and username for each login -- passwords and one-time codes are never included. Use fill_credential to sign in.',
     {},
     async () => {
       if (!bridge.isConnected) {

@@ -251,7 +251,7 @@ FSB keeps no passwords or cards of its own. `fill_credential`, `use_payment_meth
 
 After you approve, the Vault page lists the logins and cards FSB can use: titles, usernames, sites, card brand, and last 4 digits. It is read-only; add, edit, and delete items in 1Password.
 
-**Which vaults FSB reads.** By default, every vault the account can see, except transfer vaults and vault types the SDK does not support. To narrow it to some vaults, choose them under **Advanced** on the Vault page, or run `npx fsb-mcp-server onepassword --allow <id,id>`. "Save to 1Password" writes new logins to your Personal vault unless you choose another save vault. If 1Password reports no Personal vault, the Vault page asks you to pick one; `--save-vault <id>` sets it from a terminal. FSB offers "Save to 1Password" only while it has a save vault it can read.
+**Which vaults FSB reads.** By default, every vault the account can see, except transfer vaults and vault types the SDK does not support. To narrow it to some vaults, choose them under **Advanced** on the Vault page, or run `npx fsb-mcp-server onepassword --allow <id,id>`; **Use all vaults** there, or `--all-vaults`, goes back to every vault. "Save to 1Password" writes new logins to your Personal vault unless you choose another save vault. If 1Password reports no Personal vault, the Vault page asks you to pick one; `--save-vault <id>` sets it from a terminal. FSB offers "Save to 1Password" only while it has a save vault it can read.
 
 **Headless: a service account, from the terminal only.** For a machine where nobody is at the 1Password app, create a 1Password service account with read access to the vaults FSB should use, then:
 
@@ -259,6 +259,7 @@ After you approve, the Vault page lists the logins and cards FSB can use: titles
 npx fsb-mcp-server onepassword --service-account   # token is read hidden, or from OP_SERVICE_ACCOUNT_TOKEN
 npx fsb-mcp-server onepassword --vaults            # list vault ids
 npx fsb-mcp-server onepassword --allow <vaultId>   # limit FSB to that vault
+npx fsb-mcp-server onepassword --all-vaults        # or: let FSB use every vault it can see again
 npx fsb-mcp-server onepassword --save-vault <vaultId>   # optional: where "Save to 1Password" writes
 npx fsb-mcp-server onepassword                     # show the current setup
 ```

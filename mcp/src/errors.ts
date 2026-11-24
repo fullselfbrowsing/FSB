@@ -507,12 +507,22 @@ function buildLayeredDetail(
         nextAction: 'Wait a minute before the next 1Password call.',
       };
     case 'onepassword_not_configured':
-    case 'onepassword_no_vaults':
-    case 'onepassword_save_vault_missing':
       return {
         detected: LAYER_LABELS.vault,
         why: errorMsg || '1Password is not set up in FSB yet.',
-        nextAction: 'Ask the user to connect 1Password in FSB settings and allow at least one vault. Do not retry until they have.',
+        nextAction: 'Ask the user to open the Vault page in FSB and press Log in to 1Password. Do not retry until they have.',
+      };
+    case 'onepassword_no_vaults':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'FSB can read no 1Password vault.',
+        nextAction: 'Ask the user to open the Vault page in FSB and check which vaults FSB may use (under Advanced). Do not retry until they have.',
+      };
+    case 'onepassword_save_vault_missing':
+      return {
+        detected: LAYER_LABELS.vault,
+        why: errorMsg || 'No 1Password vault is chosen for new logins.',
+        nextAction: 'Ask the user to choose where new logins are saved on the Vault page in FSB. Do not retry until they have.',
       };
     case 'onepassword_auth_failed':
       return {
