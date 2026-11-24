@@ -702,8 +702,13 @@ function createUninstallRuntimeAdapter(
         throw new Error('runtime-boundary-changed');
       }
       const tombstone = `${layout.stableRoot}.remove-${randomBytes(16).toString('hex')}`;
-      await rename(layout.stableRoot, tombstone);
-      await rm(tombstone, { recursive: true });
+      await renameWithRetry(layout.stableRoot, tombstone);
+      try {
+        await rm(tombstone, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      } catch {
+        // The helper is already gone from the stable root; the next run's
+        // recovery deletes the `.remove-` leftover.
+      }
     },
   });
 }

@@ -3542,6 +3542,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     },
     removeExactRuntime: async (receipt) => {
       trace.push('runtime:remove');
+      if (options.failRuntimeRemove) throw new Error('sensitive:EBUSY');
       if (!stable || stable.receipt !== receipt) throw new Error('sensitive:runtime-changed');
       stable = null;
     },
@@ -4441,6 +4442,45 @@ async function runEnsureTransaction() {
     equal(result.reason, 'lock-lost', 'the refusal names the lost lock');
     check(!harness.trace.includes('runtime:remove'), 'the runtime is never removed without the lock');
     deepEqual(result.removedBrowsers, ['chrome'], 'only the registration removed before the loss is reported');
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome', 'edge'],
+        failRuntimeRemove: true,
+      });
+      const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} uninstall-all whose runtime cannot be removed is refused`);
+      equal(result.reason, 'runtime-remove-failed', `${platformName} the refusal names the runtime removal`);
+      deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} the removed registrations are put back`);
+      deepEqual(result.removedBrowsers, [], `${platformName} no registration is reported removed once restored`);
+      check(harness.stable() !== null, `${platformName} the runtime is still installed`);
+      const current = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(current.outcome, 'current', `${platformName} the restored helper is consistent, not split`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        failRuntimeRemove: true,
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.reason, 'runtime-remove-failed', `${platformName} the last per-browser uninstall reports the runtime removal`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the last registration is put back`);
+    }
+    {
+      // An exact runtime left with no registration at all is repaired by the
+      // explicit install instead of being refused as split state.
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: [],
+      });
+      const result = await installer.installNativeHostBrowser({}, harness.dependencies);
+      equal(result.status, 'installed', `${platformName} the explicit install re-registers an unregistered exact runtime`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} Chrome is registered again`);
+      equal(harness.publishCount(), 0, `${platformName} the runtime in place is reused`);
+    }
   }
   {
     const harness = fakeEnsureHarness(modules, 'darwin', {

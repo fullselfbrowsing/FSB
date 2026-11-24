@@ -1863,6 +1863,26 @@ async function rebuildWithWakeLock(
 type RegistrationStep = Readonly<{ ok: true }> | Readonly<{ ok: false; reason: string }>;
 
 /**
+ * Puts back registrations an uninstall removed just before the runtime itself
+ * could not be removed (on Windows, a process can keep a handle open inside
+ * it). The helper is then still installed, instead of left as an unregistered
+ * runtime that an explicit install would refuse. Returns the browsers restored.
+ */
+async function restoreRegistrations(
+  dependencies: NativeHostEnsureDependencies,
+  lease: NativeHostLockLease,
+  browsers: readonly NativeHostBrowser[],
+  extensionId: string,
+): Promise<NativeHostBrowser[]> {
+  const restored: NativeHostBrowser[] = [];
+  for (const browser of browsers) {
+    if (!await stillHeld(lease)) break;
+    if ((await addRegistrationLocked(dependencies, browser, extensionId)).ok) restored.push(browser);
+  }
+  return restored;
+}
+
+/**
  * Registers one more browser for the exact runtime already in place, using
  * the extension id its marker records. Requires the browser's own surface to
  * be absent; nothing that exists is overwritten.
@@ -2260,7 +2280,9 @@ export async function installNativeHostBrowser(
           runtime.marker?.packageVersion ?? null,
         );
       }
-      if (!others.some((surface) => surface.state === 'exact')) {
+      // An exact runtime with no registration at all (an uninstall that could
+      // not remove its files) is registered again below rather than refused.
+      if (runtime.state !== 'exact' && !others.some((surface) => surface.state === 'exact')) {
         const publisher = await createPublisher(dependencies, {
           extensionId,
           installToken: lease.token,
@@ -2468,6 +2490,7 @@ export async function uninstallNativeHostBrowser(
         try {
           await dependencies.runtime.removeExactRuntime(receipt);
         } catch {
+          await restoreRegistrations(dependencies, lease, [browser], installedExtensionId);
           return browserUninstallResult(dependencies, browser, 'refused', 'runtime-remove-failed', receipt.origin, receipt.packageVersion);
         }
         return browserUninstallResult(dependencies, browser, 'removed', 'removed', receipt.origin, receipt.packageVersion);
@@ -2600,9 +2623,15 @@ export async function uninstallAllNativeHost(
         try {
           await dependencies.runtime.removeExactRuntime(receipt);
         } catch {
+          const restored = await restoreRegistrations(
+            dependencies,
+            lease,
+            removedBrowsers,
+            installedExtensionId,
+          );
           return uninstallAllResult('refused', {
             reason: 'runtime-remove-failed',
-            removedBrowsers,
+            removedBrowsers: removedBrowsers.filter((browser) => !restored.includes(browser)),
             provenance,
           });
         }
