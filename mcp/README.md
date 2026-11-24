@@ -240,7 +240,7 @@ The browser selector controls the user-scoped native-messaging registration loca
 
 ### 1Password for logins and cards
 
-FSB keeps no passwords or cards of its own. `fill_credential`, `use_payment_method`, and their list tools read the user's 1Password. This server signs in to 1Password with the [1Password JavaScript SDK](https://www.npmjs.com/package/@1password/sdk) and hands values to the extension over the paired loopback bridge; the extension fills the page. The 1Password connection lives in this server, so the extension has to be paired with it. When it is not, the Vault page shows the command to run.
+FSB keeps no passwords or cards of its own. `fill_credential`, `use_payment_method`, and their list tools read the user's 1Password. This server signs in to 1Password with the [1Password JavaScript SDK](https://www.npmjs.com/package/@1password/sdk) and hands values to the extension over the paired loopback bridge; the extension fills the page. The 1Password connection lives in this server, so the extension has to reach it over the paired bridge. When it cannot, the Vault page shows the command that installs the local helper.
 
 **Log in from the extension.** Open the FSB control panel, choose **Vault**, and press **Log in to 1Password**. The button does not skip 1Password's own steps; it walks you through them:
 
