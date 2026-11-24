@@ -2967,8 +2967,20 @@ function applyTheme(preference) {
   }
 }
 
+// The toolbar icon is drawn by the service worker, which cannot read this page's
+// localStorage, so the preference is copied where it can (utils/action-icon.js
+// puts the icon on its white tile only for an explicit 'light'). An identical
+// write raises no change event, so repeating it on every load costs nothing.
+function mirrorThemePreference(preference) {
+  try {
+    const result = chrome.storage.local.set({ fsbThemePreference: preference });
+    if (result && typeof result.catch === 'function') result.catch(() => {});
+  } catch (_e) { /* the icon stays on its black tile */ }
+}
+
 function setThemePreference(preference) {
   localStorage.setItem('fsb-theme', preference);
+  mirrorThemePreference(preference);
   applyTheme(preference);
   updateSystemThemeListener(preference);
 }

@@ -16,11 +16,17 @@
  * cuts every frame with their alpha, so CORNER_RATIO there must equal RADIUS_128 / 128 here;
  * tests/fsb-icon-corners.test.js checks both, and that the copies below are byte-identical.
  *
+ * It also writes the light pair (LIGHT below): the cut icon with its luminance inverted, a white
+ * tile with the black lockup, the same inversion the brand's light logo (fsb_logo_light.png) is.
+ * action-icon.js draws it when FSB's theme is set to Light. Alpha is untouched, so the light
+ * icon has exactly the same rounded edge, and its cut corners come out white, which is what lets
+ * the toolbar animation rebuild the uncut tile by painting white under it.
+ *
  * No dependencies: PNG decoding and encoding use node:zlib and a CRC table, and the output
  * holds only IHDR, IDAT and IEND, so editor metadata in a re-exported file is dropped.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deflateSync, inflateSync } from 'node:zlib';
@@ -34,6 +40,11 @@ export const COPIES = {
   'extension/assets/onboarding/icon48.png': 'extension/assets/icon48.png',
   'showcase/assets/icon48.png': 'extension/assets/icon48.png',
   'showcase/assets/icon128.png': 'extension/assets/icon128.png',
+};
+// Light icon -> the source it inverts. Only the two sizes the toolbar animation draws from.
+export const LIGHT = {
+  'extension/assets/icon16_light.png': 'extension/assets/icon16.png',
+  'extension/assets/icon128_light.png': 'extension/assets/icon128.png',
 };
 // A cut pixel brighter than this would lose visible artwork, and would break the toolbar
 // animation's assumption that black under the icon rebuilds the square tile.
@@ -202,12 +213,24 @@ export function cutCorners(bytes) {
   return encodePng({ width: image.width, height: image.height, rgba });
 }
 
+/** PNG bytes -> the same icon with every pixel's R, G and B inverted and its alpha kept. */
+export function invertLuma(bytes) {
+  const image = decodePng(bytes);
+  const rgba = Uint8Array.from(image.rgba);
+  for (let i = 0; i < rgba.length; i += 4) {
+    rgba[i] = 255 - rgba[i];
+    rgba[i + 1] = 255 - rgba[i + 1];
+    rgba[i + 2] = 255 - rgba[i + 2];
+  }
+  return encodePng({ width: image.width, height: image.height, rgba });
+}
+
 function main() {
   const check = process.argv.includes('--check');
   const stale = [];
   const write = (relative, bytes) => {
     const file = path.join(ROOT, relative);
-    if (Buffer.compare(readFileSync(file), bytes) === 0) return;
+    if (existsSync(file) && Buffer.compare(readFileSync(file), bytes) === 0) return;
     stale.push(relative);
     if (!check) writeFileSync(file, bytes);
   };
@@ -222,6 +245,7 @@ function main() {
     write(source, cut[source]);
   }
   for (const [copy, source] of Object.entries(COPIES)) write(copy, cut[source]);
+  for (const [light, source] of Object.entries(LIGHT)) write(light, invertLuma(cut[source]));
   if (check) {
     if (stale.length) {
       console.error(`out of date: ${stale.join(', ')}\nrun node scripts/build-icon-corners.mjs`);

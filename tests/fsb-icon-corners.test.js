@@ -18,6 +18,11 @@
  *   5. Places that round the icon in CSS, or draw it as a tile on the showcase, must stay at
  *      about the same share (22-25% of their size), so the icon reads as one shape everywhere.
  *   6. The manifest must still point at the files that carry the corners.
+ *   7. The light pair (icon16_light, icon128_light), which the toolbar icon draws when FSB's
+ *      theme is set to Light, must be its source inverted: the same alpha, so the same rounded
+ *      edge, and luminance 255 - source at every pixel, which leaves the cut corners white for
+ *      the animation's white plate to rebuild. action-icon.js must draw from exactly that pair.
+ *      Fix: node scripts/build-icon-corners.mjs
  */
 
 const fs = require('node:fs');
@@ -138,6 +143,33 @@ async function main() {
   for (const [label, set] of [['icons', manifest.icons], ['action.default_icon', manifest.action && manifest.action.default_icon]]) {
     check(`manifest ${label}`, JSON.stringify(set) === JSON.stringify(expected), JSON.stringify(set));
   }
+
+  console.log('\n7. The light pair is its source inverted');
+  for (const [light, source] of Object.entries(corners.LIGHT)) {
+    if (!fs.existsSync(path.join(ROOT, light))) { check(`${light} exists`, false, fix); continue; }
+    const a = corners.decodePng(bytes(source));
+    const b = corners.decodePng(bytes(light));
+    check(`${light} is ${a.width}x${a.height}, like ${source}`, a.width === b.width && a.height === b.height,
+      `${b.width}x${b.height}; ${fix}`);
+    if (a.width !== b.width || a.height !== b.height) continue;
+    let alphaOff = 0;
+    let lumaOff = 0;
+    for (let i = 0; i < a.rgba.length; i += 4) {
+      if (a.rgba[i + 3] !== b.rgba[i + 3]) alphaOff++;
+      for (let c = 0; c < 3; c++) if (b.rgba[i + c] !== 255 - a.rgba[i + c]) { lumaOff++; break; }
+    }
+    check(`${light}: same alpha as ${source}, so the same rounded edge`, alphaOff === 0, `${alphaOff} pixels differ; ${fix}`);
+    check(`${light}: luminance is 255 - ${source} at every pixel`, lumaOff === 0, `${lumaOff} pixels differ; ${fix}`);
+    // cornerInk reports the brightest corner pixel, so ask it about the inverse.
+    const darkest = 255 - corners.cornerInk(corners.invertLuma(bytes(light)));
+    check(`${light}: only white under the cut corners`, darkest >= 255 - corners.MAX_CORNER_LUMA,
+      `darkest corner pixel ${darkest}; the white plate could not rebuild the tile`);
+  }
+  const lightPaths = /var LIGHT_GLYPH_PATHS = \{ 16: '([^']+)', 32: '([^']+)' \};/.exec(icon);
+  const lightFiles = Object.keys(corners.LIGHT).map((file) => file.replace(/^extension\//, ''));
+  check('the light tile is drawn from exactly the light pair',
+    !!lightPaths && lightPaths[1] === lightFiles[0] && lightPaths[2] === lightFiles[1],
+    `LIGHT_GLYPH_PATHS is ${lightPaths ? lightPaths.slice(1).join(', ') : 'missing'}; expected ${lightFiles.join(', ')}`);
 
   console.log(`\nfsb-icon-corners: ${passed} passed, ${failed} failed`);
   if (failed) process.exit(1);

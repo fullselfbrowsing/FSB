@@ -132,12 +132,25 @@ function resolveEffectiveTheme(preference) {
   return preference;
 }
 
+// The toolbar icon is drawn by the service worker, which cannot read this page's
+// localStorage, so the preference is copied where it can (utils/action-icon.js
+// puts the icon on its white tile only for an explicit 'light'). Doing it here
+// too brings a choice made before the copy existed across the first time this
+// page opens; an identical write raises no change event.
+function mirrorThemePreference(preference) {
+  try {
+    const result = chrome.storage.local.set({ fsbThemePreference: preference });
+    if (result && typeof result.catch === 'function') result.catch(() => {});
+  } catch (_e) { /* the icon stays on its black tile */ }
+}
+
 function applyTheme() {
   let preference = localStorage.getItem('fsb-theme');
   if (!['system', 'dark', 'light'].includes(preference)) {
     preference = 'system';
   }
   document.documentElement.setAttribute('data-theme', resolveEffectiveTheme(preference));
+  mirrorThemePreference(preference);
 }
 
 // Listen for theme changes from options page

@@ -27,6 +27,8 @@
  *   ICON-19: exact-pixel interning and deadline scheduling skip only invisible work
  *   ICON-20: setIcon is serialized, phase-correct, and failure-backoff bounded
  *   ICON-21: the animation preference is authoritative across every ingress
+ *   ICON-22: each tab reports its motion and start time to the status pill
+ *   ICON-23: FSB's Light theme puts every state on the white tile; nothing else does
  *
  * ICON-01 reads the canonical sources directly, so a timing or palette change in
  * visual-feedback.js that the icon does not follow fails here. ICON-14/15 derive
@@ -128,6 +130,10 @@ function makeWorker(opts) {
   function makeCtx(size) {
     const ops = [];
     let path = [];
+    // What the open frame was drawn on, stamped onto its ImageData so an emitted
+    // toolbar frame says which tile it shows: the first fill is the plate, the
+    // first bitmap draw is the artwork.
+    let frameInfo = {};
     const ctx = {
       _ops: ops,
       globalAlpha: 1,
@@ -139,12 +145,15 @@ function makeWorker(opts) {
       strokeStyle: null,
       fillStyle: null,
       globalCompositeOperation: 'source-over',
-      clearRect() { ops.push({ op: 'clearRect' }); },
+      clearRect() { frameInfo = {}; ops.push({ op: 'clearRect' }); },
       drawImage(bitmap, x, y, w, h) {
+        const src = bitmap && bitmap.__bitmap ? bitmap.__bitmap : null;
+        if (src && !frameInfo.src) frameInfo.src = src;
         ops.push({
           op: 'drawImage', x, y, w, h, alpha: ctx.globalAlpha, filter: ctx.filter,
           composite: ctx.globalCompositeOperation,
-          source: bitmap && bitmap.__scratch ? 'scratch' : 'bitmap'
+          source: bitmap && bitmap.__scratch ? 'scratch' : 'bitmap',
+          src
         });
       },
       save() { ops.push({ op: 'save' }); },
@@ -164,6 +173,7 @@ function makeWorker(opts) {
       },
       clip() { ops.push({ op: 'clip', path: path.slice() }); },
       fillRect(x, y, w, h) {
+        if (!frameInfo.plate) frameInfo.plate = ctx.fillStyle;
         ops.push({
           op: 'fillRect', x, y, w, h, fillStyle: ctx.fillStyle,
           composite: ctx.globalCompositeOperation
@@ -190,7 +200,7 @@ function makeWorker(opts) {
       },
       getImageData() {
         imageSeq += 1;
-        const image = { __img: true, size, seq: imageSeq };
+        const image = { __img: true, size, seq: imageSeq, plate: frameInfo.plate, src: frameInfo.src };
         if (opts.identicalPixels) image.data = new Uint8ClampedArray(size * size * 4);
         return image;
       }
@@ -247,7 +257,11 @@ function makeWorker(opts) {
         set: async (rec) => { Object.assign(sessionStore, rec); }
       },
       local: {
-        get: async (k) => (Object.prototype.hasOwnProperty.call(localStore, k) ? { [k]: localStore[k] } : {}),
+        get: async (k) => {
+          // Lets a test act at an exact point in init's sequence of reads.
+          if (opts.onLocalGet) opts.onLocalGet(k);
+          return Object.prototype.hasOwnProperty.call(localStore, k) ? { [k]: localStore[k] } : {};
+        },
         set: async (rec) => { Object.assign(localStore, rec); }
       },
       onChanged: {
@@ -265,8 +279,13 @@ function makeWorker(opts) {
     OffscreenCanvas: OffscreenCanvasStub,
     createImageBitmap: async (blob) => ({ __bitmap: blob.__url, closed: false, close() { this.closed = true; } }),
     fetch: async (url) => {
-      if (opts.failGlyphs) throw new Error('glyph fetch failed');
+      // true fails every glyph; a function fails the URLs it returns true for.
+      if (opts.failGlyphs === true || (typeof opts.failGlyphs === 'function' && opts.failGlyphs(url))) {
+        throw new Error('glyph fetch failed');
+      }
       fetches.push(url);
+      // Lets a test act at an exact point inside a frame build.
+      if (opts.onFetch) opts.onFetch(url);
       // Lets a test charge real wall-clock to the frame build, which is the only
       // way to tell "clock starts with the loop" from "clock starts before it".
       if (opts.buildDelayMs) now += opts.buildDelayMs;
@@ -368,7 +387,10 @@ function makeWorker(opts) {
       }
       return out;
     },
-    resetOps: (size) => { if (contexts[size]) contexts[size]._ops.length = 0; }
+    resetOps: (size) => { if (contexts[size]) contexts[size]._ops.length = 0; },
+    // The glow's scratch surface keeps its own op log.
+    scratchOps: (size) => (scratchContexts[size] || { _ops: [] })._ops,
+    resetScratch: (size) => { if (scratchContexts[size]) scratchContexts[size]._ops.length = 0; }
   };
 }
 
@@ -411,11 +433,15 @@ const cutOf = (group, size) => {
   console.log('\nICON-01: each state tracks its own canonical source');
   // -------------------------------------------------------------------------
 
-  // The icon's own table. Key order is not pinned -- only the values are.
+  // The icon's own table. Key order is not pinned -- only the values are. Read
+  // from the STATES literal alone: other one-line maps (TILES) share its shape.
+  const statesStart = ICON_SRC.indexOf('var STATES = {');
+  assert(statesStart !== -1, 'the icon declares its STATES table');
+  const statesSrc = ICON_SRC.slice(statesStart, ICON_SRC.indexOf('\n  };', statesStart));
   const iconStates = {};
   const stateRe = /^\s{4}(\w+):\s*\{(.+?)\},?$/gm;
   let m;
-  while ((m = stateRe.exec(ICON_SRC)) !== null) {
+  while ((m = stateRe.exec(statesSrc)) !== null) {
     const body = m[2];
     const num = (k) => {
       const hit = body.match(new RegExp(k + ':\\s*(\\d+)'));
@@ -2046,6 +2072,248 @@ const cutOf = (group, size) => {
     w.api.noteActivity(3, 'sweep');
     await flush();
     assertEq(w.api.getMotion(3), null, 'with animations off the pill gets no motion either');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-23: FSB\'s Light theme puts every state on the white tile');
+  // -------------------------------------------------------------------------
+
+  const THEME_KEY = 'fsbThemePreference';
+  const PAGE_SRC = {
+    'settings page (options.js)': fs.readFileSync(path.join(ROOT, 'extension/ui/options.js'), 'utf8'),
+    'side panel (sidepanel.js)': fs.readFileSync(path.join(ROOT, 'extension/ui/sidepanel.js'), 'utf8'),
+    'popup (popup.js)': fs.readFileSync(path.join(ROOT, 'extension/ui/popup.js'), 'utf8')
+  };
+  // A top-level function, from its signature to its closing brace.
+  const fnBody = (src, signature) => {
+    const at = src.indexOf(signature);
+    return at === -1 ? '' : src.slice(at, src.indexOf('\n}\n', at) + 2);
+  };
+  const lastShown = (w, size) => {
+    const e = w.emits[w.emits.length - 1];
+    return e && e.imageData && e.imageData[size];
+  };
+  const fromPair = (src, light, size) => typeof src === 'string'
+    && src.endsWith('/assets/icon' + (size === 16 ? 16 : 128) + (light ? '_light' : '') + '.png');
+  // An emitted frame's ImageData carries the plate and artwork it was drawn with.
+  const onTile = (image, light, size) => !!image && image.plate === (light ? '#ffffff' : '#000000')
+    && fromPair(image.src, light, size);
+  const lightFetches = (w) => w.fetches.filter((u) => /_light\.png$/.test(u)).length;
+
+  {
+    // The pages keep the choice in localStorage, out of the worker's reach, and
+    // copy it to where the icon reads it.
+    assert(ICON_SRC.includes("var THEME_KEY = 'fsbThemePreference';"),
+      'the icon reads the theme from chrome.storage.local fsbThemePreference');
+    for (const [label, src] of Object.entries(PAGE_SRC)) {
+      assert(fnBody(src, 'function mirrorThemePreference(').includes('chrome.storage.local.set({ fsbThemePreference: preference })'),
+        `the ${label} copies the preference there`);
+    }
+    assert(fnBody(PAGE_SRC['settings page (options.js)'], 'function setThemePreference(').includes('mirrorThemePreference(preference);'),
+      'the settings toggle copies each choice as it is made');
+    for (const label of ['side panel (sidepanel.js)', 'popup (popup.js)']) {
+      assert(fnBody(PAGE_SRC[label], 'function applyTheme()').includes('mirrorThemePreference(preference);'),
+        `the ${label} copies the stored choice whenever it applies the theme`);
+    }
+  }
+
+  for (const value of [undefined, 'system', 'dark', 'Light', true]) {
+    const w = makeWorker(value === undefined ? {} : { local: { [THEME_KEY]: value } });
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const label = value === undefined ? 'no stored theme' : 'a stored ' + JSON.stringify(value);
+    assert(onTile(lastShown(w, 16), false, 16) && onTile(lastShown(w, 32), false, 32), `${label} keeps the black tile`);
+    assertEq(lightFetches(w), 0, `${label} never fetches the light pair`);
+  }
+
+  {
+    const w = makeWorker({ local: { [THEME_KEY]: 'light' } });
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    for (const size of [16, 32]) {
+      // The resting frames render in order: idle:on, then idle:off.
+      const [idle, dimmed] = w.groups(size);
+      const plate = (idle || [])[0];
+      assert(!!plate && plate.op === 'fillRect' && plate.fillStyle === '#ffffff' && plate.w === size && plate.h === size,
+        `${size}px: idle opens with the white plate as a full square`);
+      const mark = opsOf(idle, 'drawImage')[0];
+      assert(!!mark && fromPair(mark.src, true, size) && mark.composite === 'source-over',
+        `${size}px: the artwork is the light pair's`);
+      const cut = cutOf(idle, size);
+      assert(!!cut && fromPair(cut.src, true, size), `${size}px: the corner cut uses the light pair's own alpha`);
+      assertEq(opsOf(dimmed, 'fillRect').length, 0, `${size}px: a dimmed light frame paints no plate`);
+      const faded = opsOf(dimmed, 'drawImage');
+      assert(faded.length === 1 && fromPair(faded[0].src, true, size) && faded[0].alpha === 0.5,
+        `${size}px: it is only the light artwork at half strength, with no cut`);
+    }
+    assert(onTile(lastShown(w, 16), true, 16) && onTile(lastShown(w, 32), true, 32),
+      'the toolbar shows the white tile at both sizes');
+    assertEq(w.fetches.filter((u) => /icon(16|128)\.png$/.test(u)).length, 0, 'the black pair is never fetched');
+  }
+
+  {
+    const light = makeWorker({ local: { [THEME_KEY]: 'light' } });
+    const dark = makeWorker();
+    await light.api.init({ hasLiveSession: () => true });
+    await dark.api.init({ hasLiveSession: () => true });
+    await flush();
+
+    const ls = await renderActivity(light, 'sweep');
+    const ds = await renderActivity(dark, 'sweep');
+    assert(ls[32].length > 0 && ls[32].length === ds[32].length, 'the sweep has as many frames on either tile');
+    assertEq((opsOf(ls[32][0], 'fill')[0] || {}).fillStyle, 'rgba(0, 0, 0, 0.1)',
+      'its track turns from 10% white to 10% black');
+    const gradients = (frames) => JSON.stringify(frames.map((f) => opsOf(f, 'linear')));
+    assertEq(gradients(ls[32]), gradients(ds[32]), 'its moving fill is the same orange, in the same place, every frame');
+    assert(ls[32].every((f) => (opsOf(f, 'fillRect')[0] || {}).fillStyle === '#ffffff'),
+      'every light sweep frame sits on the white plate');
+    assert(ls[16].every((f) => { const c = cutOf(f, 16); return !!c && fromPair(c.src, true, 16); })
+      && ls[32].every((f) => { const c = cutOf(f, 32); return !!c && fromPair(c.src, true, 32); }),
+      'and ends with the light cut at 16px and 32px');
+
+    const strokes = (frames) => JSON.stringify(frames.map((f) => opsOf(f, 'stroke')));
+    const lo = await renderActivity(light, 'orbit', 2);
+    const dorb = await renderActivity(dark, 'orbit', 2);
+    assert(lo[32].length > 0 && strokes(lo[32]) === strokes(dorb[32]) && strokes(lo[16]) === strokes(dorb[16]),
+      'the orbit bead is stroke-for-stroke the same on either tile');
+    const lr = await renderCapability(light, 3);
+    const dr = await renderCapability(dark, 3);
+    assert(lr[32].length > 0 && strokes(lr[32]) === strokes(dr[32]) && strokes(lr[16]) === strokes(dr[16]),
+      'and so is the capability ring');
+  }
+
+  {
+    const light = makeWorker({ local: { [THEME_KEY]: 'light' } });
+    const dark = makeWorker();
+    await light.api.init({ hasLiveSession: () => true });
+    await dark.api.init({ hasLiveSession: () => true });
+    await flush();
+    for (const w of [light, dark]) { w.resetOps(16); w.resetOps(32); w.resetScratch(32); }
+    light.api.setWatching(true, 5);
+    dark.api.setWatching(true, 5);
+    await flush();
+    const lf = light.groups(32);
+    const df = dark.groups(32);
+    const mid = lf.length >> 1;
+    assert(lf.length > 0 && lf.length === df.length, 'the breathe has as many frames on either tile');
+    assertEq((opsOf(lf[mid], 'fillRect')[0] || {}).fillStyle, '#ffffff', 'it fades the mark over the white plate');
+    const glow = opsOf(lf[mid], 'drawImage').find((d) => d.source === 'scratch');
+    assertEq(glow && glow.composite, 'multiply', 'the glow is multiplied in, so the white plate contributes nothing');
+    const tint = light.scratchOps(32).filter((o) => o.op === 'fillRect');
+    assert(tint.length >= 2 && tint.every((o, i) => (i % 2 === 0
+      ? o.fillStyle === '#ffffff' && o.composite === 'source-over'
+      : o.composite === 'screen')),
+      'its scratch starts as a white square and screens the orange in, which turns only the black mark orange');
+    const markAlphas = (frames) => JSON.stringify(frames.map((f) => {
+      const draws = opsOf(f, 'drawImage').filter((d) => d.source === 'bitmap' && d.composite !== 'destination-in');
+      return (draws[draws.length - 1] || {}).alpha;
+    }));
+    assertEq(markAlphas(lf), markAlphas(df), 'the mark fades on the same ramp as on the black tile');
+    const blooms = (frames) => JSON.stringify(frames.map((f) => {
+      const g = opsOf(f, 'drawImage').find((d) => d.source === 'scratch');
+      return g ? [g.alpha, g.filter] : null;
+    }));
+    assertEq(blooms(lf), blooms(df), 'and the glow blooms on the same curve');
+    assert(lf.every((f) => { const c = cutOf(f, 32); return !!c && fromPair(c.src, true, 32); }),
+      'every light breathe frame ends with the light cut');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const blackIdle = lastShown(w, 32);
+    assert(onTile(blackIdle, false, 32), 'idle starts on the black tile');
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    assert(onTile(lastShown(w, 16), true, 16) && onTile(lastShown(w, 32), true, 32),
+      'choosing Light repaints the idle icon on the white tile');
+    const fetched = w.fetches.length;
+    w.setLocal(THEME_KEY, 'dark');
+    await flush();
+    assert(lastShown(w, 32) === blackIdle, 'choosing Dark again shows the very frame it showed before');
+    assertEq(w.fetches.length, fetched, 'without fetching or decoding anything');
+    const emitted = w.emits.length;
+    w.setLocal(THEME_KEY, 'system');
+    await flush();
+    assertEq(w.emits.length, emitted, 'System is the black tile too, so it repaints nothing');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    await flush();
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    w.api.noteActivity(4, 'orbit');
+    await flush();
+    const before = w.api.getMotion(4);
+    assert(!!before && before.form === 'orbit' && onTile(lastShown(w, 32), false, 32), 'orbiting on the black tile');
+    w.advance(500);
+    const heardAt = heard.length;
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    const after = w.api.getMotion(4);
+    assert(!!after && after.form === 'orbit', 'the orbit carries on after the switch');
+    assert(!!after && !!before && after.startedAt === before.startedAt + 500, 'restarting its cycle on the white tile');
+    assert(heard.slice(heardAt).some((h) => h.tabId === 4 && h.motion && after && h.motion.startedAt === after.startedAt),
+      'and the status pill hears the new start time, so the two stay in step');
+    assert(onTile(lastShown(w, 32), true, 32), 'the frames on screen now come from the white tile');
+    assertEq(w.timerCount(), 1, 'one animation scheduler, not one per tile');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const blackIdle = lastShown(w, 32);
+    const emitted = w.emits.length;
+    w.setLocal(THEME_KEY, 'light');
+    w.setLocal(THEME_KEY, 'dark');   // before the white tile's frames exist
+    await flush();
+    assertEq(w.emits.length, emitted, 'Light then Dark before the white tile is ready repaints nothing');
+    assert(lastShown(w, 32) === blackIdle, 'and leaves the black tile on screen');
+    w.setLocal(THEME_KEY, 'light');
+    w.setLocal(THEME_KEY, 'dark');
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    assert(onTile(lastShown(w, 32), true, 32), 'Light, Dark, Light lands on Light');
+    assertEq(w.emits.length, emitted + 1, 'with a single repaint');
+  }
+
+  // A switch can reach init at two points: while the stored tile's artwork is
+  // still being fetched, and after its resting frames exist but before init is
+  // done (it still reads the relay record then). Both must land.
+  const initMoments = [
+    ['while init fetches the stored tile', 'onFetch', () => true],
+    ['after the stored tile is rendered, before init is done', 'onLocalGet', (key) => key === RELAY_SEEN_KEY]
+  ];
+  for (const [moment, hook, at] of initMoments) {
+    for (const [stored, chosen] of [['light', 'dark'], ['dark', 'light']]) {
+      let w = null;
+      let switched = false;
+      w = makeWorker({
+        local: { [THEME_KEY]: stored },
+        [hook]: (arg) => { if (!switched && at(arg)) { switched = true; w.setLocal(THEME_KEY, chosen); } }
+      });
+      await w.api.init({ hasLiveSession: () => false });
+      await flush();
+      assert(switched && onTile(lastShown(w, 16), chosen === 'light', 16) && onTile(lastShown(w, 32), chosen === 'light', 32),
+        `${chosen} chosen ${moment} (${stored} stored) lands`);
+    }
+  }
+
+  {
+    const w = makeWorker({ failGlyphs: (url) => /_light\.png$/.test(url) });
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const blackIdle = lastShown(w, 32);
+    const emitted = w.emits.length;
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    assertEq(w.emits.length, emitted, 'a light pair that will not load repaints nothing');
+    assert(lastShown(w, 32) === blackIdle, 'so the black tile stays on screen');
+    assert(w.errors.some((e) => /could not render the light tile/.test(e)), 'and the failure is reported');
   }
 
   // -------------------------------------------------------------------------

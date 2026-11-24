@@ -29,6 +29,9 @@
  * Everything canvas, timer and persistence related lives in this file. The
  * service worker drives it through the small public API at the bottom.
  *
+ * Every form is drawn on the artwork's black tile, or on its white counterpart
+ * when FSB's theme is set to Light (TILES). Nothing else about a state changes.
+ *
  * Classic script. Loaded into the MV3 service worker global scope.
  */
 
@@ -135,6 +138,27 @@
   // was redrawn about a fifth chunkier to stay legible, so 16 has to come from
   // its own asset or the mark renders thin. 128 into 32 is an exact 4:1 reduction.
   var GLYPH_PATHS = { 16: 'assets/icon16.png', 32: 'assets/icon128.png' };
+  // The white tile's pair: the same artwork with its luminance inverted, written
+  // by scripts/build-icon-corners.mjs. Fetched only once Light is chosen.
+  var LIGHT_GLYPH_PATHS = { 16: 'assets/icon16_light.png', 32: 'assets/icon128_light.png' };
+
+  // ---- Tiles --------------------------------------------------------------
+  // FSB's theme setting can put the icon on a white tile: the brand's light logo,
+  // which is the dark one with its luminance inverted. Only an explicit Light
+  // choice does. The default, 'system', stays on the black tile: a worker can see
+  // neither the OS theme nor the browser's, and only an open FSB page could tell
+  // it when either changed. The pages keep the choice in localStorage, which a
+  // worker cannot read, so options.js, sidepanel.js and popup.js copy it here.
+  //
+  // tint and glow are the breathe's two blend steps (drawMarkGlow); each tile's
+  // pair leaves that tile's own plate untouched.
+  var THEME_KEY = 'fsbThemePreference';
+  var TILES = {
+    dark: { glyphs: GLYPH_PATHS, plate: PLATE_COLOR, track: SWEEP_TRACK_COLOR, tint: 'multiply', glow: 'lighter' },
+    // The track is the dark tile's 10% white turned to 10% black; the status pill
+    // it quotes has no light form to copy.
+    light: { glyphs: LIGHT_GLYPH_PATHS, plate: '#ffffff', track: 'rgba(0, 0, 0, 0.1)', tint: 'screen', glow: 'multiply' }
+  };
 
   // Normalized fade width expressed within the bead's own 0..1 span.
   var FADE_SPAN = FADE_FRACTION / BEAD_FRACTION;
@@ -168,12 +192,14 @@
 
   var contexts = Object.create(null);       // size -> CanvasRenderingContext2D
   var scratches = Object.create(null);      // size -> scratch ctx, for the glow
-  var animatedFrames = Object.create(null); // state -> array of frame records
-  var animatedBuilds = Object.create(null); // state -> in-flight build promise
-  var staticFrames = Object.create(null);   // key -> frame record
+  // Frames and bitmaps are kept per tile, so a theme switch can never paint one
+  // tile's frames on the other, and switching back is instant.
+  var animatedFrames = Object.create(null); // 'tile:state' -> array of frame records
+  var animatedBuilds = Object.create(null); // 'tile:state' -> in-flight build promise
+  var staticFrames = Object.create(null);   // tile -> { key -> frame record }
   var canonicalFrameBuckets = Object.create(null); // pixel hash -> frame records
-  var glyphCache = null;                    // decoded bitmaps, shared by builds
-  var glyphBuild = null;                    // in-flight decode
+  var glyphCaches = Object.create(null);    // tile -> decoded bitmaps, shared by builds
+  var glyphBuilds = Object.create(null);    // tile -> in-flight decode
   var emitFailureLogged = false;
 
   // The toolbar icon is global but the things it reports are not: several tabs
@@ -194,6 +220,9 @@
   var resolved = null;                // the state currently on screen
   var animating = false;
   var animationsEnabled = true;
+  var tile = 'dark';                  // the tile on screen
+  var wantedTile = 'dark';            // the latest tile asked for; ahead of `tile` while it builds
+  var tileExplicit = false;           // a switch arrived, so the stored value read at init is stale
   var preferenceListenerArmed = false;
   var connected = false;
   var relaySeen = false;
@@ -299,8 +328,8 @@
   }
 
   // One scratch surface per size, reused. Needed because the artwork is a FLAT
-  // tile: the mark is distinguished from the black plate by luminance, not by
-  // alpha, so it cannot be isolated with a composite op on the main canvas.
+  // tile: the mark is distinguished from the plate by luminance, not by alpha,
+  // so it cannot be isolated with a composite op on the main canvas.
   function scratchFor(size) {
     var ctx = scratches[size];
     if (!ctx) {
@@ -312,30 +341,33 @@
 
   // An orange halo around the MARK, not around the tile.
   //
-  // 'multiply' on the scratch turns the white mark orange and leaves the black
-  // plate black (x * 0 = 0). Compositing that back with 'lighter' then adds only
-  // where the scratch is non-black, so the halo hugs the lettering and the plate
-  // contributes nothing. A filter on the tile itself would halo the whole tile.
+  // On the black tile, 'multiply' on the scratch turns the white mark orange and
+  // leaves the black plate black (x * 0 = 0). Compositing that back with
+  // 'lighter' then adds only where the scratch is non-black, so the halo hugs
+  // the lettering and the plate contributes nothing. A filter on the tile itself
+  // would halo the whole tile. The white tile uses the counterparts: 'screen'
+  // turns the black mark orange and leaves the white plate white
+  // (1 - 0 * (1 - x) = 1), and 'multiply' then leaves white untouched (x * 1 = x).
   //
-  // The scratch starts as a black square, which under the rounded artwork
-  // rebuilds the full tile. Without it, 'multiply' over the transparent corners
-  // would paint them orange (a blend over nothing leaves the source colour), and
-  // the blur would carry that orange into the tile.
-  function drawMarkGlow(ctx, size, bitmap, spec, offset, drawn) {
+  // The scratch starts as a square of the plate colour, which under the rounded
+  // artwork rebuilds the full tile. Without it, the tint over the transparent
+  // corners would paint them orange (a blend over nothing leaves the source
+  // colour), and the blur would carry that orange into the tile.
+  function drawMarkGlow(ctx, size, bitmap, spec, offset, drawn, look) {
     var scratch = scratchFor(size);
     scratch.globalCompositeOperation = 'source-over';
     scratch.globalAlpha = 1;
     scratch.filter = 'none';
     scratch.clearRect(0, 0, size, size);
-    scratch.fillStyle = PLATE_COLOR;
+    scratch.fillStyle = look.plate;
     scratch.fillRect(0, 0, size, size);
     scratch.drawImage(bitmap, offset, offset, drawn, drawn);
-    scratch.globalCompositeOperation = 'multiply';
+    scratch.globalCompositeOperation = look.tint;
     scratch.fillStyle = alphaColor(GLOW_RGB, 1);
     scratch.fillRect(0, 0, size, size);
     scratch.globalCompositeOperation = 'source-over';
 
-    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = look.glow;
     ctx.globalAlpha = spec.glowAlpha;
     ctx.filter = 'blur(' + (spec.glowRatio * size).toFixed(2) + 'px)';
     ctx.drawImage(scratch.canvas, 0, 0);
@@ -348,16 +380,17 @@
   // plate itself never moves. Fading the artwork instead fades the whole icon,
   // because the artwork IS the plate. So the plate is painted solid first and the
   // mark composited over it: black-on-black is a no-op, so only the lettering
-  // varies. Dim is deliberately different -- a dropped relay recedes the whole
-  // icon, and it outranks the glow because grayscale would fight an orange halo.
+  // varies. The white tile does the same over a white plate. Dim is deliberately
+  // different -- a dropped relay recedes the whole icon, and it outranks the
+  // glow because grayscale would fight an orange halo.
   //
-  // Every undimmed frame starts from that black plate as a full square. The
-  // artwork's cut corners are plain black, so the square under it rebuilds the
-  // uncut tile; renderFrame then cuts the finished frame back to the artwork's
-  // own rounded edge, so whatever was drawn near a corner ends on exactly the
-  // edge pixels of the static icon. A dimmed frame is only the faded artwork,
-  // whose alpha already carries the corners.
-  function drawGlyph(ctx, size, bitmap, spec) {
+  // Every undimmed frame starts from that plate as a full square. The artwork's
+  // cut corners are plain plate colour (black, or white in the light pair), so
+  // the square under it rebuilds the uncut tile; renderFrame then cuts the
+  // finished frame back to the artwork's own rounded edge, so whatever was drawn
+  // near a corner ends on exactly the edge pixels of the static icon. A dimmed
+  // frame is only the faded artwork, whose alpha already carries the corners.
+  function drawGlyph(ctx, size, bitmap, spec, look) {
     var drawn = size * GLYPH_SCALE;
     var offset = (size - drawn) / 2;
 
@@ -370,7 +403,7 @@
       return;
     }
 
-    ctx.fillStyle = PLATE_COLOR;
+    ctx.fillStyle = look.plate;
     ctx.fillRect(0, 0, size, size);
 
     var markAlpha = typeof spec.glyphAlpha === 'number' ? spec.glyphAlpha : 1;
@@ -381,7 +414,7 @@
       return;
     }
 
-    if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn);
+    if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn, look);
     ctx.globalAlpha = markAlpha;
     ctx.drawImage(bitmap, offset, offset, drawn, drawn);
     ctx.globalAlpha = 1;
@@ -543,14 +576,14 @@
     ctx.rect(x, y, w, h);
   }
 
-  function drawSweep(ctx, size, palette, progress) {
+  function drawSweep(ctx, size, palette, progress, look) {
     var trackW = SWEEP_TRACK_W_RATIO * size;
     var trackH = Math.max(SWEEP_TRACK_H_MIN, Math.round(SWEEP_TRACK_H_RATIO * size));
     var x = (size - trackW) / 2;
     var y = Math.round(SWEEP_CENTER_Y_RATIO * size - trackH / 2);
     var radius = trackH <= 2 ? 0 : trackH / 2;
 
-    ctx.fillStyle = SWEEP_TRACK_COLOR;
+    ctx.fillStyle = look.track;
     barPath(ctx, x, y, trackW, trackH, radius);
     ctx.fill();
 
@@ -610,24 +643,26 @@
   }
 
   // Renders one frame at every shipped size, each from its own source bitmap.
-  // The only background is the artwork's own black tile, rebuilt as a square
-  // under it (drawGlyph); a service worker cannot read the toolbar theme to pick
-  // one. The last step cuts each undimmed frame with the artwork's alpha, so its
-  // rounded corners are pixel-for-pixel the static icon's in every state.
+  // The only background is the artwork's own tile, rebuilt as a square under it
+  // (drawGlyph). A service worker cannot read the toolbar theme, so the tile is
+  // black unless FSB's own theme is set to Light (TILES). The last step cuts each
+  // undimmed frame with the artwork's alpha, so its rounded corners are
+  // pixel-for-pixel the static icon's in every state.
   //
   // Exactly one clearRect per frame, which opens it: the test harness splits its
   // recorded op log on clearRect to reconstruct frames. The glyph is the first
   // bitmap draw and, in an undimmed frame, the corner cut is the last.
-  function renderFrame(bitmaps, spec) {
+  function renderFrame(bitmaps, spec, look) {
+    look = look || TILES.dark;
     var frame = {};
     for (var i = 0; i < SIZES.length; i++) {
       var size = SIZES[i];
       var ctx = contextFor(size);
       var progress = spec.progress || 0;
       ctx.clearRect(0, 0, size, size);
-      drawGlyph(ctx, size, bitmaps[size], spec);
+      drawGlyph(ctx, size, bitmaps[size], spec, look);
       if (spec.form === 'orbit') strokeOrbit(ctx, size, spec.palette, progress);
-      else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress);
+      else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress, look);
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
       if (spec.dimmed !== true) {
         var drawn = size * GLYPH_SCALE;
@@ -740,12 +775,13 @@
   // One bitmap per output size. createImageBitmap rejects SVG sources in a
   // worker, so PNG is the only viable base image here. A partial failure closes
   // whatever already decoded rather than stranding it.
-  async function loadGlyphs() {
+  async function loadGlyphs(name) {
+    var paths = TILES[name].glyphs;
     var bitmaps = {};
     try {
       for (var i = 0; i < SIZES.length; i++) {
         var size = SIZES[i];
-        var response = await fetch(chrome.runtime.getURL(GLYPH_PATHS[size]));
+        var response = await fetch(chrome.runtime.getURL(paths[size]));
         var blob = await response.blob();
         bitmaps[size] = await createImageBitmap(blob);
       }
@@ -756,57 +792,72 @@
     return bitmaps;
   }
 
-  // Decoded once per worker and kept. Every state's build used to re-fetch and
-  // re-decode both PNGs, so a session that touched all four states paid the I/O
-  // and the decode four times over. The bitmaps are small; the decode is not.
-  function ensureGlyphs() {
-    if (glyphCache) return Promise.resolve(glyphCache);
-    if (glyphBuild) return glyphBuild;
-    glyphBuild = loadGlyphs().then(function (bitmaps) {
-      glyphCache = bitmaps;
-      glyphBuild = null;
+  // Decoded once per worker and tile, and kept. Every state's build used to
+  // re-fetch and re-decode both PNGs, so a session that touched all four states
+  // paid the I/O and the decode four times over. The bitmaps are small; the
+  // decode is not.
+  function ensureGlyphs(name) {
+    if (glyphCaches[name]) return Promise.resolve(glyphCaches[name]);
+    if (glyphBuilds[name]) return glyphBuilds[name];
+    var build = loadGlyphs(name).then(function (bitmaps) {
+      glyphCaches[name] = bitmaps;
+      delete glyphBuilds[name];
       return bitmaps;
     }, function (e) {
-      glyphBuild = null;
+      delete glyphBuilds[name];
       throw e;
     });
-    return glyphBuild;
+    glyphBuilds[name] = build;
+    return build;
   }
 
   // Only the four resting frames and one Ring kickoff are rendered up front. A
   // worker wake that never animates should not pay for full animation cycles.
-  async function buildStaticCache() {
-    var bitmaps = await ensureGlyphs();
-    staticFrames['idle:on'] = renderFrame(bitmaps, { dimmed: false });
-    staticFrames['idle:off'] = renderFrame(bitmaps, { dimmed: true });
+  // The set is published whole, so a tile's resting frames are all there or
+  // none are.
+  async function buildStaticCache(name) {
+    var bitmaps = await ensureGlyphs(name);
+    var look = TILES[name];
+    var frames = Object.create(null);
+    frames['idle:on'] = renderFrame(bitmaps, { dimmed: false }, look);
+    frames['idle:off'] = renderFrame(bitmaps, { dimmed: true }, look);
     // Keep the reduced-motion watching frames cached alongside idle so a cold
     // restore can render watch state without rebuilding the glyphs.
-    staticFrames['watching:on'] = renderFrame(bitmaps, settledSpec(false));
-    staticFrames['watching:off'] = renderFrame(bitmaps, settledSpec(true));
+    frames['watching:on'] = renderFrame(bitmaps, settledSpec(false), look);
+    frames['watching:off'] = renderFrame(bitmaps, settledSpec(true), look);
     // Keep one Ring frame ready so a short capability invoke can paint
     // immediately without delaying business logic for the full frame build.
-    staticFrames['ring:kickoff'] = renderFrame(bitmaps, frameSpec('ring', 0));
+    frames['ring:kickoff'] = renderFrame(bitmaps, frameSpec('ring', 0), look);
+    staticFrames[name] = frames;
   }
 
-  // One state's worth of frames, rendered on first use and kept for the life of
-  // the worker. Concurrent callers share the in-flight build; a failed build is
-  // dropped so a later transition can retry it.
-  function ensureAnimatedFrames(state) {
-    if (animatedFrames[state]) return Promise.resolve(animatedFrames[state]);
-    if (animatedBuilds[state]) return animatedBuilds[state];
+  // The animated frames for `state` on the tile on screen, or undefined until
+  // they are built.
+  function framesFor(state) {
+    return animatedFrames[tile + ':' + state];
+  }
+
+  // One state's worth of frames on one tile, rendered on first use and kept for
+  // the life of the worker. Concurrent callers share the in-flight build; a
+  // failed build is dropped so a later transition can retry it.
+  function ensureAnimatedFrames(state, name) {
+    var key = name + ':' + state;
+    if (animatedFrames[key]) return Promise.resolve(animatedFrames[key]);
+    if (animatedBuilds[key]) return animatedBuilds[key];
     var build = (async function () {
-      var bitmaps = await ensureGlyphs();
+      var bitmaps = await ensureGlyphs(name);
+      var look = TILES[name];
       var count = Math.round(STATES[state].duration / FRAME_INTERVAL_MS);
       var frames = new Array(count);
       for (var f = 0; f < count; f++) {
-        frames[f] = renderFrame(bitmaps, frameSpec(state, f / count));
+        frames[f] = renderFrame(bitmaps, frameSpec(state, f / count), look);
       }
-      animatedFrames[state] = frames;
+      animatedFrames[key] = frames;
       return frames;
     })();
-    animatedBuilds[state] = build;
+    animatedBuilds[key] = build;
     build.catch(function (e) {
-      delete animatedBuilds[state];
+      delete animatedBuilds[key];
       console.error('[FSB] action icon: could not render ' + state + ' frames:', e && e.message);
     });
     return build;
@@ -913,15 +964,17 @@
   // in the first place. Until one has connected once, every resting frame is
   // full strength -- that is the only appearance the design has.
   function staticFrame() {
+    var frames = staticFrames[tile];
+    if (!frames) return null;
     var dim = relaySeen && !connected;
     // A settled breathe keeps its claim, so the resting frame it lands on is the
     // watching one; only an empty claim set falls back to idle.
     var base = resolved === 'breathe' ? 'watching' : 'idle';
-    return staticFrames[base + (dim ? ':off' : ':on')];
+    return frames[base + (dim ? ':off' : ':on')];
   }
 
   function frameAt(now) {
-    var frames = animatedFrames[resolved];
+    var frames = framesFor(resolved);
     if (!frames || !frames.length) return null;
     var duration = STATES[resolved].duration;
     var elapsed = (now - startTime) % duration;
@@ -937,7 +990,7 @@
   // same object, so omitting their timer wake cannot alter a displayed pixel or
   // the time at which a distinct frame is requested.
   function nextVisibleTickDelay(now, currentFrame) {
-    var frames = animatedFrames[resolved];
+    var frames = framesFor(resolved);
     if (!frames || !frames.length) return null;
     var elapsed = Math.max(0, now - startTime);
     var ordinal = Math.floor(elapsed / FRAME_INTERVAL_MS) + 1;
@@ -1084,14 +1137,31 @@
     }
   }
 
+  // Only an explicit Light choice moves the icon to the white tile.
+  function tileFor(preference) {
+    return preference === 'light' ? 'light' : 'dark';
+  }
+
+  async function readTile() {
+    try {
+      var area = chrome.storage && chrome.storage.local;
+      if (!area || typeof area.get !== 'function') return 'dark';
+      var stored = await area.get(THEME_KEY);
+      return tileFor(stored && stored[THEME_KEY]);
+    } catch (_e) {
+      return 'dark';
+    }
+  }
+
   function armPreferenceListener() {
     if (preferenceListenerArmed) return;
     try {
       var changed = chrome.storage && chrome.storage.onChanged;
       if (!changed || typeof changed.addListener !== 'function') return;
       changed.addListener(function (changes, area) {
-        if (area !== 'local' || !changes || !changes[ANIMATIONS_KEY]) return;
-        setAnimationsEnabled(changes[ANIMATIONS_KEY].newValue !== false);
+        if (area !== 'local' || !changes) return;
+        if (changes[ANIMATIONS_KEY]) setAnimationsEnabled(changes[ANIMATIONS_KEY].newValue !== false);
+        if (changes[THEME_KEY]) setTile(tileFor(changes[THEME_KEY].newValue));
       });
       preferenceListenerArmed = true;
     } catch (_e) { /* preference synchronization is best-effort */ }
@@ -1141,20 +1211,28 @@
     animating = true;
     armWatchdog();
     persistIntent();
-    if (next === 'ring' && !animatedFrames[next]) {
-      emit(staticFrames['ring:kickoff']);
+    if (next === 'ring' && !framesFor(next) && staticFrames[tile]) {
+      emit(staticFrames[tile]['ring:kickoff']);
     }
-    if (animatedFrames[next]) {
-      // The clock starts WITH the loop, never before it. Setting it earlier let
-      // the frame build eat into the cycle: the first showing of a state began
-      // mid-animation, and a bounded hold was short by the build's duration.
+    playFrames(next);
+  }
+
+  // Runs `state`'s loop on the tile on screen, building that tile's frames first
+  // when it has none yet. The clock starts WITH the loop, never before it.
+  // Setting it earlier let the frame build eat into the cycle: the first showing
+  // of a state began mid-animation, and a bounded hold was short by the build's
+  // duration.
+  function playFrames(state) {
+    if (framesFor(state)) {
       startTime = Date.now();
       startLoop();
       queueMotionNotify();
       return;
     }
-    ensureAnimatedFrames(next).then(function () {
-      if (!animating || resolved !== next) return;
+    var name = tile;
+    ensureAnimatedFrames(state, name).then(function () {
+      // A tile switch during the build restarts the loop itself.
+      if (!animating || resolved !== state || tile !== name) return;
       startTime = Date.now();
       startLoop();
       queueMotionNotify();
@@ -1244,7 +1322,52 @@
     applyResolved();
   }
 
+  // A switch renders the new tile's resting frames before showing anything, so
+  // the icon never goes blank, and lands only if it is still the one wanted: a
+  // quick Light, Dark, Light lands on whichever came last. A running animation
+  // restarts its cycle on the new tile; the restart reaches the status pill with
+  // the new start time, so the two stay in step.
+  function setTile(next) {
+    wantedTile = next;
+    tileExplicit = true;
+    if (!ready || unavailable) {
+      // init renders whichever tile is current when it gets there.
+      tile = next;
+      return;
+    }
+    if (tile === next) return;
+    var rendered = staticFrames[next] ? Promise.resolve() : buildStaticCache(next);
+    rendered.then(function () {
+      if (wantedTile !== next || tile === next) return;
+      tile = next;
+      if (animating && resolved) {
+        stopLoop();
+        playFrames(resolved);
+      } else {
+        emit(staticFrame());
+      }
+    }, function (e) {
+      console.error('[FSB] action icon: could not render the ' + next + ' tile:', e && e.message);
+    });
+  }
+
   // ---- Public API ---------------------------------------------------------
+
+  // Resting frames for the tile on screen, retried until that tile has them, so
+  // a switch made while they render still lands. False means the icon is off.
+  async function buildRestingFrames() {
+    try {
+      while (!staticFrames[tile]) await buildStaticCache(tile);
+      return true;
+    } catch (e) {
+      unavailable = true;
+      // repair() no-ops once unavailable, so a beat left armed by an earlier
+      // generation would wake the worker forever with nothing to do.
+      disarmWatchdog();
+      console.error('[FSB] action icon: base frames failed to render, icon disabled:', e && e.message);
+      return false;
+    }
+  }
 
   function init(options) {
     if (initPromise) return initPromise;
@@ -1264,16 +1387,10 @@
       }
       animationsEnabled = await readAnimationsEnabled();
       armPreferenceListener();
-      try {
-        await buildStaticCache();
-      } catch (e) {
-        unavailable = true;
-        // repair() no-ops once unavailable, so a beat left armed by an earlier
-        // generation would wake the worker forever with nothing to do.
-        disarmWatchdog();
-        console.error('[FSB] action icon: base frames failed to render, icon disabled:', e && e.message);
-        return;
-      }
+      var storedTile = await readTile();
+      // A switch that arrived during the read is newer than what it returned.
+      if (!tileExplicit) tile = wantedTile = storedTile;
+      if (!(await buildRestingFrames())) return;
       var intent = await readIntent();
       if (intent) {
         if (!connectedExplicit) connected = intent.connected === true;
@@ -1306,6 +1423,9 @@
           if (liveKeys[l].indexOf('session:') === 0) delete claims[liveKeys[l]];
         }
       }
+      // A switch during the reads above can leave the tile on screen without its
+      // resting frames; render them before going ready.
+      if (!staticFrames[tile] && !(await buildRestingFrames())) return;
       ready = true;
       preReadyClaimKeys = null;
       // Restart from frame 0 rather than resuming mid-cycle; this matches the
@@ -1438,19 +1558,7 @@
         return;
       }
       if (animating && resolved && STATES[resolved]) {
-        var revived = resolved;
-        if (animatedFrames[revived]) {
-          startTime = Date.now();
-          startLoop();
-          queueMotionNotify();
-        } else {
-          ensureAnimatedFrames(revived).then(function () {
-            if (!animating || resolved !== revived) return;
-            startTime = Date.now();
-            startLoop();
-            queueMotionNotify();
-          }).catch(function () { /* reported by ensureAnimatedFrames */ });
-        }
+        playFrames(resolved);
       } else {
         // Nothing is owed, so the beat that woke us retires itself here. This is
         // also the self-heal for an alarm stranded by an earlier generation.
