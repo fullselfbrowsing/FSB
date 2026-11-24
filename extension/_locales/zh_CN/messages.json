@@ -5458,5 +5458,11 @@
   },
   "panel_7a9e047a27": {
     "message": "仅限在“高级”中打开的保险库"
+  },
+  "panel_fec6b9e93d": {
+    "message": "忘记已保存的登录"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "已在此浏览器中退出登录。本地服务器仍保留 1Password 登录，FSB 会在下次可以时将其删除。"
   }
 }

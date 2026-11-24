@@ -1070,6 +1070,7 @@ async function run() {
           logIn: logInToOnePassword,
           continueLogin: continueOnePasswordLogin,
           disconnect: disconnectOnePassword,
+          cancel: cancelOnePasswordConnect,
           retry: retryOnePassword,
           useAll: useAllOnePasswordVaults,
           saveLimit: saveOnePasswordVaults,
@@ -1133,6 +1134,20 @@ async function run() {
       };
       return { answer, listCalls: () => listCalls };
     }
+    // Holds list-vaults answers (after the first `pass`) until release(), the
+    // way 1Password holds one while it waits for the user's approval.
+    function holdLists(srv, { pass = 0 } = {}) {
+      const held = [];
+      let seen = 0;
+      return {
+        answer: (request, sent) => {
+          if (request.action !== 'onePasswordListVaults' || seen++ < pass) return srv.answer(request, sent);
+          return new Promise((resolve) => held.push(() => resolve(srv.answer(request, sent))));
+        },
+        release: () => held.splice(0).forEach((resolve) => resolve()),
+      };
+    }
+    const forgets = (env) => env.sent.filter((request) => request.action === 'onePasswordDisconnect');
 
     await check('a guest opening the Vault page reads the status without pairing and asks 1Password nothing', async () => {
       const srv = server({ statusFails: { code: 'onepassword_bridge_unpaired' } });
@@ -1291,6 +1306,130 @@ async function run() {
       assert.equal(env.storage.fsbOnePasswordLoggedIn, false);
       assert.ok(env.actions().includes('onePasswordDisconnect'));
       assert.equal(env.page.view(), 'none');
+    });
+
+    await check('Cancel leaves alone a sign-in that was saved before this Log in', async () => {
+      const srv = server({ config: { ...DESKTOP, vaultScope: 'listed', vaultIds: ['v-work'], saveVaultId: 'v-work', effectiveSaveVaultId: 'v-work' } });
+      const held = holdLists(srv);
+      const env = makePage({ answer: held.answer });
+      await env.page.load({ readItems: true });
+      const pending = env.page.logIn();
+      await env.settle();
+      assert.equal(env.page.view(), 'waiting');
+      assert.equal(env.nodes('onePasswordCancelBtn').hidden, false);
+      await env.page.cancel();
+      held.release();
+      await pending;
+      await env.settle();
+      assert.ok(!env.actions().includes('onePasswordConfigure'), 'the saved sign-in was reused as it is');
+      assert.deepEqual(forgets(env), [], 'Cancel never forgets a sign-in it did not create');
+      assert.equal(env.page.status().authKind, 'desktop');
+      assert.deepEqual(env.page.status().vaultIds, ['v-work'], 'the vault limit is kept');
+      assert.equal(env.page.view(), 'none');
+    });
+
+    await check('Cancel forgets a sign-in this Log in saved before 1Password approved it', async () => {
+      const srv = server();
+      const held = holdLists(srv);
+      const env = makePage({ answer: held.answer });
+      await env.page.load({ readItems: true });
+      await env.page.logIn();
+      await env.settle();
+      env.nodes('onePasswordAccount').value = 'Acme';
+      env.page.continueLogin();
+      await env.settle();
+      assert.ok(env.actions().includes('onePasswordConfigure'));
+      assert.equal(env.page.view(), 'waiting');
+      await env.page.cancel();
+      held.release();
+      await env.settle();
+      assert.deepEqual(forgets(env), [{ action: 'onePasswordDisconnect', forget: true }]);
+      assert.equal(env.page.status().authKind, null);
+      assert.notEqual(env.storage.fsbOnePasswordLoggedIn, true);
+    });
+
+    await check('Cancel never deletes a service account token', async () => {
+      const service = { configured: true, authKind: 'service-account', accountName: null, tokenSource: 'config', vaultScope: 'listed', vaultIds: ['v-work'], saveVaultId: null, effectiveSaveVaultId: null, vaults: [{ id: 'v-work', title: 'Work' }] };
+      const srv = server({ config: service, lists: [{ success: false, errorCode: 'onepassword_rate_limited', error: 'slow' }, { success: true, vaults: VAULTS }] });
+      const held = holdLists(srv, { pass: 1 });
+      const env = makePage({ answer: held.answer });
+      await env.page.load({ readItems: true });
+      await env.settle();
+      assert.equal(env.page.view(), 'rate');
+      assert.notEqual(env.storage.fsbOnePasswordLoggedIn, true, 'a failed list leaves the flag unset');
+      env.page.retry();
+      await env.settle();
+      assert.equal(env.page.view(), 'waiting', 'Try again logs in again, and shows Cancel');
+      await env.page.cancel();
+      held.release();
+      await env.settle();
+      assert.deepEqual(forgets(env), [], 'only Disconnect, after asking, deletes the token');
+      assert.equal(env.page.status().authKind, 'service-account');
+    });
+
+    await check('before Log in, a sign-in saved on the local server can be forgotten', async () => {
+      const srv = server({ config: DESKTOP });
+      const env = makePage({ answer: srv.answer });
+      await env.page.load({ readItems: true });
+      assert.equal(env.page.view(), 'none');
+      assert.equal(env.nodes('onePasswordAccountLine').hidden, false, 'Forget saved sign-in sits on the account line');
+      await env.page.disconnect();
+      await env.settle();
+      assert.deepEqual(forgets(env), [{ action: 'onePasswordDisconnect', forget: true }]);
+      assert.equal(env.page.status().authKind, null);
+      assert.equal(env.nodes('onePasswordAccountLine').hidden, true);
+      const html = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ui', 'control_panel.html'), 'utf8');
+      const line = html.slice(html.indexOf('id="onePasswordAccountLine"'), html.indexOf('</p>', html.indexOf('id="onePasswordAccountLine"')));
+      assert.ok(line.includes('id="onePasswordForgetBtn"'), 'the button shows only with a saved desktop sign-in');
+      assert.ok(options.includes("forgetBtn.addEventListener('click', disconnectOnePassword)"), 'it asks before it forgets, like Disconnect');
+    });
+
+    await check('a Disconnect the local server never got finishes on the next status read', async () => {
+      const srv = server({ config: DESKTOP });
+      let offline = false;
+      const down = { success: false, errorCode: 'onepassword_bridge_offline', error: 'offline' };
+      const answer = (request, sent) => {
+        if (offline && (request.action === 'onePasswordDisconnect' || request.action === 'onePasswordStatus')) return down;
+        return srv.answer(request, sent);
+      };
+      const env = makePage({ answer, stored: { fsbOnePasswordLoggedIn: true } });
+      await env.page.load({ readItems: true });
+      assert.equal(env.page.view(), 'ready');
+      offline = true;
+      await env.page.disconnect();
+      await env.settle();
+      assert.equal(env.storage.fsbOnePasswordLoggedIn, false);
+      assert.deepEqual(JSON.parse(JSON.stringify(env.storage.fsbOnePasswordDisconnectPending)), { authKind: 'desktop', accountName: 'Acme' });
+      assert.ok(env.toasts.some((toast) => toast.message.startsWith('Logged out in this browser. The local server still has the 1Password sign-in')),
+        'the page says the local server still holds the sign-in');
+      assert.ok(!env.toasts.some((toast) => toast.message === '1Password disconnected'));
+      offline = false;
+      await env.page.load({ readItems: true });
+      await env.settle();
+      assert.equal(forgets(env).length, 2, 'the Disconnect that failed, then the one that finished it');
+      assert.equal(env.storage.fsbOnePasswordDisconnectPending, false);
+      assert.equal(env.page.status().authKind, null, 'agents can no longer read through the old sign-in');
+      assert.ok(env.toasts.some((toast) => toast.message === '1Password disconnected'));
+      assert.equal(env.page.view(), 'none');
+    });
+
+    await check('a pending Disconnect leaves a different sign-in alone, and Log in overrides it', async () => {
+      const other = makePage({
+        answer: server({ config: { ...DESKTOP, accountName: 'Other' } }).answer,
+        stored: { fsbOnePasswordDisconnectPending: { authKind: 'desktop', accountName: 'Acme' } },
+      });
+      await other.page.load({ readItems: true });
+      assert.deepEqual(forgets(other), [], 'a sign-in set up since is not the one the user disconnected');
+      assert.equal(other.storage.fsbOnePasswordDisconnectPending, false);
+
+      const srv = server({ config: DESKTOP, statusFails: { code: 'onepassword_bridge_unpaired' } });
+      const env = makePage({ answer: srv.answer, stored: { fsbOnePasswordDisconnectPending: { authKind: 'desktop', accountName: 'Acme' } } });
+      await env.page.load({ readItems: true });
+      await env.page.logIn();
+      await env.settle();
+      assert.deepEqual(forgets(env), [], 'logging in again means the user wants the sign-in');
+      assert.equal(env.storage.fsbOnePasswordDisconnectPending, false);
+      assert.equal(env.page.view(), 'ready');
     });
 
     await check('a logged-in flag with nothing saved on the server is cleared', async () => {

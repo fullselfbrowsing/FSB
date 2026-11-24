@@ -5458,5 +5458,11 @@
   },
   "panel_7a9e047a27": {
     "message": "僅限在「進階」中開啟的保險庫"
+  },
+  "panel_fec6b9e93d": {
+    "message": "忘記已儲存的登入"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "已在此瀏覽器中登出。本機伺服器仍保留 1Password 登入，FSB 會在下次可以時將其移除。"
   }
 }

@@ -5087,6 +5087,9 @@ const _vaultUi = {
   loggedIn: false,
   // The account name field is open.
   askAccount: false,
+  // A Log in on this page saved the sign-in the local server now holds, and
+  // it has not been approved yet. Only then may Cancel forget it.
+  createdSignIn: false,
   // 'integration' while FSB waits for the 1Password setting, 'managed' once it stops.
   integration: null,
   scope: 'listed',
@@ -5108,6 +5111,9 @@ const _vaultUi = {
 // the account name is kept only to fill in the field next time.
 const ONEPASSWORD_LOGGED_IN_KEY = 'fsbOnePasswordLoggedIn';
 const ONEPASSWORD_ACCOUNT_KEY = 'fsbOnePasswordAccountName';
+// A Disconnect the local server never received: { authKind, accountName } of
+// the sign-in to forget there once a status read reaches it again.
+const ONEPASSWORD_DISCONNECT_PENDING_KEY = 'fsbOnePasswordDisconnectPending';
 // Opens Settings > Developer in the 1Password app.
 const ONEPASSWORD_DEVELOPER_SETTINGS_URL = 'onepassword://settings/developers';
 // While Integrate with 1Password SDKs is off, FSB tries again this often, for this long.
@@ -5165,7 +5171,36 @@ async function writeOnePasswordLocal(values) {
 
 async function setOnePasswordLoggedIn(loggedIn) {
   _vaultUi.loggedIn = loggedIn === true;
+  if (_vaultUi.loggedIn) _vaultUi.createdSignIn = false;
   await writeOnePasswordLocal({ [ONEPASSWORD_LOGGED_IN_KEY]: _vaultUi.loggedIn });
+}
+
+function onePasswordSameSignIn(pending, status) {
+  return !!pending && typeof pending === 'object' && !!status && !!status.authKind
+    && pending.authKind === status.authKind
+    && (pending.accountName || null) === (status.accountName || null);
+}
+
+// Finishes a Disconnect the local server did not receive, once it answers a
+// status read, if it still holds that same sign-in. Returns the status to show.
+async function finishPendingOnePasswordDisconnect(status) {
+  const pending = await readOnePasswordLocal(ONEPASSWORD_DISCONNECT_PENDING_KEY);
+  if (!pending) return status;
+  if (!onePasswordSameSignIn(pending, status)) {
+    // Gone already, or replaced by a sign-in set up since: nothing to forget.
+    await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: false });
+    return status;
+  }
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
+  } catch (_error) {
+    return status;
+  }
+  if (!response || !response.success) return status;
+  await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: false });
+  showToast('1Password disconnected', 'success');
+  return response.status || {};
 }
 
 // Reading the saved settings needs no 1Password sign-in. Listing vaults,
@@ -5310,7 +5345,7 @@ function renderOnePasswordSetup() {
   vaultShow(document.getElementById('onePasswordAccountLine'), !asking && !!stored);
   const accountText = document.getElementById('onePasswordAccountText');
   if (accountText && stored) fsbUiSet(accountText, '1Password account: $ACCOUNT$', { account: stored });
-  for (const id of ['onePasswordLoginBtn', 'onePasswordContinueBtn']) {
+  for (const id of ['onePasswordLoginBtn', 'onePasswordContinueBtn', 'onePasswordForgetBtn']) {
     const button = document.getElementById(id);
     if (button) button.disabled = _onePasswordBusy;
   }
@@ -5405,10 +5440,11 @@ async function loadOnePasswordStatus(options = {}) {
     return;
   }
 
-  _onePasswordStatus = response.status || {};
+  _onePasswordStatus = await finishPendingOnePasswordDisconnect(response.status || {});
   const status = _onePasswordStatus;
   // No saved sign-in on the local server means the user is logged out.
   if (_vaultUi.loggedIn && !status.authKind) await setOnePasswordLoggedIn(false);
+  if (!status.authKind) _vaultUi.createdSignIn = false;
   if (onPage && status.authKind === 'service-account') readItems = true;
   if (!_vaultUi.waiting && options.keepError !== true) _vaultUi.error = null;
   const accountInput = document.getElementById('onePasswordAccount');
@@ -5617,6 +5653,8 @@ async function logInToOnePassword(options = {}) {
   _vaultUi.integration = null;
   renderVault();
   try {
+    // Logging in again overrides a Disconnect still waiting for the server.
+    await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: false });
     // The click is the go-ahead to pair FSB with the local server.
     const current = await chrome.runtime.sendMessage({ action: 'onePasswordStatus', pair: true });
     if (token !== _vaultUi.connectToken) return;
@@ -5634,6 +5672,7 @@ async function logInToOnePassword(options = {}) {
         return;
       }
       if (accountName !== stored) {
+        const hadSignIn = !!_onePasswordStatus.authKind;
         // A new sign-in reads every vault. Advanced can limit it later.
         const configured = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', authKind: 'desktop', accountName, vaultScope: 'all' });
         if (token !== _vaultUi.connectToken) return;
@@ -5642,6 +5681,8 @@ async function logInToOnePassword(options = {}) {
           return;
         }
         if (configured.status) _onePasswordStatus = configured.status;
+        // Nothing was saved before this Log in, so Cancel may forget it again.
+        if (!hadSignIn) _vaultUi.createdSignIn = true;
       }
       _vaultUi.askAccount = false;
       await writeOnePasswordLocal({ [ONEPASSWORD_ACCOUNT_KEY]: accountName });
@@ -5729,16 +5770,21 @@ function changeOnePasswordAccount() {
   askOnePasswordAccount(onePasswordStoredAccount(_onePasswordStatus));
 }
 
-// Cancel while FSB waits for 1Password: a late answer is ignored. Before the
-// first Log in finished, FSB also forgets the account it was connecting to.
+// Cancel while FSB waits for 1Password: a late answer is ignored. When this
+// page's Log in saved the sign-in and 1Password never approved it, FSB also
+// forgets it again. A sign-in that was there before (set up from the
+// terminal, or in another browser) and a service account are left alone.
 async function cancelOnePasswordConnect() {
+  const forget = _vaultUi.createdSignIn && !_vaultUi.loggedIn
+    && !(_onePasswordStatus && _onePasswordStatus.authKind === 'service-account');
+  _vaultUi.createdSignIn = false;
   _vaultUi.connectToken += 1;
   _vaultUi.waiting = false;
   _vaultUi.integration = null;
   _vaultUi.error = null;
   _onePasswordBusy = false;
   renderVault();
-  if (!_vaultUi.loggedIn) {
+  if (forget) {
     try {
       await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
     } catch (_error) { /* the status reload below shows the result */ }
@@ -5804,14 +5850,30 @@ async function disconnectOnePassword() {
     ? fsbUiLine('Disconnect 1Password? FSB forgets its 1Password settings and deletes the saved service account token. Reconnecting needs the terminal again.')
     : fsbUiLine('Disconnect 1Password? FSB forgets its 1Password settings.');
   if (!confirm(question)) return;
+  const signIn = _onePasswordStatus && _onePasswordStatus.authKind
+    ? { authKind: _onePasswordStatus.authKind, accountName: _onePasswordStatus.accountName || null }
+    : null;
+  let response = null;
+  let failure = null;
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
-    if (response && response.success) showToast('1Password disconnected', 'success');
-    else showToast((response && response.error) || 'Unknown error', 'error');
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
   } catch (error) {
-    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+    failure = error;
+  }
+  if (response && response.success) {
+    showToast('1Password disconnected', 'success');
+  } else if (signIn) {
+    // The local server still holds the sign-in. The next status read that
+    // reaches it forgets it there.
+    await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: signIn });
+    showToast('Logged out in this browser. The local server still has the 1Password sign-in, and FSB removes it there the next time it can.', 'error');
+  } else if (failure) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: failure.message }), 'error');
+  } else {
+    showToast((response && response.error) || 'Unknown error', 'error');
   }
   // Logged out in this browser even if the local server could not be reached.
+  _vaultUi.createdSignIn = false;
   await setOnePasswordLoggedIn(false);
   _vaultUi.logins = [];
   _vaultUi.cards = [];
@@ -6138,6 +6200,9 @@ function initializeCredentialManager() {
   if (allVaultsBtn) allVaultsBtn.addEventListener('click', useAllOnePasswordVaults);
   const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
   if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectOnePassword);
+  // Before Log in: forget a sign-in the local server holds from the terminal or another browser.
+  const forgetBtn = document.getElementById('onePasswordForgetBtn');
+  if (forgetBtn) forgetBtn.addEventListener('click', disconnectOnePassword);
   const cancelBtn = document.getElementById('onePasswordCancelBtn');
   if (cancelBtn) cancelBtn.addEventListener('click', cancelOnePasswordConnect);
   const retryBtn = document.getElementById('onePasswordRetryBtn');

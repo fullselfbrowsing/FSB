@@ -5458,5 +5458,11 @@
   },
   "panel_7a9e047a27": {
     "message": "Nur die unter „Erweitert“ aktivierten Tresore"
+  },
+  "panel_fec6b9e93d": {
+    "message": "Gespeicherte Anmeldung entfernen"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "In diesem Browser abgemeldet. Der lokale Server hat die 1Password-Anmeldung noch, und FSB entfernt sie dort, sobald es kann."
   }
 }

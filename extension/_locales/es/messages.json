@@ -5458,5 +5458,11 @@
   },
   "panel_7a9e047a27": {
     "message": "Solo las bóvedas activadas en Avanzado"
+  },
+  "panel_fec6b9e93d": {
+    "message": "Olvidar el inicio de sesión guardado"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "Sesión cerrada en este navegador. El servidor local aún conserva el inicio de sesión de 1Password, y FSB lo eliminará allí en cuanto pueda."
   }
 }
