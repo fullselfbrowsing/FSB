@@ -1906,6 +1906,35 @@ async function ensureTransaction(
   if (refreshOnly && await optedOut()) {
     return ensureResult(dependencies, 'skipped-opt-out', { reason: 'opt-out' });
   }
+  if (!refreshOnly) {
+    // Any install withdraws an earlier opt-out, even when nothing else changes.
+    try {
+      await dependencies.state.clearOptOut();
+    } catch {
+      // An explicit install proceeds; the stale opt-out only pauses refreshes.
+    }
+  }
+  // A holder that died mid-transaction can leave the stable root missing, which
+  // would otherwise read as "nothing installed". Settle leftovers first.
+  let leftovers = false;
+  try {
+    leftovers = (await dependencies.state.listSiblings()).length > 0;
+  } catch {
+    leftovers = false;
+  }
+  if (leftovers) {
+    const recoveryLease = await acquireLease(
+      dependencies,
+      refreshOnly ? 0 : dependencies.timing.lockWaitMs,
+    );
+    if (recoveryLease) {
+      try {
+        await recoverSiblings(dependencies, recoveryLease);
+      } finally {
+        await releaseLease(recoveryLease);
+      }
+    }
+  }
   // Cheap checks first, without the lock: most runs end here as `current`.
   const preview = await planEnsure(request, dependencies);
   if (preview.kind === 'final') return preview.result;
@@ -1924,16 +1953,8 @@ async function ensureTransaction(
   if (!lease) return ensureResult(dependencies, 'deferred', { reason: 'locked' });
   try {
     await recoverSiblings(dependencies, lease);
-    if (refreshOnly) {
-      if (await optedOut()) {
-        return ensureResult(dependencies, 'skipped-opt-out', { reason: 'opt-out' });
-      }
-    } else {
-      try {
-        await dependencies.state.clearOptOut();
-      } catch {
-        // An explicit install proceeds; the stale opt-out only pauses refreshes.
-      }
+    if (refreshOnly && await optedOut()) {
+      return ensureResult(dependencies, 'skipped-opt-out', { reason: 'opt-out' });
     }
     const plan = await planEnsure(request, dependencies);
     if (plan.kind === 'final') return plan.result;
