@@ -431,6 +431,11 @@ async function runHealthSection() {
     assertEqual(initial.json.transport, 'streamable-http', 'existing transport evidence is preserved');
     assertEqual(initial.json.bridgeMode, 'hub', 'existing bridge topology evidence is preserved');
     assertEqual(initial.json.queuedMutationTools, false, 'existing queue evidence is preserved');
+    assertEqual(
+      Object.hasOwn(initial.json, 'stopRequests'),
+      false,
+      'a listener that does not watch for stop requests never claims to',
+    );
     assertEqual(version.DEFAULT_HTTP_HOST, '127.0.0.1', 'health stays on canonical loopback');
     assertEqual(version.DEFAULT_HTTP_PORT, 7226, 'health introduces no new serve port');
     assertEqual(typeof server.markServeReady, 'function', 'listener exposes lifecycle-only readiness authority');
@@ -441,6 +446,10 @@ async function runHealthSection() {
     assertEqual(ready.json.serveReady, true, 'the readiness authority is idempotent and monotonic while open');
     assertEqual(ready.json.service, initial.json.service, 'readiness does not change product identity');
     assertEqual(ready.json.nativeHostProtocol, 1, 'readiness does not change protocol identity');
+    server.advertiseStopRequests();
+    const advertised = await readHealth(server.healthEndpoint);
+    assertEqual(advertised.json.stopRequests, 1, 'the stop-request flag is the exact number 1');
+    assertEqual(advertised.json.serveReady, true, 'advertising stop requests changes nothing else');
   } finally {
     await server.close();
   }
@@ -1557,7 +1566,7 @@ function makeStepDownHarness(options = {}) {
   const scheduled = [];
   const exits = [];
   const signals = new Map();
-  const state = { supervisorCloseCalls: 0, httpCloseCalls: 0 };
+  const state = { supervisorCloseCalls: 0, httpCloseCalls: 0, advertised: 0 };
   const { bridge, state: bridgeState } = stepDownFakeBridge(probes, {
     withIdleProbe: options.legacyProbes !== true,
   });
@@ -1594,6 +1603,10 @@ function makeStepDownHarness(options = {}) {
           endpoint: running.endpoint,
           healthEndpoint: running.healthEndpoint,
           markServeReady: () => running.markServeReady(),
+          advertiseStopRequests: () => {
+            state.advertised += 1;
+            running.advertiseStopRequests();
+          },
           activeRequestCount: () => running.activeRequestCount(),
           async close() {
             state.httpCloseCalls += 1;
@@ -1605,6 +1618,9 @@ function makeStepDownHarness(options = {}) {
         endpoint: 'http://127.0.0.1:9/mcp',
         healthEndpoint: 'http://127.0.0.1:9/health',
         markServeReady() {},
+        advertiseStopRequests() {
+          state.advertised += 1;
+        },
         async close() {
           state.httpCloseCalls += 1;
         },
@@ -1921,6 +1937,7 @@ async function runStepDownLifecycleCases(lifecycle, startHttpServer, scratch) {
     dependencies: outside.dependencies,
   });
   assertEqual(outside.scheduled.length, 0, 'a serve process outside the stable root arms no stop-request check');
+  assertEqual(outside.state.advertised, 0, 'a serve process outside the stable root never advertises stop requests');
   await outsideRunning.shutdown();
 
   // The refresh path, one condition at a time.
@@ -1931,6 +1948,7 @@ async function runStepDownLifecycleCases(lifecycle, startHttpServer, scratch) {
     dependencies: harness.dependencies,
   });
   assertEqual(harness.armed().length, 1, 'a stable-root serve process arms one stop-request check');
+  assertEqual(harness.state.advertised, 1, 'a stable-root serve process advertises stop requests once it watches for them');
   assertEqual(harness.scheduled[0].delayMs, 2_000, 'the first check waits the poll interval');
 
   harness.tick();
@@ -2053,6 +2071,8 @@ async function runStepDownLifecycleCases(lifecycle, startHttpServer, scratch) {
     port: 0,
     dependencies: live.dependencies,
   });
+  const liveHealth = await readHealth(liveRunning.healthEndpoint);
+  assertEqual(liveHealth.json.stopRequests, 1, 'a stable-root serve reports stop requests on /health');
   const inFlight = sendPartialPost(liveRunning.endpoint);
   await waitFor(
     () => liveRunning.httpServer.activeRequestCount() === 1,

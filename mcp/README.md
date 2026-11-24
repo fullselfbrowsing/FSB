@@ -233,7 +233,7 @@ The native messaging host, `io.github.fullselfbrowsing.fsb_native_host`, is FSB'
 **FSB's server keeps it current.** When an MCP client starts a published `fsb-mcp-server`, for example through `npx -y fsb-mcp-server@latest`, the server checks the helper in a detached background process that writes nothing to the client's stdio.
 
 - It refreshes a registered helper that is older than the running package, or whose pinned Node.js no longer exists, and keeps the extension ID that helper was registered with.
-- The local agent service is stopped only while it is idle, and it starts from the refreshed copy the next time it is needed.
+- The local agent service is stopped only while it is idle, and it starts from the refreshed copy the next time it is needed. A service from an earlier version cannot report that it is idle, so it is stopped only when it has no open MCP session, no running tool call and no child process, such as a delegated agent. On Windows that stop ends the process at once.
 - It never registers a helper you have not installed. After `--no-native-host`, `uninstall --native-host`, or `uninstall --all`, it does nothing until you next run `install`.
 - A helper it cannot verify as its own is never changed, and `doctor` reports it.
 - A server started from a source checkout never touches the installed helper.

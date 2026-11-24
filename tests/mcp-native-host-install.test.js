@@ -3628,6 +3628,24 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
       if (!daemonOnline) return Object.freeze({ status: 'none' });
       return Object.freeze(options.listener || { status: 'stable-root', pid: 4242 });
     },
+    // By default the listener reports what a daemon from before stop requests
+    // reports while idle.
+    readHealth: async () => {
+      trace.push('daemon:health');
+      if (!daemonOnline) return null;
+      if (options.health === null) return null;
+      return Object.freeze({
+        version: '0.9.0',
+        stopRequests: false,
+        sessions: 0,
+        queuedMutationTools: false,
+        ...(options.health || {}),
+      });
+    },
+    hasChildProcesses: async (pid) => {
+      trace.push(`daemon:children:${pid}`);
+      return options.children === undefined ? false : options.children;
+    },
     terminate: async (pid) => {
       trace.push(`daemon:terminate:${pid}`);
       if (options.terminateWorks === false) return false;
@@ -4098,6 +4116,7 @@ async function runEnsureTransaction() {
       invokingVersion: '1.0.0',
       registered: ['chrome'],
       daemonOnline: true,
+      health: { version: '0.12.0', stopRequests: true },
     });
     const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
     equal(result.outcome, 'deferred', 'a busy daemon that understands stop requests defers the refresh');
@@ -4112,10 +4131,78 @@ async function runEnsureTransaction() {
       registered: ['chrome'],
       daemonOnline: true,
       daemonHonorsStop: true,
+      health: { version: '0.12.0', stopRequests: true },
     });
     const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
     equal(result.outcome, 'refreshed', 'a stop-aware daemon that drains lets the refresh swap');
     check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), 'a draining daemon is never signalled');
+  }
+  for (const platformName of ['linux', 'win32']) {
+    // The receipt's version says nothing about the process that is running: a
+    // helper built before a release bump records an older version but its
+    // daemon already watches for stop requests.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      daemonOnline: true,
+      daemonHonorsStop: true,
+      health: { version: '0.9.0', stopRequests: true },
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'refreshed', `${platformName} a daemon that reports stop requests is asked, whatever the receipt version`);
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} a daemon that reports stop requests is never signalled`);
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:children')), `${platformName} a stop-aware daemon needs no busy heuristic`);
+  }
+  for (const [label, overrides] of [
+    ['an open MCP session', { health: { sessions: 1 } }],
+    ['a running mutation', { health: { queuedMutationTools: true } }],
+    ['an unreported session count', { health: { sessions: null } }],
+    ['a child process', { children: true }],
+    ['an unreadable child list', { children: null }],
+  ]) {
+    for (const platformName of ['darwin', 'win32']) {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        ...overrides,
+      });
+      const before = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'deferred', `${platformName} an older daemon with ${label} defers the refresh`);
+      equal(result.reason, 'daemon-busy', `${platformName} the older daemon with ${label} is reported busy`);
+      check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} an older daemon with ${label} is never signalled`);
+      equal(harness.stable(), before, `${platformName} the busy older daemon keeps its runtime`);
+      equal(harness.stamp().failures, 1, `${platformName} the busy older daemon backs the refresh off`);
+    }
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      daemonOnline: true,
+      health: null,
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'deferred', 'a stable-root daemon with no usable /health defers the refresh');
+    equal(result.reason, 'daemon-busy', 'the silent daemon is reported busy');
+    check(harness.trace.includes('daemon:wait:50'), 'a silent daemon is only waited for');
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), 'a silent daemon is never signalled');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      daemonOnline: true,
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'refreshed', 'Windows refreshes over an idle older daemon');
+    traceOrder(harness.trace, [
+      'daemon:identify',
+      'daemon:health',
+      'daemon:children:4242',
+      'daemon:terminate:4242',
+    ], 'an older daemon is signalled only after its health and children prove it idle');
   }
   {
     const harness = fakeEnsureHarness(modules, 'darwin', {
@@ -4366,6 +4453,7 @@ async function runEnsureTransaction() {
       invokingVersion: '1.0.0',
       registered: ['chrome'],
       daemonOnline: true,
+      health: { version: '0.12.0', stopRequests: true },
     });
     const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
     equal(result.outcome, 'refused', 'a busy daemon refuses uninstall-all');
@@ -4373,6 +4461,19 @@ async function runEnsureTransaction() {
     deepEqual(harness.registeredBrowsers(), ['chrome'], 'a busy daemon keeps every registration');
     check(harness.stable() !== null, 'a busy daemon keeps the runtime');
     equal(harness.stopRequest(), null, 'the refused uninstall withdraws its stop request');
+  }
+  for (const platformName of ['linux', 'win32']) {
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { version: '0.9.0', provenance: 'auto' },
+      registered: ['chrome'],
+      daemonOnline: true,
+      children: true,
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', `${platformName} an older daemon running a delegated agent refuses uninstall-all`);
+    equal(result.reason, 'daemon-busy', `${platformName} the busy older daemon is reported`);
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} a busy older daemon is never signalled by uninstall`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} a busy older daemon keeps every registration`);
   }
   for (const platformName of ['darwin', 'linux', 'win32']) {
     const harness = fakeEnsureHarness(modules, platformName, {
@@ -4821,9 +4922,29 @@ async function runProductionEnsure() {
     const buildIndex = path.join(fakeHome, '.fsb', 'native-host', 'runtime', 'package', 'build', 'index.js');
     fs.mkdirSync(path.dirname(buildIndex), { recursive: true });
     fs.writeFileSync(buildIndex, [
-      "const server = require('node:net').createServer();",
+      "const { spawn } = require('node:child_process');",
+      'let child = null;',
+      "const server = require('node:http').createServer((req, res) => {",
+      "  if (req.url === '/health') {",
+      "    res.setHeader('content-type', 'application/json');",
+      "    res.end(JSON.stringify({ ok: true, service: 'fsb-mcp-server', version: '0.11.5', nativeHostProtocol: 1, serveReady: true, sessions: 0, queuedMutationTools: false }));",
+      '    return;',
+      '  }',
+      "  if (req.url === '/child') {",
+      "    child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+      "    child.once('spawn', () => res.end('ok'));",
+      '    return;',
+      '  }',
+      "  if (req.url === '/child-stop') {",
+      "    child.once('exit', () => { child = null; res.end('ok'); });",
+      "    child.kill('SIGKILL');",
+      '    return;',
+      '  }',
+      '  res.statusCode = 404;',
+      '  res.end();',
+      '});',
       "server.listen(Number(process.env.FSB_TEST_PORT), '127.0.0.1', () => process.stdout.write('ready\\n'));",
-      "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
+      "process.on('SIGTERM', () => { if (child) child.kill('SIGKILL'); server.close(() => process.exit(0)); });",
       '',
     ].join('\n'));
     const portProbe = net.createServer();
@@ -4851,6 +4972,22 @@ async function runProductionEnsure() {
       const listener = await probes.identifyListener();
       equal(listener.status, 'stable-root', 'a serve started from the stable root is identified by its command line');
       equal(listener.pid, daemon.pid, 'the identified pid is the listening serve process');
+      deepEqual(
+        await probes.readHealth(),
+        { version: '0.11.5', stopRequests: false, sessions: 0, queuedMutationTools: false },
+        'the older serve reports its version and idle state on /health, without stop requests',
+      );
+      equal(await probes.hasChildProcesses(listener.pid), false, 'an idle older serve has no child process');
+      const fetchPath = (pathname) => new Promise((resolve, reject) => {
+        require('node:http').get({ host: '127.0.0.1', port, path: pathname, agent: false }, (response) => {
+          response.resume();
+          response.once('end', resolve);
+        }).once('error', reject);
+      });
+      await fetchPath('/child');
+      equal(await probes.hasChildProcesses(listener.pid), true, 'a child process of the serve is seen');
+      await fetchPath('/child-stop');
+      equal(await probes.hasChildProcesses(listener.pid), false, 'the finished child is no longer seen');
       check(await probes.terminate(listener.pid), 'the confirmed stable-root serve is sent a terminate signal');
       equal(await probes.waitForOffline(5000), true, 'the terminated serve releases the port');
       equal((await exited).code, 0, 'the serve ran its own graceful shutdown');
@@ -4859,6 +4996,17 @@ async function runProductionEnsure() {
       fs.rmSync(fakeRoot, { recursive: true, force: true });
     }
   }
+  deepEqual(
+    production.serviceHealthFromDocument({ version: '0.12.0', stopRequests: 1, sessions: 2, queuedMutationTools: true }),
+    { version: '0.12.0', stopRequests: true, sessions: 2, queuedMutationTools: true },
+    'a health report with the stop-request flag is read as stop-aware',
+  );
+  deepEqual(
+    production.serviceHealthFromDocument({ version: 'x', stopRequests: '1', sessions: -1, queuedMutationTools: 'no' }),
+    { version: null, stopRequests: false, sessions: null, queuedMutationTools: null },
+    'anything but the exact flag and well-formed counts reads as unknown',
+  );
+  equal(production.serviceHealthFromDocument(null), null, 'no health document is no report');
   check(
     production.isStableRootServeCommand(
       'linux',

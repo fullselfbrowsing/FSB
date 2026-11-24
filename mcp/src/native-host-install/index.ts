@@ -29,6 +29,7 @@ import type {
   NativeHostRegistrationReadFacts,
   NativeHostRuntimeOwnedInspection,
   NativeHostRuntimeReceipt,
+  NativeHostServiceHealth,
   NativeHostUninstallAllRequest,
   NativeHostUninstallAllResult,
   NativeHostUninstallRequest,
@@ -700,11 +701,6 @@ export async function uninstallNativeHost(
 // that is gone, and the next holder finishes or discards it.
 // ---------------------------------------------------------------------------
 
-// The first package version whose serve daemon watches for a stop request.
-// Older daemons are stopped with a terminate signal after their command line
-// has been confirmed.
-export const NATIVE_HOST_STOP_REQUEST_MIN_VERSION = '0.12.0';
-
 const STAMP_BACKOFF_BASE_MS = 60_000;
 const STAMP_BACKOFF_MAX_MS = 24 * 60 * 60_000;
 // A stage directory from a holder this process never saw may belong to an
@@ -1370,16 +1366,51 @@ async function waitForOffline(dependencies: NativeHostEnsureDependencies): Promi
   }
 }
 
+async function readServiceHealth(
+  dependencies: NativeHostEnsureDependencies,
+): Promise<Readonly<NativeHostServiceHealth> | null> {
+  try {
+    return await dependencies.daemon.readHealth();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True only with positive evidence that a daemon which predates stop requests
+ * has nothing in flight: its /health reports no MCP session and no running
+ * mutation, and it has no child process (delegated agents and the servers
+ * they use run as its children). Anything unknown counts as busy.
+ */
+async function legacyDaemonIdle(
+  dependencies: NativeHostEnsureDependencies,
+  pid: number,
+  health: Readonly<NativeHostServiceHealth>,
+): Promise<boolean> {
+  if (health.sessions !== 0 || health.queuedMutationTools !== false) return false;
+  try {
+    return await dependencies.daemon.hasChildProcesses(pid) === false;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Asks a serve daemon started from the stable root to stop, so its files can
- * be moved. The request file is left in place for the caller to remove once
- * the stable root has been replaced or removed.
+ * be moved. What the daemon reports on /health decides how. One that
+ * advertises stop requests leaves on its own once it is idle, and is never
+ * signalled. One that does not predates them: its terminate handler cancels
+ * any delegated run still going, and on Windows the signal ends the process
+ * outright, so it is signalled only after its command line confirms it and
+ * it shows no sign of work. A daemon that is busy, or that gives no usable
+ * report, defers the step for a later retry. The request file is left in
+ * place for the caller to remove once the stable root has been replaced or
+ * removed.
  */
 async function stopStableRootDaemon(
   dependencies: NativeHostEnsureDependencies,
   token: string,
   reason: 'refresh' | 'uninstall',
-  runningVersion: string,
 ): Promise<Readonly<{ ok: true }> | StepFailure> {
   const ok = Object.freeze({ ok: true as const });
   try {
@@ -1406,14 +1437,15 @@ async function stopStableRootDaemon(
       ? ok
       : stepFailure('deferred', 'daemon-unidentified', true);
   }
-  const stopAware = compareNativeHostVersions(runningVersion, NATIVE_HOST_STOP_REQUEST_MIN_VERSION);
-  if (stopAware !== null && stopAware >= 0) {
+  const health = await readServiceHealth(dependencies);
+  if (!health || health.stopRequests) {
     return await waitForOffline(dependencies)
       ? ok
       : stepFailure('deferred', 'daemon-busy', true);
   }
-  // An older daemon never reads the request; its terminate handler runs the
-  // same graceful shutdown.
+  if (!await legacyDaemonIdle(dependencies, listener.pid, health)) {
+    return stepFailure('deferred', 'daemon-busy', true);
+  }
   let terminated = false;
   try {
     terminated = await dependencies.daemon.terminate(listener.pid);
@@ -1556,12 +1588,7 @@ async function refreshRuntime(
     return stepFailure(lease.lost() ? 'deferred' : 'refused', lease.lost() ? 'lock-lost' : 'ownership-mismatch', !lease.lost());
   }
 
-  const stopped = await stopStableRootDaemon(
-    dependencies,
-    token,
-    'refresh',
-    context.receipt.packageVersion,
-  );
+  const stopped = await stopStableRootDaemon(dependencies, token, 'refresh');
   const abandon = async (failure: StepFailure): Promise<StepFailure> => {
     await removeSiblingQuietly(dependencies, 'next', token);
     await removeStopRequest(dependencies, token);
@@ -1630,12 +1657,7 @@ async function rebuildQuarantinedRuntime(
   });
   if (!publisher) return stepFailure('refused', 'unavailable', true);
 
-  const stopped = await stopStableRootDaemon(
-    dependencies,
-    token,
-    'refresh',
-    context.receipt.packageVersion,
-  );
+  const stopped = await stopStableRootDaemon(dependencies, token, 'refresh');
   if (!stopped.ok) {
     await removeStopRequest(dependencies, token);
     return stopped;
@@ -2242,12 +2264,7 @@ export async function uninstallNativeHostBrowser(
           : browserUninstallResult(dependencies, browser, 'refused', 'split-state', receipt.origin, receipt.packageVersion);
       }
       if (remaining.length === 0) {
-        const stopped = await stopStableRootDaemon(
-          dependencies,
-          lease.token,
-          'uninstall',
-          receipt.packageVersion,
-        );
+        const stopped = await stopStableRootDaemon(dependencies, lease.token, 'uninstall');
         if (!stopped.ok) {
           await removeStopRequest(dependencies, lease.token);
           return browserUninstallResult(dependencies, browser, 'refused', stopped.reason, receipt.origin, receipt.packageVersion);
@@ -2366,12 +2383,7 @@ export async function uninstallAllNativeHost(
       if (onlyAuto && provenance !== 'auto') {
         return uninstallAllResult('kept', { reason: 'explicit-provenance', provenance });
       }
-      const stopped = await stopStableRootDaemon(
-        dependencies,
-        lease.token,
-        'uninstall',
-        receipt.packageVersion,
-      );
+      const stopped = await stopStableRootDaemon(dependencies, lease.token, 'uninstall');
       const removedBrowsers: NativeHostBrowser[] = [];
       try {
         if (!stopped.ok) {

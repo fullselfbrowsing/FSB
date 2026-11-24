@@ -71,6 +71,8 @@ export interface ServeDelegationHttpServer {
   readonly endpoint: string;
   readonly healthEndpoint: string;
   markServeReady(): void;
+  /** Report the stop-request watcher on /health; a listener without it never does. */
+  advertiseStopRequests?(): void;
   activeRequestCount(): number;
   close(): Promise<void>;
 }
@@ -874,6 +876,16 @@ export async function startServeDelegation(
       checkStopRequest,
       SERVE_STOP_REQUEST_POLL_MS,
     );
+    // The installer reads this flag instead of guessing from version numbers:
+    // a process that reports it is asked to stop, any other is treated as one
+    // that predates stop requests.
+    try {
+      if (typeof readyHttpServer.advertiseStopRequests === 'function') {
+        readyHttpServer.advertiseStopRequests();
+      }
+    } catch {
+      // Without the flag a refresh treats this process as an older one.
+    }
   }
 
   return Object.freeze({

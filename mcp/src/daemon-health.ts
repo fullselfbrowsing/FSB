@@ -42,13 +42,33 @@ function boundedString(value: unknown): string | null {
  * Anything else -- nothing listening, a timeout, an oversized or malformed
  * body, some other program on the port -- resolves to null. Never throws.
  */
-export function probeDaemonHealth(
+export async function probeDaemonHealth(
   port: number,
   timeoutMs: number = NATIVE_HOST_HEALTH_TIMEOUT_MS,
 ): Promise<DaemonHealth | null> {
+  const value = await fetchDaemonHealthDocument(port, timeoutMs);
+  if (!value || typeof value.serveReady !== 'boolean') return null;
+  const topology = plainObject(value.bridgeTopology) ? value.bridgeTopology : null;
+  return Object.freeze({
+    serveReady: value.serveReady,
+    bridgeInstanceId: boundedString(topology?.instanceId),
+    bridgeMode: boundedString(value.bridgeMode),
+    activeHubInstanceId: boundedString(value.activeHubInstanceId),
+  });
+}
+
+/**
+ * The whole /health body of the FSB service on `port`, once it carries the
+ * FSB product name and the native-host protocol version; null for anything
+ * else, under the same size and time bounds as probeDaemonHealth. Never throws.
+ */
+export function fetchDaemonHealthDocument(
+  port: number,
+  timeoutMs: number = NATIVE_HOST_HEALTH_TIMEOUT_MS,
+): Promise<Readonly<Record<string, unknown>> | null> {
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (value: DaemonHealth | null): void => {
+    const finish = (value: Readonly<Record<string, unknown>> | null): void => {
       if (settled) return;
       settled = true;
       resolve(value);
@@ -67,6 +87,8 @@ export function probeDaemonHealth(
         path: '/health',
         method: 'GET',
         headers: { accept: 'application/json' },
+        // A pooled keep-alive socket would outlive the probe for nothing.
+        agent: false,
       }, (response) => {
         const chunks: Buffer[] = [];
         let total = 0;
@@ -85,7 +107,7 @@ export function probeDaemonHealth(
             finish(null);
             return;
           }
-          finish(parseDaemonHealth(Buffer.concat(chunks, total)));
+          finish(parseHealthDocument(Buffer.concat(chunks, total)));
         });
         response.once('error', () => finish(null));
         response.once('aborted', () => finish(null));
@@ -102,7 +124,7 @@ export function probeDaemonHealth(
   });
 }
 
-function parseDaemonHealth(body: Buffer): DaemonHealth | null {
+function parseHealthDocument(body: Buffer): Readonly<Record<string, unknown>> | null {
   let value: unknown;
   try {
     value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body)) as unknown;
@@ -114,15 +136,8 @@ function parseDaemonHealth(body: Buffer): DaemonHealth | null {
     || value.ok !== true
     || value.service !== NATIVE_HOST_HEALTH_PRODUCT
     || value.nativeHostProtocol !== NATIVE_HOST_PROTOCOL_VERSION
-    || typeof value.serveReady !== 'boolean'
   ) {
     return null;
   }
-  const topology = plainObject(value.bridgeTopology) ? value.bridgeTopology : null;
-  return Object.freeze({
-    serveReady: value.serveReady,
-    bridgeInstanceId: boundedString(topology?.instanceId),
-    bridgeMode: boundedString(value.bridgeMode),
-    activeHubInstanceId: boundedString(value.activeHubInstanceId),
-  });
+  return value;
 }

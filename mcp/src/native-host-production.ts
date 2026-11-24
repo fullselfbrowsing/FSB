@@ -61,6 +61,7 @@ import {
   validateNativeHostMarker,
 } from './native-host-registration.js';
 import { inspectNativeHostDaemonHealth } from './native-host/daemon.js';
+import { fetchDaemonHealthDocument } from './daemon-health.js';
 import { createNativeHostDaemonDependencies } from './native-host/platform.js';
 import { createNativeHostRegistryHelperAdapter } from './native-host-registry-helper.js';
 import {
@@ -94,6 +95,7 @@ import type {
   NativeHostInstallRuntimeAdapter,
   NativeHostListenerFact,
   NativeHostLockLease,
+  NativeHostServiceHealth,
   NativeHostOptOutRecord,
   NativeHostProcessInvocation,
   NativeHostProvenance,
@@ -1820,6 +1822,81 @@ async function processCommandLine(
   return result && result.status === 0 ? result.stdout.trim() : null;
 }
 
+const HEALTH_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
+
+/** Reduces a /health body to the facts a refresh or uninstall acts on. */
+export function serviceHealthFromDocument(
+  value: Readonly<Record<string, unknown>> | null,
+): Readonly<NativeHostServiceHealth> | null {
+  if (!value) return null;
+  const version = typeof value.version === 'string'
+    && value.version.length <= 64
+    && HEALTH_VERSION_PATTERN.test(value.version)
+    ? value.version
+    : null;
+  const sessions = Number.isSafeInteger(value.sessions) && (value.sessions as number) >= 0
+    ? value.sessions as number
+    : null;
+  return Object.freeze({
+    version,
+    stopRequests: value.stopRequests === 1,
+    sessions,
+    queuedMutationTools: typeof value.queuedMutationTools === 'boolean'
+      ? value.queuedMutationTools
+      : null,
+  });
+}
+
+async function hasChildProcessesLinux(pid: number): Promise<boolean | null> {
+  let entries: string[];
+  try {
+    entries = await readdir('/proc');
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    if (!/^\d+$/u.test(entry)) continue;
+    let stat: string;
+    try {
+      stat = await readFile(`/proc/${entry}/stat`, 'utf8');
+    } catch {
+      continue;
+    }
+    // `pid (comm) state ppid ...`; comm may itself hold spaces or parentheses.
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    if (Number(fields[1]) === pid) return true;
+  }
+  return false;
+}
+
+async function hasChildProcesses(
+  platform: 'darwin' | 'linux' | 'win32',
+  pid: number,
+  environment: Readonly<Record<string, string | undefined>>,
+): Promise<boolean | null> {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+  if (platform === 'linux') return hasChildProcessesLinux(pid);
+  if (platform === 'darwin') {
+    const result = await captureProcessOutput('/usr/bin/pgrep', ['-P', String(pid)]);
+    // pgrep exits 1 with no output when nothing matches.
+    if (!result) return null;
+    if (result.status === 0) return parsePidLines(result.stdout).length > 0;
+    return result.status === 1 && result.stdout.trim() === '' ? false : null;
+  }
+  // The console host Windows attaches to a console process is not work.
+  const result = await captureProcessOutput(
+    windowsSystemExecutable(environment, 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `@(Get-CimInstance -ClassName Win32_Process -Filter 'ParentProcessId=${pid}' | Where-Object { $_.Name -ne 'conhost.exe' }).Count`,
+    ],
+  );
+  if (!result || result.status !== 0 || !/^\d+$/u.test(result.stdout.trim())) return null;
+  return Number(result.stdout.trim()) > 0;
+}
+
 /**
  * True only for `<node> <stableRoot>/runtime/package/build/index.js serve ...`,
  * the command the native host's wake path spawns.
@@ -1883,8 +1960,14 @@ function createProductionDaemonStopAdapter(
       }
       return Object.freeze({ status: unidentified ? 'unknown' : 'other' });
     },
+    readHealth: async (): Promise<Readonly<NativeHostServiceHealth> | null> => (
+      serviceHealthFromDocument(await fetchDaemonHealthDocument(port))
+    ),
+    hasChildProcesses: (pid: number): Promise<boolean | null> => (
+      hasChildProcesses(context.platform, pid, context.environment)
+    ),
     // Only reached for a pid whose command line was just confirmed to be the
-    // stable root's own serve daemon.
+    // stable root's own serve daemon, and that showed no sign of work.
     terminate: async (pid: number): Promise<boolean> => {
       if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return false;
       try {

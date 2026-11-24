@@ -544,10 +544,26 @@ export type NativeHostListenerFact =
   | Readonly<{ status: 'stable-root'; pid: number }>
   | Readonly<{ status: 'unknown' }>;
 
+/** What the local service says about itself on its loopback /health endpoint. */
+export interface NativeHostServiceHealth {
+  /** Package version of the listening process, when it reports a usable one. */
+  version: string | null;
+  /** True only when the process reports that it honors stop requests. */
+  stopRequests: boolean;
+  /** Open MCP sessions over HTTP, or null when not reported. */
+  sessions: number | null;
+  /** Whether a mutating tool call is running, or null when not reported. */
+  queuedMutationTools: boolean | null;
+}
+
 export interface NativeHostDaemonStopAdapter {
   isOnline(): Promise<boolean>;
   waitForOffline(timeoutMs: number): Promise<boolean>;
   identifyListener(): Promise<NativeHostListenerFact>;
+  /** The service's /health report, or null when nothing answers with one that parses. */
+  readHealth(): Promise<Readonly<NativeHostServiceHealth> | null>;
+  /** Whether `pid` has child processes of its own; null when that cannot be read. */
+  hasChildProcesses(pid: number): Promise<boolean | null>;
   terminate(pid: number): Promise<boolean>;
 }
 
