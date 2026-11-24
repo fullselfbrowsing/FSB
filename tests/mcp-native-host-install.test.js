@@ -3117,6 +3117,39 @@ async function runCliOutput() {
     'removed native result reports one exact host removal and location',
   );
 
+  const oneOfTwo = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true, browser: 'edge' },
+    operationsWith(null, {
+      status: 'removed',
+      reason: 'registration-removed',
+      location,
+      origin: ORIGIN,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(
+    oneOfTwo.stdout,
+    `Native messaging host removed.\nRemoved: 1\nExpected location: ${location}\n`
+      + "Only the Edge registration was removed; FSB's local helper (native messaging host) stays installed for the other browsers.\n",
+    'removing one of several registrations says the helper stays for the other browsers',
+  );
+  const otherBrowser = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true, browser: 'brave' },
+    operationsWith(null, {
+      status: 'not-installed',
+      reason: 'absent',
+      location,
+      origin: ORIGIN,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(
+    otherBrowser.stdout,
+    `Native messaging host is not installed.\nRemoved: 0\nExpected location: ${location}\n`
+      + "Brave has no registration; FSB's local helper (native messaging host) is still installed for other browsers.\n",
+    'a browser without a registration says the helper is still installed elsewhere',
+  );
+
   const notInstalled = await captureCliAction(() => cli.runUninstall(
     { 'native-host': true, browser: 'chrome' },
     operationsWith(null, {
@@ -3290,7 +3323,11 @@ async function runCliOutput() {
     ['newer', { outcome: 'current', reason: 'installed-newer', version: '999.0.0', browsers: ['chromium'], addedBrowsers: [], stableRoot: '' },
       'stdout', `\u25CB ${helper} is already installed for Chromium (a newer version than this package)`],
     ['deferred', { outcome: 'deferred', reason: 'locked', browsers: [], addedBrowsers: [], stableRoot: '' },
-      'stderr', `\u26A0 ${helper} was not updated: locked. Run npx -y fsb-mcp-server@latest install --native-host to retry.`],
+      'stderr', `\u26A0 ${helper} was not updated: locked. Run the same install command again.`],
+    ['deferred busy', { outcome: 'deferred', reason: 'daemon-busy', version: '0.0.1', browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not updated: daemon-busy. FSB retries this the next time an MCP client starts it, or run the same install command again once no delegated run is active.`],
+    ['deferred backoff', { outcome: 'deferred', reason: 'backoff', version: '0.0.1', browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not updated: backoff. FSB retries this the next time an MCP client starts it, or run the same install command again later.`],
     ['refused', { outcome: 'refused', reason: 'registry-shadow', browsers: [], addedBrowsers: [], stableRoot: '' },
       'stderr', `\u26A0 ${helper} was not changed: registry-shadow. Run npx -y fsb-mcp-server@latest doctor for details.`],
     ['unknown', { outcome: sensitive, reason: sensitive },

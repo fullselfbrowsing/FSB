@@ -407,7 +407,7 @@ function printNativeInstallResult(result: unknown, updatedFrom: string | null = 
   console.log(`Allowed origin: ${origin}`);
 }
 
-function printNativeUninstallResult(result: unknown): void {
+function printNativeUninstallResult(result: unknown, browser?: NativeHostBrowser): void {
   const receipt = exactNativeReceipt(result);
   if (!receipt) {
     printNativeHostRefusal('unavailable', 'Unavailable');
@@ -433,6 +433,13 @@ function printNativeUninstallResult(result: unknown): void {
     console.log('Removed: 0');
   }
   console.log(`Expected location: ${location}`);
+  // One browser's registration can go while the helper stays for the others.
+  const label = browser ? NATIVE_HOST_BROWSER_LABELS[browser] : 'This browser';
+  if (receipt.status === 'removed' && receipt.reason === 'registration-removed') {
+    console.log(`Only the ${label} registration was removed; ${HELPER_LABEL} stays installed for the other browsers.`);
+  } else if (receipt.status === 'not-installed' && typeof receipt.origin === 'string') {
+    console.log(`${label} has no registration; ${HELPER_LABEL} is still installed for other browsers.`);
+  }
 }
 
 function plainRecord(value: unknown): Readonly<Record<string, unknown>> | null {
@@ -497,8 +504,14 @@ function printHelperEnsureResult(value: unknown): void {
       console.log('\u25CB ' + HELPER_LABEL + ' was not changed: ' + reason);
       return;
     case 'deferred':
-      console.error('\u26A0 ' + HELPER_LABEL + ' was not updated: ' + reason
-        + '. Run npx -y fsb-mcp-server@latest install --native-host to retry.');
+      // `install --native-host` would record the helper as explicit and drop
+      // the extension ID and browser set this install chose, so the retry is
+      // this same command, or for an installed helper the next server start.
+      console.error('\u26A0 ' + HELPER_LABEL + ' was not updated: ' + reason + '. '
+        + (boundedVersion(result.version)
+          ? 'FSB retries this the next time an MCP client starts it, or run the same install command again'
+            + (reason === 'daemon-busy' ? ' once no delegated run is active.' : ' later.')
+          : 'Run the same install command again.'));
       return;
     default:
       console.error('\u26A0 ' + HELPER_LABEL + ' was not changed: ' + reason + '. ' + DOCTOR_HINT);
@@ -1683,7 +1696,7 @@ export async function runUninstall(
     if (request.browser) {
       // One browser's registration; the helper's files go with the last one.
       try {
-        printNativeUninstallResult(await nativeHostOperations.uninstall(request));
+        printNativeUninstallResult(await nativeHostOperations.uninstall(request), request.browser);
       } catch {
         printNativeHostRefusal('unavailable', expectedNativeHostLocation());
       }

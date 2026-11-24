@@ -226,7 +226,7 @@ The native messaging host, `io.github.fullselfbrowsing.fsb_native_host`, is FSB'
 - The helper is registered in each supported browser (Chrome, Edge, Brave, Chromium) whose user profile has FSB installed, or in Chrome when FSB is found in none of them.
 - Each registration names one permitted extension origin: the published Chrome Web Store ID unless you pass `--extension-id`.
 - A helper that is already current is left alone, so running `install` again reports it as already installed.
-- A helper problem never fails the client install. It is printed as a warning, `doctor` reports it, and `install --native-host` repairs it.
+- A helper problem never fails the client install. It is printed as a warning, and `doctor` reports it. A step that only had to wait, for example while a delegated run was active, is retried by the next server start or by running the same install command again; anything else is repaired with `install --native-host`.
 - `--dry-run` previews the helper step together with the config writes.
 - `--no-native-host` skips the helper and stops the automatic refresh described below. A later `install` without the flag turns both back on.
 
