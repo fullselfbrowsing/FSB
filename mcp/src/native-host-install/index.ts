@@ -1265,6 +1265,20 @@ async function acquireLease(
   }
 }
 
+/**
+ * Re-reads the cross-process lock right before a step that moves or deletes
+ * a tree. Once another process holds it, this one changes nothing more and
+ * leaves its own tokened directories for that holder to finish or discard.
+ */
+async function stillHeld(lease: NativeHostLockLease): Promise<boolean> {
+  if (lease.lost()) return false;
+  try {
+    return await lease.held();
+  } catch {
+    return false;
+  }
+}
+
 async function releaseLease(lease: NativeHostLockLease): Promise<void> {
   try {
     await lease.release();
@@ -1301,6 +1315,7 @@ async function recoverSiblings(
       const has = (kind: string) => abandoned.some((sibling) => (
         sibling.token === token && sibling.kind === kind
       ));
+      if (!await stillHeld(lease)) return;
       try {
         if (has('retired') && has('next')) {
           await dependencies.state.moveSiblingToStable('next', token);
@@ -1336,6 +1351,7 @@ async function recoverSiblings(
     ) {
       continue;
     }
+    if (!await stillHeld(lease)) return;
     try {
       await dependencies.state.removeSibling(sibling.kind, sibling.token);
     } catch {
@@ -1357,6 +1373,10 @@ function stepFailure(
   backoff: boolean,
 ): StepFailure {
   return Object.freeze({ ok: false, outcome, reason, backoff });
+}
+
+function lockLost(): StepFailure {
+  return stepFailure('deferred', 'lock-lost', false);
 }
 
 async function waitForOffline(dependencies: NativeHostEnsureDependencies): Promise<boolean> {
@@ -1654,9 +1674,10 @@ async function refreshRuntime(
     return stepFailure('refused', publication.reason, true);
   }
   const next = publication.receipt;
-  if (!publicationMatches(dependencies, next, extensionId) || lease.lost()) {
+  if (!await stillHeld(lease)) return lockLost();
+  if (!publicationMatches(dependencies, next, extensionId)) {
     await removeSiblingQuietly(dependencies, 'next', token);
-    return stepFailure(lease.lost() ? 'deferred' : 'refused', lease.lost() ? 'lock-lost' : 'ownership-mismatch', !lease.lost());
+    return stepFailure('refused', 'ownership-mismatch', true);
   }
 
   const wake = await takeWakeLock(dependencies, token);
@@ -1668,7 +1689,7 @@ async function refreshRuntime(
     const stopped = await stopStableRootDaemon(dependencies, token, 'refresh');
     const abandon = async (failure: StepFailure): Promise<StepFailure> => {
       await releaseWakeLock(wake.hold);
-      await removeSiblingQuietly(dependencies, 'next', token);
+      if (await stillHeld(lease)) await removeSiblingQuietly(dependencies, 'next', token);
       await removeStopRequest(dependencies, token);
       return failure;
     };
@@ -1676,7 +1697,7 @@ async function refreshRuntime(
 
     let unchanged = false;
     try {
-      unchanged = !lease.lost() && await dependencies.runtime.recheckExactRuntime(context.receipt);
+      unchanged = await dependencies.runtime.recheckExactRuntime(context.receipt);
     } catch {
       unchanged = false;
     }
@@ -1684,16 +1705,20 @@ async function refreshRuntime(
 
     // The lock moves with the old tree; it stays fresh long enough for that.
     await stopRefreshingWakeLock(wake.hold);
+    if (!await stillHeld(lease)) return abandon(lockLost());
     try {
       await dependencies.state.moveStableToSibling('retired', token);
     } catch {
       return abandon(stepFailure('deferred', 'swap-failed', true));
     }
+    // From here a holder that lost the lock stops: the next one completes the
+    // swap or puts the old tree back from the tokened directories.
+    if (!await stillHeld(lease)) return lockLost();
     try {
       await dependencies.state.moveSiblingToStable('next', token);
     } catch {
       try {
-        await dependencies.state.moveSiblingToStable('retired', token);
+        if (await stillHeld(lease)) await dependencies.state.moveSiblingToStable('retired', token);
       } catch {
         // Recovery under the next lock restores or completes the swap.
       }
@@ -1702,8 +1727,10 @@ async function refreshRuntime(
 
     if (!await verifyStableRoot(dependencies, next, extensionId, context.registered)) {
       try {
-        await dependencies.state.moveStableToSibling('next', token);
-        await dependencies.state.moveSiblingToStable('retired', token);
+        if (await stillHeld(lease)) {
+          await dependencies.state.moveStableToSibling('next', token);
+          await dependencies.state.moveSiblingToStable('retired', token);
+        }
       } catch {
         // Recovery under the next lock restores or completes the swap.
       }
@@ -1716,7 +1743,7 @@ async function refreshRuntime(
       // the old tree.
       return Object.freeze({ ok: true, receipt: next });
     }
-    await removeSiblingQuietly(dependencies, 'retired', token);
+    if (await stillHeld(lease)) await removeSiblingQuietly(dependencies, 'retired', token);
     await removeStopRequest(dependencies, token);
     return Object.freeze({ ok: true, receipt: next });
   } finally {
@@ -1772,8 +1799,7 @@ async function rebuildWithWakeLock(
   let unchanged = false;
   try {
     const current = await dependencies.runtime.inspectRuntime();
-    unchanged = !lease.lost()
-      && current.state === 'invalid'
+    unchanged = current.state === 'invalid'
       && current.reason === 'launcher-integrity'
       && Boolean(current.receipt)
       && receiptsEqual(current.receipt as Readonly<NativeHostRuntimeReceipt>, context.receipt);
@@ -1785,6 +1811,10 @@ async function rebuildWithWakeLock(
     return stepFailure('refused', 'boundary-changed', false);
   }
   await stopRefreshingWakeLock(wake);
+  if (!await stillHeld(lease)) {
+    await removeStopRequest(dependencies, token);
+    return lockLost();
+  }
   try {
     await dependencies.state.moveStableToSibling('quarantine', token);
   } catch {
@@ -1793,11 +1823,15 @@ async function rebuildWithWakeLock(
   }
   const restore = async (failure: StepFailure): Promise<StepFailure> => {
     try {
-      if (await dependencies.state.stableRootPresent()) {
+      // Each move re-reads the lock: a holder that took it over may already
+      // have put the quarantined tree back.
+      if (await stillHeld(lease) && await dependencies.state.stableRootPresent()) {
         await dependencies.state.moveStableToSibling('next', token);
       }
-      await dependencies.state.moveSiblingToStable('quarantine', token);
-      await removeSiblingQuietly(dependencies, 'next', token);
+      if (await stillHeld(lease)) {
+        await dependencies.state.moveSiblingToStable('quarantine', token);
+        await removeSiblingQuietly(dependencies, 'next', token);
+      }
     } catch {
       // Recovery under the next lock puts the quarantined tree back.
     }
@@ -1814,13 +1848,14 @@ async function rebuildWithWakeLock(
     return restore(stepFailure('refused', publication.reason, true));
   }
   const rebuilt = publication.receipt;
+  if (!await stillHeld(lease)) return restore(lockLost());
   if (
     !publicationMatches(dependencies, rebuilt, extensionId)
     || !await verifyStableRoot(dependencies, rebuilt, extensionId, context.registered)
   ) {
     return restore(stepFailure('refused', 'boundary-changed', false));
   }
-  await removeSiblingQuietly(dependencies, 'quarantine', token);
+  if (await stillHeld(lease)) await removeSiblingQuietly(dependencies, 'quarantine', token);
   await removeStopRequest(dependencies, token);
   return Object.freeze({ ok: true, receipt: rebuilt });
 }
@@ -1944,6 +1979,7 @@ async function executeInstall(
     await recordStamp(dependencies, key, false);
     return ensureResult(dependencies, 'unavailable', { reason: 'unavailable' });
   }
+  if (!await stillHeld(lease)) return ensureResult(dependencies, 'deferred', { reason: 'lock-lost' });
   const installed = await installTransaction(plan.extensionId, {
     platform: dependencies.registrations[first],
     runtime: publisher,
@@ -1959,6 +1995,7 @@ async function executeInstall(
   }
   const added: NativeHostBrowser[] = [first];
   for (const browser of rest) {
+    if (!await stillHeld(lease)) break;
     if ((await addRegistrationLocked(dependencies, browser, plan.extensionId)).ok) {
       added.push(browser);
     }
@@ -2014,6 +2051,7 @@ async function executeUpdate(
   }
   const added: NativeHostBrowser[] = [];
   for (const browser of plan.additions) {
+    if (!await stillHeld(lease)) break;
     if ((await addRegistrationLocked(dependencies, browser, plan.extensionId)).ok) {
       added.push(browser);
     }
@@ -2233,6 +2271,9 @@ export async function installNativeHostBrowser(
         if (!publisher) {
           return browserInstallResult(dependencies, browser, 'refused', 'unavailable', expectedOrigin, null);
         }
+        if (!await stillHeld(lease)) {
+          return browserInstallResult(dependencies, browser, 'refused', 'lock-lost', expectedOrigin, null);
+        }
         const result = await installTransaction(extensionId, {
           platform: dependencies.registrations[browser],
           runtime: publisher,
@@ -2277,6 +2318,9 @@ export async function installNativeHostBrowser(
       if (target.state === 'exact') {
         if (provenance === 'explicit') await promoteProvenance(dependencies);
         return browserInstallResult(dependencies, browser, 'already-installed', 'exact', receipt.origin, receipt.packageVersion);
+      }
+      if (!await stillHeld(lease)) {
+        return browserInstallResult(dependencies, browser, 'refused', 'lock-lost', receipt.origin, receipt.packageVersion);
       }
       const added = await addRegistrationLocked(dependencies, browser, extensionId);
       if (!added.ok) {
@@ -2386,6 +2430,9 @@ export async function uninstallNativeHostBrowser(
         }
       }
       try {
+        if (!await stillHeld(lease)) {
+          return browserUninstallResult(dependencies, browser, 'refused', 'lock-lost', receipt.origin, receipt.packageVersion);
+        }
         const removed = await removeRegistrationLocked(
           dependencies,
           browser,
@@ -2415,6 +2462,9 @@ export async function uninstallNativeHostBrowser(
           return browserUninstallResult(dependencies, browser, 'refused', 'boundary-changed', receipt.origin, receipt.packageVersion);
         }
         await stopRefreshingWakeLock(wake);
+        if (!await stillHeld(lease)) {
+          return browserUninstallResult(dependencies, browser, 'refused', 'lock-lost', receipt.origin, receipt.packageVersion);
+        }
         try {
           await dependencies.runtime.removeExactRuntime(receipt);
         } catch {
@@ -2512,6 +2562,9 @@ export async function uninstallAllNativeHost(
           return uninstallAllResult('refused', { reason: stopped.reason, provenance });
         }
         for (const browser of browsersIn(surfaces, 'exact')) {
+          if (!await stillHeld(lease)) {
+            return uninstallAllResult('refused', { reason: 'lock-lost', removedBrowsers, provenance });
+          }
           const removed = await removeRegistrationLocked(
             dependencies,
             browser,
@@ -2541,6 +2594,9 @@ export async function uninstallAllNativeHost(
           });
         }
         await stopRefreshingWakeLock(wake);
+        if (!await stillHeld(lease)) {
+          return uninstallAllResult('refused', { reason: 'lock-lost', removedBrowsers, provenance });
+        }
         try {
           await dependencies.runtime.removeExactRuntime(receipt);
         } catch {

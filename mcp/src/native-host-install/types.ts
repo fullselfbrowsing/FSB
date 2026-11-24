@@ -518,6 +518,8 @@ export interface NativeHostLockLease {
   /** Tokens of dead holders whose lock this acquisition broke. */
   readonly staleTokens: readonly string[];
   lost(): boolean;
+  /** Re-reads the lock: true only while it still names this holder. */
+  held(): Promise<boolean>;
   release(): Promise<void>;
 }
 

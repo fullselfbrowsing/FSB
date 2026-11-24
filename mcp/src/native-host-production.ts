@@ -1106,6 +1106,10 @@ const DEFAULT_ENSURE_TIMING: NativeHostEnsureTiming = Object.freeze({
 });
 const LOCK_STALE_MS = 5 * 60_000;
 const LOCK_HEARTBEAT_MS = 30_000;
+// How long a live holder's lock must stay byte-for-byte unchanged, after its
+// heartbeat already looked old, before a waiting caller takes it over. A holder
+// that was only asleep beats again within one heartbeat of waking.
+const LOCK_SILENT_HOLDER_MS = LOCK_HEARTBEAT_MS + 15_000;
 const LOCK_POLL_MS = 250;
 const UNPARSEABLE_LOCK_GRACE_MS = 30_000;
 const STATE_FILE_MAX_BYTES = 16 * 1024;
@@ -1415,10 +1419,14 @@ async function breakStaleLock(lockPath: string, observed: string): Promise<boole
 }
 
 /**
- * The cross-process lock at `${stableRoot}.lock`. It is stale only when its
- * holder is gone or its heartbeat is older than five minutes; the holder
- * refreshes the heartbeat every thirty seconds and notices if the lock was
- * taken from it.
+ * The cross-process lock at `${stableRoot}.lock`. The holder refreshes its
+ * heartbeat every thirty seconds. A lock whose holder process is gone is
+ * stale. A live holder's lock is never taken just because its heartbeat looks
+ * old, since a laptop that slept or a process that was paused looks exactly
+ * like that: a caller that does not wait leaves it alone, and a waiting caller
+ * takes it over only after it stays unchanged for more than another heartbeat
+ * (a holder frozen for good, or a pid reused by another program). Each step
+ * that moves or deletes a tree re-reads the lock first through `held()`.
  */
 async function acquireStableRootLock(
   stableRoot: string,
@@ -1430,6 +1438,7 @@ async function acquireStableRootLock(
   const token = randomBytes(16).toString('hex');
   const staleTokens: string[] = [];
   const deadline = Date.now() + Math.max(0, waitMs);
+  let silent = null as Readonly<{ raw: string; since: number }> | null;
   for (;;) {
     const startedAt = now();
     try {
@@ -1454,9 +1463,19 @@ async function acquireStableRootLock(
     }
     if (raw === null) continue;
     const record = parseLockRecord(raw);
-    const stale = record
-      ? !processAlive(record.pid) || now() - record.heartbeatAt > LOCK_STALE_MS
-      : ageMs > UNPARSEABLE_LOCK_GRACE_MS;
+    let stale = false;
+    if (!record) {
+      stale = ageMs > UNPARSEABLE_LOCK_GRACE_MS;
+    } else if (!processAlive(record.pid)) {
+      stale = true;
+    } else if (now() - record.heartbeatAt > LOCK_STALE_MS) {
+      if (waitMs <= 0) return null;
+      const observed: Readonly<{ raw: string; since: number }> = silent !== null && silent.raw === raw
+        ? silent
+        : Object.freeze({ raw, since: Date.now() });
+      silent = observed;
+      stale = Date.now() - observed.since > LOCK_SILENT_HOLDER_MS;
+    }
     if (stale) {
       if (await breakStaleLock(lockPath, raw) && record) staleTokens.push(record.token);
       continue;
@@ -1489,6 +1508,17 @@ async function acquireStableRootLock(
     token,
     staleTokens: Object.freeze([...staleTokens]),
     lost: () => lost,
+    held: async (): Promise<boolean> => {
+      if (lost) return false;
+      try {
+        const record = parseLockRecord(await readSmallFile(lockPath));
+        if (record?.token === token) return true;
+      } catch {
+        // Unreadable counts as lost: nothing moves without proof.
+      }
+      lost = true;
+      return false;
+    },
     release: async (): Promise<void> => {
       clearInterval(heartbeat);
       try {

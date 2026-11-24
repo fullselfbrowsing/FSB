@@ -3585,6 +3585,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
         token,
         staleTokens: Object.freeze([...(options.staleTokens || [])]),
         lost: () => false,
+        held: async () => !(typeof options.loseLock === 'function' && options.loseLock(trace, token)),
         release: async () => {
           trace.push('lock:release');
           lockHeld = false;
@@ -4390,6 +4391,58 @@ async function runEnsureTransaction() {
     }
   }
   {
+    // The lock is re-read before every move: a holder that lost it between
+    // its two renames stops, and the next holder completes the swap.
+    const firstToken = hexToken(0x101);
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      loseLock: (trace, token) => token === firstToken && trace.includes('move:stable->retired'),
+    });
+    const lost = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(lost.outcome, 'deferred', 'a refresh that loses its lock mid-swap stops');
+    equal(lost.reason, 'lock-lost', 'the stop names the lost lock');
+    check(!harness.trace.includes('move:next->stable'), 'a holder without the lock never makes the second rename');
+    check(!harness.trace.some((entry) => entry.startsWith('remove:')), 'a holder without the lock deletes nothing');
+    equal(harness.stable(), null, 'the stable root is mid-swap when the holder stops');
+    deepEqual(
+      [...harness.siblings.keys()].sort(),
+      [`next-${firstToken}`, `retired-${firstToken}`],
+      'the tokened directories are left for the next holder',
+    );
+    const recovered = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(recovered.outcome, 'current', 'the next run completes the interrupted swap');
+    equal(harness.stable().receipt.packageVersion, PACKAGE_VERSION, 'the completed swap holds the new runtime');
+    equal(harness.siblings.size, 0, 'the next run deletes the retired tree');
+  }
+  {
+    const firstToken = hexToken(0x101);
+    const harness = fakeEnsureHarness(modules, 'darwin', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      loseLock: (trace, token) => token === firstToken && trace.includes('stop:write:refresh'),
+    });
+    const before = harness.stable();
+    const lost = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(lost.reason, 'lock-lost', 'a refresh that loses its lock before the swap stops');
+    equal(harness.stable(), before, 'the old runtime stays in place');
+    check(!harness.trace.some((entry) => entry.startsWith('move:')), 'nothing is moved without the lock');
+    check(harness.siblings.has(`next-${firstToken}`), 'the unused replacement is left for the next holder to delete');
+  }
+  {
+    const firstToken = hexToken(0x101);
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      loseLock: (trace, token) => token === firstToken && trace.some((entry) => entry.startsWith('registry:delete:')),
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', 'uninstall-all that loses its lock stops');
+    equal(result.reason, 'lock-lost', 'the refusal names the lost lock');
+    check(!harness.trace.includes('runtime:remove'), 'the runtime is never removed without the lock');
+    deepEqual(result.removedBrowsers, ['chrome'], 'only the registration removed before the loss is reported');
+  }
+  {
     const harness = fakeEnsureHarness(modules, 'darwin', {
       installed: { version: '0.9.0' },
       registered: ['chrome'],
@@ -4830,6 +4883,8 @@ const ops = production.createProductionNativeHostCliOperations({
     isOnline: async () => false,
     waitForOffline: async () => true,
     identifyListener: async () => ({ status: 'none' }),
+    readHealth: async () => null,
+    hasChildProcesses: async () => null,
     terminate: async () => false,
   },
 });
@@ -5024,6 +5079,34 @@ async function runProductionEnsure() {
       equal(recovered.outcome, 'refreshed', 'the next ensure breaks the dead lock and refreshes');
       deepEqual(siblings(), [], 'the next ensure deletes what the killed publisher left');
       check(!fs.existsSync(`${stableRoot}.lock`), 'the recovered ensure releases its lock');
+    }
+    {
+      // A live holder whose heartbeat only looks old, as after a laptop
+      // sleep, keeps its lock: the automatic refresh leaves at once and a
+      // waiting caller gives up long before it would take a silent lock over.
+      lowerVersion();
+      const lockPath = `${stableRoot}.lock`;
+      const longAgo = Date.now() - 10 * 60_000;
+      const record = `${JSON.stringify({
+        version: 1,
+        pid: process.pid,
+        token: hexToken(0x5150),
+        startedAt: longAgo,
+        heartbeatAt: longAgo,
+      })}\n`;
+      fs.writeFileSync(lockPath, record, { mode: 0o600 });
+      const [automatic, waiting] = runProductionSteps(home, [
+        ensureRefresh,
+        { op: 'ensure', request: { mode: 'install', browsers: 'auto', provenance: 'auto' } },
+      ]);
+      equal(automatic.outcome, 'deferred', 'the automatic refresh defers to a live holder with an old heartbeat');
+      equal(automatic.reason, 'locked', 'the deferral names the held lock');
+      equal(waiting.outcome, 'deferred', 'a waiting install does not take over a live holder within its wait');
+      equal(fs.readFileSync(lockPath, 'utf8'), record, 'the live holder\'s lock is left exactly as it was');
+      deepEqual(siblings(), [], 'nothing is published beside a tree another holder owns');
+      fs.unlinkSync(lockPath);
+      const [restored] = runProductionSteps(home, [ensureRefresh]);
+      equal(restored.outcome, 'refreshed', 'the refresh proceeds once the holder has gone');
     }
     {
       const [edge, optOut, skipped, cleared] = runProductionSteps(home, [
