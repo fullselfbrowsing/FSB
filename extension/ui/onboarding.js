@@ -161,6 +161,7 @@
   let copyClickMutationTail = Promise.resolve();
   let lmstudioDiscoveryGeneration = 0;
   let lmstudioDiscoveryTimer = null;
+  let keyCheckGeneration = 0;
 
   globalThis.FSB_ONBOARDING_PROVIDER_KEY_FIELDS = PROVIDER_KEY_FIELDS;
   globalThis.FSB_ONBOARDING_INSTALL_CLIENTS = INSTALL_CLIENTS;
@@ -1160,6 +1161,8 @@
     if (provider.local) {
       const discovered = await discoverLmStudioModels({ force: true });
       if (!discovered) return false;
+      // Another provider picked while discovery ran owns the step now.
+      if (currentProvider().id !== provider.id) return false;
       if (!state.lmstudioModel
           || !state.lmstudioModels.some(model => model.id === state.lmstudioModel)) {
         state.keyStatus = 'invalid';
@@ -1169,6 +1172,10 @@
       }
     }
 
+    // This check holds the busy state from here until its answer, unless a newer one starts.
+    // No return comes before the try below, so the latest check always ends it.
+    const generation = keyCheckGeneration + 1;
+    keyCheckGeneration = generation;
     state.validating = true;
     state.keyStatus = 'validating';
     state.keyMessage = '';
@@ -1184,6 +1191,7 @@
     } else {
       patch[PROVIDER_KEY_FIELDS[provider.id]] = key;
     }
+    const target = keyCheckTarget();
 
     try {
       await validateProvider(provider.id, {
@@ -1191,18 +1199,52 @@
         model: provider.local ? state.lmstudioModel : (PROVIDER_MODELS[provider.id] || ''),
         baseUrl: getValidationBaseUrl(provider.id, baseUrl)
       });
+      if (keyCheckLapsed(generation, target)) return false;
       await storageSet(patch);
+      if (keyCheckLapsed(generation, target)) return false;
       state.validating = false;
       state.keyStatus = 'valid';
       state.keyMessage = provider.local ? obExact('LM Studio responded successfully') : ob('entry_key_valid', 'Key ending in $LAST$ is valid', { last: key.slice(-4) });
       return true;
     } catch (error) {
+      if (keyCheckLapsed(generation, target)) return false;
       state.validating = false;
       state.keyStatus = 'invalid';
       state.keyMessage = error && error.message ? error.message : obExact('Connection test failed');
       render();
       return false;
     }
+  }
+
+  // What a connection test checks: the provider and its key, or the LM Studio server and model.
+  // An answer only counts while the wizard still holds the same ones. Going back to pick another
+  // provider, or editing the key, URL or model while the test runs, makes it an answer for
+  // something no longer on screen.
+  function keyCheckTarget() {
+    const provider = currentProvider();
+    return provider.local
+      ? [provider.id, normalizeBaseUrl(state.lmstudioBaseUrl), state.lmstudioModel].join('\n')
+      : [provider.id, state.apiKey.trim()].join('\n');
+  }
+
+  // Only the latest check may answer. An older one says nothing: the newer check holds the
+  // spinner and Continue until its own answer comes, and an old failure must not undo a newer
+  // success. The latest check, when the key, URL or model changed under it, only ends the
+  // busy state.
+  function keyCheckLapsed(generation, target) {
+    if (generation !== keyCheckGeneration) return true;
+    if (keyCheckTarget() === target) return false;
+    settleStaleKeyCheck();
+    return true;
+  }
+
+  // A stale answer only ends the busy state. The edit that made it stale already reset the
+  // status, so the step's current key still waits for its own test, and Continue is free again.
+  function settleStaleKeyCheck() {
+    state.validating = false;
+    if (state.keyStatus === 'validating') state.keyStatus = 'idle';
+    render();
+    return false;
   }
 
   function validateProvider(provider, config) {

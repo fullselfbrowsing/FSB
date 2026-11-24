@@ -63,16 +63,33 @@
       if (P2.length) { st.transitionDuration = D2.join(', '); st.transitionTimingFunction = F2.join(', '); st.transitionDelay = L2.join(', '); }
     }
 
-    // a render can add or replace travelling elements (the summary on the last plane): find them again
-    function collect() {
+    // a render can add or replace travelling elements (the summary on the last plane): find them
+    // again, and hand back the ones that are new
+    function track() {
+      var added = [];
       items = items.filter(function (it) { return it.el.isConnected; });
       order.forEach(function (id) {
         var L = layers[id];
         Array.prototype.forEach.call(L.el.querySelectorAll('[data-di]'), function (el) {
           for (var j = 0; j < items.length; j++) if (items[j].el === el) return;
-          items.push({ el: el, L: L, k: clamp(parseFloat(el.getAttribute('data-di')) || 0, 0, 1), p: goal(L), q: L.lat, last: '', fit: !!el.closest('.ob3-fit'), tw: null, door: false });
+          var it = { el: el, L: L, k: clamp(parseFloat(el.getAttribute('data-di')) || 0, 0, 1), p: goal(L), q: L.lat, last: '', fit: !!el.closest('.ob3-fit'), tw: null, door: false };
+          items.push(it);
+          added.push(it);
         });
       });
+      return added;
+    }
+
+    // new elements take their plane's place before the browser paints, or a row added to a plane
+    // far back shows for a few frames at full opacity; only they are touched, so the transitions
+    // of elements already in flight are left alone
+    function adopt() {
+      if (!alive) return;
+      track().forEach(function (it) { strip(it.el); it.last = ''; apply(it); });
+    }
+
+    function collect() {
+      track();
       var next = [];
       items.forEach(function (it) { strip(it.el); it.last = ''; if (next.indexOf(it.el.parentElement) < 0) next.push(it.el.parentElement); });
       parents.forEach(function (par) { if (next.indexOf(par) < 0) { par.style.perspective = ''; par.style.perspectiveOrigin = ''; } });
@@ -371,7 +388,7 @@
     var ro = win.ResizeObserver ? new win.ResizeObserver(function () { layout(); }) : null;
     if (ro) { ro.observe(stage); order.forEach(function (id) { if (layers[id].el.firstElementChild) ro.observe(layers[id].el.firstElementChild); }); }
     else win.addEventListener('resize', layout);
-    var mo = win.MutationObserver ? new win.MutationObserver(relayout) : null;
+    var mo = win.MutationObserver ? new win.MutationObserver(function () { adopt(); relayout(); }) : null;
     if (mo) mo.observe(stage, { childList: true, subtree: true });
     var links = Array.prototype.slice.call(doc.querySelectorAll('link[rel~="stylesheet"]'));
     links.forEach(function (l) { if (!l.sheet) l.addEventListener('load', relayout); });

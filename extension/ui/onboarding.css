@@ -1536,11 +1536,14 @@ a:hover {
   touch-action: none;
 }
 
+/* The sides keep the step rail's lane clear (28px from the edge plus its widest entry, 44px),
+   so a step's content shrinks before it reaches under the rail. Both sides, so it stays centred;
+   a step narrower than the room is not touched. */
 .ob3-layer {
   position: absolute;
   inset: 0;
   box-sizing: border-box;
-  padding: 62px 24px 84px;
+  padding: 62px 72px 84px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2055,6 +2058,8 @@ a:hover {
 }
 
 /* ---- step index on the right edge (the showcase's plane rail) ---- */
+/* Only the entries take the pointer: the gaps between them and the space beside a short tick
+   belong to the step underneath. */
 .fsb-depth-rail {
   position: absolute;
   right: 28px;
@@ -2065,6 +2070,7 @@ a:hover {
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
+  pointer-events: none;
 }
 
 .fsb-depth-go {
@@ -2073,10 +2079,11 @@ a:hover {
   border: 0;
   margin: 0;
   cursor: pointer;
+  pointer-events: auto;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
   min-height: 40px;
   padding: 0 0 0 12px;
   color: var(--text-muted);
@@ -2087,11 +2094,30 @@ a:hover {
   text-transform: uppercase;
 }
 
+/* A step's name shows left of its tick, out of the rail's flow: the rail is only as wide as its
+   ticks however long a translation runs, and a hidden name never takes a click. The entry's left
+   padding is the gap between name and tick. */
 .fsb-depth-lbl {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  translate: 0 -50%;
+  pointer-events: none;
   opacity: 0;
   transform: translateX(6px);
   transition: opacity .25s ease,transform .25s ease;
   white-space: nowrap;
+}
+
+/* Where a step's content runs up to the rail's lane, a name that shows sits on a chip of its own
+   so it reads over whatever the step has there (the showcase's rail does the same on a phone). */
+@media (max-width: 1100px) {
+  .fsb-depth-lbl {
+    padding: 6px 10px;
+    border: 1px solid var(--border-hover);
+    border-radius: .5rem;
+    background: var(--bg-card);
+  }
 }
 
 .fsb-depth-tick {
@@ -2194,9 +2220,11 @@ a:hover {
 }
 
 @media (max-width: 760px) {
+  /* The content runs edge to edge here; the right side keeps the compact rail's lane (6px from
+     the edge plus its widest entry, 30px). */
   .ob3-layer {
     padding-left: 18px;
-    padding-right: 18px;
+    padding-right: 36px;
   }
 
   .ob3 .ob-h {
