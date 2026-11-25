@@ -274,6 +274,7 @@ const TOGGLE_STATE_ATTRIBUTES = ['aria-checked', 'aria-pressed', 'aria-selected'
  * does not live on the clicked element itself: the control of a clicked label,
  * the details element of a clicked summary, or the nearest toggle-like ancestor
  * of a clicked child (for example the text span inside a role="switch" row).
+ * A label with no control holds no state, so the search goes on past it.
  * @param {Element} element - The clicked element
  * @returns {Element|null} The associated state element, or null when there is none
  */
@@ -283,7 +284,7 @@ function getAssociatedStateElement(element) {
     for (let depth = 0; node && depth <= 5; depth++, node = node.parentElement) {
       if (node.tagName === 'LABEL') {
         const control = node.control;
-        return control && control !== element ? control : null;
+        if (control) return control !== element ? control : null;
       }
       if (node.tagName === 'SUMMARY' && node.parentElement && node.parentElement.tagName === 'DETAILS') {
         return node.parentElement;

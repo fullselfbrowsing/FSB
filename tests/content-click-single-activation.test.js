@@ -141,6 +141,19 @@ test('a click on text inside a switch verifies through the switch state', () => 
   assert.equal(clickVerifies(span, () => sw.setAttribute('aria-checked', 'true')).verified, true);
 });
 
+test('a click on a control-less label inside a switch verifies through the switch state', () => {
+  const sw = fakeElement('DIV', { attrs: { role: 'switch', 'aria-checked': 'false' } });
+  const label = fakeElement('LABEL', { parent: sw, control: null, innerText: 'Dark mode' });
+  assert.equal(clickVerifies(label, () => sw.setAttribute('aria-checked', 'true')).verified, true);
+});
+
+test('a click on text inside a control-less label inside a switch verifies through the switch state', () => {
+  const sw = fakeElement('DIV', { attrs: { role: 'switch', 'aria-checked': 'false' } });
+  const label = fakeElement('LABEL', { parent: sw, control: null });
+  const span = fakeElement('SPAN', { parent: label, innerText: 'Dark mode' });
+  assert.equal(clickVerifies(span, () => sw.setAttribute('aria-checked', 'true')).verified, true);
+});
+
 test('a click on text inside a summary verifies through the details state', () => {
   const details = fakeElement('DETAILS', { open: false });
   const summary = fakeElement('SUMMARY', { parent: details });
