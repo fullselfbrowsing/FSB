@@ -302,6 +302,11 @@ console.log('\n--- Test 8: the service worker sees the threshold helper ---');
 console.log('\n--- Integration Test 6: the task is classified when no task type is set ---');
 {
   // In the worker AIIntegration is a global; here it is lent for this block.
+  // ai-integration.js reads navigator.userAgent as it loads. Node 21 and later
+  // have a navigator global, but Node 20 (the CI runtime) does not, so one is
+  // lent here too when the runtime lacks it.
+  const lendNavigator = typeof globalThis.navigator === 'undefined';
+  if (lendNavigator) globalThis.navigator = { userAgent: '' };
   globalThis.AIIntegration = require('../extension/ai/ai-integration.js');
   try {
     const runLoop = (task, iterations) => {
@@ -343,6 +348,7 @@ console.log('\n--- Integration Test 6: the task is classified when no task type 
     assertEqual(followUp._goalTaskType && followUp._goalTaskType.type, 'form', 'a follow-up task is classified afresh');
   } finally {
     delete globalThis.AIIntegration;
+    if (lendNavigator) delete globalThis.navigator;
   }
 
   // Without the classifier (or with one that throws) the default window stays.
