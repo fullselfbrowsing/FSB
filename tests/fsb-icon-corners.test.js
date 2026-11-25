@@ -7,6 +7,8 @@
  *
  *   1. The icon PNGs carry the corners in their alpha. Each must equal what
  *      scripts/build-icon-corners.mjs makes of it, so a re-exported square icon fails here.
+ *      They are compared chunk for chunk with the pixel rows inflated (samePng), not byte for
+ *      byte: Node 20, which CI runs, compresses the same rows to different bytes than Node 24.
  *      Fix: node scripts/build-icon-corners.mjs
  *   2. The cut corners must hold only black. The toolbar animation rebuilds the uncut tile by
  *      painting black under the artwork, which is only lossless if the corners were black.
@@ -62,7 +64,7 @@ async function main() {
     const committed = bytes(source);
     let image = null;
     try { image = corners.decodePng(committed); } catch (e) { check(`${source} decodes`, false, e.message); continue; }
-    check(`${source} is cut with the script's corners`, Buffer.compare(committed, corners.cutCorners(committed)) === 0, fix);
+    check(`${source} is cut with the script's corners`, corners.samePng(committed, corners.cutCorners(committed)), fix);
     check(`${source} has transparent corners`, image.rgba[3] === 0 && image.rgba[image.rgba.length - 1] === 0,
       `corner alpha ${image.rgba[3]}; ${fix}`);
     const ink = corners.cornerInk(committed);

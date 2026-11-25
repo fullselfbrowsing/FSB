@@ -8,8 +8,10 @@
  * The artwork is a full-bleed black tile, so rounding it is only an alpha mask: pixels outside
  * a rounded square of radius RADIUS_128 / 128 of the side become transparent, with each edge
  * pixel's alpha set to how much of it the rounded square covers (16 x 16 samples per pixel).
- * Colour is never touched. Re-running on an already cut icon writes identical bytes, so a
- * re-exported square icon only needs this script run over it again.
+ * Colour is never touched. Re-running on an already cut icon changes nothing, so a re-exported
+ * square icon only needs this script run over it again. An icon is compared with what this
+ * script would write by samePng, not byte for byte: Node's zlib differs between versions, so
+ * the same pixels compress to different bytes on Node 20 (CI) and Node 24.
  *
  * The radius matches the rounded icon tiles the showcase draws (8/34 and 20/86 in the release
  * notes). extension/utils/action-icon.js draws its animated toolbar frames over these files and
@@ -73,32 +75,36 @@ function paeth(a, b, c) {
   return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 }
 
-/** 8-bit, non-interlaced grey, grey+alpha, RGB or RGBA PNG -> { width, height, rgba }. */
-export function decodePng(bytes) {
+/** PNG bytes -> its chunks, up to and including IEND, as { type, body }. */
+function readChunks(bytes) {
   if (!Buffer.from(bytes.subarray(0, 8)).equals(SIGNATURE)) throw new Error('not a PNG');
+  const chunks = [];
   let offset = 8;
-  let header = null;
-  const idat = [];
   while (offset < bytes.length) {
     const length = bytes.readUInt32BE(offset);
     const type = bytes.toString('latin1', offset + 4, offset + 8);
-    const body = bytes.subarray(offset + 8, offset + 8 + length);
-    if (type === 'IHDR') {
-      header = { width: body.readUInt32BE(0), height: body.readUInt32BE(4), depth: body[8], colorType: body[9], interlace: body[12] };
-    } else if (type === 'IDAT') {
-      idat.push(body);
-    } else if (type === 'IEND') {
-      break;
-    }
+    chunks.push({ type, body: bytes.subarray(offset + 8, offset + 8 + length) });
+    if (type === 'IEND') break;
     offset += 12 + length;
   }
-  if (!header) throw new Error('PNG has no IHDR');
+  return chunks;
+}
+
+const idatOf = (chunks) => Buffer.concat(chunks.filter((c) => c.type === 'IDAT').map((c) => c.body));
+
+/** 8-bit, non-interlaced grey, grey+alpha, RGB or RGBA PNG -> { width, height, rgba }. */
+export function decodePng(bytes) {
+  const chunks = readChunks(bytes);
+  const ihdr = chunks.find((c) => c.type === 'IHDR');
+  if (!ihdr) throw new Error('PNG has no IHDR');
+  const body = ihdr.body;
+  const header = { width: body.readUInt32BE(0), height: body.readUInt32BE(4), depth: body[8], colorType: body[9], interlace: body[12] };
   const channels = CHANNELS[header.colorType];
   if (header.depth !== 8 || !channels || header.interlace !== 0) {
     throw new Error(`unsupported PNG (depth ${header.depth}, colour type ${header.colorType}, interlace ${header.interlace})`);
   }
   const { width, height } = header;
-  const raw = inflateSync(Buffer.concat(idat));
+  const raw = inflateSync(idatOf(chunks));
   const stride = width * channels;
   const pixels = new Uint8Array(height * stride);
   for (let y = 0; y < height; y++) {
@@ -124,6 +130,22 @@ export function decodePng(bytes) {
     rgba.set([r, g, b, channels === 2 ? p[1] : channels === 4 ? p[3] : 255], i * 4);
   }
   return { width, height, rgba };
+}
+
+/**
+ * Whether two PNGs are the same file apart from how zlib compressed the pixel rows: the same
+ * chunks in the same order, the same bytes in every chunk but IDAT, and IDAT data that
+ * inflates to the same rows. zlib builds differ, and Node 20, which CI runs, compresses the
+ * same rows to different bytes than Node 24 does, so a re-encoded icon only matches byte for
+ * byte on the Node that wrote it. Comparing only the decoded pixels would be too loose: it
+ * would let a re-export through with editor metadata, another colour type or other filters.
+ */
+export function samePng(a, b) {
+  const x = readChunks(a);
+  const y = readChunks(b);
+  return x.length === y.length
+    && x.every((c, i) => c.type === y[i].type && (c.type === 'IDAT' || c.body.equals(y[i].body)))
+    && inflateSync(idatOf(x)).equals(inflateSync(idatOf(y)));
 }
 
 /** { width, height, rgba } -> PNG bytes. Grey+alpha when every pixel is grey, else RGBA. */
@@ -228,9 +250,18 @@ export function invertLuma(bytes) {
 function main() {
   const check = process.argv.includes('--check');
   const stale = [];
-  const write = (relative, bytes) => {
+  // A file is current when it holds these bytes or, for an icon this script encodes, the same
+  // PNG (samePng); a file that is not a readable PNG is out of date. Copies pass exact, since
+  // copying involves no zlib and they must stay byte-identical to their source.
+  const current = (file, bytes, exact) => {
+    if (!existsSync(file)) return false;
+    const held = readFileSync(file);
+    if (held.equals(bytes)) return true;
+    try { return !exact && samePng(held, bytes); } catch { return false; }
+  };
+  const write = (relative, bytes, exact = false) => {
     const file = path.join(ROOT, relative);
-    if (existsSync(file) && Buffer.compare(readFileSync(file), bytes) === 0) return;
+    if (current(file, bytes, exact)) return;
     stale.push(relative);
     if (!check) writeFileSync(file, bytes);
   };
@@ -241,10 +272,13 @@ function main() {
     if (ink > MAX_CORNER_LUMA) {
       throw new Error(`${source}: the corners carry artwork (brightness ${ink}), so cutting them would lose it`);
     }
-    cut[source] = cutCorners(bytes);
+    const recut = cutCorners(bytes);
+    // An icon that is already cut keeps its own bytes, so the copies made from it match it
+    // byte for byte whichever Node runs this.
+    cut[source] = samePng(bytes, recut) ? bytes : recut;
     write(source, cut[source]);
   }
-  for (const [copy, source] of Object.entries(COPIES)) write(copy, cut[source]);
+  for (const [copy, source] of Object.entries(COPIES)) write(copy, cut[source], true);
   for (const [light, source] of Object.entries(LIGHT)) write(light, invertLuma(cut[source]));
   if (check) {
     if (stale.length) {
