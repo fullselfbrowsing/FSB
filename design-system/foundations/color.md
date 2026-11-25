@@ -51,7 +51,7 @@ Key values:
 
 ## Known gaps
 
-- **Product pages repeat the dark values.** The side panel, popup and control panel still declare near-black surfaces in their own stylesheets. The core now carries the same near-black ramp ([0011](../decisions/0011-product-dark-is-near-black.md)), so those blocks can be removed; `sidepanel.css` is hash-pinned.
+- **Product pages keep their own dark blocks.** The control panel's dark surfaces now equal the core's near-black ramp ([0011](../decisions/0011-product-dark-is-near-black.md)) and can be removed with no visible change. The side panel and popup differ: `--bg-primary` is the page base `#050505` (the core's alias gives `#0d0d0d`), `--bg-tertiary` is `#121212` (core `#141414`) and `--border-color` is white at 6% (core 8%). Removing their blocks lifts the chat's surfaces, so it is a design decision; `sidepanel.css` is hash-pinned.
 - **The site re-declares four product names** with its own values: `--fsb-primary-soft`, `--fsb-border-subtle`, `--fsb-border-accent`, `--fsb-focus-ring`. They should become site names.
 - **The danger red differs** between palettes: `#ef4444` on the site, `#dc2626` in the product core, `#e57373` in the control panel's dark mode.
 - **Off-palette colours:**

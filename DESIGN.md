@@ -293,7 +293,7 @@ Rules: `@design-system/foundations/accessibility.md`.
 
 These are open, or decided and not yet applied. Each has a home in a foundation or surface page.
 
-1. **Product pages repeat the dark values.** The side panel, popup and control panel still declare near-black in their own stylesheets. The core now carries the same values ([decision 0011](design-system/decisions/0011-product-dark-is-near-black.md)), so those blocks can be removed. `sidepanel.css` is hash-pinned.
+1. **Product pages keep their own dark blocks.** The control panel's dark surfaces now equal the core ([decision 0011](design-system/decisions/0011-product-dark-is-near-black.md)) and can be removed with no visible change. The side panel's and popup's cannot: in dark mode they set `--bg-primary` to the page base `#050505` (the core's alias gives `#0d0d0d`), `--bg-tertiary` to `#121212` (core `#141414`) and `--border-color` to white at 6% (core 8%). Removing them lifts the chat's surfaces, so keeping that flatter look is a design decision, not a cleanup. `sidepanel.css` is hash-pinned.
 2. **The showcase never loads Poppins.** Its Content-Security-Policy blocks Google Fonts and nothing is self-hosted, so the wordmark's F and S render in the system font.
 3. **Wordmark B height drifts.** It is 0.74em on the site (canonical), 0.68em in onboarding and 0.715em in release notes.
 4. **Space Mono is still in shipped CSS** until the migration in [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md) lands: onboarding, the control panel's version tag, six showcase pages and the release-notes template's inline styles.

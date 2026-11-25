@@ -112,7 +112,7 @@ No test hashes popup.html or popup.css. Edits are cheap, but the token block mus
 - **No reduced motion** anywhere on the page, and `.message.new` overshoots, against the no-bounce rule.
 - **Copied tokens.** The 23-token block is a copy of sidepanel.css; nothing checks that the two stay equal.
 - **Shared problems with the side panel:**
-  - near-black overrides that now repeat the core ([0011](../decisions/0011-product-dark-is-near-black.md));
+  - a dark block that differs from the core's ramp ([0011](../decisions/0011-product-dark-is-near-black.md)): `#050505` primary, `#121212` tertiary and 6% hairlines, the same values as the side panel;
   - markdown.css replacing the dark message tones with literals;
   - `showChromepageError()` appending to a `#messages` element that does not exist, so the restricted-page notice throws.
 

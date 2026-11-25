@@ -148,7 +148,12 @@ The design checks also hold this surface. [`check-style-literals.mjs`](../../scr
 
 ## Known issues
 
-- **Repeated dark values.** The page's near-black overrides now repeat the core's dark ramp ([0011](../decisions/0011-product-dark-is-near-black.md)), and delegated-run cards sit at `#0d0d0d` on the `#050505` panel. The overrides can go in a cleanup; sidepanel.css is hash-pinned, so that change recomputes the pin.
+- **Its own dark block.** The page's dark overrides differ from the core's ramp ([0011](../decisions/0011-product-dark-is-near-black.md)):
+  - `--bg-primary` is the page base `#050505` (the core's alias gives `#0d0d0d`);
+  - `--bg-tertiary` is `#121212` (core `#141414`);
+  - `--border-color` is white at 6% (core 8%).
+
+  Only `--bg-secondary` and `--border-hover` repeat the core. Delegated-run cards read the core tokens directly, so they sit at `#0d0d0d` on the `#050505` panel. Dropping the block would lift the chat's surfaces to `#0d0d0d`, which is a design decision, not a cleanup. sidepanel.css is hash-pinned, so any edit recomputes the pin.
 - **markdown.css uses no tokens.** Its `[data-theme="dark"] .message.system`, `.message.ai`, `.message.error` and `.message.action` rules load after sidepanel.css with equal specificity. In dark mode they replace the page's tones with literals: `.message.system` becomes `#303030`, `.message.error` `#451a1a` and `.message.action` `#1a2e1a`. Its links are blue (`#1a73e8`) and its inline code pink (`#e83e8c`).
 - **44px only for delegated controls.** The header and composer buttons stay under 44px, and a test pins the composer at 36px.
 - **Off-brand colours.**
