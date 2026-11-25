@@ -3285,7 +3285,14 @@ async function runCliOutput() {
     `Native messaging host is not installed.\nRemoved registrations: none\nExpected location: ${helperRoot}\n`,
     'uninstall-all with nothing installed reports zero removals',
   );
-  for (const [reason, expected] of [['split-state', 'split-state'], [sensitive, 'unavailable']]) {
+  for (const [reason, expected] of [
+    ['split-state', 'split-state'],
+    // Retryable: a browser was starting the helper, or another run took the lock over.
+    ['wake-in-progress', 'wake-in-progress'],
+    ['wake-lock-failed', 'wake-lock-failed'],
+    ['lock-lost', 'lock-lost'],
+    [sensitive, 'unavailable'],
+  ]) {
     const refusedAll = await captureCliAction(() => cli.runUninstall(
       { 'native-host': true },
       operationsWith(null, null, {

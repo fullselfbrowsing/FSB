@@ -105,6 +105,7 @@ const NATIVE_HOST_REFUSAL_REASONS = new Set([
   'invalid-request',
   'invalid-source-package',
   'invalid-state',
+  'lock-lost',
   'locked',
   'network-attempted',
   'ownership-mismatch',
@@ -127,6 +128,8 @@ const NATIVE_HOST_REFUSAL_REASONS = new Set([
   'unavailable',
   'unsupported-architecture',
   'version-mismatch',
+  'wake-in-progress',
+  'wake-lock-failed',
 ]);
 const HELPER_LABEL = "FSB's local helper (native messaging host)";
 const DOCTOR_HINT = 'Run npx -y fsb-mcp-server@latest doctor for details.';
