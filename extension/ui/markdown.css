@@ -180,7 +180,7 @@
   background: #fafafa;
   color: #171717;
   border-bottom-left-radius: 6px;
-  border-left: 3px solid #ff6b35;
+  border-left: 3px solid var(--fsb-primary);
   padding: 14px 16px;
   font-size: 14px;
   line-height: 1.5;
@@ -269,7 +269,7 @@
 [data-theme="dark"] .message.ai-completion {
   background: #262626;
   color: #e5e5e5;
-  border-left-color: #ff6b35;
+  border-left-color: var(--fsb-primary);
 }
 
 /* ============================================
@@ -286,7 +286,7 @@
 [data-theme="dark"] .message.ai {
   background: #292929;
   color: #d4d4d4;
-  border-left-color: #ff6b35;
+  border-left-color: var(--fsb-primary);
 }
 
 [data-theme="dark"] .message.error {

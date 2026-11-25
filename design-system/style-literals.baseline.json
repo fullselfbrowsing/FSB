@@ -14,7 +14,7 @@
       "tokenForks": 0
     },
     "extension/ui/markdown.css": {
-      "colors": 44,
+      "colors": 41,
       "zIndex": 0,
       "fontFamily": 1,
       "tokenForks": 0
@@ -26,19 +26,19 @@
       "tokenForks": 0
     },
     "extension/ui/options.css": {
-      "colors": 160,
+      "colors": 145,
       "zIndex": 15,
       "fontFamily": 9,
-      "tokenForks": 22
+      "tokenForks": 17
     },
     "extension/ui/popup.css": {
-      "colors": 40,
+      "colors": 28,
       "zIndex": 0,
       "fontFamily": 2,
       "tokenForks": 26
     },
     "extension/ui/sidepanel.css": {
-      "colors": 163,
+      "colors": 149,
       "zIndex": 2,
       "fontFamily": 7,
       "tokenForks": 26
@@ -92,19 +92,19 @@
       "tokenForks": 9
     },
     "showcase/angular/src/app/pages/dashboard/dashboard-page.component.scss": {
-      "colors": 137,
+      "colors": 136,
       "zIndex": 18,
       "fontFamily": 18,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/home/home-page.component.scss": {
-      "colors": 35,
+      "colors": 33,
       "zIndex": 4,
       "fontFamily": 13,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/lattice/lattice-page.component.scss": {
-      "colors": 69,
+      "colors": 65,
       "zIndex": 1,
       "fontFamily": 16,
       "tokenForks": 5
@@ -140,7 +140,7 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/release-notes/release-notes-page.component.scss": {
-      "colors": 87,
+      "colors": 84,
       "zIndex": 4,
       "fontFamily": 11,
       "tokenForks": 0
@@ -158,7 +158,7 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/support/support-page.component.scss": {
-      "colors": 6,
+      "colors": 5,
       "zIndex": 0,
       "fontFamily": 0,
       "tokenForks": 0

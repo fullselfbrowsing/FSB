@@ -39,7 +39,7 @@
 .lat-eyebrow {
   align-items: center;
   background: rgba(232, 238, 252, 0.06);
-  border: 1px solid rgba(232, 238, 252, 0.14);
+  border: 1px solid var(--lat-line);
   border-radius: 999px;
   color: #c7d2e8;
   display: inline-flex;
@@ -134,20 +134,20 @@
 .lat-btn-light {
   background: #f5f8ff;
   border: 1px solid #f5f8ff;
-  color: #0b1220;
+  color: var(--navy);
 }
 
 .lat-btn-light:hover {
   background: #fff;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
-  color: #0b1220;
+  color: var(--navy);
   transform: translateY(-2px);
 }
 
 .lat-btn-ghost {
   background: rgba(232, 238, 252, 0.05);
   border: 1px solid rgba(232, 238, 252, 0.18);
-  color: #e8eefc;
+  color: var(--node);
 }
 
 .lat-btn-ghost:hover {

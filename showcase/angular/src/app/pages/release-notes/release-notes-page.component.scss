@@ -390,12 +390,12 @@ img[src*="xai"] { filter: invert(1); }
   .ps-mini-ul{font-family:'Space Mono',monospace;font-size:4px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
   .ps-mini-colon{font-family:'Poppins',system-ui,sans-serif;font-weight:300;font-size:10px;padding-top:4px}
   .ps-frame-src .ps-mini-badge{background:rgba(255,107,53,0.12);border:1px solid rgba(255,107,53,0.34);color:#ff8c42}
-  .ps-frame-src .ps-mini-dot{background:#ff6b35}
+  .ps-frame-src .ps-mini-dot{background:var(--primary)}
   .ps-frame-src .ps-mini-word .pro{color:#f6efe9}
-  .ps-frame-src .ps-mini-word .rest{color:#ff6b35}
+  .ps-frame-src .ps-mini-word .rest{color:var(--primary)}
   .ps-frame-src .ps-mini-sub{color:#cabfb6}
   .ps-frame-src .ps-mini-num{background:rgba(246,239,233,0.03);border:1px solid rgba(255,241,232,0.10);color:#f6efe9}
-  .ps-frame-src .ps-mini-secs{color:#ff6b35}
+  .ps-frame-src .ps-mini-secs{color:var(--primary)}
   .ps-frame-src .ps-mini-ul{color:#9a9088}
   .ps-frame-src .ps-mini-colon{color:rgba(255,107,53,0.55)}
   .ps-frame-mir .ps-mini-badge{background:rgba(234,235,238,0.06);border:1px solid rgba(234,235,238,0.16);color:#a7abb1}

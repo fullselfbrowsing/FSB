@@ -777,11 +777,11 @@ const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
 assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
   'the session-replay CSS block has stable boundaries');
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
-// Rolled when the prefers-reduced-motion block gained .pixel-letter coverage:
-// the block already silenced the delegation spinner and status dot, but the
-// automation loader kept animating for users who asked it not to.
+// Rolled when colour literals that already equalled a core token became
+// var(--fsb-*) references (status dots, mic states, focus outline, retry
+// button). Computed styles were compared before and after: no visible change.
 assert.equal(sha256(delegationCssSource),
-  'db8ee02f3ed61b84b9ced7af1e9c043460b4f8fa24ba222d79e235badb058ef7',
+  '118dca35af03810e26ddb2008e17b89e38378259a448bb97cffea9b067e2fc63',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

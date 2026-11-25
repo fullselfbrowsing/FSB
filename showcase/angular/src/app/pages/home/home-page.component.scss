@@ -818,14 +818,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: var(--bg-body);
   border-radius: var(--radius-sm);
   color: var(--primary);
   overflow: hidden;
-}
-
-:host-context([data-theme="light"]) .mcp-callout-icon {
-  background: #fff;
 }
 
 .mcp-callout-content h3 {
