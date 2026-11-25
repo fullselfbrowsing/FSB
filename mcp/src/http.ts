@@ -34,6 +34,13 @@ type RunningHttpServer = {
   endpoint: string;
   healthEndpoint: string;
   markServeReady: () => void;
+  /**
+   * Advertise on /health that this process honors the installer's stop
+   * request, so a refresh or uninstall asks it to leave instead of signalling.
+   */
+  advertiseStopRequests: () => void;
+  /** MCP calls (POST and DELETE on /mcp) whose response has not finished yet. */
+  activeRequestCount: () => number;
   close: () => Promise<void>;
 };
 
@@ -74,6 +81,23 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
   const sessions = new Map<string, SessionContext>();
   let closed = false;
   let serveReady = false;
+  let stopRequests = false;
+  let activeRequests = 0;
+
+  // A GET on /mcp is the client's standing notification stream and stays open
+  // for the life of the session, so it is not a call in progress. Counting it
+  // would keep the server from ever looking idle.
+  const trackActiveRequest = (res: ServerResponse): void => {
+    activeRequests += 1;
+    let released = false;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      activeRequests -= 1;
+    };
+    res.once('finish', release);
+    res.once('close', release);
+  };
 
   const server = createHttpServer((req, res) => {
     void handleRequest(req, res).catch((err: unknown) => {
@@ -133,6 +157,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
         activeHubInstanceId: options.bridge.topology.activeHubInstanceId,
         queuedMutationTools: options.queue.isRunning,
         sessions: sessions.size,
+        ...(stopRequests ? { stopRequests: 1 } : {}),
       });
       return;
     }
@@ -148,6 +173,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
       res.end('Method Not Allowed');
       return;
     }
+
+    if (req.method !== 'GET') trackActiveRequest(res);
 
     const sessionIdHeader = req.headers['mcp-session-id'];
     const sessionId = Array.isArray(sessionIdHeader) ? sessionIdHeader[0] : sessionIdHeader;
@@ -230,6 +257,10 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
     markServeReady: () => {
       if (!closed) serveReady = true;
     },
+    advertiseStopRequests: () => {
+      if (!closed) stopRequests = true;
+    },
+    activeRequestCount: () => activeRequests,
     close: async () => {
       closed = true;
       serveReady = false;

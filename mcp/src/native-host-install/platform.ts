@@ -7,6 +7,7 @@ import {
 } from '../native-host/constants.js';
 import type { NativeHostPlatform } from '../native-host/runtime-layout.js';
 import {
+  NATIVE_HOST_BROWSERS,
   NATIVE_HOST_WINDOWS_REGISTRY_KEYS,
   isNativeHostBrowser,
 } from './browser.js';
@@ -44,6 +45,19 @@ const LINUX_MANIFEST_ROOTS: Readonly<Record<NativeHostBrowser, readonly string[]
     brave: Object.freeze(['BraveSoftware', 'Brave-Browser']),
     chromium: Object.freeze(['chromium']),
   });
+
+// Per-user profile roots on Windows, below %LOCALAPPDATA%. On macOS and Linux
+// a browser's profile root is the directory that also holds its
+// NativeMessagingHosts folder.
+const WINDOWS_USER_DATA_ROOTS: Readonly<Record<NativeHostBrowser, readonly string[]>> =
+  Object.freeze({
+    chrome: Object.freeze(['Google', 'Chrome', 'User Data']),
+    edge: Object.freeze(['Microsoft', 'Edge', 'User Data']),
+    brave: Object.freeze(['BraveSoftware', 'Brave-Browser', 'User Data']),
+    chromium: Object.freeze(['Chromium', 'User Data']),
+  });
+
+const MAX_PROFILE_ENTRIES = 256;
 
 function refuse(): never {
   throw new Error('FSBNH_INSTALL_PLATFORM');
@@ -215,6 +229,43 @@ export function createNativeHostPlatformAdapter(
         );
       }
     },
+    publishBrowserRegistration: async (contents: string): Promise<void> => {
+      const exactContents = validateManifestContents(contents);
+      if (!registryRegistration) {
+        await dependencies.files.writePrivateFileAtomic(
+          layout.manifestPath,
+          exactContents,
+          NATIVE_HOST_PRIVATE_FILE_MODE,
+        );
+        return;
+      }
+      if (!dependencies.registry) refuse();
+      await requireAbsentShadow();
+      const manifest = await dependencies.files.inspectFile(
+        layout.manifestPath,
+        MAX_MANIFEST_BYTES,
+      );
+      if (manifest.status === 'absent') {
+        await dependencies.files.writePrivateFileAtomic(
+          layout.manifestPath,
+          exactContents,
+          NATIVE_HOST_PRIVATE_FILE_MODE,
+        );
+      } else if (
+        manifest.status !== 'file'
+        || manifest.path !== layout.manifestPath
+        || manifest.realPath !== layout.manifestPath
+        || manifest.contents !== exactContents
+      ) {
+        refuse();
+      }
+      await requireAbsentShadow();
+      await dependencies.registry.writeDefault(
+        registryRegistration.canonicalView,
+        registryRegistration.key,
+        Object.freeze({ type: 'REG_SZ', value: layout.manifestPath }),
+      );
+    },
     removeCanonicalRegistration: async (): Promise<void> => {
       if (registryRegistration) {
         if (!dependencies.registry) refuse();
@@ -244,4 +295,115 @@ export function createNativeHostPlatformAdapter(
       );
     },
   });
+}
+
+export interface NativeHostBrowserDetectionInput {
+  platform: NativeHostPlatform;
+  homeDirectory: string;
+  localAppData?: string;
+  extensionId: string;
+}
+
+export interface NativeHostBrowserDetectionFiles {
+  /** Entry names of a real directory, or null when it is absent or not a directory. */
+  listDirectory(pathname: string): Promise<readonly string[] | null>;
+  /** True only for a real directory, never for a link to one. */
+  isDirectory(pathname: string): Promise<boolean>;
+}
+
+/** The per-user directory that holds a browser's profiles. */
+export function resolveNativeHostBrowserUserDataRoot(
+  input: Omit<NativeHostBrowserDetectionInput, 'extensionId'>,
+  browser: NativeHostBrowser,
+): string {
+  if (!input || typeof input !== 'object') refuse();
+  assertSupportedPlatform(input.platform);
+  const platform = input.platform;
+  const api = platform === 'win32' ? win32 : posix;
+  const selected = nativeHostBrowser(browser);
+  if (platform === 'win32') {
+    return api.join(
+      normalizedAbsolute(input.localAppData, platform),
+      ...WINDOWS_USER_DATA_ROOTS[selected],
+    );
+  }
+  const homeDirectory = normalizedAbsolute(input.homeDirectory, platform);
+  return platform === 'darwin'
+    ? api.join(homeDirectory, 'Library', 'Application Support', ...DARWIN_MANIFEST_ROOTS[selected])
+    : api.join(homeDirectory, '.config', ...LINUX_MANIFEST_ROOTS[selected]);
+}
+
+/**
+ * Browsers where this user has the extension installed: a browser counts when
+ * any of its profiles holds `Extensions/<extension id>`. Only per-user
+ * profile folders are read; nothing system-wide is consulted. Unreadable
+ * folders count as "not installed". The list may be empty; callers decide
+ * the fallback.
+ */
+export async function detectFsbBrowsers(
+  input: NativeHostBrowserDetectionInput,
+  files: NativeHostBrowserDetectionFiles,
+): Promise<NativeHostBrowser[]> {
+  if (!input || typeof input !== 'object' || !files) refuse();
+  if (!/^[a-p]{32}$/u.test(String(input.extensionId))) refuse();
+  const api = input.platform === 'win32' ? win32 : posix;
+  const found: NativeHostBrowser[] = [];
+  for (const browser of NATIVE_HOST_BROWSERS) {
+    let userDataRoot: string;
+    try {
+      userDataRoot = resolveNativeHostBrowserUserDataRoot(input, browser);
+    } catch {
+      continue;
+    }
+    let entries: readonly string[] | null;
+    try {
+      entries = await files.listDirectory(userDataRoot);
+    } catch {
+      entries = null;
+    }
+    if (!entries) continue;
+    for (const entry of entries.slice(0, MAX_PROFILE_ENTRIES)) {
+      if (
+        typeof entry !== 'string'
+        || entry.length === 0
+        || entry.startsWith('.')
+        || entry.includes('/')
+        || entry.includes('\\')
+        || !isBounded(entry)
+      ) {
+        continue;
+      }
+      let present = false;
+      try {
+        present = await files.isDirectory(
+          api.join(userDataRoot, entry, 'Extensions', input.extensionId),
+        );
+      } catch {
+        present = false;
+      }
+      if (present) {
+        found.push(browser);
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * A fixed browser list for tests. It is honored only when
+ * FSB_NATIVE_HOST_TEST_MODE=1, so an inherited variable can never steer a
+ * real install.
+ */
+export function nativeHostBrowsersFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>>,
+): NativeHostBrowser[] | null {
+  if (environment.FSB_NATIVE_HOST_TEST_MODE !== '1') return null;
+  const raw = environment.FSB_NATIVE_HOST_BROWSERS;
+  if (typeof raw !== 'string') return null;
+  const browsers: NativeHostBrowser[] = [];
+  for (const candidate of raw.split(',').map((value) => value.trim()).filter(Boolean)) {
+    if (isNativeHostBrowser(candidate) && !browsers.includes(candidate)) browsers.push(candidate);
+  }
+  return browsers;
 }

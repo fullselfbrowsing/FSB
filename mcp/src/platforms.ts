@@ -422,7 +422,8 @@ export function getEntryForPlatform(platformKey: string): Record<string, unknown
   }
 }
 
-interface PlatformTargetCandidate {
+/** One config file a platform may read; most platforms have exactly one. */
+export interface PlatformTargetCandidate {
   configPath: string;
   targetLabel: string;
   variant: string | null;
@@ -441,7 +442,12 @@ function getPlatformConfigPath(platform: PlatformConfig): string | null {
   return resolved;
 }
 
-function getPlatformTargetCandidates(platformKey: string, platform: PlatformConfig): PlatformTargetCandidate[] {
+/**
+ * Every config file a platform may read on this OS, in preference order.
+ * Install writes to the first detected one; uninstall's last-client check
+ * reads all of them.
+ */
+export function getPlatformTargetCandidates(platformKey: string, platform: PlatformConfig): PlatformTargetCandidate[] {
   const configPath = getPlatformConfigPath(platform);
   if (!configPath) return [];
 

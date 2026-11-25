@@ -317,6 +317,8 @@ export interface SpawnSupervisor {
   recover(): Promise<AgentStartupRecoveryResult>;
   close(): Promise<SpawnSupervisorCloseResult>;
   journalEntryForChild(child: SupervisedChild): JournalEntry | null;
+  /** Runs that have not settled yet, including held and still-starting ones. */
+  activeCount(): number;
 }
 
 export interface SpawnSupervisorDependencies {
@@ -1161,6 +1163,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
   journalEntryForChild(child: SupervisedChild): JournalEntry | null {
     return this.entriesByPid.get(child.pid) ?? null;
+  }
+
+  // A run leaves activeRuns only once it settles, so a held run, one still
+  // spawning, and one being stopped all count. Closing now would cancel them.
+  activeCount(): number {
+    return this.activeRuns.size;
   }
 
   close(): Promise<SpawnSupervisorCloseResult> {

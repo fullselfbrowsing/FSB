@@ -234,6 +234,66 @@ for (const id of REQUIRED_IDS) {
     'WebPage JSON-LD with dateModified missing');
 }
 
+// =============================================================================
+// 7. The September 29, 2026 policy is the first Policy History entry. The
+//    "september" id already holds the September 28 text, so this entry uses
+//    "september29". Its body is one i18n unit, so it must not nest markers.
+// =============================================================================
+const SEP29_SUMMARY = '@@privacy.archive.september29.summary';
+const SEP29_BODY = '@@privacy.archive.september29.body';
+const SEP28_SUMMARY = '@@privacy.archive.september.summary';
+check('archive has the September 29 summary unit',
+  archiveHtml.includes(SEP29_SUMMARY),
+  `${SEP29_SUMMARY} missing from the archive`);
+check('archive has the September 29 body unit',
+  archiveHtml.includes(SEP29_BODY),
+  `${SEP29_BODY} missing from the archive`);
+check('the September 29 entry is the first Policy History entry',
+  archiveHtml.indexOf('<details class="policy-version">') === 0 &&
+    archiveHtml.indexOf(SEP29_SUMMARY) >= 0 &&
+    archiveHtml.indexOf(SEP28_SUMMARY) > archiveHtml.indexOf(SEP29_BODY) &&
+    archiveHtml.indexOf('<details class="policy-version">', 1) > archiveHtml.indexOf(SEP29_BODY),
+  'the september29 entry must open the archive, ahead of the september entry');
+const sep29Start = archiveHtml.indexOf(SEP29_BODY);
+const sep29End = archiveHtml.indexOf('</details>', sep29Start);
+const sep29Body = sep29Start >= 0 && sep29End > sep29Start ? archiveHtml.slice(sep29Start, sep29End) : '';
+check('the September 29 archive note names September 29, 2026',
+  /<p class="archive-note">[^<]*September 29, 2026[^<]*<\/p>/.test(sep29Body),
+  'archive note must say the text stood from September 29, 2026');
+check('the September 29 archive keeps the earlier native-host registration sentence',
+  sep29Body.includes('is registered only by an explicit action you take, by running <code [attr.translate]="\'no\'">fsb-mcp-server install --native-host</code>'),
+  'the archived body must hold the September 29 wording of the registration bullet');
+check('the September 29 archive carries no nested i18n markers',
+  !/\si18n="/.test(sep29Body.slice(sep29Body.indexOf('>') + 1)),
+  'archive bodies are one unit; nested i18n attributes break extraction');
+
+// =============================================================================
+// 8. The live registration bullet: the host is registered only by running
+//    fsb-mcp-server install, the local server never registers it, the
+//    extension cannot install it, and each registration names one origin.
+// =============================================================================
+{
+  const li1 = (html.match(/<li i18n="@@privacy\.section\.localService\.li\.1">([\s\S]*?)<\/li>/) || [])[1] || '';
+  const text = li1.replace(/<[^>]+>/g, '');
+  check('registration bullet found', Boolean(li1), 'privacy.section.localService.li.1 missing');
+  check('registration happens only when the user runs fsb-mcp-server install',
+    /registered only when you run fsb-mcp-server install\b/.test(text),
+    'the bullet must tie registration to running the install command');
+  check('the local server only refreshes an already registered host',
+    /only refreshes a host you have already registered and never registers one/.test(text),
+    'the bullet must say server start never registers the host');
+  check('the extension cannot install the host',
+    text.includes('The extension cannot install it'),
+    'the bullet must say the extension cannot install the host');
+  check('each registration names one permitted extension origin, in browsers where FSB is installed',
+    text.includes('each registration names one permitted extension origin') &&
+      /in each browser where FSB is installed/.test(text),
+    'the bullet must keep the one-origin and per-browser statements');
+  check('the bullet names the opt-out and removal commands',
+    text.includes('--no-native-host') && text.includes('fsb-mcp-server uninstall --native-host'),
+    'the bullet must say how to skip and how to remove the host');
+}
+
 console.log(`\n=== showcase-privacy-page.test results: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);
 process.exit(0);
