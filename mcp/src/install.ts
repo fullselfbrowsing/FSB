@@ -551,6 +551,17 @@ function printNativeUninstallAllResult(value: unknown): void {
     console.log(`Expected location: ${boundedNativeLocation(expectedNativeHostRoot())}`);
     return;
   }
+  // A removal can stop after some registrations are already gone; saying
+  // nothing changed would hide that those browsers can no longer reach it.
+  const removed = browserNames(result?.removedBrowsers);
+  if (removed) {
+    console.error(`Native messaging host was only partly removed: ${stableNativeRefusalReason(result?.reason)}`);
+    console.error(`Removed registrations: ${removed}`);
+    console.error(`Expected location: ${boundedNativeLocation(expectedNativeHostRoot())}`);
+    console.error('Run npx -y fsb-mcp-server@latest doctor for repair details.');
+    process.exitCode = 1;
+    return;
+  }
   printNativeHostRefusal(result?.reason, expectedNativeHostRoot());
 }
 
@@ -845,8 +856,12 @@ async function runUninstallHelperStep(
       console.log('\u25CB Kept ' + HELPER_LABEL + ': install --native-host set it up. Remove it with'
         + ' npx -y fsb-mcp-server@latest uninstall --native-host');
       return;
-    default:
-      console.error('\u26A0 ' + HELPER_LABEL + ' was not removed: ' + boundedReason(result?.reason) + '. ' + DOCTOR_HINT);
+    default: {
+      const removed = browserNames(result?.removedBrowsers);
+      console.error('\u26A0 ' + HELPER_LABEL
+        + (removed ? ' was only partly removed: ' : ' was not removed: ') + boundedReason(result?.reason) + '. '
+        + (removed ? 'Removed registrations: ' + removed + '. ' : '') + DOCTOR_HINT);
+    }
   }
 }
 

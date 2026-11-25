@@ -2902,6 +2902,8 @@ async function runCliRouting() {
     for (const [label, results, expectedOutput, stream] of [
       ['absent', { uninstallAll: { outcome: 'absent', reason: 'absent', removedBrowsers: [] } }, null, null],
       ['refused', { uninstallAll: { outcome: 'refused', reason: 'daemon-busy', removedBrowsers: [] } }, 'was not removed: daemon-busy', 'stderr'],
+      ['unfinished', { uninstallAll: { outcome: 'refused', reason: 'boundary-changed', removedBrowsers: ['chrome'] } },
+        'was only partly removed: boundary-changed. Removed registrations: Chrome.', 'stderr'],
       ['throwing', { uninstallAllThrows: true }, 'was not removed: unavailable', 'stderr'],
     ]) {
       fixture.write('.codex/config.toml', CODEX_WITH_FSB);
@@ -3304,6 +3306,24 @@ async function runCliOutput() {
       refusedAll.stderr,
       `Native messaging host was not changed: ${expected}\nExpected location: ${helperRoot}\nRun npx -y fsb-mcp-server@latest doctor for repair details.\n`,
       `uninstall-all refusal (${expected}) prints only the stable reason, location and doctor guidance`,
+    );
+  }
+  {
+    // A removal that stopped after some registrations were already gone says
+    // which, instead of claiming nothing changed.
+    const partial = await captureCliAction(() => cli.runUninstall(
+      { 'native-host': true },
+      operationsWith(null, null, {
+        uninstallAll: { outcome: 'refused', reason: 'boundary-changed', removedBrowsers: ['edge', 'chrome', sensitive] },
+      }),
+    ));
+    equal(partial.exitCode, 1, 'a partial uninstall-all exits nonzero');
+    equal(partial.stdout, '', 'a partial uninstall-all prints nothing optimistic');
+    equal(
+      partial.stderr,
+      'Native messaging host was only partly removed: boundary-changed\nRemoved registrations: Chrome, Edge\n'
+        + `Expected location: ${helperRoot}\nRun npx -y fsb-mcp-server@latest doctor for repair details.\n`,
+      'a partial uninstall-all names the registrations it removed before it stopped',
     );
   }
   {
