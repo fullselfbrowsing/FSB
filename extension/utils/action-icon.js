@@ -1558,7 +1558,11 @@
         return;
       }
       if (animating && resolved && STATES[resolved]) {
-        playFrames(resolved);
+        // A loop that already has a clock on this worker carries on from where
+        // it is, so the beat never jumps the icon or the status pill back to
+        // frame 0. A fresh worker has no clock yet and starts the loop over.
+        if (framesFor(resolved) && startTime) startLoop();
+        else playFrames(resolved);
       } else {
         // Nothing is owed, so the beat that woke us retires itself here. This is
         // also the self-heal for an alarm stranded by an earlier generation.
@@ -1592,7 +1596,10 @@
     if (!best) return null;
     // A claim restored from storage has no recorded start; it begins now.
     if (!claimSince[bestKey]) claimSince[bestKey] = Date.now();
-    var startedAt = animating && resolved === best && startTime ? startTime : claimSince[bestKey];
+    // Until this form's frames are built, the icon's clock still belongs to the
+    // form it is leaving, so the pill takes the claim's own start meanwhile.
+    var startedAt = animating && resolved === best && startTime && framesFor(best)
+      ? startTime : claimSince[bestKey];
     return { form: STATES[best].form, startedAt: startedAt };
   }
 

@@ -2317,6 +2317,47 @@ const cutOf = (group, size) => {
   }
 
   // -------------------------------------------------------------------------
+  console.log('\nICON-24: the status pill keeps the icon\'s clock');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    w.api.noteActivity(4, 'orbit');
+    await flush();
+    const before = w.api.getMotion(4);
+    assert(!!before && before.form === 'orbit', 'orbiting before the watchdog beat');
+    w.advance(1700);
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    await w.api.repair();
+    await flush();
+    const after = w.api.getMotion(4);
+    assert(!!after && after.startedAt === before.startedAt, 'a watchdog beat on a healthy loop keeps its start time');
+    assert(!heard.some((h) => h.tabId === 4 && h.motion && h.motion.startedAt !== before.startedAt),
+      'so the status pill is never told to start its cycle over');
+    assertEq(w.timerCount(), 1, 'and the loop is still running');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    w.api.noteActivity(7, 'sweep');
+    await flush();
+    w.advance(800);
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    const orbitAt = w.nowValue();
+    w.api.noteActivity(7, 'orbit');
+    await flush();
+    const orbits = heard.filter((h) => h.tabId === 7 && h.motion && h.motion.form === 'orbit');
+    assert(orbits.length >= 1, 'the pill hears the tab move to orbit');
+    assert(orbits.every((h) => h.motion.startedAt >= orbitAt),
+      'while the orbit frames build, the pill never gets the sweep\'s start time');
+    assert(w.api.getMotion(7).startedAt >= orbitAt, 'and the orbit starts no earlier than its claim');
+  }
+
+  // -------------------------------------------------------------------------
   console.log('\n=========================================');
   console.log('action-icon-behavior.test.js results');
   console.log('  passed:', passed);
