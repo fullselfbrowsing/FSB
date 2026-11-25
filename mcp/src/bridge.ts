@@ -235,6 +235,9 @@ export class WebSocketBridge {
   private relayCapabilities = new Map<string, Set<BridgeCapability>>();
   private activeExtRequests = new Map<string, ActiveExtRequest>();
   private messageOrigin = new Map<string, string>(); // msgId -> instanceId | "local"
+  // Relay messages still unanswered when their extension socket was replaced,
+  // msgId -> relay instanceId, dropped once that socket closes.
+  private relayRoutesOnReplacedSocket = new WeakMap<WsWebSocket, Map<string, string>>();
   private handshakeTimers = new Map<WsWebSocket, ReturnType<typeof setTimeout>>();
   private acceptedSocketMetadata = new WeakMap<WsWebSocket, AcceptedSocketMetadata>();
   private extensionLivenessTimer: ReturnType<typeof setInterval> | null = null;
@@ -1007,6 +1010,14 @@ export class WebSocketBridge {
         origin: this.acceptedSocketMetadata.get(this.extensionClient)?.browserOrigin ?? null,
       });
       this._abortRoutesForOrigin(this.extensionClient);
+      // Every relay message waiting here went to the socket being replaced,
+      // since relay messages only ever go to the current one. They stay routed
+      // while it closes, so a late answer still reaches its relay.
+      const relayRoutes = new Map<string, string>();
+      for (const [msgId, origin] of this.messageOrigin) {
+        if (origin !== 'local') relayRoutes.set(msgId, origin);
+      }
+      if (relayRoutes.size > 0) this.relayRoutesOnReplacedSocket.set(this.extensionClient, relayRoutes);
       this.extensionClient.close();
     }
 
@@ -1028,7 +1039,10 @@ export class WebSocketBridge {
     });
 
     ws.on('close', (code: number) => {
-      if (this.extensionClient !== ws) return;
+      if (this.extensionClient !== ws) {
+        this._dropRelayRoutesOnReplacedSocket(ws);
+        return;
+      }
       this._stopExtensionLiveness();
 
       // The rejection message below stays literal so the sw_evicted recovery
@@ -1554,6 +1568,21 @@ export class WebSocketBridge {
     route.settled = true;
     this.activeExtRequests.delete(route.id);
     this._sendExtResponse(route.originSocket, response);
+  }
+
+  /**
+   * A replaced extension socket has closed, so nothing it was sent can be
+   * answered any more. Relays find out when their calls time out; an entry
+   * left here would keep isIdle() false for good, blocking step-down,
+   * uninstall and hub handover.
+   */
+  private _dropRelayRoutesOnReplacedSocket(ws: WsWebSocket): void {
+    const relayRoutes = this.relayRoutesOnReplacedSocket.get(ws);
+    if (!relayRoutes) return;
+    this.relayRoutesOnReplacedSocket.delete(ws);
+    for (const [msgId, relayId] of relayRoutes) {
+      if (this.messageOrigin.get(msgId) === relayId) this.messageOrigin.delete(msgId);
+    }
   }
 
   private _abortRoutesForOrigin(originSocket: WsWebSocket): void {
