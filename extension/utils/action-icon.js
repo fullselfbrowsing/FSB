@@ -113,6 +113,14 @@
   var CAP_PING_ALPHA = 0.55;
   var CAP_PING_STOP = 0.7;           // the keyframe's 70% stop
 
+  // ---- Tile edge (white tile only) ----------------------------------------
+  // A white tile on Chrome's white toolbar has no visible edge, so the mark
+  // floats loose. A neutral hairline traces the tile's rounded outline from the
+  // inside -- the tile is full bleed, so there is no room outside it for a
+  // shadow. One CSS pixel at either density, scaled like the capability ring.
+  var EDGE_W_RATIO = 0.0625;         // 1px at 16, 2px at 32
+  var EDGE_W_MIN = 1;
+
   var INTENT_KEY = 'fsbActionIconIntent';
   var ANIMATIONS_KEY = 'animatedActionHighlights';
   // Install-scoped, so it outlives the session record above. Dimming means "the
@@ -151,13 +159,14 @@
   // worker cannot read, so options.js, sidepanel.js and popup.js copy it here.
   //
   // tint and glow are the breathe's two blend steps (drawMarkGlow); each tile's
-  // pair leaves that tile's own plate untouched.
+  // pair leaves that tile's own plate untouched. edge is the hairline drawTileEdge
+  // traces round the tile; the black tile needs none.
   var THEME_KEY = 'fsbThemePreference';
   var TILES = {
     dark: { glyphs: GLYPH_PATHS, plate: PLATE_COLOR, track: SWEEP_TRACK_COLOR, tint: 'multiply', glow: 'lighter' },
     // The track is the dark tile's 10% white turned to 10% black; the status pill
-    // it quotes has no light form to copy.
-    light: { glyphs: LIGHT_GLYPH_PATHS, plate: '#ffffff', track: 'rgba(0, 0, 0, 0.1)', tint: 'screen', glow: 'multiply' }
+    // it quotes has no light form to copy. The edge reads as #cccccc on the plate.
+    light: { glyphs: LIGHT_GLYPH_PATHS, plate: '#ffffff', track: 'rgba(0, 0, 0, 0.1)', tint: 'screen', glow: 'multiply', edge: 'rgba(0, 0, 0, 0.2)' }
   };
 
   // Normalized fade width expressed within the bead's own 0..1 span.
@@ -433,6 +442,22 @@
     ctx.rect(inset, inset, span, span);
   }
 
+  // The white tile's hairline, inset by half its width so its outside edge is
+  // the tile's own rounded edge. It belongs to the plate: drawn right after the
+  // glyph, so the orbit, sweep and ring paint over it and the breathe never
+  // fades it. The path is closed and smooth, so cap and join never show; leaving
+  // them alone keeps the motion strokes that follow identical on either tile.
+  function drawTileEdge(ctx, size, look, alpha) {
+    if (!look.edge) return;
+    var width = Math.max(EDGE_W_MIN, Math.round(EDGE_W_RATIO * size));
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = width;
+    ctx.strokeStyle = look.edge;
+    tilePath(ctx, size, width / 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   // The orbit's centreline: the tile's outline inset by half the stroke, so the
   // bead's outside edge runs flush with the tile along the sides and round the
   // corners. Eight runs, clockwise from where the top side's straight run
@@ -645,9 +670,10 @@
   // Renders one frame at every shipped size, each from its own source bitmap.
   // The only background is the artwork's own tile, rebuilt as a square under it
   // (drawGlyph). A service worker cannot read the toolbar theme, so the tile is
-  // black unless FSB's own theme is set to Light (TILES). The last step cuts each
-  // undimmed frame with the artwork's alpha, so its rounded corners are
-  // pixel-for-pixel the static icon's in every state.
+  // black unless FSB's own theme is set to Light (TILES); the white tile also gets
+  // its edge (drawTileEdge), at half strength when dimmed like the artwork. The
+  // last step cuts each undimmed frame with the artwork's alpha, so its rounded
+  // corners are pixel-for-pixel the static icon's in every state.
   //
   // Exactly one clearRect per frame, which opens it: the test harness splits its
   // recorded op log on clearRect to reconstruct frames. The glyph is the first
@@ -661,6 +687,7 @@
       var progress = spec.progress || 0;
       ctx.clearRect(0, 0, size, size);
       drawGlyph(ctx, size, bitmaps[size], spec, look);
+      drawTileEdge(ctx, size, look, spec.dimmed === true ? DIM_ALPHA : 1);
       if (spec.form === 'orbit') strokeOrbit(ctx, size, spec.palette, progress);
       else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress, look);
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);

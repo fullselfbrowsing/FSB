@@ -28,7 +28,8 @@
  *   ICON-20: setIcon is serialized, phase-correct, and failure-backoff bounded
  *   ICON-21: the animation preference is authoritative across every ingress
  *   ICON-22: each tab reports its motion and start time to the status pill
- *   ICON-23: FSB's Light theme puts every state on the white tile; nothing else does
+ *   ICON-23: FSB's Light theme puts every state on the white tile, edged so it shows on a
+ *            white toolbar; nothing else does
  *
  * ICON-01 reads the canonical sources directly, so a timing or palette change in
  * visual-feedback.js that the icon does not follow fails here. ICON-14/15 derive
@@ -2099,6 +2100,34 @@ const cutOf = (group, size) => {
   const onTile = (image, light, size) => !!image && image.plate === (light ? '#ffffff' : '#000000')
     && fromPair(image.src, light, size);
   const lightFetches = (w) => w.fetches.filter((u) => /_light\.png$/.test(u)).length;
+  // The white tile's edge: a neutral hairline, 1px at 16 and 2px at 32, traced
+  // as the tile's rounded outline inset by half its width (roundRectPath records
+  // moveTo(x + r, y) and then the four corners as arcTo). It is a frame's first
+  // stroke, drawn after the mark and so before any motion stroke and the cut.
+  const EDGE_COLOR = 'rgba(0, 0, 0, 0.2)';
+  const edgeBox = (stroke) => {
+    const p = (stroke && stroke.path) || [];
+    const move = p.find((e) => e.kind === 'moveTo');
+    const corners = p.filter((e) => e.kind === 'arcTo');
+    if (!move || corners.length !== 4) return null;
+    const x = corners[3].x1;
+    return { x, y: move.y, w: corners[0].x1 - x, h: corners[1].y1 - move.y, r: corners[0].r };
+  };
+  const hasEdge = (group, size, alpha) => {
+    const strokes = opsOf(group, 'stroke');
+    const edge = strokes[0];
+    const width = size === 16 ? 1 : 2;
+    const box = edgeBox(edge);
+    const mark = (group || []).findIndex((o) => o.op === 'drawImage' && o.source === 'bitmap');
+    return !!edge && edge.strokeStyle === EDGE_COLOR && edge.lineWidth === width && edge.alpha === alpha
+      && strokes.filter((s) => s.strokeStyle === EDGE_COLOR).length === 1
+      && !!box && box.x === width / 2 && box.y === width / 2
+      && box.w === size - width && box.h === size - width
+      && Math.abs(box.r - (CORNER_RATIO * size - width / 2)) < 1e-9
+      && mark !== -1 && mark < group.indexOf(edge);
+  };
+  // A light frame's strokes past its edge: the motion's own.
+  const motionStrokes = (frames, light) => JSON.stringify(frames.map((f) => opsOf(f, 'stroke').slice(light ? 1 : 0)));
 
   {
     // The pages keep the choice in localStorage, out of the worker's reach, and
@@ -2124,6 +2153,12 @@ const cutOf = (group, size) => {
     const label = value === undefined ? 'no stored theme' : 'a stored ' + JSON.stringify(value);
     assert(onTile(lastShown(w, 16), false, 16) && onTile(lastShown(w, 32), false, 32), `${label} keeps the black tile`);
     assertEq(lightFetches(w), 0, `${label} never fetches the light pair`);
+    // The fifth resting frame is the ring's kickoff, whose violet stroke is the ring.
+    assert([16, 32].every((size) => {
+      const resting = w.groups(size);
+      return resting.length === 5 && resting.slice(0, 4).every((f) => opsOf(f, 'stroke').length === 0)
+        && resting.every((f) => opsOf(f, 'stroke').every((s) => s.strokeStyle !== EDGE_COLOR));
+    }), `${label}: the black tile draws no edge`);
   }
 
   {
@@ -2145,6 +2180,14 @@ const cutOf = (group, size) => {
       const faded = opsOf(dimmed, 'drawImage');
       assert(faded.length === 1 && fromPair(faded[0].src, true, size) && faded[0].alpha === 0.5,
         `${size}px: it is only the light artwork at half strength, with no cut`);
+      // Resting frames render as idle:on, idle:off, watching:on, watching:off, ring:kickoff.
+      const resting = w.groups(size);
+      assertEq(resting.length, 5, `${size}px: the five resting frames render`);
+      assert(hasEdge(resting[0], size, 1), `${size}px: idle traces the white tile's edge`);
+      assert(hasEdge(resting[1], size, 0.5), `${size}px: dimmed, the edge fades with the artwork`);
+      assert(hasEdge(resting[2], size, 1) && hasEdge(resting[3], size, 0.5),
+        `${size}px: so does the resting watch, lit and dimmed`);
+      assert(hasEdge(resting[4], size, 1), `${size}px: and the ring's first frame, under the violet`);
     }
     assert(onTile(lastShown(w, 16), true, 16) && onTile(lastShown(w, 32), true, 32),
       'the toolbar shows the white tile at both sizes');
@@ -2170,16 +2213,23 @@ const cutOf = (group, size) => {
     assert(ls[16].every((f) => { const c = cutOf(f, 16); return !!c && fromPair(c.src, true, 16); })
       && ls[32].every((f) => { const c = cutOf(f, 32); return !!c && fromPair(c.src, true, 32); }),
       'and ends with the light cut at 16px and 32px');
+    assert([16, 32].every((size) => ls[size].every((f) => hasEdge(f, size, 1))),
+      'every light sweep frame traces the edge');
 
-    const strokes = (frames) => JSON.stringify(frames.map((f) => opsOf(f, 'stroke')));
     const lo = await renderActivity(light, 'orbit', 2);
     const dorb = await renderActivity(dark, 'orbit', 2);
-    assert(lo[32].length > 0 && strokes(lo[32]) === strokes(dorb[32]) && strokes(lo[16]) === strokes(dorb[16]),
-      'the orbit bead is stroke-for-stroke the same on either tile');
+    assert(lo[32].length > 0 && motionStrokes(lo[32], true) === motionStrokes(dorb[32], false)
+      && motionStrokes(lo[16], true) === motionStrokes(dorb[16], false),
+      'past the edge, the orbit bead is stroke-for-stroke the same on either tile');
+    assert([16, 32].every((size) => lo[size].every((f) => hasEdge(f, size, 1))),
+      'and every light orbit frame draws the edge first, so the bead passes over it');
     const lr = await renderCapability(light, 3);
     const dr = await renderCapability(dark, 3);
-    assert(lr[32].length > 0 && strokes(lr[32]) === strokes(dr[32]) && strokes(lr[16]) === strokes(dr[16]),
+    assert(lr[32].length > 0 && motionStrokes(lr[32], true) === motionStrokes(dr[32], false)
+      && motionStrokes(lr[16], true) === motionStrokes(dr[16], false),
       'and so is the capability ring');
+    assert([16, 32].every((size) => lr[size].every((f) => hasEdge(f, size, 1))),
+      'which also paints over the edge');
   }
 
   {
@@ -2216,6 +2266,9 @@ const cutOf = (group, size) => {
     assertEq(blooms(lf), blooms(df), 'and the glow blooms on the same curve');
     assert(lf.every((f) => { const c = cutOf(f, 32); return !!c && fromPair(c.src, true, 32); }),
       'every light breathe frame ends with the light cut');
+    const lf16 = light.groups(16);
+    assert(lf.every((f) => hasEdge(f, 32, 1)) && lf16.length === lf.length && lf16.every((f) => hasEdge(f, 16, 1)),
+      'the breathe fades only the mark: its edge stays at full strength');
   }
 
   {
