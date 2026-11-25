@@ -70,6 +70,14 @@ function requestAnimationFrameStub(cb) {
 function cancelAnimationFrameStub(id) {
   rafQueue = rafQueue.filter(e => e.id !== id);
 }
+// One browser frame: runs the callbacks queued so far. Callbacks they queue wait for the next one.
+function tickRAF() {
+  const batch = rafQueue;
+  rafQueue = [];
+  for (const e of batch) {
+    try { e.cb(); } catch (err) { console.error('rAF callback threw:', err); }
+  }
+}
 
 function makeElement(tag, opts) {
   opts = opts || {};
@@ -1091,12 +1099,16 @@ console.log('\n--- Test: shapes and sizes match the spec board ---');
   o._stage = 0;
   o.update(makeState({ phase: 'acting', detail: 'Continuing to payment', clientLabel: 'Claude' }));
   assertEq(o.container.style.width + ' ' + o.container.style.height, '56px 36px', 'seed is 56 x 36');
+  // Each shape is its own beat in the real pill, so a frame passes between them.
+  tickRAF();
   o._stage = 1;
   o._render();
   assertEq(o.container.style.width + ' ' + o.container.style.height, '161px 36px', 'top line is 89 plus name and timer: 161 x 36');
+  tickRAF();
   o._stage = 2;
   o._render();
   assertEq(o.container.style.width + ' ' + o.container.style.height, '168px 58px', 'two lines are the status plus 26: 168 x 58');
+  tickRAF();
   o._folded = true;
   o._render();
   assertEq(o.container.style.width + ' ' + o.container.style.height, '161px 36px', 'folded is the top line');
@@ -1125,6 +1137,73 @@ console.log('\n--- Test: shapes and sizes match the spec board ---');
   // 161 for the top line plus the 20px tick
   assertEq(done.container.style.width, '181px', 'done adds the 20px tick by the timer');
   done.destroy();
+}
+
+console.log('\n--- Test: the pill shrinks on the shrinking curve however many times it renders ---');
+{
+  // update() renders two or three times before the next frame when it writes the
+  // status at once. The browser only sees the shape it lands on, so the curve has
+  // to follow the change since the last frame, not since the last render.
+  const LONG = 'Filling in the delivery address from the saved profile';
+  const SHORT = 'Continuing to payment';
+  const size = (o) => o.container.style.width + ' ' + o.container.style.height;
+  setMatchMedia(false);
+
+  setNow(109500);
+  const shorter = buildOverlay();
+  shorter.update(makeState({ phase: 'acting', detail: LONG, clientLabel: 'Claude' }));
+  tickRAF();
+  advanceNow(1300); // past the dwell floor, so the next status is written at once
+  shorter.update(makeState({ phase: 'acting', detail: SHORT, clientLabel: 'Claude' }));
+  assertEq(size(shorter), '168px 58px', 'the shorter status is written at once');
+  assert(shorter.container.classList.contains('shrink'), 'a shorter status written at once shrinks on the shrinking curve');
+  shorter.destroy();
+
+  setNow(111000);
+  const finished = buildOverlay();
+  finished.update(makeState({ phase: 'acting', detail: LONG, clientLabel: 'Claude' }));
+  tickRAF();
+  finished.update(makeState({ lifecycle: 'final', result: 'success', detail: 'Task completed', clientLabel: 'Claude' }));
+  assertEq(size(finished), '181px 58px', 'Done is the top line, the tick and one line');
+  assert(finished.container.classList.contains('shrink'), 'the final Done shrinks on the shrinking curve');
+  finished.destroy();
+
+  setNow(112500);
+  const longer = buildOverlay();
+  longer.update(makeState({ phase: 'acting', detail: SHORT, clientLabel: 'Claude' }));
+  tickRAF();
+  advanceNow(1300);
+  longer.update(makeState({ phase: 'acting', detail: LONG, clientLabel: 'Claude' }));
+  assertEq(size(longer), '248px 75px', 'the longer status is written at once');
+  assert(!longer.container.classList.contains('shrink'), 'a longer status grows on the growing curve');
+  longer.destroy();
+
+  // A new session takes over a pill that was leaving: reset() renders the full pill
+  // with the old status, then update() writes a shorter one, both before the next
+  // frame. On screen the seed grows into the new pill.
+  setNow(114000);
+  const revived = buildOverlay();
+  revived.update(makeState({ phase: 'acting', detail: LONG, clientLabel: 'Claude' }));
+  tickRAF();
+  revived.dismiss();
+  tickRAF();
+  revived._leaving = 2;
+  revived._render();
+  assertEq(size(revived), '56px 36px', 'the leaving pill has drawn back to the seed');
+  tickRAF();
+  revived.reset();
+  revived.update(makeState({ phase: 'acting', detail: SHORT, clientLabel: 'Claude' }));
+  assertEq(size(revived), '168px 58px', 'the new session opens the full pill');
+  assert(!revived.container.classList.contains('shrink'), 'a revived pill grows on the growing curve');
+  revived.destroy();
+
+  setNow(115500);
+  const gone = buildOverlay();
+  gone.update(makeState({ phase: 'acting', detail: SHORT, clientLabel: 'Claude' }));
+  const marker = gone._styledAreaRAF;
+  gone.destroy();
+  assert(typeof marker === 'number' && gone._styledAreaRAF === null && !rafQueue.some(e => e.id === marker),
+    'destroy cancels the pending frame marker');
 }
 
 console.log('\n--- Test: the status folds 2.6s after an action ends, and stays open while it runs ---');

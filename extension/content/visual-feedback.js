@@ -695,6 +695,8 @@
       this._flip = 0;
       this._nameFlip = 0;
       this._lastArea = 0;
+      this._styledArea = 0;              // the area the browser last drew; shrinking is measured from it
+      this._styledAreaRAF = null;        // the next frame, which moves _styledArea forward
       this._paint = null;                // element refs and last painted values for the motion loop
       this._onPointerMove = null;
       this._onPointerLeave = null;
@@ -940,7 +942,16 @@
       var w = seed ? 56 : head ? headW : fullW;
       var h = seed || head ? 36 : fullH;
       var area = w * h;
-      var shrinking = area < this._lastArea - 1;
+      // update() can render more than once before the next frame, and the browser
+      // takes the transition timing from the style it lands on then. Measure the
+      // direction from the shape the last frame drew, so a repeat render with the
+      // same shape cannot undo the shrink timing.
+      if (this._styledAreaRAF === null) {
+        this._styledArea = this._lastArea;
+        var self = this;
+        this._styledAreaRAF = requestAnimationFrame(function () { self._styledAreaRAF = null; });
+      }
+      var shrinking = area < this._styledArea - 1;
       this._lastArea = area;
       this._lastW = w;
       this._lastH = h;
@@ -1490,6 +1501,11 @@
       this._shownEnglish = null;
       this._lastDetail = null;
       this._lastArea = 0;
+      if (this._styledAreaRAF !== null) {
+        cancelAnimationFrame(this._styledAreaRAF);
+        this._styledAreaRAF = null;
+      }
+      this._styledArea = 0;
       this._paint = null;
       this._view = this._freshView();
       if (this.host) {
