@@ -1482,6 +1482,7 @@ async function acquireStableRootLock(
   stableRoot: string,
   waitMs: number,
   now: () => number,
+  heartbeatMs: number = LOCK_HEARTBEAT_MS,
 ): Promise<NativeHostLockLease | null> {
   const lockPath = `${stableRoot}.lock`;
   await ensureParents(lockPath);
@@ -1503,42 +1504,52 @@ async function acquireStableRootLock(
     } catch (error) {
       if (errorCode(error) !== 'EEXIST') throw error;
     }
-    let raw: string | null;
+    let raw: string | null = null;
+    let unreadable = false;
     let ageMs = 0;
     try {
       raw = await readSmallFile(lockPath);
-      ageMs = Date.now() - (await lstat(lockPath)).mtimeMs;
-    } catch {
+      if (raw !== null) ageMs = Date.now() - (await lstat(lockPath)).mtimeMs;
+    } catch (error) {
       raw = null;
+      unreadable = errorCode(error) !== 'ENOENT';
     }
-    if (raw === null) continue;
-    const record = parseLockRecord(raw);
-    let stale = false;
-    if (!record) {
-      stale = ageMs > UNPARSEABLE_LOCK_GRACE_MS;
-    } else if (!processAlive(record.pid)) {
-      stale = true;
-    } else if (now() - record.heartbeatAt > LOCK_STALE_MS) {
-      if (waitMs <= 0) return null;
-      const observed: Readonly<{ raw: string; since: number }> = silent !== null && silent.raw === raw
-        ? silent
-        : Object.freeze({ raw, since: Date.now() });
-      silent = observed;
-      stale = Date.now() - observed.since > LOCK_SILENT_HOLDER_MS;
-    }
-    if (stale) {
-      if (await breakStaleLock(lockPath, raw) && record) staleTokens.push(record.token);
-      continue;
+    // Gone between the create attempt and the read: try to create it again.
+    if (raw === null && !unreadable) continue;
+    // A lock this process cannot read, such as one a root-run install left
+    // behind or something that is not a regular file, is never broken: it is
+    // waited for like a live holder's and given up on at the deadline.
+    if (raw !== null) {
+      const record = parseLockRecord(raw);
+      let stale = false;
+      if (!record) {
+        stale = ageMs > UNPARSEABLE_LOCK_GRACE_MS;
+      } else if (!processAlive(record.pid)) {
+        stale = true;
+      } else if (now() - record.heartbeatAt > LOCK_STALE_MS) {
+        if (waitMs <= 0) return null;
+        const observed: Readonly<{ raw: string; since: number }> = silent !== null && silent.raw === raw
+          ? silent
+          : Object.freeze({ raw, since: Date.now() });
+        silent = observed;
+        stale = Date.now() - observed.since > LOCK_SILENT_HOLDER_MS;
+      }
+      if (stale) {
+        if (await breakStaleLock(lockPath, raw) && record) staleTokens.push(record.token);
+        continue;
+      }
     }
     if (Date.now() >= deadline) return null;
     await wait(LOCK_POLL_MS);
   }
 
   let lost = false;
-  let beating = false;
-  const beat = async (): Promise<void> => {
-    if (lost || beating) return;
-    beating = true;
+  let released = false;
+  // The heartbeat in flight, if any. Release waits for it: a beat that already
+  // read this holder's token would otherwise rename the lock back into place
+  // after release removed it, and nothing would ever remove it again.
+  let beating: Promise<void> | null = null;
+  const beatOnce = async (): Promise<void> => {
     try {
       const record = parseLockRecord(await readSmallFile(lockPath));
       if (!record || record.token !== token) {
@@ -1548,11 +1559,13 @@ async function acquireStableRootLock(
       await replaceFileAtomic(lockPath, `${JSON.stringify({ ...record, heartbeatAt: now() })}\n`);
     } catch (error) {
       if (errorCode(error) === 'ENOENT') lost = true;
-    } finally {
-      beating = false;
     }
   };
-  const heartbeat = setInterval(() => { void beat(); }, LOCK_HEARTBEAT_MS);
+  const beat = (): void => {
+    if (lost || released || beating) return;
+    beating = beatOnce().catch(() => undefined).finally(() => { beating = null; });
+  };
+  const heartbeat = setInterval(beat, heartbeatMs);
   heartbeat.unref?.();
   return Object.freeze({
     token,
@@ -1570,7 +1583,9 @@ async function acquireStableRootLock(
       return false;
     },
     release: async (): Promise<void> => {
+      released = true;
       clearInterval(heartbeat);
+      if (beating) await beating;
       try {
         const record = parseLockRecord(await readSmallFile(lockPath));
         if (record?.token === token) await unlink(lockPath);
@@ -2241,6 +2256,19 @@ export function holdNativeHostWakeLock(
   token: string,
 ): Promise<NativeHostWakeLockHold | null> {
   return holdWakeLock(stableRoot, token);
+}
+
+/**
+ * The stable-root lock every install, refresh and uninstall takes, for
+ * diagnostics and tests. `heartbeatMs` exists only so a test can make the
+ * heartbeat race its own release.
+ */
+export function acquireNativeHostStableRootLock(
+  stableRoot: string,
+  waitMs: number,
+  heartbeatMs: number = LOCK_HEARTBEAT_MS,
+): Promise<NativeHostLockLease | null> {
+  return acquireStableRootLock(stableRoot, waitMs, Date.now, heartbeatMs);
 }
 
 /**

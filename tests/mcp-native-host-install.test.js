@@ -5593,6 +5593,66 @@ async function runWakeLockCompatibility() {
   }
 }
 
+// The stable-root lock itself, against a real directory. A lock this process
+// cannot read is held, never spun on and never broken, and a release never
+// races its own heartbeat into leaving the lock behind.
+async function runStableRootLock() {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const production = await importBuild('native-host-production.js');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-native-lock-')));
+  const stableRoot = path.join(root, 'native-host');
+  const lockPath = `${stableRoot}.lock`;
+  // A run that never returns would otherwise hang the suite without a word.
+  const within = (promise, milliseconds) => Promise.race([
+    promise,
+    new Promise((resolve) => {
+      const timer = setTimeout(() => resolve('timed-out'), milliseconds);
+      timer.unref?.();
+    }),
+  ]);
+  try {
+    fs.mkdirSync(lockPath);
+    let startedAt = Date.now();
+    const automatic = await within(production.acquireNativeHostStableRootLock(stableRoot, 0), 5000);
+    equal(automatic, null, 'a caller that does not wait gets no lease while the lock cannot be read');
+    check(Date.now() - startedAt < 1000, 'a caller that does not wait leaves an unreadable lock at once');
+    startedAt = Date.now();
+    const waiting = await within(production.acquireNativeHostStableRootLock(stableRoot, 300), 5000);
+    const waited = Date.now() - startedAt;
+    equal(waiting, null, 'a waiting caller gets no lease while the lock cannot be read');
+    check(waited >= 300 && waited < 5000, 'a waiting caller gives up on an unreadable lock at its deadline');
+    check(fs.statSync(lockPath).isDirectory(), 'an unreadable lock is never broken');
+    deepEqual(
+      fs.readdirSync(root).filter((name) => name !== 'native-host.lock'),
+      [],
+      'no temporary lock file is left beside an unreadable lock',
+    );
+    fs.rmdirSync(lockPath);
+
+    // A heartbeat every millisecond is nearly always writing when release
+    // runs, so a release that does not wait for it would leave the lock.
+    // A heartbeat that lands after release returns brings the lock back a
+    // moment later, and the next round then finds it held; both count.
+    let leftBehind = 0;
+    for (let round = 0; round < 200; round += 1) {
+      const lease = await production.acquireNativeHostStableRootLock(stableRoot, 100, 1);
+      if (lease) {
+        await new Promise((resolve) => setTimeout(resolve, round % 4));
+        await lease.release();
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      if (!lease || fs.existsSync(lockPath)) {
+        leftBehind += 1;
+        fs.rmSync(lockPath, { force: true });
+      }
+    }
+    equal(leftBehind, 0, 'a release never lets an in-flight heartbeat put the lock back');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
@@ -5631,6 +5691,8 @@ async function main() {
     await runProductionEnsure();
     console.log('\n=== Wake lock shared with the native host ===');
     await runWakeLockCompatibility();
+    console.log('\n=== Stable-root lock ===');
+    await runStableRootLock();
   }
   console.log(`\nNative host install tests: ${passed} passed, 0 failed`);
 }
