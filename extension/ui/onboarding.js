@@ -945,12 +945,9 @@
     });
     bind('#obLocalModelSelect', 'change', (event) => {
       state.lmstudioModel = String(event.target.value || '');
-      state.keyStatus = 'idle';
-      state.keyMessage = '';
+      resetKeyStatusIdle();
       const nextButton = planes.apikey && planes.apikey.el.querySelector('[data-nav="next"]');
       if (nextButton) nextButton.disabled = !state.lmstudioModel;
-      if (planes.apikey) planes.apikey.html = '';
-      renderStepper();
     });
     bind('#obRevealKey', 'click', () => { state.revealed = !state.revealed; render(); });
     bind('#obPasteKey', 'click', pasteFromClipboard);
@@ -1065,15 +1062,19 @@
     if (provider.local) {
       const loading = state.lmstudioDiscoveryStatus === 'loading';
       const failed = state.lmstudioDiscoveryStatus === 'error';
+      // Models found but none checked yet: localFieldHtml() draws the same check.
+      const ready = state.lmstudioDiscoveryStatus === 'ready';
       if (icon) {
         icon.innerHTML = loading
           ? '<i class="fa-solid fa-spinner spin"></i>'
           : failed
             ? '<i class="fa-solid fa-circle-xmark bad"></i>'
-            : '';
+            : ready
+              ? '<i class="fa-solid fa-circle-check ok"></i>'
+              : '';
       }
       if (msgEl) {
-        msgEl.className = 'ob-status-msg ' + (failed ? 'bad' : '');
+        msgEl.className = 'ob-status-msg ' + (failed ? 'bad' : ready ? 'ok' : '');
         msgEl.textContent = state.lmstudioDiscoveryMessage || ob('entry_discovering', 'Discovering loaded chat models...');
       }
     } else {

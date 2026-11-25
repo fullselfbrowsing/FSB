@@ -397,12 +397,33 @@ function createHarness(initialStore, options) {
     // LM Studio: choosing another model resets the status in place the same way.
     {
       const { harness, api, handler, tick, press } = railHarness();
-      Object.assign(api.state, { path: 'byok', provider: 'lmstudio', lmstudioModel: 'model-a', keyStatus: 'valid', screen: 'apikey' });
+      Object.assign(api.state, {
+        path: 'byok',
+        provider: 'lmstudio',
+        lmstudioModel: 'model-a',
+        lmstudioDiscoveryStatus: 'ready',
+        lmstudioDiscoveryMessage: '2 chat models found — choose one',
+        keyStatus: 'valid',
+        keyMessage: 'LM Studio responded successfully',
+        screen: 'apikey'
+      });
+      // The status area as drawn for model A after its check passed.
+      const fieldClasses = new Set(['ob3-field', 'is-ok']);
+      const field = { classList: { remove: (...names) => names.forEach((name) => fieldClasses.delete(name)) } };
+      const icon = { innerHTML: '<i class="fa-solid fa-circle-check ok"></i>' };
+      const msg = { className: 'ob-status-msg ok', textContent: 'LM Studio responded successfully' };
+      const statusNodes = { '.ob3-field': field, '.ob-status': icon, '.ob-status-msg': msg };
+      api.els.screen = { querySelector: (selector) => statusNodes[selector] || null };
       api.renderStepper();
       const staleDone = tick('done');
       assert.strictEqual(staleDone.disabled, false, 'a validated LM Studio model opens the Done tick');
       handler('#obLocalModelSelect', 'change')({ target: { value: 'model-b' } });
+      assert.strictEqual(api.state.keyStatus, 'idle', 'a new model resets the check');
       assert.strictEqual(tick('done').disabled, true, 'a new model closes the Done tick');
+      assert.strictEqual(fieldClasses.has('is-ok'), false, 'a new model drops the passed-check field state');
+      assert.strictEqual(msg.textContent, '2 chat models found — choose one', 'a new model shows the discovery message, not the old success');
+      assert.strictEqual(msg.className, 'ob-status-msg ok', 'the discovery message keeps the ready colour');
+      assert.strictEqual(icon.innerHTML, '<i class="fa-solid fa-circle-check ok"></i>', 'the icon shows discovery is ready, as a full render does');
       press({}, staleDone);
       await flush();
       assert.strictEqual(api.state.screen, 'apikey', 'a stale Done tick does not skip the new model check');
