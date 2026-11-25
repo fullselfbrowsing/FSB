@@ -41,7 +41,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 20%, rgba(255, 107, 53, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 20%, var(--primary-soft-strong) 0%, transparent 70%),
     radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255, 140, 66, 0.12) 0%, transparent 60%);
   pointer-events: none;
   animation: heroGlow 12s ease-in-out infinite;
@@ -102,7 +102,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: 14px;
-  box-shadow: var(--shadow-md), 0 0 30px rgba(255, 107, 53, 0.08);
+  box-shadow: var(--shadow-md), 0 0 30px var(--primary-faint);
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
@@ -206,7 +206,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 107, 53, 0.1);
+  background: var(--primary-wash);
   border: 1px solid rgba(255, 107, 53, 0.25);
   border-radius: 10px;
   color: var(--primary);
@@ -222,7 +222,7 @@
 .install-copy.copied {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .install-fan {
@@ -286,7 +286,7 @@
 .install-fan-item:hover {
   border-color: rgba(255, 107, 53, 0.55);
   background: color-mix(in srgb, var(--bg-card) 88%, transparent);
-  box-shadow: var(--shadow-lg), 0 0 18px rgba(255, 107, 53, 0.18);
+  box-shadow: var(--shadow-lg), 0 0 18px var(--primary-soft-strong);
   transform: translateX(var(--dx, 0)) rotate(var(--rot, 0deg)) scale(1.07);
   z-index: 2;
 }
@@ -695,8 +695,8 @@
   display: inline-block;
   font-size: 0.7rem;
   font-weight: 600;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  background: var(--danger-wash);
   padding: 3px 10px;
   border-radius: 10px;
   letter-spacing: 0.02em;
@@ -715,7 +715,7 @@
   text-align: center;
   max-width: 700px;
   margin: 0 auto 32px;
-  box-shadow: var(--shadow-glow), 0 0 40px rgba(255, 107, 53, 0.08);
+  box-shadow: var(--shadow-glow), 0 0 40px var(--primary-faint);
 }
 
 .fsb-highlight-header {
@@ -745,7 +745,7 @@
   display: inline-block;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-primary);
   background: var(--primary);
   padding: 4px 12px;
   border-radius: 10px;
@@ -846,7 +846,7 @@
   gap: 9px;
   margin-bottom: 18px;
   padding: 6px 14px;
-  background: rgba(255, 107, 53, 0.1);
+  background: var(--primary-wash);
   border: 1px solid rgba(255, 107, 53, 0.28);
   border-radius: 999px;
   color: var(--primary);
@@ -912,7 +912,7 @@
 }
 
 .cap-logo:hover {
-  border-color: rgba(255, 107, 53, 0.4);
+  border-color: var(--primary-glow-strong);
 }
 
 .cap-logo-img {
@@ -1074,7 +1074,7 @@
   padding: 1px 7px;
   background: var(--primary);
   border-radius: 10px;
-  color: #fff;
+  color: var(--on-primary);
   font-family: 'Space Mono', 'SF Mono', monospace;
   font-size: 0.6rem;
   letter-spacing: 0.06em;
@@ -1271,7 +1271,7 @@
   align-items: center;
   gap: 7px;
   padding: 5px 10px;
-  background: rgba(255, 107, 53, 0.08);
+  background: var(--primary-faint);
   border: 1px solid rgba(255, 107, 53, 0.22);
   border-radius: var(--radius-sm);
   font-family: 'Space Mono', 'SF Mono', monospace;

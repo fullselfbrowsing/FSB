@@ -166,11 +166,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--danger-wash);
   border-radius: var(--radius-sm);
   margin-bottom: 16px;
   font-size: 1rem;
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .trouble-card h3 {

@@ -165,7 +165,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 107, 53, 0.1);
+  background: var(--primary-wash);
   border: 1px solid rgba(255, 107, 53, 0.2);
   border-radius: var(--radius-sm);
   color: var(--primary);
@@ -196,7 +196,7 @@
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  background: rgba(255, 107, 53, 0.1);
+  background: var(--primary-wash);
   border: 1px solid rgba(255, 107, 53, 0.25);
   border-radius: 999px;
   color: var(--primary);
@@ -339,7 +339,7 @@
 
 .kg-toggle-btn.active {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .kg-toggle-btn:not(.active):hover {
@@ -369,7 +369,7 @@
 :host ::ng-deep .knowledge-graph-tooltip {
   position: absolute;
   display: none;
-  background: var(--bg-elevated, #1a1a1a);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 9px 13px;

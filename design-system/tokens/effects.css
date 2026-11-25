@@ -20,6 +20,11 @@
   --blur-nav: 16px; /* proposed */
   --lift-card: -4px; /* proposed */
   --lift-button: -2px; /* proposed */
+
+  /* Stacking layers of the shell, lowest first (decisions/0013). */
+  --z-rail: 30;
+  --z-nav-mobile: 999;
+  --z-nav: 1000;
 }
 
 [data-theme="light"] {

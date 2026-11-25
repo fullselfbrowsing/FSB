@@ -148,8 +148,12 @@ async function main() {
     check('tokens in mirrored scopes are exempt, page-local ones fork', scoped.tokenForks === 1 && scoped.colors === 0, JSON.stringify(scoped));
     const marked = literals.countCss('.a { color: #fff; /* design-literal-ok: pinned by a test */ }');
     check('the exemption marker exempts one declaration', marked.colors === 0, JSON.stringify(marked));
-    const script = literals.countScript("/* #abcdef in a comment */\nconst s = 'x&#9632;y';\nel.style.cssText = 'z-index:5;color:#ff8c00';\nconst id = '#add-button';");
+    const script = literals.countScript("/* #abcdef in a comment */\nconst s = 'x&#9632;y';\nel.style.cssText = 'z-index:50;color:#ff8c00';\nconst id = '#add-button';");
     check('in scripts, entities, comments and ids are not colours', script.colors === 1 && script.zIndex === 1, JSON.stringify(script));
+    const local = literals.countCss('.a { z-index: 2; } .b { z-index: -1; } .c { z-index: 9 !important; } .d { z-index: var(--fsb-z-modal); } .e { z-index: 10; }');
+    check('z-index below 10 and z-index tokens are not counted', local.zIndex === 1, JSON.stringify(local));
+    const localScript = literals.countScript("el.style.zIndex = '3'; el.style.setProperty('z-index', '2147483647');");
+    check('in scripts, only z-index layers of 10 and up count', localScript.zIndex === 1, JSON.stringify(localScript));
     const base = { 'a.css': { colors: 2, zIndex: 0, fontFamily: 0, tokenForks: 0 }, 'gone.css': { colors: 0, zIndex: 0, fontFamily: 0, tokenForks: 0 } };
     const rose = literals.compareToBaseline({ 'a.css': { colors: 3, zIndex: 0, fontFamily: 0, tokenForks: 0 } }, base);
     check('a raised count fails', rose.errors.some((e) => e.includes('rose from 2 to 3')), rose.errors.join('; '));

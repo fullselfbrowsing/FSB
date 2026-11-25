@@ -219,7 +219,7 @@
 }
 
 [data-theme="dark"] .md-rendered a {
-  color: #60a5fa;
+  color: var(--fsb-blue-400);
 }
 
 [data-theme="dark"] .md-rendered hr {
@@ -292,7 +292,7 @@
 [data-theme="dark"] .message.error {
   background: #451a1a;
   color: #fca5a5;
-  border-left-color: #ef4444;
+  border-left-color: var(--fsb-red-500);
 }
 
 [data-theme="dark"] .message.action {

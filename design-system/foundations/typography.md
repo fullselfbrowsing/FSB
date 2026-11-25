@@ -32,6 +32,8 @@ System font for reading, Poppins for the wordmark, the platform monospace stack 
 
 The control panel has its own scale: `--dashboard-heading-*` and `--dashboard-body-*` inside `.dashboard-container` in options.css.
 
+The product core ships `--fsb-font-mono` (the 0012 stack), with a `--font-mono` alias that the control panel reads ([0013](../decisions/0013-name-values-before-changing-them.md)). The site's `--font-mono` stays proposed for now. The dashboard and stats pages already read `var(--font-mono, …)` with a Menlo fallback, so defining it would change them; it ships with the Space Mono migration.
+
 ## Specimens
 
 [Families](../guidelines/type-families.card.html), [scale](../guidelines/type-scale.card.html), [mono and version tag](../guidelines/type-mono.card.html), [gradient text](../guidelines/type-gradient.card.html).

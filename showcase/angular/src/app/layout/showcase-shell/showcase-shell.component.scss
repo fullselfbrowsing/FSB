@@ -46,7 +46,7 @@
   background: var(--bg-nav);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  z-index: 1000;
+  z-index: var(--z-nav);
   transition: background var(--transition-base);
 }
 
@@ -178,7 +178,7 @@
   padding: 16px 24px;
   flex-direction: column;
   gap: 8px;
-  z-index: 999;
+  z-index: var(--z-nav-mobile);
 }
 
 .nav-mobile.active {
@@ -275,7 +275,7 @@
   position: fixed;
   top: 20px;
   left: 20px;
-  z-index: 1000;
+  z-index: var(--z-nav);
   width: 36px;
   height: 36px;
   display: flex;
@@ -333,7 +333,7 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 20%, rgba(255, 107, 53, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 20%, var(--primary-soft-strong) 0%, transparent 70%),
     radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255, 140, 66, 0.12) 0%, transparent 60%);
   animation: statsGlow 12s ease-in-out infinite;
 }

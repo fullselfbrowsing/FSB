@@ -152,7 +152,7 @@ body {
 }
 
 .status-dot.error {
-  color: #ef4444;
+  color: var(--fsb-red-500);
   text-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
 }
 
@@ -270,8 +270,8 @@ body {
 /* User Messages (Right-aligned) */
 .message.user {
   align-self: flex-end;
-  background: linear-gradient(135deg, var(--primary-color), #ff8c42);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color), var(--fsb-primary-tint));
+  color: var(--fsb-on-primary);
   border-bottom-right-radius: 6px;
   border-color: transparent;
   box-shadow: var(--fsb-shadow-accent);
@@ -503,13 +503,13 @@ body {
 }
 
 .send-btn {
-  background: linear-gradient(135deg, var(--primary-color), #ff8c42);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color), var(--fsb-primary-tint));
+  color: var(--fsb-on-primary);
 }
 
 .send-btn:hover:not(:disabled) {
   transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 4px 12px var(--fsb-primary-glow-strong);
 }
 
 .send-btn:hover:not(:disabled) i {
@@ -692,13 +692,13 @@ body {
 
 [data-theme="dark"] .message.partial-result {
   background: rgba(245, 158, 11, 0.1);
-  border-left-color: #d97706;
+  border-left-color: var(--fsb-amber-600);
 }
 
 .partial-result-label {
   font-size: 11px;
   font-weight: 600;
-  color: #d97706;
+  color: var(--fsb-amber-600);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -719,7 +719,7 @@ body {
 .message.auto-collapsed { max-height: 24px; overflow: hidden; opacity: 0.5; transition: all 0.5s; cursor: pointer; }
 .message.auto-collapsed:hover { max-height: 200px; opacity: 1; }
 .message.collapsing { opacity: 0; max-height: 0; padding: 0; margin: 0; transition: all 0.3s; overflow: hidden; }
-.retry-btn { background: var(--fsb-primary); color: white; border: none; border-radius: 16px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.retry-btn { background: var(--fsb-primary); color: var(--fsb-on-primary); border: none; border-radius: 16px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
 .retry-btn:hover { filter: brightness(1.1); }
 
 /* Action summary collapse group */
@@ -767,7 +767,7 @@ body {
 body[data-ui-state="running"] .status-indicator {
   border-color: color-mix(in srgb, var(--fsb-primary) 42%, var(--border-color) 58%);
   background: color-mix(in srgb, var(--fsb-primary-soft) 42%, var(--bg-secondary) 58%);
-  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.08), 0 10px 18px -16px rgba(255, 107, 53, 0.65);
+  box-shadow: 0 0 0 1px var(--fsb-primary-faint), 0 10px 18px -16px rgba(255, 107, 53, 0.65);
 }
 
 body[data-ui-state="running"] .status-text {
@@ -776,7 +776,7 @@ body[data-ui-state="running"] .status-text {
 
 body[data-ui-state="running"] .input-wrapper {
   border-color: color-mix(in srgb, var(--fsb-primary) 36%, var(--border-color) 64%);
-  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.08), 0 14px 28px -22px rgba(255, 107, 53, 0.55);
+  box-shadow: 0 0 0 1px var(--fsb-primary-faint), 0 14px 28px -22px rgba(255, 107, 53, 0.55);
 }
 
 body[data-ui-state="error"] .status-indicator {

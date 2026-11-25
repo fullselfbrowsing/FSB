@@ -45,6 +45,17 @@ Key values:
 | Secondary text | `#94a3b8` / `#475569` | `#6a584d` / `#d2c1b4` |
 | Hairline | white 8% / black 8% | warm 10% / white 8% |
 
+Values named so far without being settled ([0013](../decisions/0013-name-values-before-changing-them.md)):
+
+| Role | Site | Product |
+|---|---|---|
+| Gradient end | `--primary-tint` `#ff8c42` | `--fsb-primary-tint` |
+| Text on the orange (both themes) | `--on-primary` `#ffffff` | `--fsb-on-primary` |
+| Orange transparencies | `--primary-faint` 8%, `--primary-wash` 10%, `--primary-soft` 12%, `--primary-soft-strong` 18%, `--primary-glow` 30%, `--primary-glow-strong` 40% | `--fsb-primary-faint` 8%, `-soft` 12%, `-soft-strong` 18%, `-glow` 24%, `-glow-strong` 40% |
+| Status | `--danger` `#ef4444`, `--danger-wash`, `--success` `#22c55e`, `--warning` `#eab308` | semantic `--fsb-success`, `-warning`, `-danger`, `-info`, plus migration-only hues `--fsb-red-500`, `-green-500`, `-yellow-500`, `-amber-400/600/800`, `-indigo-500`, `-blue-400` |
+
+**MUST NOT** use the migration-only hues in new code. Each one is waiting for a decision that folds it into a semantic token or renames it to its role.
+
 ## Specimens
 
 [Accent](../guidelines/color-accent.card.html), [site surfaces, dark](../guidelines/color-surfaces-dark.card.html), [site surfaces, light](../guidelines/color-surfaces-light.card.html), [text and borders](../guidelines/color-text.card.html), [product surfaces](../guidelines/color-product-surface.card.html), [product dark](../guidelines/color-product-dark.card.html), [warm gray ramp](../guidelines/color-product-gray.card.html), [overlay palette](../guidelines/color-overlay.card.html).
@@ -52,7 +63,7 @@ Key values:
 ## Known gaps
 
 - **Product pages keep their own dark blocks.** The control panel's dark surfaces now equal the core's near-black ramp ([0011](../decisions/0011-product-dark-is-near-black.md)) and can be removed with no visible change. The side panel and popup differ: `--bg-primary` is the page base `#050505` (the core's alias gives `#0d0d0d`), `--bg-tertiary` is `#121212` (core `#141414`) and `--border-color` is white at 6% (core 8%). Removing their blocks lifts the chat's surfaces, so it is a design decision; `sidepanel.css` is hash-pinned.
-- **The site re-declares four product names** with its own values: `--fsb-primary-soft`, `--fsb-border-subtle`, `--fsb-border-accent`, `--fsb-focus-ring`. They should become site names.
+- **The site re-declares four product names:** `--fsb-primary-soft`, `--fsb-border-subtle`, `--fsb-border-accent`, `--fsb-focus-ring`. The first now reads the site's own `--primary-soft`; the other three still carry their own values and should become site names.
 - **The danger red differs** between palettes: `#ef4444` on the site, `#dc2626` in the product core, `#e57373` in the control panel's dark mode.
 - **Off-palette colours:**
   - the side panel's checkboxes use `accent-color: #f97316`, which is not the brand orange;

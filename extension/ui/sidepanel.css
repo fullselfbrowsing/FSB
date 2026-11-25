@@ -149,7 +149,7 @@ body {
 }
 
 .status-dot.error {
-  color: #ef4444;
+  color: var(--fsb-red-500);
   text-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
 }
 
@@ -240,8 +240,8 @@ body {
 /* User Messages (Right-aligned) */
 .message.user {
   align-self: flex-end;
-  background: linear-gradient(135deg, var(--primary-color), #ff8c42);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color), var(--fsb-primary-tint));
+  color: var(--fsb-on-primary);
   border-bottom-right-radius: 6px;
   border-color: transparent;
   box-shadow: var(--fsb-shadow-accent);
@@ -538,13 +538,13 @@ body {
 }
 
 .send-btn {
-  background: linear-gradient(135deg, var(--primary-color), #ff8c42);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color), var(--fsb-primary-tint));
+  color: var(--fsb-on-primary);
 }
 
 .send-btn:hover:not(:disabled) {
   transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 4px 12px var(--fsb-primary-glow-strong);
 }
 
 .send-btn:hover:not(:disabled) i {
@@ -680,7 +680,7 @@ body {
   text-align: center;
   border-top: none;
   flex-shrink: 0;
-  z-index: 100;
+  z-index: var(--fsb-z-sticky);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -768,7 +768,7 @@ body {
 
 [data-theme="dark"] .message.login-prompt {
   background: #451a03;
-  border-color: #d97706;
+  border-color: var(--fsb-amber-600);
 }
 
 .login-prompt-header {
@@ -782,7 +782,7 @@ body {
 }
 
 [data-theme="dark"] .login-prompt-header {
-  color: #fbbf24;
+  color: var(--fsb-amber-400);
 }
 
 .login-prompt-header i {
@@ -808,7 +808,7 @@ body {
 }
 
 [data-theme="dark"] .login-prompt-subtext {
-  color: #d97706;
+  color: var(--fsb-amber-600);
 }
 
 .login-prompt-form {
@@ -821,12 +821,12 @@ body {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: #92400e;
+  color: var(--fsb-amber-800);
   margin-bottom: 4px;
 }
 
 [data-theme="dark"] .login-prompt-field label {
-  color: #fbbf24;
+  color: var(--fsb-amber-400);
 }
 
 .login-prompt-field input {
@@ -848,7 +848,7 @@ body {
 
 [data-theme="dark"] .login-prompt-field input {
   background: rgba(0, 0, 0, 0.3);
-  border-color: #92400e;
+  border-color: var(--fsb-amber-800);
   color: #fef3c7;
 }
 
@@ -878,7 +878,7 @@ body {
 }
 
 [data-theme="dark"] .login-prompt-eye {
-  color: #fbbf24;
+  color: var(--fsb-amber-400);
 }
 
 .login-prompt-save-label {
@@ -886,12 +886,12 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #92400e;
+  color: var(--fsb-amber-800);
   cursor: pointer;
 }
 
 [data-theme="dark"] .login-prompt-save-label {
-  color: #d97706;
+  color: var(--fsb-amber-600);
 }
 
 .login-prompt-save-label input[type="checkbox"] {
@@ -936,8 +936,8 @@ body {
 }
 
 [data-theme="dark"] .login-prompt-btn.ghost {
-  color: #fbbf24;
-  border-color: #92400e;
+  color: var(--fsb-amber-400);
+  border-color: var(--fsb-amber-800);
 }
 
 [data-theme="dark"] .login-prompt-btn.ghost:hover {
@@ -948,7 +948,7 @@ body {
   align-self: stretch;
   max-width: 100%;
   background: #eff6ff;
-  border: 1.5px solid #60a5fa;
+  border: 1.5px solid var(--fsb-blue-400);
   border-radius: 12px;
   padding: 16px;
   border-left: none;
@@ -1009,7 +1009,7 @@ body {
 
 [data-theme="dark"] .payment-prompt-option:hover,
 [data-theme="dark"] .payment-prompt-option.selected {
-  border-color: #60a5fa;
+  border-color: var(--fsb-blue-400);
   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.12);
 }
 
@@ -1053,7 +1053,7 @@ body {
 
 .payment-card-brand.discover {
   background: rgba(217, 119, 6, 0.12);
-  color: #d97706;
+  color: var(--fsb-amber-600);
 }
 
 .payment-card-brand.diners,
@@ -1096,13 +1096,13 @@ body {
 
 [data-theme="dark"] .message.partial-result {
   background: rgba(245, 158, 11, 0.1);
-  border-left-color: #d97706;
+  border-left-color: var(--fsb-amber-600);
 }
 
 .partial-result-label {
   font-size: 11px;
   font-weight: 600;
-  color: #d97706;
+  color: var(--fsb-amber-600);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -1123,7 +1123,7 @@ body {
 .message.auto-collapsed { max-height: 24px; overflow: hidden; opacity: 0.5; transition: all 0.5s; cursor: pointer; }
 .message.auto-collapsed:hover { max-height: 200px; opacity: 1; }
 .message.collapsing { opacity: 0; max-height: 0; padding: 0; margin: 0; transition: all 0.3s; overflow: hidden; }
-.retry-btn { background: var(--fsb-primary); color: white; border: none; border-radius: 16px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.retry-btn { background: var(--fsb-primary); color: var(--fsb-on-primary); border: none; border-radius: 16px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
 .retry-btn:hover { filter: brightness(1.1); }
 
 /* Reconnaissance suggestion and progress */
@@ -1142,8 +1142,8 @@ body {
   gap: 0.375rem;
   padding: 0.375rem 0.75rem;
   background: rgba(99, 102, 241, 0.1);
-  color: #6366f1;
-  border: 1px solid #6366f1;
+  color: var(--fsb-indigo-500);
+  border: 1px solid var(--fsb-indigo-500);
   border-radius: 0.375rem;
   font-size: 0.75rem;
   font-weight: 500;
@@ -1152,7 +1152,7 @@ body {
   width: fit-content;
 }
 .recon-btn:hover {
-  background: #6366f1;
+  background: var(--fsb-indigo-500);
   color: #fff;
 }
 [data-theme="dark"] .recon-btn {
@@ -1161,7 +1161,7 @@ body {
   border-color: #818cf8;
 }
 [data-theme="dark"] .recon-btn:hover {
-  background: #6366f1;
+  background: var(--fsb-indigo-500);
   color: #fff;
 }
 .recon-progress {
@@ -1209,7 +1209,7 @@ body {
 /* Active icon button state */
 .icon-btn.active {
   background: var(--primary-color);
-  color: white;
+  color: var(--fsb-on-primary);
   border-color: transparent;
   box-shadow: 0 10px 20px -16px rgba(255, 107, 53, 0.9);
 }
@@ -1431,7 +1431,7 @@ body {
 
 [data-theme="dark"] .history-cost {
   background: #1a2744;
-  color: #60a5fa;
+  color: var(--fsb-blue-400);
 }
 
 /* History replay button */
@@ -1508,7 +1508,7 @@ body {
 body[data-ui-state="running"] .status-indicator {
   border-color: color-mix(in srgb, var(--fsb-primary) 42%, var(--border-color) 58%);
   background: color-mix(in srgb, var(--fsb-primary-soft) 42%, var(--bg-secondary) 58%);
-  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.08), 0 10px 18px -16px rgba(255, 107, 53, 0.65);
+  box-shadow: 0 0 0 1px var(--fsb-primary-faint), 0 10px 18px -16px rgba(255, 107, 53, 0.65);
 }
 
 body[data-ui-state="running"] .status-text {
@@ -1517,7 +1517,7 @@ body[data-ui-state="running"] .status-text {
 
 body[data-ui-state="running"] .input-wrapper {
   border-color: color-mix(in srgb, var(--fsb-primary) 36%, var(--border-color) 64%);
-  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.08), 0 14px 28px -22px rgba(255, 107, 53, 0.55);
+  box-shadow: 0 0 0 1px var(--fsb-primary-faint), 0 14px 28px -22px rgba(255, 107, 53, 0.55);
 }
 
 body[data-ui-state="error"] .status-indicator {
@@ -1577,7 +1577,7 @@ body[data-sidepanel-view="history"] .author-footer {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--fsb-z-overlay);
   backdrop-filter: blur(2px);
 }
 
@@ -1586,8 +1586,8 @@ body[data-sidepanel-view="history"] .author-footer {
 }
 
 .payment-fill-confirm-card {
-  background: var(--bg-secondary, #1e1e2e);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 20px;
   max-width: 320px;
@@ -1601,7 +1601,7 @@ body[data-sidepanel-view="history"] .author-footer {
   gap: 8px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary, #e0e0e0);
+  color: var(--text-primary);
   margin-bottom: 16px;
 }
 
@@ -1623,18 +1623,18 @@ body[data-sidepanel-view="history"] .author-footer {
 
 .payment-fill-confirm-brand {
   font-weight: 600;
-  color: var(--text-primary, #e0e0e0);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
 .payment-fill-confirm-last4 {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   font-family: monospace;
   font-size: 14px;
 }
 
 .payment-fill-confirm-domain {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   font-size: 13px;
   margin-bottom: 12px;
 }
@@ -1672,9 +1672,9 @@ body[data-sidepanel-view="history"] .author-footer {
 }
 
 .payment-fill-confirm-btn.deny {
-  background: var(--bg-tertiary, #2a2a3e);
-  color: var(--text-secondary, #888);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
 /* Phase 11 FINT-20 -- foreign-owned input lockout visual treatment.

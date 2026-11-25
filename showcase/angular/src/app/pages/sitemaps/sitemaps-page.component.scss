@@ -86,7 +86,7 @@
 }
 
 .sitemaps-actions .btn-secondary:hover {
-  background: rgba(255, 107, 53, 0.1);
+  background: var(--primary-wash);
   border-color: rgba(255, 107, 53, 0.24);
   color: var(--text-primary);
   transform: translateY(-2px);

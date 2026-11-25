@@ -139,7 +139,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.18);
+  box-shadow: 0 0 0 3px var(--primary-soft-strong);
 }
 
 .agents-hero-actions {
@@ -522,7 +522,7 @@
   height: 42px;
   margin-bottom: 16px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 107, 53, 0.12);
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 1.3rem;
 }
@@ -604,7 +604,7 @@
 }
 
 .ag-cmd:hover {
-  border-color: rgba(255, 107, 53, 0.4);
+  border-color: var(--primary-glow-strong);
   box-shadow: var(--shadow-glow);
 }
 
@@ -660,7 +660,7 @@
 
 .ag-host:hover,
 .ag-host.on {
-  border-color: rgba(255, 107, 53, 0.4);
+  border-color: var(--primary-glow-strong);
   color: var(--primary);
 }
 
@@ -701,7 +701,7 @@
   width: 30px;
   height: 30px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 107, 53, 0.12);
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 1rem;
 }

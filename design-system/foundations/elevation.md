@@ -12,7 +12,9 @@ Shadows, radius and layering.
   - site: 8 / 12 / 16 / 24px as `--radius-sm` … `--radius-xl`;
   - product: 8 / 12 / 18 / 24px as `--fsb-radius-*`;
   - pills: 999px; square tags: 10px.
-- **Layering:** page overlays live in the top layer (`showPopover()`), with `z-index: 2147483647` as the fallback; see [0006](../decisions/0006-overlays-in-shadow-dom-top-layer.md). Inside FSB's own pages, **SHOULD** keep z-index values small and local to a component.
+- **Layering:** page overlays live in the top layer (`showPopover()`), with `z-index: 2147483647` as the fallback; see [0006](../decisions/0006-overlays-in-shadow-dom-top-layer.md). Inside FSB's own pages:
+  - **MUST** take a layer that sits above other parts of the page (nav, drawer, overlay, toast, modal) from the layer tokens below;
+  - **SHOULD** keep any other z-index below 10, so it only orders siblings inside one component. The literal count ignores values below 10.
 
 ## Tokens
 
@@ -25,13 +27,29 @@ Shadows, radius and layering.
 
 Exact values are in [../tokens/effects.css](../tokens/effects.css) and [../tokens/product-surface.css](../tokens/product-surface.css).
 
+Stacking layers, lowest first ([0013](../decisions/0013-name-values-before-changing-them.md)); each keeps the number it had as a literal:
+
+| Product (`--fsb-z-*`) | Value | Used by | Site (`--z-*`) | Value | Used by |
+|---|---|---|---|---|---|
+| `dropdown` | 50 | model combobox listbox | `rail` | 30 | depth-page rail |
+| `menu` | 60 | custom select menu | `nav-mobile` | 999 | phone menu |
+| `sticky` | 100 | dashboard header, author footer, overflow dropdown | `nav` | 1000 | nav, stats back button |
+| `drawer-scrim` | 150 | sidebar overlay | | | |
+| `drawer` | 200 | dashboard sidebar | | | |
+| `overlay` | 1000 | save bar, graph tooltips, payment confirm | | | |
+| `toast` | 1100 | status toast | | | |
+| `modal` | 2000 | credential modal | | | |
+| `top` | 9999 | pairing QR overlay | | | |
+
 ## Specimens
 
 [Elevation](../guidelines/spacing-elevation.card.html), [radius](../guidelines/spacing-radius.card.html).
 
 ## Known gaps
 
-- **No z-index tokens.** About 30 z-index values in extension CSS and 62 in the showcase are literal. The ratchet counts integer z-index values.
+- **Some layers are still literal:** the dashboard's preview and modal layers, the home install fan and the about page's graph. A test pins the control panel's open-select card at a literal 20 (`tests/settings-card-select-clipping.test.js`).
+- **The overflow dropdown shares the sticky layer** (100) with the header it opens from. Today's numbers were kept, not reordered.
+- **No shadow value repeats** three times, so there are no new shadow tokens. Moving shadows onto `--fsb-shadow-*` and the site's `--shadow-*` is a visual decision still to make.
 - **The `--shadow-sm` alias is inconsistent.** sidepanel.css and popup.css point it at `--fsb-shadow-sm`; the core and options.css point it at `--fsb-shadow-xs`.
 - **Lift sizes disagree.** The design system lifts site cards 4px; the agents page lifts its cards 3px.
 

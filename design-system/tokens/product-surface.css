@@ -9,14 +9,29 @@
 [data-surface="product"] {
   --fsb-primary: #ff6b35;
   --fsb-primary-hover: #e55a2b;
+  --fsb-primary-tint: #ff8c42;
+  --fsb-on-primary: #ffffff;
+  --fsb-primary-faint: rgba(255, 107, 53, 0.08);
   --fsb-primary-soft: rgba(255, 107, 53, 0.12);
   --fsb-primary-soft-strong: rgba(255, 107, 53, 0.18);
   --fsb-primary-glow: rgba(255, 107, 53, 0.24);
+  --fsb-primary-glow-strong: rgba(255, 107, 53, 0.4);
 
   --fsb-success: #10b981;
   --fsb-warning: #f59e0b;
   --fsb-danger: #dc2626;
   --fsb-info: #0891b2;
+
+  /* Status hues the pages use today beside the four above. Migration only:
+     new code uses the four semantic names (decisions/0013). */
+  --fsb-red-500: #ef4444;
+  --fsb-green-500: #22c55e;
+  --fsb-yellow-500: #eab308;
+  --fsb-amber-400: #fbbf24;
+  --fsb-amber-600: #d97706;
+  --fsb-amber-800: #92400e;
+  --fsb-indigo-500: #6366f1;
+  --fsb-blue-400: #60a5fa;
 
   --fsb-gray-50: #faf8f6;
   --fsb-gray-100: #f5f1ed;
@@ -65,6 +80,20 @@
   --fsb-space-8: 32px;
   --fsb-space-12: 48px;
 
+  /* Stacking layers, lowest first (decisions/0013). */
+  --fsb-z-dropdown: 50;
+  --fsb-z-menu: 60;
+  --fsb-z-sticky: 100;
+  --fsb-z-drawer-scrim: 150;
+  --fsb-z-drawer: 200;
+  --fsb-z-overlay: 1000;
+  --fsb-z-toast: 1100;
+  --fsb-z-modal: 2000;
+  --fsb-z-top: 9999;
+
+  /* Technical text: the platform monospace stack (decisions/0012). */
+  --fsb-font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+
   --fsb-focus-ring: 0 0 0 3px rgba(255, 107, 53, 0.14);
 
   /* Compatibility aliases. Older product CSS reads these names; new product CSS
@@ -75,7 +104,7 @@
   --primary-glow: var(--fsb-primary-glow);
 
   --primary-color: var(--fsb-primary);
-  --primary-color-dark: #ff8c42;
+  --primary-color-dark: var(--fsb-primary-tint);
   --primary-light: rgba(255, 107, 53, 0.10);
 
   --success-color: var(--fsb-success);
@@ -116,6 +145,8 @@
   --space-lg: var(--fsb-space-6);
   --space-xl: var(--fsb-space-8);
   --space-2xl: var(--fsb-space-12);
+
+  --font-mono: var(--fsb-font-mono);
 }
 
 /* Product dark theme: near-black surfaces under the warm light text

@@ -8,10 +8,16 @@
 :root {
   --primary: #ff6b35;
   --primary-hover: #e55a2b;
-  --primary-tint: #ff8c42; /* proposed */
+  --primary-tint: #ff8c42;
+  --on-primary: #ffffff;
   --primary-gradient: linear-gradient(135deg, #ff6b35, #ff8c42);
   --primary-glow: rgba(255, 107, 53, 0.3);
-  --primary-wash: rgba(255, 107, 53, 0.1); /* proposed */
+  /* Brand transparencies in use today; decisions/0013. */
+  --primary-faint: rgba(255, 107, 53, 0.08);
+  --primary-wash: rgba(255, 107, 53, 0.1);
+  --primary-soft: rgba(255, 107, 53, 0.12);
+  --primary-soft-strong: rgba(255, 107, 53, 0.18);
+  --primary-glow-strong: rgba(255, 107, 53, 0.4);
   --primary-wash-border: rgba(255, 107, 53, 0.28); /* proposed */
 
   --bg-body: #000000;
@@ -26,12 +32,15 @@
   --border-color: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.15);
 
-  --danger: #ef4444; /* proposed */
-  --danger-wash: rgba(239, 68, 68, 0.1); /* proposed */
+  --danger: #ef4444;
+  --danger-wash: rgba(239, 68, 68, 0.1);
+  --success: #22c55e;
+  --warning: #eab308;
 
   /* The site re-declares four product names with its own values. Naming gap:
-     these should become site names; see DESIGN.md, Known gaps. */
-  --fsb-primary-soft: rgba(255, 107, 53, 0.12);
+     these should become site names; see DESIGN.md, Known gaps.
+     --fsb-primary-soft already reads the site's own --primary-soft. */
+  --fsb-primary-soft: var(--primary-soft);
   --fsb-border-subtle: rgba(255, 241, 232, 0.1);
   --fsb-border-accent: rgba(255, 140, 66, 0.28);
   --fsb-focus-ring: 0 0 0 3px rgba(255, 107, 53, 0.14);

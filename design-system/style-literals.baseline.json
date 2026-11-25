@@ -14,32 +14,32 @@
       "tokenForks": 0
     },
     "extension/ui/markdown.css": {
-      "colors": 41,
+      "colors": 39,
       "zIndex": 0,
       "fontFamily": 1,
       "tokenForks": 0
     },
     "extension/ui/onboarding.css": {
-      "colors": 46,
-      "zIndex": 13,
+      "colors": 26,
+      "zIndex": 4,
       "fontFamily": 13,
       "tokenForks": 0
     },
     "extension/ui/options.css": {
-      "colors": 145,
-      "zIndex": 15,
+      "colors": 73,
+      "zIndex": 1,
       "fontFamily": 9,
-      "tokenForks": 17
+      "tokenForks": 16
     },
     "extension/ui/popup.css": {
-      "colors": 28,
+      "colors": 20,
       "zIndex": 0,
       "fontFamily": 2,
       "tokenForks": 26
     },
     "extension/ui/sidepanel.css": {
-      "colors": 149,
-      "zIndex": 2,
+      "colors": 113,
+      "zIndex": 0,
       "fontFamily": 7,
       "tokenForks": 26
     },
@@ -51,13 +51,13 @@
     },
     "showcase/angular/src/app/layout/depth/depth-end.component.scss": {
       "colors": 3,
-      "zIndex": 1,
+      "zIndex": 0,
       "fontFamily": 1,
       "tokenForks": 0
     },
     "showcase/angular/src/app/layout/depth/depth-rail.component.scss": {
       "colors": 0,
-      "zIndex": 1,
+      "zIndex": 0,
       "fontFamily": 1,
       "tokenForks": 0
     },
@@ -68,19 +68,19 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss": {
-      "colors": 3,
-      "zIndex": 5,
+      "colors": 2,
+      "zIndex": 0,
       "fontFamily": 1,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/about/about-page.component.scss": {
-      "colors": 15,
-      "zIndex": 2,
+      "colors": 11,
+      "zIndex": 1,
       "fontFamily": 1,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/agents/agents-page.component.scss": {
-      "colors": 5,
+      "colors": 0,
       "zIndex": 0,
       "fontFamily": 10,
       "tokenForks": 0
@@ -92,14 +92,14 @@
       "tokenForks": 9
     },
     "showcase/angular/src/app/pages/dashboard/dashboard-page.component.scss": {
-      "colors": 136,
-      "zIndex": 18,
+      "colors": 97,
+      "zIndex": 9,
       "fontFamily": 18,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/home/home-page.component.scss": {
-      "colors": 33,
-      "zIndex": 4,
+      "colors": 20,
+      "zIndex": 2,
       "fontFamily": 13,
       "tokenForks": 0
     },
@@ -117,7 +117,7 @@
     },
     "showcase/angular/src/app/pages/phantom-stream/phantom-stream-page.component.scss": {
       "colors": 106,
-      "zIndex": 7,
+      "zIndex": 3,
       "fontFamily": 22,
       "tokenForks": 8
     },
@@ -129,7 +129,7 @@
     },
     "showcase/angular/src/app/pages/prometheus/prometheus-page.component.scss": {
       "colors": 28,
-      "zIndex": 3,
+      "zIndex": 1,
       "fontFamily": 10,
       "tokenForks": 8
     },
@@ -140,38 +140,38 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/release-notes/release-notes-page.component.scss": {
-      "colors": 84,
-      "zIndex": 4,
+      "colors": 78,
+      "zIndex": 0,
       "fontFamily": 11,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/sitemaps/sitemaps-page.component.scss": {
-      "colors": 4,
-      "zIndex": 2,
+      "colors": 3,
+      "zIndex": 0,
       "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/stats/stats-page.component.scss": {
-      "colors": 5,
-      "zIndex": 6,
+      "colors": 3,
+      "zIndex": 0,
       "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/support/support-page.component.scss": {
-      "colors": 5,
+      "colors": 3,
       "zIndex": 0,
       "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/styles.scss": {
-      "colors": 4,
+      "colors": 2,
       "zIndex": 0,
       "fontFamily": 8,
       "tokenForks": 0
     },
     "showcase/angular/src/styles/depth.scss": {
       "colors": 14,
-      "zIndex": 3,
+      "zIndex": 0,
       "fontFamily": 0,
       "tokenForks": 0
     }

@@ -299,8 +299,10 @@ These are open, or decided and not yet applied. Each has a home in a foundation 
 4. **Space Mono is still in shipped CSS** until the migration in [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md) lands: onboarding, the control panel's version tag, six showcase pages and the release-notes template's inline styles.
 5. **Control panel timings differ.** options.css uses 150/200/300ms ease-in-out under the site's token names.
 6. **The control panel's `.status-toast` carries errors**, and the side panel's checkboxes use `#f97316`.
-7. **No z-index, type-size or motion tokens ship yet.** The site re-declares four `--fsb-*` names with its own values.
-8. **Raw values are common.** `design-system/style-literals.baseline.json` records them per file, and the counts may only fall. HTML inline styles are not counted yet.
+7. **No type-size or motion tokens ship yet.** Stacking layers have tokens now (`--fsb-z-*`, `--z-*`; [decision 0013](design-system/decisions/0013-name-values-before-changing-them.md)). The site still re-declares three `--fsb-*` names with its own values; `--fsb-primary-soft` now reads the site's `--primary-soft`.
+8. **Raw values are common, and many hold today's conflicts.**
+   - `design-system/style-literals.baseline.json` records them per file, and the counts may only fall. HTML inline styles are not counted yet.
+   - The migration-only hue tokens (`--fsb-red-500` and the rest) and the six brand transparencies name values that still conflict. Each will be settled as one token value ([decision 0013](design-system/decisions/0013-name-values-before-changing-them.md)).
 9. **Overlay gaps against these rules:**
     - The viewport glow's bead keeps travelling under `prefers-reduced-motion`, and the crawl card and the element highlight ignore it.
     - The status pill overshoots as it pops in and grows, and scales new text in, against the motion rules. Its labels use Space Mono, against [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md).
@@ -311,7 +313,7 @@ These are open, or decided and not yet applied. Each has a home in a foundation 
 
 - **Run** `npm run test:design`, which `npm test` also runs. It does two things:
   - `scripts/verify-design-system.mjs` compares the token files with the shipped token blocks, this front matter with the tokens, the specimen cards, assets, links and page templates;
-  - `scripts/check-style-literals.mjs` holds raw colours, integer z-index values, literal font stacks and page-local colour tokens to the baseline.
+  - `scripts/check-style-literals.mjs` holds raw colours, integer z-index values of 10 and up, literal font stacks and page-local colour tokens to the baseline. Smaller z-indexes order siblings inside one component and are not counted; layers use the `--fsb-z-*` and `--z-*` tokens.
 - **Changing a token** means changing the shipped file and its twin in `design-system/tokens/` together.
 - **A literal that must stay** gets a comment on the declaration that starts with `design-literal-ok:` and gives the reason.
 - **A lower count** is locked in with `node scripts/check-style-literals.mjs --write`. Raising a count is a hand edit to the baseline, visible in review.

@@ -4,7 +4,8 @@
  *
  * Counts four things in each in-scope file:
  *   colors      colour literals (#hex, rgb[a](), hsl[a]()) in declarations
- *   zIndex      integer z-index values
+ *   zIndex      integer z-index values of 10 and up (smaller values order
+ *               siblings inside one component; layers use tokens)
  *   fontFamily  literal font-family stacks (var(), inherit and @font-face skipped)
  *   tokenForks  colour literals inside custom properties declared outside the
  *               token blocks that design-system/tokens mirrors (page-local
@@ -45,6 +46,8 @@ export const MIRRORED_SCOPES = {
 export const SCRIPT_FILES = ['extension/content/visual-feedback.js'];
 
 const FONT_KEYWORDS = /^(var\(|inherit$|initial$|unset$|revert$|revert-layer$)/i;
+/** z-index values below this order siblings inside a component and are not counted. */
+export const LAYER_MIN = 10;
 
 function zeroCounts() {
   return { colors: 0, zIndex: 0, fontFamily: 0, tokenForks: 0 };
@@ -61,7 +64,10 @@ export function countCss(text, { scss = false, mirrored = [] } = {}) {
       continue;
     }
     counts.colors += countColors(decl.value);
-    if (prop === 'z-index' && /^-?\d+$/.test(decl.value.replace(/!important/i, '').trim())) counts.zIndex += 1;
+    if (prop === 'z-index') {
+      const z = decl.value.replace(/!important/i, '').trim();
+      if (/^-?\d+$/.test(z) && Number(z) >= LAYER_MIN) counts.zIndex += 1;
+    }
     if (prop === 'font-family'
       && !decl.context.some((header) => /^@font-face\b/i.test(header))
       && !FONT_KEYWORDS.test(decl.value.trim())) {
@@ -86,9 +92,10 @@ export function countScript(text) {
     .replace(/^\s*\/\/.*$/gm, '')
     .replace(/&#x?[0-9a-fA-F]+;/g, ' ');
   counts.colors = (cleaned.match(HEX_COLOR) || []).length + (cleaned.match(COLOR_FUNCTION) || []).length;
-  counts.zIndex = (cleaned.match(/z-index\s*:\s*-?\d+/gi) || []).length
-    + (cleaned.match(/\.zIndex\s*=\s*['"`]?-?\d+/g) || []).length
-    + (cleaned.match(/setProperty\(\s*['"]z-index['"]\s*,\s*['"`]?-?\d+/g) || []).length;
+  const layers = (re) => [...cleaned.matchAll(re)].filter((m) => Number(m[1]) >= LAYER_MIN).length;
+  counts.zIndex = layers(/z-index\s*:\s*(-?\d+)/gi)
+    + layers(/\.zIndex\s*=\s*['"`]?(-?\d+)/g)
+    + layers(/setProperty\(\s*['"]z-index['"]\s*,\s*['"`]?(-?\d+)/g);
   counts.fontFamily = (cleaned.match(/font-family\s*:\s*(?!var\(|inherit|initial|unset|revert)/gi) || []).length
     + (cleaned.match(/\.fontFamily\s*=\s*['"`](?!var\()/g) || []).length;
   return counts;
