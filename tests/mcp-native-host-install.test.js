@@ -3339,6 +3339,37 @@ async function runCliOutput() {
     equal(result.exitCode, 0, `a ${label} helper result never changes the install exit code`);
     equal(result[stream].split('\n')[0], line, `a ${label} helper result prints its one fixed line on ${stream}`);
   }
+  // A browser whose registration failed beside the ones that worked is a
+  // warning of its own, after the success line.
+  for (const [label, ensure, line] of [
+    ['installed', {
+      outcome: 'installed', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: ['chrome'], stableRoot: '',
+      failedBrowsers: ['edge'], failedReason: 'registration-publish-failed',
+    }, `\u2713 Installed ${helper} for Chrome`],
+    ['current', {
+      outcome: 'current', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '',
+      failedBrowsers: ['brave', 'edge'], failedReason: 'lock-lost',
+    }, `\u25CB ${helper} is already installed for Chrome`],
+  ]) {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, { ensure })));
+    equal(result.exitCode, 0, `a failed extra registration on a ${label} helper never changes the exit code`);
+    equal(result.stdout.split('\n')[0], line, `a ${label} helper with a failed extra registration still prints its success line`);
+    equal(
+      result.stderr.split('\n')[0],
+      `\u26A0 ${helper} was not registered for ${ensure.failedBrowsers.includes('brave') ? 'Edge, Brave' : 'Edge'}: ${ensure.failedReason}. Run the same install command again.`,
+      `a ${label} helper names the browsers whose registration failed on stderr`,
+    );
+  }
+  {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, {
+      ensure: {
+        outcome: 'installed', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: ['chrome'], stableRoot: '',
+        failedBrowsers: [sensitive], failedReason: sensitive,
+      },
+    })));
+    equal(result.stderr, '', 'failed registrations naming no known browser print no warning');
+    check(!result.stdout.includes(sensitive), 'failed-registration fields never reach the output unchecked');
+  }
   {
     const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, {
       ensure: { outcome: 'refreshed', version: `${sensitive}`, browsers: ['chrome', sensitive], addedBrowsers: [sensitive], stableRoot: sensitive },
@@ -3587,6 +3618,11 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     }
   }
 
+  // Browsers whose own registration write fails: the manifest file on macOS
+  // and Linux, the registry value on Windows, where the manifest is shared.
+  const failingRegistrationWrites = new Set((options.failRegistrationWrites || []).map((browser) => (
+    platformName === 'win32' ? layouts[browser].registration.key : layouts[browser].manifestPath
+  )));
   const platformDependencies = {
     files: {
       inspectFile: async (pathname) => {
@@ -3601,6 +3637,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
       },
       writePrivateFileAtomic: async (pathname, contents) => {
         trace.push(`file:write:${pathname}`);
+        if (platformName !== 'win32' && failingRegistrationWrites.has(pathname)) throw new Error('sensitive:EACCES');
         if (windowsManifestPath && pathname === windowsManifestPath) {
           if (!stable || stable.manifest) throw new Error('sensitive:EEXIST');
           stable.manifest = contents;
@@ -3618,6 +3655,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
       readDefault: async (view, key) => registry.get(`${view}|${key}`) || Object.freeze({ status: 'absent' }),
       writeDefault: async (view, key, value) => {
         trace.push(`registry:write:${view}:${key}`);
+        if (platformName === 'win32' && failingRegistrationWrites.has(key)) throw new Error('sensitive:EACCES');
         registry.set(`${view}|${key}`, Object.freeze({ status: 'value', ...value }));
       },
       deleteDefault: async (view, key) => {
@@ -4028,6 +4066,38 @@ async function runEnsureTransaction() {
       );
       deepEqual(result.browsers, ['chrome'], `${platformName} install falls back to Chrome when no profile has the extension`);
       equal(harness.stable().provenance, 'explicit', `${platformName} explicit provenance is recorded`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        detected: ['chrome', 'edge'],
+        failRegistrationWrites: ['edge'],
+      });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'auto' },
+        harness.dependencies,
+      );
+      equal(result.outcome, 'installed', `${platformName} a failed second registration still leaves the first installed`);
+      deepEqual(result.browsers, ['chrome'], `${platformName} the result names only the browser that was registered`);
+      deepEqual(result.failedBrowsers, ['edge'], `${platformName} the result names the browser whose registration failed`);
+      equal(result.failedReason, 'registration-publish-failed', `${platformName} the result carries why it failed`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} only Chrome is registered`);
+      check(!JSON.stringify(result).includes('sensitive'), `${platformName} the failure carries no raw error text`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        detected: ['chrome', 'edge'],
+        failRegistrationWrites: ['edge'],
+      });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'auto' },
+        harness.dependencies,
+      );
+      equal(result.outcome, 'current', `${platformName} a current helper whose only addition failed stays current`);
+      deepEqual(result.addedBrowsers, [], `${platformName} the failed addition is not reported as added`);
+      deepEqual(result.failedBrowsers, ['edge'], `${platformName} the failed addition is reported`);
+      equal(result.failedReason, 'registration-publish-failed', `${platformName} the failed addition carries its reason`);
     }
     {
       const harness = fakeEnsureHarness(modules, platformName, {

@@ -476,6 +476,18 @@ function forBrowsers(value: unknown): string {
 }
 
 /**
+ * A browser the run meant to register beside the others but could not. The
+ * helper works for the rest, so this is a warning; the same install command
+ * plans the missing browser again.
+ */
+function printFailedRegistrations(result: Readonly<Record<string, unknown>>): void {
+  const names = browserNames(result.failedBrowsers);
+  if (!names) return;
+  console.error('\u26A0 ' + HELPER_LABEL + ' was not registered for ' + names + ': '
+    + boundedReason(result.failedReason) + '. Run the same install command again.');
+}
+
+/**
  * One line for an ensure result. Successes go to stdout; anything that left
  * the helper missing or stale goes to stderr as a warning. Neither changes
  * the exit code.
@@ -486,18 +498,22 @@ function printHelperEnsureResult(value: unknown): void {
   switch (result?.outcome) {
     case 'installed':
       console.log('\u2713 Installed ' + HELPER_LABEL + forBrowsers(result.browsers));
+      printFailedRegistrations(result);
       return;
     case 'refreshed': {
       const version = boundedVersion(result.version);
       console.log('\u2713 Updated ' + HELPER_LABEL + (version ? ' to ' + version : '') + forBrowsers(result.browsers));
+      printFailedRegistrations(result);
       return;
     }
     case 'registered':
       console.log('\u2713 Registered ' + HELPER_LABEL + forBrowsers(result.addedBrowsers));
+      printFailedRegistrations(result);
       return;
     case 'current':
       console.log('\u25CB ' + HELPER_LABEL + ' is already installed' + forBrowsers(result.browsers)
         + (result.reason === 'installed-newer' ? ' (a newer version than this package)' : ''));
+      printFailedRegistrations(result);
       return;
     case 'skipped-absent':
     case 'skipped-opt-out':

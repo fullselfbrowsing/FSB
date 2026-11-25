@@ -472,6 +472,13 @@ export interface NativeHostEnsureResult {
   browsers: NativeHostBrowser[];
   addedBrowsers: NativeHostBrowser[];
   stableRoot: string;
+  /**
+   * Browsers this run meant to register beside the others but could not.
+   * Present only when one failed; the outcome still describes the rest.
+   */
+  failedBrowsers?: NativeHostBrowser[];
+  /** Why the first of `failedBrowsers` failed. */
+  failedReason?: string;
 }
 
 export interface NativeHostUninstallAllRequest {

@@ -828,6 +828,8 @@ type EnsureResultFields = Readonly<{
   version?: string | null;
   browsers?: readonly NativeHostBrowser[];
   addedBrowsers?: readonly NativeHostBrowser[];
+  failedBrowsers?: readonly NativeHostBrowser[];
+  failedReason?: string | null;
 }>;
 
 function ensureResult(
@@ -842,6 +844,12 @@ function ensureResult(
     browsers: [...(fields.browsers ?? [])],
     addedBrowsers: [...(fields.addedBrowsers ?? [])],
     stableRoot: dependencies?.stableRoot ?? '',
+    ...(fields.failedBrowsers && fields.failedBrowsers.length > 0
+      ? {
+        failedBrowsers: [...fields.failedBrowsers],
+        ...(fields.failedReason ? { failedReason: fields.failedReason } : {}),
+      }
+      : {}),
   });
 }
 
@@ -1932,6 +1940,37 @@ async function addRegistrationLocked(
 }
 
 /**
+ * Registers each of `browsers` beside the ones already registered. A browser
+ * that fails is reported rather than dropped, so the install can say so, and
+ * a lost lock leaves every browser not yet tried among the failures.
+ */
+async function addRegistrations(
+  dependencies: NativeHostEnsureDependencies,
+  lease: NativeHostLockLease,
+  browsers: readonly NativeHostBrowser[],
+  extensionId: string,
+): Promise<Readonly<{ added: NativeHostBrowser[]; failed: NativeHostBrowser[]; failedReason: string | null }>> {
+  const added: NativeHostBrowser[] = [];
+  const failed: NativeHostBrowser[] = [];
+  let failedReason: string | null = null;
+  for (const [index, browser] of browsers.entries()) {
+    if (!await stillHeld(lease)) {
+      failed.push(...browsers.slice(index));
+      failedReason ??= 'lock-lost';
+      break;
+    }
+    const step = await addRegistrationLocked(dependencies, browser, extensionId);
+    if (step.ok) {
+      added.push(browser);
+    } else {
+      failed.push(browser);
+      failedReason ??= step.reason;
+    }
+  }
+  return Object.freeze({ added, failed, failedReason });
+}
+
+/**
  * Removes one browser's exact registration, rechecking it first. On Windows
  * only the browser's registry value and its emptied key go; the manifest
  * inside the stable root stays for the other browsers and leaves with it.
@@ -2015,18 +2054,17 @@ async function executeInstall(
       browsers: settled ? [first] : [],
     });
   }
-  const added: NativeHostBrowser[] = [first];
-  for (const browser of rest) {
-    if (!await stillHeld(lease)) break;
-    if ((await addRegistrationLocked(dependencies, browser, plan.extensionId)).ok) {
-      added.push(browser);
-    }
-  }
+  const more = await addRegistrations(dependencies, lease, rest, plan.extensionId);
+  const added: NativeHostBrowser[] = [first, ...more.added];
+  // The publish itself succeeded, so the stamp records success; a browser
+  // that failed is retried by the next install, which plans it again.
   await recordStamp(dependencies, key, true);
   return ensureResult(dependencies, 'installed', {
     version: installed.packageVersion,
     browsers: sortedBrowsers(added),
     addedBrowsers: sortedBrowsers(added),
+    failedBrowsers: sortedBrowsers(more.failed),
+    failedReason: more.failedReason,
   });
 }
 
@@ -2071,18 +2109,19 @@ async function executeUpdate(
       // The helper keeps working; it only stays removable with its last client.
     }
   }
-  const added: NativeHostBrowser[] = [];
-  for (const browser of plan.additions) {
-    if (!await stillHeld(lease)) break;
-    if ((await addRegistrationLocked(dependencies, browser, plan.extensionId)).ok) {
-      added.push(browser);
-    }
-  }
+  const { added, failed, failedReason } = await addRegistrations(
+    dependencies,
+    lease,
+    plan.additions,
+    plan.extensionId,
+  );
   if (outcome === 'current' && added.length > 0) outcome = 'registered';
   return ensureResult(dependencies, outcome, {
     version: receipt.packageVersion,
     browsers: sortedBrowsers([...plan.registered, ...added]),
     addedBrowsers: sortedBrowsers(added),
+    failedBrowsers: sortedBrowsers(failed),
+    failedReason,
   });
 }
 
