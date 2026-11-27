@@ -5219,10 +5219,12 @@
     return selector.replace(BIND_SELECTOR_PREFIX, '');
   }
 
+  // FSB's own UI is found by its host ids. data-fsb-role is not a marker for
+  // it: getFilteredElements stamps that attribute on page elements (the Docs
+  // editor and title, the Sheets formula bar), which must stay bindable.
   function bindIsHostNode(el) {
     const hosts = FSB.FSB_HOST_IDS;
-    if (hosts && typeof hosts.has === 'function' && el.id && hosts.has(el.id)) return true;
-    return !!(el.dataset && el.dataset.fsbRole);
+    return !!(hosts && typeof hosts.has === 'function' && el.id && hosts.has(el.id));
   }
 
   // Depth-first walk in document order over document.body, entering open

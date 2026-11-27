@@ -668,6 +668,25 @@ test('click text no longer picks the last match: ambiguity lists candidates', ()
   assert.equal(/createTreeWalker|candidates\.length - 1/.test(textBranch), false);
 });
 
+test('page elements stamped data-fsb-role stay bindable; FSB\'s own UI is not', () => {
+  // A snapshot of Google Docs stamps data-fsb-role on the editor column; a
+  // button inside it is a page control.
+  const ctx = loadContentScripts();
+  const insert = ctx.el('button', { id: 'insert', type: 'button' }, ['Insert table']);
+  const editor = ctx.el('div', { id: 'editor', class: 'kix-appview-editor', 'data-fsb-role': 'document-body' }, [insert]);
+  editor.dataset.fsbRole = 'document-body';   // as getFilteredElements writes it
+  const fsbButton = ctx.el('button', { id: 'fsb-stop', type: 'button' }, ['Stop overlay']);
+  ctx.mount(editor, ctx.el('div', { id: 'fsb-progress-host' }, [fsbButton]));
+  const bound = ctx.execute('click', { selector: 'text=Insert table' });
+  assert.equal(bound.refused, null, bound.refused && bound.refused[0].error);
+  assert.equal(bound.result.target, insert);
+
+  const own = ctx.execute('click', { selector: 'text=Stop overlay' });
+  assert.equal(own.result, null, 'a control inside an FSB host is never bound');
+  assert.equal(own.refused[0].errorCode, 'BIND_NOT_FOUND');
+  assert.equal(fsbButton.clicks, 0);
+});
+
 test('an ordinal picks by position only within one repeated list', () => {
   const ctx = loadContentScripts();
   const cards = buildCatalog(ctx);
