@@ -547,7 +547,7 @@ export class WebSocketBridge {
 
   /** Browsers that tried to attach and were turned away, with the reason. */
   get refusedBrowsers(): BrowserRefusal[] {
-    return this.mode === 'hub' ? [...this.browserRefusals.values()] : this.relayRefusedBrowsers;
+    return this.mode === 'hub' ? this._currentRefusals() : this.relayRefusedBrowsers;
   }
 
   /** Current operating mode. */
@@ -690,6 +690,28 @@ export class WebSocketBridge {
       at: Date.now(),
       extensionId: extensionIdOfOrigin(origin),
     });
+  }
+
+  /**
+   * The refusals that still hold. One for the pin holds only while that pin
+   * does, and the pin is released by `pair --reset` in another process, so it
+   * is read again here and a refusal it no longer explains is forgotten. Safari
+   * needs this most: it connects with a new Origin on every launch, so a later
+   * launch attaching never clears what an earlier one was refused for, and a
+   * session in that Safari would go on being told to release a pairing that
+   * no longer exists. The pin is read only while such a refusal is listed.
+   */
+  private _currentRefusals(): BrowserRefusal[] {
+    const pinRefusal = 'extension_origin_pin_mismatch';
+    if ([...this.browserRefusals.values()].some((refusal) => refusal.reason === pinRefusal)) {
+      const pinnedOrigin = readBridgeAuthState()?.allowedExtensionOrigin ?? null;
+      for (const [origin, refusal] of this.browserRefusals) {
+        if (refusal.reason === pinRefusal && (pinnedOrigin === null || pinnedOrigin === origin)) {
+          this.browserRefusals.delete(origin);
+        }
+      }
+    }
+    return [...this.browserRefusals.values()];
   }
 
   /** Forget everything known about attached browsers, in either mode. */
@@ -1560,9 +1582,12 @@ export class WebSocketBridge {
    * the one a relay was given if it names none (a client from before the
    * roster, which must go on seeing the one-browser bridge it expects), and
    * otherwise the default. `browsers` lists all of them for clients that can
-   * choose.
+   * choose. A broadcast hands every relay the same `refusals`.
    */
-  private _relayView(relayId: string | null): Omit<RelayState, 'type'> {
+  private _relayView(
+    relayId: string | null,
+    refusals: BrowserRefusal[] = this._currentRefusals(),
+  ): Omit<RelayState, 'type'> {
     const boundKey = relayId ? this._legacyBinding(relayId) : undefined;
     const slot = boundKey ? this.slots.get(boundKey) ?? null : this._defaultSlot();
     return {
@@ -1573,7 +1598,7 @@ export class WebSocketBridge {
       lastDisconnectReason: this.lastDisconnectReason,
       extensionAttachment: slot?.attachment ?? null,
       browsers: this._hubRoster(),
-      refusedBrowsers: [...this.browserRefusals.values()],
+      refusedBrowsers: refusals,
       hubVersion: FSB_MCP_VERSION,
     };
   }
@@ -1607,14 +1632,16 @@ export class WebSocketBridge {
     this.legacyBindingTimers.add(timer);
   }
 
-  private _buildRelayState(relayId: string | null = null): RelayState {
-    return { type: 'relay:state', ...this._relayView(relayId) };
+  private _buildRelayState(relayId: string | null = null, refusals?: BrowserRefusal[]): RelayState {
+    return { type: 'relay:state', ...this._relayView(relayId, refusals) };
   }
 
   private _broadcastRelayState(): void {
+    // Decided once for the whole broadcast: it can mean reading the pin.
+    const refusals = this._currentRefusals();
     for (const [relayId, ws] of this.relayClients) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(this._buildRelayState(relayId)));
+        ws.send(JSON.stringify(this._buildRelayState(relayId, refusals)));
       }
     }
   }

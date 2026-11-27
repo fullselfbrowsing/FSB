@@ -3067,6 +3067,84 @@ async function runPairingTurnsAwayAWaitingBrowser(WebSocketBridge, auth) {
   });
 }
 
+// A browser turned away by the pin is turned away only while that pin stands.
+// `pair --reset` runs in another process, and Safari connects with a new Origin
+// on every launch, so neither a reset nor a later Safari attaching clears the
+// refusal by itself. A session in that Safari must not go on being told to
+// release a pairing that no longer exists.
+async function runPinRefusalEndsWithThePin(WebSocketBridge, auth, routing) {
+  await withTempHome('bridge-pin-refusal-ends', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    const pairingCode = auth.formatPairingCode(auth.rotateBridgeSessionSecret(authPath, 30_000));
+    const options = { port, host: '127.0.0.1', handshakeTimeoutMs: 100 };
+    const hub = new WebSocketBridge({ ...options, instanceId: 'pin-refusal-hub' });
+    const relay = new WebSocketBridge({ ...options, instanceId: 'pin-refusal-relay' });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    const otherOrigin = 'chrome-extension://pin-refusal-other';
+    const pinRefusals = (bridge) => bridge.refusedBrowsers
+      .filter((entry) => entry.reason === 'extension_origin_pin_mismatch');
+    try {
+      await hub.connect();
+      await relay.connect();
+
+      // One Safari launch, turned away by pairing chrome, and another extension
+      // ID refused at upgrade while the pin stands.
+      const firstLaunch = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      resources.sockets.push(firstLaunch.socket);
+      await waitFor(() => browserKeys(hub) === SAFARI_KEY, 'safari attaches while nothing is pinned');
+      const firstClosed = waitForSocketClose(firstLaunch.socket, 1500);
+      firstClosed.catch(() => {});
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN, { pairingCode });
+      resources.sockets.push(chrome.socket);
+      assertEqual((await firstClosed).code, 1008, 'pairing chrome turns safari away');
+      await waitFor(() => browserKeys(hub) === CHROME_KEY, 'only the paired browser stays attached');
+      const otherUpgrade = await rawUpgrade(port, [`Host: 127.0.0.1:${port}`, `Origin: ${otherOrigin}`]);
+      assert(otherUpgrade.startsWith('HTTP/1.1 403'), 'another extension id is refused at upgrade while the pin stands');
+      assert(pinRefusals(hub).some((entry) => entry.kind === 'safari'), 'safari is listed as refused for the pin');
+      assert(pinRefusals(hub).some((entry) => entry.extensionId === 'pin-refusal-other'), 'and so is the other extension id');
+
+      // The pin moves to the other extension: its refusal is over, safari's is not.
+      auth.resetBridgePairing(authPath, 31_000);
+      auth.bindAllowedExtensionOrigin(otherOrigin, authPath);
+      assertEqual(
+        pinRefusals(hub).some((entry) => entry.extensionId === 'pin-refusal-other'),
+        false,
+        'an extension the pin now names is no longer listed as refused for it',
+      );
+      assert(pinRefusals(hub).some((entry) => entry.kind === 'safari'), 'safari, still outside the pin, still is');
+
+      // Released: nothing is refused for a pin any more.
+      auth.resetBridgePairing(authPath, 32_000);
+      assertEqual(pinRefusals(hub).length, 0, 'with the pairing released no browser is listed as refused for it');
+
+      // Safari's next launch connects with a new Origin and attaches. The
+      // frame that tells relays so carries the refusals that still hold.
+      const nextLaunch = await attachBrowser(port, WAITING_SAFARI_ORIGIN);
+      resources.sockets.push(nextLaunch.socket);
+      await waitFor(() => browserKeys(relay) === BOTH_KEYS, 'relays see the next safari launch attached');
+      assertEqual(relay.topology.refusedBrowsers.length, 0, 'and are told nothing is refused');
+
+      // A session working in that safari. Safari quits, and the session is told
+      // its browser is not connected, not to release a pairing.
+      const scope = new routing.AgentScope({ environment: {} });
+      const placed = routing.routeBrowserCall(relay, scope, { browser: 'safari' });
+      assertEqual(placed.ok && placed.browser, SAFARI_KEY, 'naming safari puts the session in it');
+      scope.noteBrowserUse(SAFARI_KEY, []);
+      const nextClosed = waitForSocketClose(nextLaunch.socket, 1500);
+      nextLaunch.socket.close();
+      await nextClosed;
+      await waitFor(() => browserKeys(relay) === CHROME_KEY, 'relays see safari leave');
+      const away = routing.routeBrowserCall(relay, scope, {});
+      assertEqual(away.ok, false, 'the session is not moved to the chrome that is left');
+      assertEqual(away.failure && away.failure.code, 'BROWSER_NOT_CONNECTED', 'it is told its browser is not connected');
+      assertEqual(away.failure && away.failure.refusalReason, undefined, 'with no refusal from a pin that is gone');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runSafariIdentityAndFocus(WebSocketBridge) {
   await withTempHome('bridge-safari-identity', async () => {
     const port = await getFreePort();
@@ -3928,6 +4006,11 @@ async function runHubExitPromotion(WebSocketBridge) {
 async function run() {
   const WebSocketBridge = await loadBridgeClass();
   const bridgeModule = await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'bridge.js')).href);
+  // How a session chooses its browser, for cases that check what it is told.
+  const routing = {
+    ...(await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'agent-bridge.js')).href)),
+    ...(await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'agent-scope.js')).href)),
+  };
   const auth = await loadAuthModule();
   const lifecycleModule = await loadServeDelegationModule();
 
@@ -3964,6 +4047,7 @@ async function run() {
   await runCase('a relay that names no browser stays when the default moves', () => runLegacyRelayStaysWhenTheDefaultMoves(WebSocketBridge));
   await runCase('pairing one browser closes the other', () => runPairingClosesTheOtherBrowser(WebSocketBridge, auth));
   await runCase('a browser still saying who it is when pairing binds is turned away', () => runPairingTurnsAwayAWaitingBrowser(WebSocketBridge, auth));
+  await runCase('a pin refusal ends with the pin', () => runPinRefusalEndsWithThePin(WebSocketBridge, auth, routing));
   await runCase('safari identity and focus reports', () => runSafariIdentityAndFocus(WebSocketBridge));
   await runCase('each browser has its own liveness reaper', () => runEachBrowserHasItsOwnReaper(WebSocketBridge));
   await runCase('a promoted relay starts with no roster', () => runPromotedRelayStartsWithNoRoster(WebSocketBridge));
