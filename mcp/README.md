@@ -260,6 +260,8 @@ Claude Code:
 claude mcp add --scope user fsb -- npx -y fsb-mcp-server@latest
 ```
 
+Claude Code and Cowork can use the Full Self Browsing plugin instead: `claude plugin marketplace add fullselfbrowsing/fsb-claude-plugin`, then `claude plugin install full-self-browsing@full-self-browsing`. The plugin pins the matching server release and adds the FSB skill. Keep one of the two setups, not both, so Claude sees a single FSB server.
+
 Codex CLI / Codex IDE (`~/.codex/config.toml`):
 
 ```toml

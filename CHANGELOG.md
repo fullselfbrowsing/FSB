@@ -6,6 +6,10 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Added
+
+- **Claude plugin.** `plugins/claude/` packages the FSB skill and a local `fsb` MCP server, pinned to the current `fsb-mcp-server` release, as the `full-self-browsing` plugin for Claude Code and Cowork tasks on the user's computer. `npm run version:set:mcp` keeps its manifest version, launcher pin and README commands on the MCP version, and `tests/claude-plugin-spec.test.js` enforces the Claude plugin directory's offline checks. `scripts/export-claude-plugin.mjs` and the `claude-plugin-mirror` workflow publish it to `fullselfbrowsing/fsb-claude-plugin`, which Claude Code users add as a marketplace and which is the source for a Claude directory submission (see `docs/claude-plugin-submission.md`).
+
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline and Antigravity installer fixes, Grok Build capability checks, and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.
