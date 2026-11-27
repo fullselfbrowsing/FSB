@@ -14,6 +14,7 @@ import { registerVaultTools } from './tools/vault.js';
 import { registerCapabilityTools } from './tools/capabilities.js';
 import { registerResources } from './resources/index.js';
 import { registerPrompts } from './prompts/index.js';
+import { annotateTools } from './tools/annotations.js';
 
 export type FSBRuntime = {
   server: McpServer;
@@ -33,6 +34,7 @@ export function createRuntime(options: RuntimeOptions = {}): FSBRuntime {
   const queue = options.queue ?? new TaskQueue();
   const agentScope = options.agentScope ?? new AgentScope();
   const server = createServer();
+  annotateTools(server);
 
   if (typeof agentScope.setClientInfoSupplier === 'function') {
     agentScope.setClientInfoSupplier(() => server.server.getClientVersion?.() ?? null);

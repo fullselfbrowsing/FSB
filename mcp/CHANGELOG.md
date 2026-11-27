@@ -2,6 +2,12 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+## Unreleased
+
+### Changed
+
+- **Every tool declares a title and behavior hints.** Each of the server's tools now advertises a human-readable `title` and the `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` annotations in `tools/list`. Hosts such as Claude Code may run read-only calls like `read_page` and `list_tabs` in parallel, and may ask for confirmation before destructive tools such as `click`, `type_text`, `execute_js`, or `use_payment_method`. The hints are set in one place, `src/tools/annotations.ts`, and `tests/mcp-tool-annotations.test.js` fails when a registered tool has no entry.
+
 <a id="v0.11.5"></a>
 
 ## 0.11.5 (2026-10-18)
