@@ -36,7 +36,6 @@ None yet. The forms card shows focus styles: [forms](../components/forms/forms.c
 - **Reduced motion is uneven.**
   - The popup has no reduced-motion handling, and the site has no global guard.
   - On web pages, the viewport glow keeps its bead loop running under reduced motion, as do the crawl card and the element highlight ([overlays](../surfaces/overlays.md)).
-  - The showcase dashboard's infinite pulses have no reduced-motion block either.
 - **Overlay focus and targets:**
   - The status pill's Stop button can take keyboard focus inside an `aria-hidden` host.
   - Stop is 36px square (`.pl-stop` in `visual-feedback.js`), under the 44px that new controls must meet.

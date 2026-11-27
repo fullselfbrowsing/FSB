@@ -8,7 +8,7 @@ Start with [DESIGN.md](../DESIGN.md) at the repository root: the short contract,
 
 | Surface | What it is | Palette | Page |
 |---|---|---|---|
-| Showcase site | Marketing and research pages, every route including `/dashboard` | Site: dark first, slate on near-black | [surfaces/showcase.md](surfaces/showcase.md) |
+| Showcase site | Marketing and research pages, every route | Site: dark first, slate on near-black | [surfaces/showcase.md](surfaces/showcase.md) |
 | Side panel | The extension's chat and task surface | Product: warm, light first | [surfaces/side-panel.md](surfaces/side-panel.md) |
 | Popup | A 400×600 chat window, opened when the side panel cannot open or when pinned (not a toolbar popup) | Product | [surfaces/popup.md](surfaces/popup.md) |
 | Control panel | Settings and dashboard (`control_panel.html` with `options.css`) | Product | [surfaces/control-panel.md](surfaces/control-panel.md) |

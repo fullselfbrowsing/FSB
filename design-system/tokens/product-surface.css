@@ -1,5 +1,5 @@
-/* Product palette: the extension's side panel, popup and control panel, and the
-   legacy showcase/dashboard.html. Light first; [data-theme="dark"] flips it.
+/* Product palette: the extension's side panel, popup and control panel. Light
+   first; [data-theme="dark"] flips it.
 
    Mirrors extension/shared/fsb-ui-core.css. On shipped pages these names sit on
    :root, because every product page loads fsb-ui-core.css. Here they sit under

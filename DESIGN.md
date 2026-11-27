@@ -152,7 +152,7 @@ There are three palettes, each tied to where it ships ([decision 0002](design-sy
 
 | Palette | Ships on | Default | Theme switch |
 |---|---|---|---|
-| Site | the showcase (every route, including `/dashboard`) and extension onboarding | dark | `[data-theme="light"]` |
+| Site | the showcase (every route) and extension onboarding | dark | `[data-theme="light"]` |
 | Product | side panel, popup, control panel | light | `[data-theme="dark"]` |
 | Overlay | everything drawn on web pages | dark cards | none |
 

@@ -39,7 +39,7 @@ Stacking layers, lowest first ([0013](../decisions/0013-name-values-before-chang
 | `overlay` | 1000 | save bar, graph tooltips | | | |
 | `toast` | 1100 | status toast | | | |
 | `modal` | 2000 | credential modal | | | |
-| `top` | 9999 | pairing QR overlay | | | |
+| `top` | 9999 | nothing since the pairing QR overlay was removed | | | |
 
 ## Specimens
 

@@ -24,7 +24,7 @@ The `.card.html` files load a `_ds_bundle.js` that only the design tool builds, 
 | [SectionHeader](core/SectionHeader.prompt.md) | num, eyebrow, align | `.section-header` (styles.scss), centred only | No left-aligned variant ships. The numbered form exists only inline in release notes |
 | [StatBlock](core/StatBlock.prompt.md) | value, label | `.fsb-stats`, `.fsb-stat`, `.fsb-stat-value`, `.fsb-stat-label` on home and about | The shipped value is 1.5rem and the label 0.8rem; the kit uses 1.4rem and 0.78rem |
 | [Field](forms/Field.prompt.md) | label, hint | `.form-group label` (options.css); onboarding labels | No shipped hint style |
-| [Input](forms/Input.prompt.md) | text | `.form-input` (options.css, focus ring from fsb-ui-core.css); onboarding key input; showcase dashboard input | Onboarding and the dashboard inputs use a mono font |
+| [Input](forms/Input.prompt.md) | text | `.form-input` (options.css, focus ring from fsb-ui-core.css); onboarding key input | The onboarding input uses a mono font |
 | [Textarea](forms/Textarea.prompt.md) | rows | The side panel's `.input-wrapper` with a contenteditable `.chat-input` | The shipped input grows with content, has resize off and a 20px-radius wrapper |
 | [Select](forms/Select.prompt.md) | options | `.form-select` and the custom `.fsb-select` listbox (options.css); the showcase language picker | The kit is a native select with a Font Awesome chevron |
 | [Toggle](forms/Toggle.prompt.md) | checked, label | `.toggle-switch`, `.toggle-track`, `.toggle-thumb` (options.css) | Shipped track 44×24 with an 18px knob, flat orange. The kit uses 46×26, a gradient track and a 20px knob |

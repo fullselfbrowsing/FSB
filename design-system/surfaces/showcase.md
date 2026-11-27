@@ -14,7 +14,7 @@ The marketing, docs and research site: an Angular app under `showcase/angular`, 
 | Family | Routes | Chrome |
 |---|---|---|
 | Depth (`data: { depth }`) | `/`, `/about`, `/agents`, `/privacy`, `/support` | Shell nav without links, the nav cue at the bottom edge, the plane rail, and a closing site-index plane instead of the footer |
-| Flat | `/dashboard`, `/release-notes`, `/sitemaps`, `/legal` | Shell nav with wordmark, links and a menu button at 768px and below, and the shell footer |
+| Flat | `/release-notes`, `/sitemaps`, `/legal` | Shell nav with wordmark, links and a menu button at 768px and below, and the shell footer |
 | Shellless (`data: { shellless: true }`) | `/stats`, `/lattice`, `/concierge`, `/phantom-stream`, `/prometheus` | Their own chrome; the shell draws no nav and no footer |
 
 ## Palette and tokens
@@ -35,7 +35,6 @@ The site palette lives in [`styles.scss`](../../showcase/angular/src/styles.scss
 - **Borrowed names.** `:root` re-declares `--fsb-primary-soft`, `--fsb-border-subtle`, `--fsb-border-accent` and `--fsb-focus-ring` with site values, and light flips the two borders. Only the stats page reads them: `--fsb-focus-ring` in [`stats-page.component.scss`](../../showcase/angular/src/app/pages/stats/stats-page.component.scss), and `--fsb-primary-soft` for its chart colours in [`stats-page.component.ts`](../../showcase/angular/src/app/pages/stats/stats-page.component.ts).
 - **Proposed names** (marked `/* proposed */` in the token files, such as `--space-4`, `--text-h1`, `--font-mono`) do not ship. The site writes those values as literals.
 - **Theme switching.** [`theme.service.ts`](../../showcase/angular/src/app/core/theme.service.ts) `ThemeService` follows `prefers-color-scheme` and its `change` event: `applyDark()` removes `data-theme` for dark and sets `data-theme="light"` for light. The inline `initShowcaseTheme()` script in [`index.html`](../../showcase/angular/src/index.html) sets the light attribute before Angular boots. There is no manual toggle; `ShowcaseShellComponent` injects the service so it runs on every route.
-- **`/dashboard`** uses the site palette (`--bg-card`, `--text-*`, `--border-color`), not the product `--fsb-surface-*` ramp.
 - **Local palettes.** The research pages and release notes scope their own names:
 
 | Page | Scope | What it sets |
@@ -175,14 +174,12 @@ The root suites run in the `npm test` chain of [`package.json`](../../package.js
 ## Known issues
 
 1. **Google Fonts never load on the live site.** `SHOWCASE_CSP` in `server.js` allows stylesheets from the site only and fonts from the site and `data:` (`style-src 'self' 'unsafe-inline'`, `font-src 'self' data:`), so the Google Fonts `@import` atop the lattice, concierge, phantom-stream and prometheus stylesheets is blocked. Outfit and every `'Poppins'` outside the wordmark (Concierge's `.con-mark`, all of Prometheus through `.pr-page`, the `.ps-mini-*` mocks on PhantomStream and release notes) render in their fallbacks. The wordmark is unaffected: its faces are `data:` URIs. Space Mono is retired ([0012](../decisions/0012-platform-mono-for-technical-text.md)): the stylesheets and the release-notes template read `--font-mono`. The dev server in `angular.json` sends no such policy, so those pages can look right locally. See [DESIGN.md](../../DESIGN.md), Known Gaps.
-2. **Dashboard loops ignore reduced motion.** `.dash-wake-btn` (`dashWakePulse`) and `.dash-preview-automating` (`dashPreviewAutomate`) pulse forever, and `dashboard-page.component.scss` has no `prefers-reduced-motion` block.
-3. **Undeclared tokens.** The dashboard reads `--accent-color`, which no showcase stylesheet declares, so its `#f59e0b` fallback always applies.
-4. **Dead and stale shell CSS.** `showcase-shell.component.scss` keeps a stats-only block (`.stats-back-btn`, `.stats-glow-bg`, `@keyframes statsGlow`, `.footer.stats-footer`) that emulated encapsulation keeps from matching; the stats page has its own. Its comments cite a removed `isStatsRoute` and say keyframes leak globally, its header names a theme toggle that no longer exists, and the header of `release-notes-page.component.scss` repeats the keyframe claim that the same file's "Inline animation declarations, lifted" comment corrects.
-5. **Inert reveal utilities.** `.reveal`, `.reveal-left`, `.reveal-right`, `.reveal-scale` and `.delay-*` in `styles.scss` rest at their final state, yet the depth templates still carry `.reveal`.
-6. **Raw values.** Literal sizes and durations are common ([motion](../foundations/motion.md), [typography](../foundations/typography.md)). `check-style-literals.mjs` counts colours, z-index, font stacks and page-local colour tokens, not sizes, durations or inline `style` attributes, and `release-notes-page.component.html` alone carries thousands of inline styles.
-7. **Privacy rail.** Its 22 `h2[data-depth-anchor]` headings plus Overview and Index make 24 entries, so the rail runs `[data-dense="xl"]` at 22px per entry: about 574px tall, more than a phone held sideways shows, so its ends sit off screen or under the nav.
-8. **Menu button state.** `.nav-toggle` has an `aria-label` but no `aria-expanded` or `aria-controls`.
-9. **Orphan page.** [`reference-placeholder-page.component.ts`](../../showcase/angular/src/app/pages/reference-placeholder/reference-placeholder-page.component.ts) has no route in `app.routes.ts`.
+2. **Dead and stale shell CSS.** `showcase-shell.component.scss` keeps a stats-only block (`.stats-back-btn`, `.stats-glow-bg`, `@keyframes statsGlow`, `.footer.stats-footer`) that emulated encapsulation keeps from matching; the stats page has its own. Its comments cite a removed `isStatsRoute` and say keyframes leak globally, its header names a theme toggle that no longer exists, and the header of `release-notes-page.component.scss` repeats the keyframe claim that the same file's "Inline animation declarations, lifted" comment corrects.
+3. **Inert reveal utilities.** `.reveal`, `.reveal-left`, `.reveal-right`, `.reveal-scale` and `.delay-*` in `styles.scss` rest at their final state, yet the depth templates still carry `.reveal`.
+4. **Raw values.** Literal sizes and durations are common ([motion](../foundations/motion.md), [typography](../foundations/typography.md)). `check-style-literals.mjs` counts colours, z-index, font stacks and page-local colour tokens, not sizes, durations or inline `style` attributes, and `release-notes-page.component.html` alone carries thousands of inline styles.
+5. **Privacy rail.** Its 22 `h2[data-depth-anchor]` headings plus Overview and Index make 24 entries, so the rail runs `[data-dense="xl"]` at 22px per entry: about 574px tall, more than a phone held sideways shows, so its ends sit off screen or under the nav.
+6. **Menu button state.** `.nav-toggle` has an `aria-label` but no `aria-expanded` or `aria-controls`.
+7. **Orphan page.** [`reference-placeholder-page.component.ts`](../../showcase/angular/src/app/pages/reference-placeholder/reference-placeholder-page.component.ts) has no route in `app.routes.ts`.
 
 ## Sources
 

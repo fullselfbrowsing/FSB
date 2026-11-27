@@ -11,8 +11,8 @@ The control panel is the extension's options page: provider setup, settings, the
   - [`sidepanel.js`](../../extension/ui/sidepanel.js) `openControlPanelSection()` opens one section by hash.
   - [`options.js`](../../extension/ui/options.js) `initializeSections()` reads `location.hash`, and `switchSection()` writes it back.
 - **Files.** The stylesheet is [`options.css`](../../extension/ui/options.css); there is no control_panel.css. Behaviour is in options.js, plus helpers such as [`providers-panel.js`](../../extension/ui/providers-panel.js).
-- **Sections,** in rail order: `#dashboard`, `#api-config`, `#sync`, `#vault`, `#advanced`, `#memory`, `#logs` and `#help`.
-  - Sync and Vault carry a `.feature-badge.beta`. Old `#passwords` and `#payments` links land on `#vault`.
+- **Sections,** in rail order: `#dashboard`, `#api-config`, `#vault`, `#advanced`, `#memory`, `#logs` and `#help`.
+  - Vault carries a `.feature-badge.beta`. Old `#passwords` and `#payments` links land on `#vault`.
   - Entering `#advanced` also shows `#consent-audit` (`switchSection`).
 
 ## Palette and tokens
@@ -89,9 +89,8 @@ The control panel uses the product palette ([0002](../decisions/0002-three-palet
 | Card hover | `.settings-card` | `all var(--transition-base)` | keeps running |
 | Panel reveal | `slideDown`, `detailSlideDown` (max-height) | 200ms | keeps running |
 | Checking dot | `.status-dot.checking` (`pulse`) | 2s loop | keeps running |
-| Sync pill dot | `.sync-status-pill[data-state="connecting"] .dot` | 2s pulse | runs only under `no-preference` |
+| Vault status pill dot | `.sync-status-pill[data-state="connecting"] .dot` | 2s pulse | runs only under `no-preference` |
 | Model discovery | `.discovery-status.loading::before` (`discovery-spin`) | 0.8s loop | stopped |
-| Pairing countdown | `.pairing-countdown-urgent` (`pairingPulse`) | 1s scale loop | keeps running |
 | Scrolling | `html` `scroll-behavior: smooth` | — | keeps running |
 
 - **Different timings.** The `--transition-*` names are the site's, but the values (150, 200 and 300ms `ease-in-out`) are not. See [motion.md](../foundations/motion.md).
