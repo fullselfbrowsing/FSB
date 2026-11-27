@@ -686,6 +686,51 @@ test('an ordinal picks by position only within one repeated list', () => {
   assert.match(mixed.refused[0].error, /are not one repeated list/);
 });
 
+test('a leading position word is part of the name when only one element carries the rest', () => {
+  // "Last name" with only a "Name" field is a missing field, not the last of one.
+  const ctx = loadContentScripts();
+  const name = ctx.el('input', { id: 'name', type: 'text', 'aria-label': 'Name' });
+  const email = ctx.el('input', { id: 'email', type: 'text', 'aria-label': 'Email' });
+  ctx.mount(ctx.el('form', { id: 'contact' }, [name, email]));
+  for (const target of ['text=Last name', 'text=First name']) {
+    const outcome = ctx.execute('type', { selector: target, text: 'Lovelace' });
+    assert.equal(outcome.result, null, `${target} is not bound to the lone Name field`);
+    assert.equal(outcome.refused[0].errorCode, 'BIND_NOT_FOUND');
+    assert.equal(refsIn(outcome.refused[0].error).some((ref) => ctx.FSB.resolveRef(ref) === name), true,
+      'the Name field is listed as a candidate');
+  }
+  assert.equal(name.value, '');
+  assert.deepEqual(ctx.toolCalls, []);
+
+  // One "Add to cart" is not a list either; nothing is clicked.
+  const ctx2 = loadContentScripts();
+  const add = ctx2.el('button', { id: 'only-add', type: 'button' }, ['Add to cart']);
+  ctx2.mount(add);
+  const single = ctx2.execute('click', { selector: 'text=first Add to cart' });
+  assert.equal(single.result, null);
+  assert.equal(add.clicks, 0);
+});
+
+test('a text field picked by position is confirmed before anything is typed', () => {
+  // Two "Name" fields in one repeated list: "Last name" could be the second
+  // one or a field the page lacks, so the bind asks for the ref.
+  const ctx = loadContentScripts();
+  const shipping = ctx.el('input', { id: 'ship-name', type: 'text', 'aria-label': 'Name' });
+  const billing = ctx.el('input', { id: 'bill-name', type: 'text', 'aria-label': 'Name' });
+  ctx.mount(ctx.el('form', { id: 'checkout' }, [
+    ctx.el('fieldset', { id: 'ship' }, [shipping]),
+    ctx.el('fieldset', { id: 'bill' }, [billing])
+  ]));
+  const outcome = ctx.execute('type', { selector: 'text=Last name', text: 'Lovelace' });
+  assert.equal(outcome.result, null);
+  assert.equal(outcome.refused[0].errorCode, 'BIND_NEEDS_CONFIRMATION');
+  const named = outcome.refused[0].error.match(/retry with (e\d+) as the selector/);
+  assert.ok(named, outcome.refused[0].error);
+  assert.equal(ctx.FSB.resolveRef(named[1]), billing, 'the field the position picked is named by ref');
+  assert.equal(shipping.value + billing.value, '');
+  assert.deepEqual(ctx.toolCalls, []);
+});
+
 // A div made clickable by script alone: no role, handler attribute, tab stop
 // or href, only a pointer cursor.
 function scriptClickable(ctx, text, attrs = {}) {

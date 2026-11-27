@@ -5740,7 +5740,10 @@
       const ordinal = exactOnly ? null : text.match(BIND_ORDINAL_PATTERN);
       const nRest = ordinal ? bindNormalize(ordinal[3]) : '';
       const rest = nRest ? bindRank(pool.entries, nRest, true) : null;
-      if (rest && rest.list.length > 0) {
+      // A position needs a list: with one element named by the rest, the
+      // leading word is more likely part of the name ("Last name" with only a
+      // "Name" field), so the target is not read as an ordinal.
+      if (rest && rest.list.length > 1) {
         const items = rest.list.slice().sort((a, b) => a.index - b.index);
         const word = ordinal[1].toLowerCase();
         const position = word === 'last' ? items.length : (ordinal[2] ? parseInt(ordinal[2], 10) : BIND_ORDINAL_WORDS[word]);
@@ -5788,6 +5791,16 @@
         `No ${qualifier} ${noun} is named text=${shown}, so nothing was executed.${truncated} Closest names:\n`
           + `${bindCandidateLines(near, false).join('\n')}\nRetry with one of these refs as the selector, or take a get_page_snapshot.`,
         0);
+    }
+
+    // Text fields are often named with a leading position word ("First name",
+    // "Last name"), so a field picked by position is confirmed before typing.
+    if (family === 'field' && by === 'ordinal') {
+      const [line] = bindCandidateLines([chosen], true);
+      return bindRefusal('BIND_NEEDS_CONFIRMATION',
+        `text=${shown} matched ${line} ${BIND_BY_WORDS.ordinal}, and text fields are often named with a leading position word, so nothing was executed. `
+          + `If it is the right element, retry with ${chosen.ref} as the selector.`,
+        1);
     }
 
     if (!BIND_READ_TOOLS.has(tool)) {
