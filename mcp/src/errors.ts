@@ -60,6 +60,8 @@ const LAYER_LABELS = {
   nameAmbiguous: 'Target name matched more than one element',
   nameNotFound: 'Target name matched no element',
   nameNeedsConfirmation: 'Target name matched a control that can commit',
+  optionNotFound: 'Option not found',
+  optionAmbiguous: 'Option matched more than one choice',
 } as const;
 
 // Phase 66.1: the extension writes every SETTING_ sentence, Allowed clause and
@@ -97,6 +99,10 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'BIND_AMBIGUOUS',
   'BIND_NOT_FOUND',
   'BIND_NEEDS_CONFIRMATION',
+  // select_option named no single option; the select was not touched. The
+  // extension lists the options the select offers in the error text.
+  'OPTION_NOT_FOUND',
+  'OPTION_AMBIGUOUS',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -236,7 +242,7 @@ function describeElementLookupFailure(
     return {
       detected: LAYER_LABELS.elementLookup,
       why: errorMsg || 'The element ref comes from an earlier snapshot and no longer points at the page.',
-      nextAction: 'The page changed after that snapshot. Take a fresh get_dom_snapshot and retry with a ref from it.',
+      nextAction: 'The page changed after that snapshot. Take a fresh get_page_snapshot and retry with a ref from it.',
     };
   }
 
@@ -245,7 +251,7 @@ function describeElementLookupFailure(
     return {
       detected: LAYER_LABELS.elementLookup,
       why: errorMsg || 'The selector or element ref matched no element on the current page.',
-      nextAction: 'Take a fresh get_dom_snapshot and retry with a selector or ref from it, or use a different selector.',
+      nextAction: 'Take a fresh get_page_snapshot and retry with a selector or ref from it, or use a different selector.',
     };
   }
 
@@ -253,7 +259,7 @@ function describeElementLookupFailure(
     return {
       detected: LAYER_LABELS.elementLookup,
       why: errorMsg,
-      nextAction: 'Fix the selector syntax, or take a get_dom_snapshot and use a selector or ref from it.',
+      nextAction: 'Fix the selector syntax, or take a get_page_snapshot and use a selector or ref from it.',
     };
   }
   return null;
@@ -362,6 +368,18 @@ function buildLayeredDetail(
         detected: LAYER_LABELS.nameNeedsConfirmation,
         why: errorMsg || 'The name matched a control that can commit without an exact name unique on the page, so nothing was executed.',
         nextAction: 'Nothing was executed. If the listed element is the one you mean, retry with its ref as the selector.',
+      };
+    case 'OPTION_NOT_FOUND':
+      return {
+        detected: LAYER_LABELS.optionNotFound,
+        why: errorMsg || 'No option of the select matches that value or text, so nothing was changed.',
+        nextAction: 'Nothing was changed. Retry with the value or visible text of one of the listed options.',
+      };
+    case 'OPTION_AMBIGUOUS':
+      return {
+        detected: LAYER_LABELS.optionAmbiguous,
+        why: errorMsg || 'More than one option matches that text, so nothing was changed.',
+        nextAction: 'Nothing was changed. Retry with the value of the option you mean, or with its full visible text.',
       };
     case 'TAB_NOT_FOREGROUND':
       return {

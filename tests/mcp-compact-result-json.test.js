@@ -166,7 +166,7 @@ const SNAPSHOT_RESULT = {
   console.log('\n--- error texts are unchanged ---');
   const failure = mapFSBError({ success: false, error: 'element not found' });
   check(failure.isError === true
-    && failure.content[0].text === 'Detected: Element lookup\nWhy: element not found\nNext action: Take a fresh get_dom_snapshot and retry with a selector or ref from it, or use a different selector.',
+    && failure.content[0].text === 'Detected: Element lookup\nWhy: element not found\nNext action: Take a fresh get_page_snapshot and retry with a selector or ref from it, or use a different selector.',
   'a plain failure keeps its Detected / Why / Next action text');
   const unknown = mapFSBError({ success: false, outcome: 'unknown', mayHaveExecuted: true, error: 'Port closed after dispatch' });
   check(unknown.isError === true

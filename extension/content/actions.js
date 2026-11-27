@@ -5253,9 +5253,12 @@ const tools = {
         }
         if (!selectHoldsOption(live, choice)) {
           const current = describeSelectOptions(live)[live.selectedIndex];
+          // The change event has already reached the page's handlers, which
+          // may have acted on it before putting the select back.
           return fail(currentSelector, live, {
             errorCode: 'OPTION_NOT_KEPT',
-            error: `Option "${choice.shown}" was selected, but the select did not keep it. It now shows ${current ? `"${current.shown}"` : 'no option'}.`
+            error: `Option "${choice.shown}" was selected, but the select did not keep it. It now shows ${current ? `"${current.shown}"` : 'no option'}.`,
+            outcome: 'unknown', mayHaveExecuted: true
           });
         }
 

@@ -398,6 +398,31 @@ test('success is not reported when the page puts the select back', async () => {
   assert.equal(result.errorCode, 'OPTION_NOT_KEPT');
   assert.match(result.error, /did not keep it\. It now shows "Select an option"\./);
   assert.deepEqual(select.events, ['change']);
+  // The change event already reached the page, which may have acted on it.
+  assert.equal(result.outcome, 'unknown');
+  assert.equal(result.mayHaveExecuted, true);
+});
+
+test('select_option refusals reach the host under their own heading, not as a navigation', async () => {
+  const { pathToFileURL } = require('node:url');
+  const { mapFSBError } = await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'errors.js')).href);
+  const sizes = makeSelect([{ value: '', text: 'Size' }, { value: 's1', text: 'Small' }, { value: 's2', text: 'SMALL' }, { value: 'l', text: 'Large' }]);
+  const { selectOption } = load({ page: { '#size': sizes } });
+
+  const missing = mapFSBError(await selectOption({ selector: '#size', value: 'Blue' })).content[0].text;
+  assert.match(missing, /^Detected: Option not found\n/);
+  assert.match(missing, /\nNext action: Nothing was changed\. Retry with the value or visible text of one of the listed options\./);
+  assert.match(missing, /"Large"/, 'the offered options are still in the text');
+  assert.equal(missing.includes('Page navigation'), false);
+
+  const ambiguous = mapFSBError(await selectOption({ selector: '#size', value: 'small' })).content[0].text;
+  assert.match(ambiguous, /^Detected: Option matched more than one choice\n/);
+  assert.equal(ambiguous.includes('Page navigation'), false);
+
+  const reset = makeSelect(AGE_OPTIONS);
+  const notKept = load({ page: { '#select-menu': reset }, afterChange: () => { reset.selectedIndex = 0; } });
+  const keptText = mapFSBError(await notKept.selectOption({ selector: '#select-menu', value: '5-9' })).content[0].text;
+  assert.match(keptText, /^Detected: Action outcome unknown\n/, 'a select the page put back may have acted already');
 });
 
 test('success is not reported when the page leaves the select blank', async () => {

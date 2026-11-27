@@ -245,7 +245,7 @@ const MAP_FIXTURES = Object.freeze([
     label: 'element not found',
     input: { success: false, error: 'element not found' },
     isError: true,
-    text: 'Detected: Element lookup\nWhy: element not found\nNext action: Take a fresh get_dom_snapshot and retry with a selector or ref from it, or use a different selector.',
+    text: 'Detected: Element lookup\nWhy: element not found\nNext action: Take a fresh get_page_snapshot and retry with a selector or ref from it, or use a different selector.',
   },
   {
     label: 'generic error',

@@ -204,7 +204,7 @@ async function run() {
         assert(text.startsWith('Detected: Element lookup\n'), 'element not found names the element lookup layer');
         assert(!text.includes('Page navigation'), 'element not found is not reported as page navigation');
         assert(text.includes('#checkout-button'), 'element not found keeps the selector in Why');
-        assert(text.includes('get_dom_snapshot') && text.includes('different selector'),
+        assert(text.includes('get_page_snapshot') && text.includes('different selector'),
           'element not found suggests a fresh snapshot or a different selector');
       },
     },
@@ -225,7 +225,7 @@ async function run() {
       },
       checks(text) {
         assert(text.startsWith('Detected: Element lookup\n'), 'a stale ref names the element lookup layer');
-        assert(text.includes('fresh get_dom_snapshot') && text.includes('ref from it'), 'a stale ref asks for a fresh snapshot ref');
+        assert(text.includes('fresh get_page_snapshot') && text.includes('ref from it'), 'a stale ref asks for a fresh get_page_snapshot ref, the snapshot that issues refs');
         assert(!text.includes('Page navigation'), 'a stale ref is not reported as page navigation');
       },
     },
