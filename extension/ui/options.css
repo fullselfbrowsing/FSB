@@ -2817,7 +2817,7 @@ textarea.form-input {
 .vx-node-ic.dim { opacity: 0.45; }
 .vx-node-ic.err { border-color: var(--error-color); color: var(--error-color); }
 .vx-node b { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
-.vx-node span { font-family: 'Space Mono', 'SF Mono', monospace; font-size: 0.66rem; color: var(--text-muted); }
+.vx-node span { font-family: var(--fsb-font-mono); font-size: 0.66rem; color: var(--text-muted); }
 .vx-node-ic .ping { position: absolute; inset: -1px; border-radius: var(--radius-md); border: 2px solid var(--primary-color); animation: vxPing 1.6s ease-out infinite; }
 .vx-node-ic .lk { position: absolute; right: -6px; top: -6px; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--warning-color); color: #fff; font-size: 0.55rem; border: 2px solid var(--bg-primary); }
 .vx-node-ic .ping[hidden], .vx-node-ic .lk[hidden], .vx-link b[hidden] { display: none; }

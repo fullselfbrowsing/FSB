@@ -1888,13 +1888,6 @@ body[data-sidepanel-view="history"] .author-footer {
    "FSB 1Password vault" design handoff (SidePanel board); every element
    carries .vp, which holds the design tokens for the light and dark themes.
    ========================================================================== */
-@font-face {
-  font-family: "fsb-vp-mono";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../assets/onboarding/fonts/space-mono-400.ttf") format("truetype");
-}
 .vp {
   --bg: #f6f4f0; --card: #ffffff; --card-2: #f2f0eb; --sunk: #efece6;
   --line: rgba(23, 19, 15, 0.1); --line-2: rgba(23, 19, 15, 0.2);
@@ -1906,7 +1899,7 @@ body[data-sidepanel-view="history"] .author-footer {
   --err: #c23a3a; --err-soft: rgba(194, 58, 58, 0.09);
   --on-accent: #0b0b0d;
   --shadow: 0 1px 2px rgba(23, 19, 15, 0.06), 0 14px 32px rgba(23, 19, 15, 0.07);
-  --vp-mono: "fsb-vp-mono", "SFMono-Regular", Consolas, Menlo, monospace;
+  --vp-mono: var(--fsb-font-mono);
   color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }

@@ -29,7 +29,9 @@
   var EXIT_AFTER = { done: 3000, cancelled: 2600, guard: 4000 };
   var FRAME_MIN = 80;
   var FRAME_MAX = 640;
-  var MONO = "'fsb-vault-mono', 'SFMono-Regular', Consolas, Menlo, monospace";
+  // The platform monospace stack (design-system/decisions/0012). A shadow root
+  // ignores font-face rules, so the pill uses fonts the system already has.
+  var MONO = "'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace";
 
   var CSS = [
     ':host { all: initial; }',
@@ -180,7 +182,6 @@
     if (fontsRequested || typeof FontFace !== 'function' || !document.fonts) return;
     fontsRequested = true;
     [
-      ['fsb-vault-mono', 'assets/onboarding/fonts/space-mono-400.ttf', '400'],
       ['fsb-vault-poppins', 'assets/onboarding/fonts/poppins-100.ttf', '200'],
       ['fsb-vault-poppins', 'assets/onboarding/fonts/poppins-900.ttf', '900']
     ].forEach(function (spec) {

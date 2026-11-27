@@ -34,7 +34,7 @@
     "extension/ui/options.css": {
       "colors": 59,
       "zIndex": 1,
-      "fontFamily": 5,
+      "fontFamily": 4,
       "tokenForks": 3
     },
     "extension/ui/popup.css": {

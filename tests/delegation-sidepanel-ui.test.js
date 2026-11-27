@@ -789,7 +789,7 @@ const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice
 // one of those decisions. Rolled again when monospace stacks moved to
 // --fsb-font-mono (decision 0012). No delegation or ownership rule changed.
 assert.equal(sha256(delegationCssSource),
-  'c33d3f3908ba6b820605a182f84ad686dae1e8a285b4a00f8b70f410fc297fd2',
+  '0542d4a8cd530c2a624de1f14a46c0ddbde7294a3475bfe788b25b5607ba5aca',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {
