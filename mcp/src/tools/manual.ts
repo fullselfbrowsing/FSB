@@ -173,7 +173,8 @@ async function execAction(
     console.error(`[FSB Manual] ${toolName}: bridge not connected`);
     return mapFSBError({ success: false, error: 'extension_not_connected' });
   }
-  console.error(`[FSB Manual] ${toolName}: sending verb=${fsbVerb} params=${JSON.stringify(params).slice(0, 150)}`);
+  // Log parameter names only: values can hold typed text, URLs and page scripts.
+  console.error(`[FSB Manual] ${toolName}: sending verb=${fsbVerb} paramKeys=${Object.keys(params).join(',')}`);
   // fill_sheet types cell-by-cell into Google Sheets and can take minutes for large datasets.
   // Leave room for delivery, the content script's 120s execution budget, and the reply.
   const LONG_TIMEOUT_TOOLS = new Set(['fill_sheet', 'read_sheet']);

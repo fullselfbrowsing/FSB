@@ -7,6 +7,7 @@ All notable changes to `fsb-mcp-server` are documented in this file. Each entry 
 ### Changed
 
 - **Every tool declares a title and behavior hints.** Each of the server's tools now advertises a human-readable `title` and the `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` annotations in `tools/list`. Hosts such as Claude Code may run read-only calls like `read_page` and `list_tabs` in parallel, and may ask for confirmation before destructive tools such as `click`, `type_text`, `execute_js`, or `use_payment_method`. The hints are set in one place, `src/tools/annotations.ts`, and `tests/mcp-tool-annotations.test.js` fails when a registered tool has no entry.
+- **Manual-tool logs list parameter names, not values.** The stderr line each browser action writes now records the tool, the extension verb, and the parameter names (`paramKeys=selector,text`). It no longer copies parameter values, so typed text, URLs, and `execute_js` code stay out of MCP host logs.
 
 <a id="v0.11.5"></a>
 
