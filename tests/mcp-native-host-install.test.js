@@ -5681,9 +5681,11 @@ async function runWakeLockCompatibility() {
     const foreign = await production.holdNativeHostWakeLock(stableRoot, hexToken(0xabd));
     check(foreign === null, 'a live wake keeps its lock past the wait');
     equal(JSON.parse(fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8')).token, hexToken(0xbeef), 'a live wake\'s lock is never touched');
-    check(
-      fs.readdirSync(root).every((name) => name === 'native-host'),
-      'no pending or quarantined lock directory is left beside the tree',
+    // The pending and quarantine directories sit beside wake.lock, inside the stable root.
+    deepEqual(
+      fs.readdirSync(stableRoot),
+      ['wake.lock'],
+      'no pending or quarantined lock directory is left beside the lock',
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
