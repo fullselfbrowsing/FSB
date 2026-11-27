@@ -495,6 +495,36 @@ test('a ref from another document is unknown here, and refs never start at e1', 
   }
 });
 
+test('a document that uses up its block of refs opens a fresh random block, not the next range', () => {
+  // Page A numbers in block 457; page B starts in block 456. Counting on past
+  // e456999 would reach e457001, a number page A may already have handed out.
+  const ctx = loadContentScripts();
+  const realmMath = ctx.FSB.RefMap.constructor('return Math')();
+  const random = realmMath.random;
+  const draws = [456, 456, 100].map((block) => (block - 0.5) / 900);
+  realmMath.random = () => (draws.length > 0 ? draws.shift() : random());
+  let refMap;
+  try {
+    refMap = new ctx.FSB.RefMap();
+    const refs = [];
+    for (let i = 0; i < 1000; i++) {
+      refs.push(refMap.register(ctx.el('button', { id: `row-${i}` }, [`Row ${i}`]), `#row-${i}`, 'button', `Row ${i}`));
+    }
+    assert.equal(refs[0], 'e456001');
+    assert.equal(refs[998], 'e456999');
+    // The used block is drawn again and skipped; the next unused draw is taken.
+    assert.equal(refs[999], 'e100001');
+    assert.equal(new Set(refs).size, 1000, 'every element has its own ref');
+  } finally {
+    realmMath.random = random;
+  }
+  for (const ref of ['e456001', 'e456999', 'e100001']) assert.equal(refMap.issued(ref), true, ref);
+  for (const ref of ['e456000', 'e457000', 'e457001', 'e457010', 'e100000', 'e100002']) {
+    assert.equal(refMap.issued(ref), false, `${ref} was never issued here`);
+    assert.equal(refMap.resolve(ref), null, `${ref} resolves to nothing`);
+  }
+});
+
 test('an input wrapped in its label appears in the page snapshot', () => {
   const ctx = loadContentScripts();
   const page = buildForm(ctx);
