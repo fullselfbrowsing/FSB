@@ -17,7 +17,7 @@ None. Icons take the text colour or the accent.
 
 ## Specimens
 
-[Common icons](../guidelines/icons-common.card.html), [provider marks](../guidelines/icons-providers.card.html). The provider files are in [../assets/providers/](../assets/providers/claude.svg) and match `showcase/assets/providers/`.
+[Common icons](../guidelines/icons-common.card.html), [provider marks](../guidelines/icons-providers.card.html). The provider files are in [../assets/providers/](../assets/providers/claude.svg). Each is byte-identical to its namesake in `showcase/assets/providers/`, which also holds `antigravity.svg`, `cline.svg`, `grok-bot.png` and `meta.svg`.
 
 ## Known gaps
 
@@ -25,9 +25,8 @@ None. Icons take the text colour or the accent.
   - The side panel, popup and control panel load Font Awesome from cdnjs.
   - Onboarding uses a vendored copy (`extension/assets/onboarding/fontawesome`).
   - The showcase self-hosts subsets.
-- **Not every provider mark is `currentColor`.** `openrouter.svg` uses a fixed white fill and `openclaw.svg` keeps its own colours.
+- **Not every provider mark is `currentColor`.** `openrouter.svg` uses a fixed white fill, `openclaw.svg` keeps its own colours, and `meta.svg` sets no fill, so it draws in the SVG default black.
 - **`windsurf.svg` is in the design system only.** No shipped surface uses it yet.
-- **Emoji in the overlays.** On web pages, the progress card draws its capability lock and its blocked-note warning as emoji entities (`.fsb-chip-lock`, `.fsb-note-icon` in `visual-feedback.js`), against the no-emoji rule.
 
 ## Evidence
 

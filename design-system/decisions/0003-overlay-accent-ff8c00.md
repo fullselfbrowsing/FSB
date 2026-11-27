@@ -21,11 +21,11 @@ Chosen option 1. It matches every overlay in production and the overlay design b
 ## Consequences
 
 - Overlay colours are listed in [../tokens/overlay.css](../tokens/overlay.css). Each token names the selector and property it comes from, and the drift check holds them equal.
-- New overlay UI, such as the status pill in PR #173 and the vault pill in PR #172, uses this family, not `#ff6b35`.
+- New overlay UI, such as the status pill and the vault pill in PR #172, uses this family, not `#ff6b35`.
 - The crawl card is blue (`#38bdf8`). Calling an app's capability is violet (`#8b5cf6`, `#a78bfa`). A blocked site is amber (`#f5a524`), and done is green (`#34d399`).
 
 ## Evidence
 
 - [.planning/PROJECT.md](../../.planning/PROJECT.md), Key Decisions: "Visual feedback with orange glow"
-- [extension/content/visual-feedback.js](../../extension/content/visual-feedback.js) `.viewport-glow-root.state-thinking`, `.fsb-step-number`, `.box-overlay`
+- [extension/content/visual-feedback.js](../../extension/content/visual-feedback.js) `.viewport-glow-root.state-thinking`, `.pl-host`, `.box-overlay`
 - [design-system/surfaces/overlays.md](../surfaces/overlays.md)

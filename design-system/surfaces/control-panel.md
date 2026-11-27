@@ -69,7 +69,8 @@ The control panel uses the product palette ([0002](../decisions/0002-three-palet
 - **Toast.** `showToast(message, type)` sets `.status-toast` plus `success`, `info`, `warning` or `error`. The toast stays 2, 3, 4 or 6 seconds by type; success, error and warning tint the border, fill and text.
 - **Connection.** `updateConnectionStatus()` sets `.status-dot.connected` (`#10b981`), `.disconnected` (`#ef4444`) or `.checking` (`#f59e0b`, pulsing).
 - **Theme.** `#themeModeToggle` is a `role="radiogroup"` of `.detail-btn[data-theme-mode]` radios: System, Dark and Light.
-  - `setThemePreference()` stores the `fsb-theme` key in `localStorage`.
+  - `setThemePreference()` stores the `fsb-theme` key in `localStorage`. `setupTheme()` calls it on load with the stored value.
+  - It also calls `mirrorThemePreference()`, which copies the choice to `chrome.storage.local` as `fsbThemePreference`, where the service worker reads it for the toolbar icon. Only Light puts the icon on its white tile ([`action-icon.js`](../../extension/utils/action-icon.js) `tileFor`).
   - `applyTheme()` writes `data-theme` on `<html>`, and `renderThemeModeToggle()` updates `.active` and `aria-checked`.
   - `updateSystemThemeListener()` follows the OS only in System mode.
 - **Narrow and print.**
@@ -121,7 +122,7 @@ See [accessibility.md](../foundations/accessibility.md).
 
 ## Tests that pin it
 
-No test hashes these files. They pin rule bodies and markup instead.
+No test hashes these files. They pin rule bodies, markup and function bodies instead.
 
 | Test | What it pins | In `npm test` |
 |---|---|---|
@@ -132,6 +133,7 @@ No test hashes these files. They pin rule bodies and markup instead.
 | [remote-control-rebrand.test.js](../../tests/remote-control-rebrand.test.js) | `.feature-badge.beta` reused, at most four `.feature-badge.*` variants | yes |
 | [agent-sunset-control-panel.test.js](../../tests/agent-sunset-control-panel.test.js) | no supplementary-plane characters (emoji) in control_panel.html, options.css or options.js | yes |
 | [extension-ui-locale.test.js](../../tests/extension-ui-locale.test.js) | one `#fsbUiLocaleSelect` (`form-select`, `translate="no"`) inside `#advanced` after `#themeModeToggle`; static text matches the catalog; no inline `<script>` | yes |
+| [action-icon-behavior.test.js](../../tests/action-icon-behavior.test.js) | the body of `function mirrorThemePreference(` in options.js includes `chrome.storage.local.set({ fsbThemePreference: preference })`, and `function setThemePreference(` calls `mirrorThemePreference(preference);` | yes |
 
 - **First match wins.** `getCssRule()` matches the first `<selector> {` text in options.css, with no anchor. Any rule placed earlier whose text ends that way would be read instead: `.modal-body {` for `body`, or a new `.settings-card {` or `.dashboard-content {` block. Keep new rules after the pinned ones.
 - **Style ratchet.** [`check-style-literals.mjs`](../../scripts/check-style-literals.mjs) counts options.css's raw values.
@@ -160,5 +162,5 @@ No test hashes these files. They pin rule bodies and markup instead.
 
 - [`control_panel.html`](../../extension/ui/control_panel.html): `.dashboard-header`, `#dashboardSidebar`, `.nav-item`, `.content-section`, `.modern-toggle`, `#themeModeToggle`, `#fsbUiLocaleSelect`, `#saveBar`, `#statusToast`, `#branding`
 - [`options.css`](../../extension/ui/options.css): `:root`, `[data-theme="dark"]`, `.dashboard-container`, `.dashboard-sidebar`, `.nav-item > span`, `.settings-card`, `.toggle-track`, `.fsb-select`, `.status-toast`, `.menu-toggle, .sidebar-overlay`, `@media (max-width: 1024px)`
-- [`options.js`](../../extension/ui/options.js): `switchSection`, `initializeSections`, `initSidebarProximity`, `initFsbSelects`, `refreshFsbSelectOptions`, `showToast`, `handleKeyboardShortcuts`, `setThemePreference`, `updateConnectionStatus`
+- [`options.js`](../../extension/ui/options.js): `switchSection`, `initializeSections`, `initSidebarProximity`, `initFsbSelects`, `refreshFsbSelectOptions`, `showToast`, `handleKeyboardShortcuts`, `setThemePreference`, `mirrorThemePreference`, `setupTheme`, `updateConnectionStatus`
 - [`ui-locale-page.js`](../../extension/ui/ui-locale-page.js), [`panel-exact.js`](../../extension/utils/panel-exact.js)

@@ -31,7 +31,7 @@ Exact values are in [../tokens/effects.css](../tokens/effects.css) and [../token
 
 ## Known gaps
 
-- **No z-index tokens.** About 24 z-index values in extension CSS and 62 in the showcase are literal. The ratchet counts integer z-index values.
+- **No z-index tokens.** About 30 z-index values in extension CSS and 62 in the showcase are literal. The ratchet counts integer z-index values.
 - **The `--shadow-sm` alias is inconsistent.** sidepanel.css and popup.css point it at `--fsb-shadow-sm`; the core and options.css point it at `--fsb-shadow-xs`.
 - **Lift sizes disagree.** The design system lifts site cards 4px; the agents page lifts its cards 3px.
 

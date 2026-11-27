@@ -285,12 +285,23 @@ export function splitSelectors(header) {
   return parts;
 }
 
-/** The stylesheets visual-feedback.js writes into its shadow roots. */
+/**
+ * The stylesheets visual-feedback.js writes into its shadow roots: template
+ * literals assigned to `.textContent`, either inline or through a named
+ * constant (`style.textContent = PILL_CSS`).
+ */
 export function extractOverlayCss(jsText) {
   const blocks = [];
-  const pattern = /\.textContent\s*=\s*`([\s\S]*?)`/g;
+  const inline = /\.textContent\s*=\s*`([\s\S]*?)`/g;
   let match;
-  while ((match = pattern.exec(jsText))) blocks.push(match[1]);
+  while ((match = inline.exec(jsText))) blocks.push(match[1]);
+  const names = new Set();
+  const byName = /\.textContent\s*=\s*([A-Za-z_$][\w$]*)\s*;/g;
+  while ((match = byName.exec(jsText))) names.add(match[1]);
+  for (const name of names) {
+    const declared = new RegExp(`\\b(?:const|let|var)\\s+${name.replace(/\$/g, '\\$')}\\s*=\\s*\`([\\s\\S]*?)\``).exec(jsText);
+    if (declared) blocks.push(declared[1]);
+  }
   return blocks;
 }
 

@@ -9,8 +9,8 @@
    not use Google Fonts:
      - the extension bundles extension/assets/onboarding/fonts/*.ttf;
      - the showcase's Content-Security-Policy (font-src 'self' data:) blocks
-       Google Fonts, so the wordmark's Poppins never loads there today. See
-       DESIGN.md, Known gaps. */
+       Google Fonts, so the site's wordmark uses the one-glyph data: faces in
+       showcase/angular/src/styles/fsb-wordmark.css instead. */
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100;900&display=swap");
 
 :root {

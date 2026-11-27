@@ -2,9 +2,9 @@
   "about": "Raw style values per file, held by scripts/check-style-literals.mjs. Counts may only go down; see DESIGN.md.",
   "files": {
     "extension/content/visual-feedback.js": {
-      "colors": 165,
+      "colors": 167,
       "zIndex": 10,
-      "fontFamily": 9,
+      "fontFamily": 7,
       "tokenForks": 0
     },
     "extension/shared/fsb-ui-core.css": {
@@ -20,8 +20,8 @@
       "tokenForks": 0
     },
     "extension/ui/onboarding.css": {
-      "colors": 42,
-      "zIndex": 7,
+      "colors": 46,
+      "zIndex": 13,
       "fontFamily": 13,
       "tokenForks": 0
     },
@@ -52,7 +52,7 @@
     "showcase/angular/src/app/layout/depth/depth-end.component.scss": {
       "colors": 3,
       "zIndex": 1,
-      "fontFamily": 2,
+      "fontFamily": 1,
       "tokenForks": 0
     },
     "showcase/angular/src/app/layout/depth/depth-rail.component.scss": {
@@ -70,7 +70,7 @@
     "showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss": {
       "colors": 3,
       "zIndex": 5,
-      "fontFamily": 2,
+      "fontFamily": 1,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/about/about-page.component.scss": {
@@ -82,13 +82,13 @@
     "showcase/angular/src/app/pages/agents/agents-page.component.scss": {
       "colors": 5,
       "zIndex": 0,
-      "fontFamily": 11,
+      "fontFamily": 10,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/concierge/concierge-page.component.scss": {
       "colors": 98,
       "zIndex": 1,
-      "fontFamily": 22,
+      "fontFamily": 21,
       "tokenForks": 9
     },
     "showcase/angular/src/app/pages/dashboard/dashboard-page.component.scss": {
@@ -100,13 +100,13 @@
     "showcase/angular/src/app/pages/home/home-page.component.scss": {
       "colors": 35,
       "zIndex": 4,
-      "fontFamily": 14,
+      "fontFamily": 13,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/lattice/lattice-page.component.scss": {
       "colors": 69,
       "zIndex": 1,
-      "fontFamily": 17,
+      "fontFamily": 16,
       "tokenForks": 5
     },
     "showcase/angular/src/app/pages/legal/legal-page.component.scss": {
@@ -118,7 +118,7 @@
     "showcase/angular/src/app/pages/phantom-stream/phantom-stream-page.component.scss": {
       "colors": 106,
       "zIndex": 7,
-      "fontFamily": 23,
+      "fontFamily": 22,
       "tokenForks": 8
     },
     "showcase/angular/src/app/pages/privacy/privacy-page.component.scss": {

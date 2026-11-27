@@ -22,12 +22,12 @@ Chosen option 1. System fonts cost nothing to load, match each platform and cove
 ## Consequences
 
 - The extension bundles the faces it needs: Poppins 100 and 900, Space Mono 400 and 700 under `extension/assets/onboarding/fonts/`.
-- The showcase must serve the same faces from its own origin. Its Content-Security-Policy allows stylesheets only from `'self'` and fonts only from `'self'` and `data:`. The Google Fonts imports on four research pages are therefore blocked, and no page loads Poppins or Space Mono any other way. So today the wordmark's F and S fall back to the system font on the live site, and so does every Space Mono label. This is listed in [DESIGN.md](../../DESIGN.md), Known gaps.
+- The showcase must serve the same faces from its own origin. Its Content-Security-Policy allows stylesheets only from `'self'` and fonts only from `'self'` and `data:`. The Google Fonts imports on four research pages are therefore blocked, and no page loads Poppins or Space Mono any other way. Until PR #173 the wordmark's F and S fell back to the system font; they now come from `data:` faces in `fsb-wordmark.css`. Every Space Mono label still falls back. This is listed in [DESIGN.md](../../DESIGN.md), Known gaps.
 - Monospace stacks differ today. options.css puts SF Mono first and leaves out Space Mono. The ratchet in `scripts/check-style-literals.mjs` counts literal `font-family` stacks, so this can only improve.
 
 ## Evidence
 
 - [extension/ui/onboarding.css](../../extension/ui/onboarding.css) `@font-face` rules
 - [showcase/server/server.js](../../showcase/server/server.js) the Content-Security-Policy header (`font-src`)
-- [showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss](../../showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss) `.fsb-f`, `.fsb-s`, `.fsb-b`
+- [showcase/angular/src/styles/fsb-wordmark.css](../../showcase/angular/src/styles/fsb-wordmark.css) `.fsb-f`, `.fsb-s`, `.fsb-b`
 - [design-system/foundations/typography.md](../foundations/typography.md)

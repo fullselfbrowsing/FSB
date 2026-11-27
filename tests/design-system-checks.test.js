@@ -75,6 +75,9 @@ async function main() {
     check('an overlay token without a source fails', verify.checkOverlayTokens(bare, js, 'fx.js').some((e) => e.includes('names no source')), 'no error');
     const dup = tokenMap('[s] { --t: #111111; /* .dup color */ }', '[s]', lexCss, scopeKey);
     check('an ambiguous source fails', verify.checkOverlayTokens(dup, js, 'fx.js').some((e) => e.includes('more than one value')), 'no error');
+    const named = 'const PILL_CSS = `\n.pl-body { background: #000000; }\n`;\nstyle.textContent = PILL_CSS;';
+    const pill = tokenMap('[s] { --t: #000000; /* .pl-body background */ }', '[s]', lexCss, scopeKey);
+    check('a stylesheet held in a named constant is read', verify.checkOverlayTokens(pill, named, 'fx.js').length === 0, verify.checkOverlayTokens(pill, named, 'fx.js').join('; '));
   }
 
   console.log('\n--- DESIGN.md front matter ---');

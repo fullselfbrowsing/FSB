@@ -1,4 +1,4 @@
-/* In-page overlay palette: the progress card, viewport glow, action glow,
+/* In-page overlay palette: the status pill, viewport glow, action glow,
    replay player, trigger badge and crawl card that FSB draws on web pages.
 
    These colours live inside the shadow-root stylesheets that
@@ -20,17 +20,18 @@
   --fsb-ov-calling-1: #8b5cf6; /* .viewport-glow-root.state-calling --glow-color-1 */
   --fsb-ov-calling-2: #a78bfa; /* .viewport-glow-root.state-calling --glow-color-2 */
 
-  /* Progress card. */
-  --fsb-ov-card-surface: #000000; /* .fsb-overlay background */
-  --fsb-ov-card-text: #ffffff; /* .fsb-overlay color */
-  --fsb-ov-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 140, 0, 0.3); /* .fsb-overlay box-shadow */
-  --fsb-ov-accent: #ff8c00; /* .fsb-step-number color */
-  --fsb-ov-progress-fill: linear-gradient(90deg, #ff8c00, #ff6600); /* .fsb-progress-fill background */
-  --fsb-ov-done: #34d399; /* .fsb-progress-fill.complete background */
-  --fsb-ov-guarded: #f5a524; /* .fsb-progress-fill.guarded background */
-  --fsb-ov-guarded-text: #f5b942; /* .fsb-step-number.guarded color */
-  --fsb-ov-guarded-note: #f5cf8f; /* .fsb-note color */
-  --fsb-ov-calling-text: #b79dfb; /* .fsb-step-number.calling color */
+  /* Status pill (decision 0008). Each state sets an accent (--c1) and a ring
+     (--ring) on .pl-host; the body's shadow draws the ring. */
+  --fsb-ov-pill-surface: #000000; /* .pl-body background */
+  --fsb-ov-pill-text: #f1f5f9; /* .pl-body color */
+  --fsb-ov-pill-muted: #94a3b8; /* .pl-agent color */
+  --fsb-ov-pill-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--ring); /* .pl-body box-shadow */
+  --fsb-ov-accent: #ff8c00; /* .pl-host --c1 */
+  --fsb-ov-progress-fill: linear-gradient(90deg, #ff8c00, #ff6600); /* .pl-fill background */
+  --fsb-ov-done: #34d399; /* .pl-host.done .pl-fill background */
+  --fsb-ov-error: #f87171; /* .pl-host.error .pl-fill background */
+  --fsb-ov-guarded: #f5a524; /* .pl-host.guarded --c1 */
+  --fsb-ov-guarded-note: #f5cf8f; /* .pl-note color */
 
   /* Replay player. */
   --fsb-ov-replay-surface: rgba(8, 8, 8, 0.94); /* .fsb-replay-controls background */

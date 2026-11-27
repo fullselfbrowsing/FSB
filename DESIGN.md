@@ -168,7 +168,7 @@ There are three palettes, each tied to where it ships ([decision 0002](design-sy
 - **System stack** for every readable word.
 - **Poppins 100 and 900** only in the wordmark.
 - **The platform monospace stack** (`--font-mono`: SF Mono, Monaco, Cascadia Code and on) for code, selectors, tool names, version tags and eyebrows, marked `translate="no"`. No web font; Chrome on a Mac draws it in Monaco ([decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md)).
-- **Site headings** are 700, tracked -0.02em and fluid:
+- **Site headings** are 700 and fluid; pages that track them use -0.02em (home, about and support do not):
 
   | Heading | Phones | Desktop |
   |---|---|---|
@@ -253,10 +253,10 @@ FSB has no component library. The design tool's prototyping kit lives in `design
 ## Overlays
 
 - **Hosting.** Each overlay is a shadow-root host promoted to the top layer. Hosts are click-through except where the user must click.
-- **Fonts** inside a shadow root are ignored, so overlays use the system stack or draw outlines.
+- **Fonts** inside a shadow root are ignored, so overlays use the system stack or draw outlines. The status pill registers Space Mono on the document instead (`fsb-pill-mono`, `ensurePillFont`).
 - **Silence:** after 60s without an update the page's overlays show a waiting state, and the page removes them 120s after that, 180s after the last update (the overlay watchdog in `extension/content/messaging.js`). The service worker keeps its own 60s and 120s clocks (`MCP_VISUAL_SESSION_DEGRADE_AFTER_MS`, `MCP_VISUAL_SESSION_ORPHAN_CLEAR_AFTER_MS` in `extension/utils/mcp-visual-session.js`).
 - **What raises an overlay:** action tools, which carry a visual reason and the calling client. Reads such as `read_page` stay silent.
-- **The status pill** replacing the progress card is pending in PR #173 ([decision 0008](design-system/decisions/0008-status-pill-replaces-progress-card.md)).
+- **The status pill** replaced the progress card ([decision 0008](design-system/decisions/0008-status-pill-replaces-progress-card.md)). It grows from a seed in the top-right corner and plays the toolbar icon's motions on one clock.
 
 Detail: `@design-system/surfaces/overlays.md`.
 
@@ -294,17 +294,16 @@ Rules: `@design-system/foundations/accessibility.md`.
 These are open, or decided and not yet applied. Each has a home in a foundation or surface page.
 
 1. **Product pages keep their own dark blocks.** The control panel's dark surfaces now equal the core ([decision 0011](design-system/decisions/0011-product-dark-is-near-black.md)) and can be removed with no visible change. The side panel's and popup's cannot: in dark mode they set `--bg-primary` to the page base `#050505` (the core's alias gives `#0d0d0d`), `--bg-tertiary` to `#121212` (core `#141414`) and `--border-color` to white at 6% (core 8%). Removing them lifts the chat's surfaces, so keeping that flatter look is a design decision, not a cleanup. `sidepanel.css` is hash-pinned.
-2. **The showcase never loads Poppins.** Its Content-Security-Policy blocks Google Fonts and nothing is self-hosted, so the wordmark's F and S render in the system font.
-3. **Wordmark B height drifts.** It is 0.74em on the site (canonical), 0.68em in onboarding and 0.715em in release notes.
+2. **Google Fonts never load on the showcase.** Its Content-Security-Policy refuses them, so Outfit, Space Mono and `'Poppins'` outside the wordmark render in their fallbacks. The wordmark's F and S are one-glyph `data:` faces in `fsb-wordmark.css`.
+3. **The status pill draws its own wordmark.** Its outlined B is a 0.68em B, short of the 0.74em every other copy uses, and its F is Poppins 200. `fsb-wordmark-parity.test.js` does not read it.
 4. **Space Mono is still in shipped CSS** until the migration in [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md) lands: onboarding, the control panel's version tag, six showcase pages and the release-notes template's inline styles.
 5. **Control panel timings differ.** options.css uses 150/200/300ms ease-in-out under the site's token names.
 6. **The control panel's `.status-toast` carries errors**, and the side panel's checkboxes use `#f97316`.
 7. **No z-index, type-size or motion tokens ship yet.** The site re-declares four `--fsb-*` names with its own values.
 8. **Raw values are common.** `design-system/style-literals.baseline.json` records them per file, and the counts may only fall. HTML inline styles are not counted yet.
-9. **A stale version string.** `concierge-page.component.html` types its version tag by hand instead of binding `APP_VERSION`.
-10. **Overlay gaps against these rules:**
-    - The viewport glow, the crawl card and the element highlight ignore `prefers-reduced-motion`.
-    - The progress card's capability chip and blocked note use emoji entities (a lock and a warning sign).
+9. **Overlay gaps against these rules:**
+    - The viewport glow's bead keeps travelling under `prefers-reduced-motion`, and the crawl card and the element highlight ignore it.
+    - The status pill overshoots as it pops in and grows, and scales new text in, against the motion rules. Its labels use Space Mono, against [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md).
 
     See `@design-system/surfaces/overlays.md#known-issues`.
 

@@ -37,9 +37,9 @@ None yet. The forms card shows focus styles: [forms](../components/forms/forms.c
   - The popup has no reduced-motion handling, and the site has no global guard.
   - On web pages, the viewport glow keeps its bead loop running under reduced motion, as do the crawl card and the element highlight ([overlays](../surfaces/overlays.md)).
   - The showcase dashboard's infinite pulses have no reduced-motion block either.
-- **Overlay focus and contrast:**
-  - The progress card's Stop button can take keyboard focus inside an `aria-hidden` host.
-  - Its scrollback log lines are white at 34% on black, under AA.
+- **Overlay focus and targets:**
+  - The status pill's Stop button can take keyboard focus inside an `aria-hidden` host.
+  - Stop is 36px square (`.pl-stop` in `visual-feedback.js`), under the 44px that new controls must meet.
 - **Weak site focus.** The site's focus treatment is a border colour change, which is weaker than a ring on dark backgrounds.
 - **Small side-panel buttons.** The side panel's header buttons are 32px and its composer buttons 36px, under the 44px target.
 

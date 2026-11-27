@@ -1,6 +1,6 @@
 /* Site type scale. No shipped stylesheet declares these yet: the values are the
-   literals styles.scss and the shell use today (headings in styles.scss, tracking
-   in showcase-shell.component.scss). Product pages keep their own scale; see
+   literals styles.scss and the shell use today (headings in styles.scss, the
+   wordmark's tracking in fsb-wordmark.css). Product pages keep their own scale; see
    foundations/typography.md. */
 :root {
   --text-h1: clamp(2rem, 5vw, 3.5rem); /* proposed */

@@ -34,6 +34,8 @@ Quick, eased and quiet. One long loop, the hero glow, and nothing that bounces.
 - **Literal durations dominate.** The showcase has about 318 literal durations against 82 token uses.
 - **No global reduced-motion guard on the site.** styles.scss gates only `scroll-behavior`; each page handles reduced motion itself, and the popup does not handle it at all.
 - The design-system specimen pages do have a global guard in [../tokens/reset.css](../tokens/reset.css).
+- **Onboarding's install fan overshoots** (`cubic-bezier(0.34, 1.56, 0.64, 1)` on `.install-fan.open` and `.install-fan-item`), and the fan and the pinned toolbar icon scale in. Under reduced motion the flag scramble, the client rotation and most transitions keep running ([onboarding](../surfaces/onboarding.md#known-issues)).
+- **The status pill bounces.** It pops in from 30% scale on an overshooting curve, grows on `cubic-bezier(0.5, 0, 0.15, 1.22)` and scales new text in from 110%, against the rules above. The motion comes from the PillMotion board, so it needs a recorded exception or a change ([overlays](../surfaces/overlays.md#known-issues)).
 
 ## Evidence
 

@@ -54,7 +54,7 @@ These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-i
 
 ## Anatomy
 
-- **Vault pill.** Host `<fsb-vault-pill>`, `data-fsb-overlay="vault-pill"`, full-viewport, closed shadow root, top layer with a `z-index: 2147483647` fallback. Only the top frame draws it (the `vaultPill` case in `extension/content/messaging.js`). While it is up, `suppressProgress` hides `#fsb-progress-host`.
+- **Vault pill.** Host `<fsb-vault-pill>`, `data-fsb-overlay="vault-pill"`, full-viewport, closed shadow root, top layer with a `z-index: 2147483647` fallback. Only the top frame draws it (the `vaultPill` case in `extension/content/messaging.js`). While it is up, `suppressProgress` sets `visibility: hidden` on `#fsb-progress-host`, which since PR #173 hosts the [status pill](overlays.md).
   - `.op` sits 16px from the top and right. Width by mode: seed 56, head 176, text 248, vault 272, wide 304 (more than three chips), ask 300. The height is measured from the content.
   - `.op-top`, 36px tall: wordmark, divider, the MCP client's name, a `M:SS` timer.
   - `.op-text`: the status, 12.5px on 17px.
@@ -104,7 +104,7 @@ These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-i
 - **Pill intro.** The seed shows at once, the head at 380ms, and the latest state lands at 900ms. A phase that arrives during the intro becomes the landing state.
 - **Pill morph.** Width and height take 0.52s on `cubic-bezier(0.5, 0, 0.15, 1.22)`, the status pill's growing curve; the ring 0.4s; opacity 0.26s.
 - **Follow-up view.** The green "Filled" line lands 1100ms after its chips.
-- **Exit.** A fade with a 14px lift and scale 0.4; the host is removed 620ms later and the progress card returns.
+- **Exit.** A fade with a 14px lift and scale 0.4; the host is removed 620ms later and the status pill shows again.
 - **Loops.** The track sweeps every 1.2s; the approval key breathes every 2.4s; content rises in over 0.42s (`fvIn`).
 - **Side panel.** Fill card arms after 700ms, and a 2:00 countdown drains over 120000ms (`VP_PAYMENT_LIMIT_MS`).
 - **Vault page.** The path drawing pings and flows every 1.6s (`vxPing`, `vxFlow`); the move bar sweeps every 1.4s (`vxBusy`).
@@ -123,7 +123,7 @@ These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-i
 - **The pill is announced.** `role="status"` with `aria-live="polite"`, or `role="dialog"` while asking; named "FSB"; not `aria-hidden`, unlike the [in-page overlays](overlays.md).
 - **The sheet.** Enter in the username moves to the password, and Enter there signs in. The save switch is a button with `aria-pressed`. The eye button is named "Show password" or "Hide password". Buttons, the eye, the switch and the links show a 2px `#ffb45c` focus outline; a focused field gets an orange border.
 - **Covered or distracted.** Sign in stays off unless the sheet is fully visible (`IntersectionObserver` with `trackVisibility` and a 100ms delay), and typing pauses when the page takes focus (the window `blur` listener).
-- **A real prompt is provable.** While the sheet asks, the toolbar icon shows its `ask` state, an orange inset ring and key dot (`drawAskBadge` in `extension/utils/action-icon.js`), which no page can draw. It outranks every other icon motion.
+- **A real prompt is provable.** While the sheet asks, the toolbar icon shows its `ask` state, an orange inset ring and key dot (`drawAskBadge` in `extension/utils/action-icon.js`), which no page can draw. It outranks every other icon motion (`RANK` `ask: 5`). The PR adds it to the icon file as it was before PR #173 rewrote it; see Known issues.
 - **Not colour alone.** Every tone also changes the text.
 - **Side panel.** The card sheet is `role="dialog"` with `aria-modal="true"`, and Fill card ignores clicks for its first 700ms.
 
@@ -145,7 +145,7 @@ On the PR branch, not on main:
 
 1. **The tone colour is never drawn.** Each tone sets `--c1`, but nothing reads it; only the ring shows the state.
 2. **Reduced motion still moves.** The track keeps sweeping, slowed to 2.4s, and the approval key keeps breathing.
-3. **The pill blocks clicks.** `.op` takes pointer events in every mode, so even a status line covers the page's top-right corner. The status pill in PR #173 is click-through.
+3. **The pill blocks clicks.** `.op` takes pointer events in every mode, so even a status line covers the page's top-right corner. The status pill is click-through except its Stop button (`.pl-stop`).
 4. **A fourth orange.** The sheet's primary button is `#ff7a1a`, in neither the product nor the overlay family.
 5. **The side panel's typed login uses `sendMessage`.** Its autopilot form sends the values with `chrome.runtime.sendMessage` (`loginFormSubmitted`), which every extension context receives. The port rule covers only the on-page sheet.
 6. **The copy says less than the tool returns.** "What agents see" and `skills/fsb/references/vault-boundary.md` list titles, usernames, sites and last 4; `list_payment_methods` also returns the cardholder name and expiry.
@@ -153,11 +153,13 @@ On the PR branch, not on main:
 8. **Page-local palettes.** `.vp` and the `.vx-tag` literals (`#047857`, `#b45309`) fork the product tokens; the style-literal ratchet counts them.
 9. **Weight.** `fsb-vault-poppins` registers the Poppins 100 file as weight 200.
 10. **Covering check.** Where `isVisible` is not supported, the check falls back to plain intersection.
+11. **The `ask` state is built on the old icon.** The branch forks from main before PR #173 (merge base `f6c4c9441`), and PR #173 rewrote [`action-icon.js`](../../extension/utils/action-icon.js). The rewrite cuts the frames to the artwork's rounded corners and draws the ring along them (`tilePath`). An explicit Light theme puts every form on a white tile (`TILES`). `getMotion` hands each tab's form to the status pill from its `watch:`, `capability:` and `session:` claims only. The PR's `drawAskBadge` strokes a square ring (`ctx.rect`) in a file with no tiles and no corner cut. A three-way merge of the branch tip onto PR #173 conflicts in `action-icon.js` and `messaging.js`.
 
 ## Sources
 
 - PR #172, read with `git show`: `extension/content/vault-pill.js`; `extension/ui/credential-sheet.html`, `.css` and `.js`; `extension/utils/onepassword-client.js`; `extension/content/actions.js` (`fillOriginRefusal`); `extension/content/messaging.js` (`vaultPill`); `extension/ws/mcp-bridge-client.js` (`_vaultPillHooks`); `extension/ui/control_panel.html` (`#vault`), `options.css` and `options.js`; `extension/ui/sidepanel.js` and `sidepanel.css`; `extension/utils/action-icon.js` (`ask`); `mcp/src/onepassword/domain-match.ts`, `broker.ts` and `config.ts`; `mcp/src/tools/vault.ts`; `skills/fsb/references/vault-boundary.md`.
 - Read at the local branch tip `c3c162888`, ten commits ahead of the PR head `497072c67`. The all-vaults default and the one-button Vault page come from those commits.
 - Main, for comparison: [`control_panel.html`](../../extension/ui/control_panel.html) `#passwords` and `#payments`, [`secure-config.js`](../../extension/config/secure-config.js), [`vault.ts`](../../mcp/src/tools/vault.ts).
+- PR #173, the code PR #172 lands on: [`action-icon.js`](../../extension/utils/action-icon.js) (`TILES`, `tilePath`, `RANK`, `getMotion`) and [`visual-feedback.js`](../../extension/content/visual-feedback.js) (`#fsb-progress-host`, `.pl-stop`).
 - The "FSB · 1Password vault" design canvas ([sources.md](../sources.md)): Main, VaultStates, SidePanel, Overlay, OverlayStates, CredInput, CredWhere and Security. The Notes board reviews the PR and is not a source of rules. The canvas's mock data is personal and is not copied here.
 - Related: [In-page overlays](overlays.md), decisions [0003](../decisions/0003-overlay-accent-ff8c00.md), [0006](../decisions/0006-overlays-in-shadow-dom-top-layer.md) and [0009](../decisions/0009-secret-input-in-extension-frame.md).

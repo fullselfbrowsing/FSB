@@ -71,6 +71,7 @@ Inline cards in the list: `.message.login-prompt`, `.message.payment-prompt`, `.
 - **History.** `showHistoryView()` hides the messages and composer, shows `#historyView` and marks `#historyBtn` `.active`. `.history-status` has six variants: `completed`, `partial`, `stopped`, `error`, `stuck` and `idle-closed`.
 - **Microphone.** `.mic-btn.recording` is solid `#dc2626`, distinct from the pale stop button. `.transcribing` and `.error` are the other two states.
 - **Theme.** `applyTheme()` reads `localStorage` key `fsb-theme` (`system`, `dark` or `light`; anything else counts as `system`). It resolves `system` with `resolveEffectiveTheme()` and writes `data-theme` on `<html>`. It re-runs on `storage` events and on `prefers-color-scheme` changes.
+- **Toolbar icon tile.** Each `applyTheme()` run also calls `mirrorThemePreference()`, which copies the preference to `chrome.storage.local` as `fsbThemePreference`. The service worker draws the toolbar icon and cannot read `localStorage`. Only an explicit `light` puts the icon on its white tile; `system` keeps the black tile ([`action-icon.js`](../../extension/utils/action-icon.js) `tileFor`).
 - **Delegated run.** `_applyDelegationSnapshotTone()` writes `data-delegation-state` and `data-delegation-tone`, and each tone draws a 4px left rule:
 
 | Tone | When | Rule colour | Icon (`_delegationSemanticIcon`) |
@@ -142,6 +143,7 @@ Editing a hashed file means recomputing its pinned hash in the same change. The 
 | [agent-provider-forbidden-flags.test.js](../../tests/agent-provider-forbidden-flags.test.js) | the 44px delegated action and Stop | yes |
 | [extension-ui-locale.test.js](../../tests/extension-ui-locale.test.js) | static text matches the English catalog; no inline `<script>`; no language picker | yes |
 | [agent-sunset-control-panel.test.js](../../tests/agent-sunset-control-panel.test.js) | no supplementary-plane characters (emoji) in sidepanel.js | yes |
+| [action-icon-behavior.test.js](../../tests/action-icon-behavior.test.js) | the body of `function mirrorThemePreference(` includes `chrome.storage.local.set({ fsbThemePreference: preference })`, and `function applyTheme()` calls `mirrorThemePreference(preference);` | yes |
 | [owner-chip.test.js](../../tests/owner-chip.test.js) | no `.status-dot.owned` in sidepanel.css | no |
 
 The design checks also hold this surface. [`check-style-literals.mjs`](../../scripts/check-style-literals.mjs) counts raw colours, z-index values, font stacks and page-local colour tokens in sidepanel.css and markdown.css.
@@ -175,8 +177,9 @@ The design checks also hold this surface. [`check-style-literals.mjs`](../../scr
 
 - [`sidepanel.html`](../../extension/ui/sidepanel.html): `.sidepanel-header`, `#historyView`, `#delegationRun`, `#automationRunner`, `#chatInput`, `#paymentFillConfirmOverlay`
 - [`sidepanel.css`](../../extension/ui/sidepanel.css): `:root`, `[data-theme="dark"]`, `.message.*`, `.delegation-*`, `.pixel-letter`, the `prefers-reduced-motion` block
-- [`sidepanel.js`](../../extension/ui/sidepanel.js): `applyTheme`, `_setHeaderStatus`, `setRunningState`, `applyInputLockout`, `_delegationToneForSnapshot`, `addMessage`, `spLine`, `showChromepageError`
+- [`sidepanel.js`](../../extension/ui/sidepanel.js): `applyTheme`, `mirrorThemePreference`, `_setHeaderStatus`, `setRunningState`, `applyInputLockout`, `_delegationToneForSnapshot`, `addMessage`, `spLine`, `showChromepageError`
 - [`fsb-ui-core.css`](../../extension/shared/fsb-ui-core.css): `:root`, `[data-theme="dark"]`, `:is(.chat-header, .sidepanel-header)`
 - [`markdown.css`](../../extension/ui/markdown.css): `.md-rendered`, the dark message overrides
 - [`background.js`](../../extension/background.js): `chrome.action.onClicked`, `setPanelBehavior`
+- [`action-icon.js`](../../extension/utils/action-icon.js): `THEME_KEY`, `tileFor`, `TILES`
 - [`ui-locale.js`](../../extension/utils/ui-locale.js): `EXACT`, `markExact`, `apply`; [`copy-exact.js`](../../extension/utils/copy-exact.js): `registerExact`

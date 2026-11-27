@@ -52,7 +52,7 @@ The popup uses the product palette ([0002](../decisions/0002-three-palettes-one-
   - Only the popup replaces its header this way.
 - **Pinned.** `togglePinWindow()` flips the `windowMode` storage key between `popup` and `pinned`. Pinning opens a new 400×600 window and closes the current one; unpinning posts `shell_switched_popup`. On load in pinned mode, `checkWindowMode()` adds `#pinBtn.pinned`, which rotates the thumbtack 45°, and posts `shell_persistent`.
 - **Short windows.** `@media (max-height: 500px)` tightens the header, message and composer padding.
-- **Theme.** `applyTheme()` is the side panel's: `localStorage` key `fsb-theme` (`system`, `dark` or `light`) resolved by `resolveEffectiveTheme()` into `data-theme` on `<html>`. It follows `storage` events and `prefers-color-scheme` changes.
+- **Theme.** `applyTheme()` is the side panel's: `localStorage` key `fsb-theme` (`system`, `dark` or `light`) resolved by `resolveEffectiveTheme()` into `data-theme` on `<html>`. It follows `storage` events and `prefers-color-scheme` changes. Each run also calls `mirrorThemePreference()`, which copies the preference to `chrome.storage.local` as `fsbThemePreference` for the toolbar icon; see the [side panel](side-panel.md#states).
 
 ## Motion
 
@@ -102,6 +102,7 @@ No test hashes popup.html or popup.css. Edits are cheap, but the token block mus
 | [extension-ui-locale.test.js](../../tests/extension-ui-locale.test.js) | popup.html static text matches the English catalog; no inline `<script>` | yes |
 | [agent-sunset-control-panel.test.js](../../tests/agent-sunset-control-panel.test.js) | no supplementary-plane characters (emoji) and no `/agent` command code in popup.js | yes |
 | [onboarding-first-run.test.js](../../tests/onboarding-first-run.test.js) | onboarding keeps the `ui/popup.html` fallback URL | no |
+| [action-icon-behavior.test.js](../../tests/action-icon-behavior.test.js) | the body of `function mirrorThemePreference(` in popup.js includes `chrome.storage.local.set({ fsbThemePreference: preference })`, and `function applyTheme()` calls `mirrorThemePreference(preference);` | yes |
 
 [`check-style-literals.mjs`](../../scripts/check-style-literals.mjs) also counts popup.css's raw colours and its page-local dark tokens.
 
@@ -120,6 +121,6 @@ No test hashes popup.html or popup.css. Edits are cheap, but the token block mus
 
 - [`popup.html`](../../extension/ui/popup.html): `.chat-header`, `#pinBtn`, `#testBtn`, `#chatInput`, `.footer-meta`
 - [`popup.css`](../../extension/ui/popup.css): `:root`, `[data-theme="dark"]`, `body`, `.status-dot.owned`, `#pinBtn.pinned`, `.typing-dots`, `@keyframes messageSlide`, `@media (max-height: 500px)`
-- [`popup.js`](../../extension/ui/popup.js): `applyTheme`, `_setHeaderOwner`, `refreshOwnerChip`, `togglePinWindow`, `checkWindowMode`, `collapseOldActions`, `addMessage`, `showChromepageError`
+- [`popup.js`](../../extension/ui/popup.js): `applyTheme`, `mirrorThemePreference`, `_setHeaderOwner`, `refreshOwnerChip`, `togglePinWindow`, `checkWindowMode`, `collapseOldActions`, `addMessage`, `showChromepageError`
 - [`background.js`](../../extension/background.js): `chrome.action.onClicked`; [`onboarding.js`](../../extension/ui/onboarding.js): `openPopupFallback`
 - [`owner-chip.js`](../../extension/ui/owner-chip.js): `buildChipText`

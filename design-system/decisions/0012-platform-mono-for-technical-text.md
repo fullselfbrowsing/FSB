@@ -43,8 +43,8 @@ This is the stack the control panel already ships. Kept from 0004:
   - showcase component stylesheets: about 37 declarations in six page files;
   - the release-notes template's inline styles, about 497 of them. Inline styles inside i18n messages are part of the extracted message, so changing them means re-extracting all eight locales.
 - **The ratchet tracks the migration.** `scripts/check-style-literals.mjs` already counts literal `font-family` stacks, so each step lowers the baseline.
-- **The pills in PRs #172 and #173** register Space Mono on the document (`fsb-vault-mono`, `fsb-pill-mono`). They should switch to `--font-mono` before they merge.
-- **Poppins still needs a home on the showcase.** The site must self-host the two wordmark weights so the brand mark renders; Space Mono no longer needs hosting there.
+- **The pills** register Space Mono on the document: the status pill as `fsb-pill-mono`, and the vault pill in PR #172 as `fsb-vault-mono`. They should switch to the platform stack; shadow roots ignore `@font-face`, so no web font is needed.
+- **Poppins on the showcase.** Since PR #173 the wordmark's F and S are one-glyph `data:` faces in `fsb-wordmark.css`, which `font-src 'self' data:` admits. Space Mono needs no hosting there.
 
 ## Evidence
 

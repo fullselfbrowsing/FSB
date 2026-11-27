@@ -33,7 +33,7 @@ One brand orange, three palettes. See [0002](../decisions/0002-three-palettes-on
 |---|---|---|
 | Site | [../tokens/colors.css](../tokens/colors.css), [../tokens/effects.css](../tokens/effects.css) | `:root` is dark; `[data-theme="light"]` |
 | Product | [../tokens/product-surface.css](../tokens/product-surface.css) | `[data-surface="product"]` is light; dark under `[data-theme="dark"]` |
-| Overlay | [../tokens/overlay.css](../tokens/overlay.css) | dark cards; one token per state |
+| Overlay | [../tokens/overlay.css](../tokens/overlay.css) | dark surfaces, no theme switch; a colour pair per glow state |
 
 Key values:
 
