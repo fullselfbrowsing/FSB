@@ -4557,8 +4557,9 @@ async function handleFailTaskRoute({ params, payload }) {
 //   in SW context with serialized mutation records.
 // - 500ms safety net (D-09) caps total wait. partial:true is set on hit.
 //   click and type_text skip the wait when their content script reports
-//   pageStable; execute_js ends it 150 ms after the script when the harvest
-//   has recorded nothing.
+//   pageStable and the harvest has already recorded a mutation; execute_js
+//   ends it 150 ms after the script when the harvest has recorded nothing and
+//   the script starts nothing that can change the page later.
 // - Cross-origin transition (D-08) skips DOM inspection and emits URL-only
 //   report with cross_origin:true.
 // - All harvest failures are swallowed (try/catch); the underlying action
@@ -4572,6 +4573,19 @@ const _PAGE_INJECTION_TIMEOUT_MS = 750;
 // execute_js: how long after the script returns a harvest with nothing
 // recorded ends the settle wait.
 const _CHANGE_REPORT_QUIET_EXIT_MS = 150;
+// execute_js code that can change the page after it returns: a click or an
+// event a handler answers later, a request, a timer or promise, a navigation
+// or a scroll that loads more. Such a script keeps the full settle wait, so a
+// result rendered a few hundred ms later still reaches its change report.
+const _EXECUTE_JS_LATER_EFFECT_PATTERN = new RegExp([
+  '\\.(?:click|submit|requestSubmit|dispatchEvent|focus|scrollIntoView|postMessage)\\s*\\(',
+  '\\bscroll(?:To|By)\\s*\\(',
+  '\\b(?:fetch|XMLHttpRequest|sendBeacon|setTimeout|setInterval|requestAnimationFrame|Promise|async|await)\\b',
+  '\\.then\\s*\\(',
+  '\\blocation(?:\\.href)?\\s*=(?!=)',
+  '\\blocation\\.(?:assign|replace|reload)\\s*\\(',
+  '\\bhistory\\.(?:pushState|replaceState|back|forward|go)\\s*\\('
+].join('|'));
 // Tools whose content script waits for page stability after acting and
 // reports the outcome as pageStable.
 const _CONTENT_SETTLED_TOOLS = Object.freeze(['click', 'type_text']);
@@ -5364,18 +5378,29 @@ async function wrapWithChangeReport(ctx) {
   if (!startedHarvest) return expectCtx ? await _attachExpectResult(response, expectCtx, tabId, null) : response;
 
   // click and type_text already waited for page stability in the content
-  // script after acting. When that wait saw the page settle, the report is
-  // taken now; when it did not run or timed out, the settle wait below runs.
+  // script after acting. That wait cannot see the page's own requests, so its
+  // "stable" means only that the DOM was quiet. The report is taken now when
+  // that wait saw the page settle and the harvest has already recorded a
+  // mutation. An action that has changed nothing yet may still be loading its
+  // result ("Load more", a type-ahead list), so the settle wait below runs, as
+  // it does when the content wait did not run or timed out.
   const canonicalTool = (toolDef && typeof toolDef.name === 'string') ? toolDef.name : toolName;
-  const contentSettled = _CONTENT_SETTLED_TOOLS.indexOf(canonicalTool) !== -1
+  let contentSettled = _CONTENT_SETTLED_TOOLS.indexOf(canonicalTool) !== -1
     && !!response && typeof response === 'object' && response.pageStable === true;
+  if (contentSettled) {
+    const peek = await _injectFn(tabId, _fsbHarvestPeekInPage, [harvestToken]);
+    contentSettled = !!(peek && peek.ok === true && peek.mutationCount > 0);
+  }
 
   // Race waitStable vs 500ms safety net. partial:true on safety hit.
-  // execute_js may also end early when nothing has been recorded.
+  // execute_js may also end early when nothing has been recorded and its
+  // code starts nothing that can change the page later.
+  const quietExit = canonicalTool === 'execute_js'
+    && !(typeof params.code === 'string' && _EXECUTE_JS_LATER_EFFECT_PATTERN.test(params.code));
   let partial = false;
   if (!contentSettled) {
     try {
-      const winner = await _awaitChangeReportSettle(tabId, harvestToken, canonicalTool === 'execute_js');
+      const winner = await _awaitChangeReportSettle(tabId, harvestToken, quietExit);
       partial = (winner === 'safety');
     } catch (_) { partial = true; }
   }

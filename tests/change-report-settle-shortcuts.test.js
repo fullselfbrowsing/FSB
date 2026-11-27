@@ -5,14 +5,17 @@
  * nothing is happening, and never at the cost of a mutation:
  *
  *   - execute_js: when the harvest has recorded no mutation, the URL is
- *     unchanged and the tab is not loading, the wait ends 150 ms after the
+ *     unchanged, the tab is not loading and the code starts nothing that can
+ *     change the page later (a click, an event, a request, a timer or
+ *     promise, a navigation or a scroll), the wait ends 150 ms after the
  *     script instead of waiting for the 300 ms quiet window or the 500 ms
- *     safety net. Any recorded mutation keeps the old wait.
+ *     safety net. Any recorded mutation, or such code, keeps the old wait.
  *   - click and type_text: when the content script reports pageStable (its
- *     own stability wait after acting saw the page settle), the service
- *     worker takes the report without waiting again. Without that report
- *     (wait timed out, skipped, or an older content script) it waits as
- *     before.
+ *     own stability wait after acting saw the page settle) and the harvest
+ *     has already recorded a mutation, the service worker takes the report
+ *     without waiting again. An action that has changed nothing yet, or
+ *     whose content wait timed out, was skipped or came from an older
+ *     content script, waits as before, so a late result still arrives.
  *   - press_enter, select_option, check_box and the other flagged tools keep
  *     the old wait whatever their result says.
  *
@@ -168,7 +171,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   console.log('--- execute_js: early end when nothing is recorded ---');
   {
     const env = setup();
-    const { response, elapsed } = await act(env, 'execute_js', async () => ({ success: true, result: '3', tool: 'execute_js' }));
+    const { response, elapsed } = await act(env, 'execute_js', async () => ({ success: true, result: '3', tool: 'execute_js' }),
+      { code: 'return document.querySelectorAll("li").length;' });
     const cr = response.change_report;
     check(env.calls.includes('_fsbHarvestPeekInPage'), 'zero mutations: the harvest was peeked after 150 ms');
     check(elapsed >= 140 && elapsed < 400, `zero mutations in a hidden tab: settled in ${elapsed} ms (was the 500 ms safety net)`);
@@ -214,6 +218,28 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     check(cr && cr.mutation_count === 0, 'a mutation after the report was taken is not in it (report reflects the moment it was taken)');
   }
 
+  console.log('\n--- execute_js: code that can act later keeps the old wait ---');
+  for (const code of [
+    'document.querySelector("#search").click(); return true',
+    'document.querySelector("#q").dispatchEvent(new Event("input", { bubbles: true }));',
+    'window.scrollTo(0, document.body.scrollHeight); return true;',
+    'fetch("/api/rows").then(() => {});',
+    'setTimeout(() => {}, 10);'
+  ]) {
+    const env = setup();
+    let lateTimer = null;
+    const { response, elapsed } = await act(env, 'execute_js', async () => {
+      lateTimer = setTimeout(() => env.page.addRow('loaded'), 250);
+      return { success: true, result: 'true', tool: 'execute_js' };
+    }, { code });
+    clearTimeout(lateTimer);
+    const cr = response.change_report;
+    check(!env.calls.includes('_fsbHarvestPeekInPage') && elapsed >= 480,
+      `${code.slice(0, 40)}...: no early end (${elapsed} ms)`);
+    check(cr && cr.nodes_added.some((n) => n.selector === '#loaded'),
+      `${code.slice(0, 40)}...: a result rendered 250 ms later is in the report`);
+  }
+
   console.log('\n--- execute_js: URL change or a loading tab keeps the old wait ---');
   {
     const env = setup();
@@ -248,20 +274,37 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
       env.page.addRow(verb + '-row');
       return { success: true, hadEffect: true, pageStable: true, tool: verb };
     }, { selector: '#go' });
-    check(JSON.stringify(env.calls) === JSON.stringify(['_fsbHarvestStartInPage', '_fsbHarvestStopInPage']),
-      `${label} with pageStable: start then stop, no waiter injection (got ${env.calls.join(', ')})`);
+    check(JSON.stringify(env.calls) === JSON.stringify(['_fsbHarvestStartInPage', '_fsbHarvestPeekInPage', '_fsbHarvestStopInPage']),
+      `${label} with pageStable and a recorded mutation: start, peek, stop, no waiter injection (got ${env.calls.join(', ')})`);
     check(elapsed < 100, `${label} with pageStable: report taken at once (${elapsed} ms)`);
     const cr = response.change_report;
     check(cr && cr.mutation_count === 1 && cr.nodes_added[0].selector === '#' + verb + '-row' && cr.partial !== true,
       `${label}: the report holds every mutation seen up to the stop`);
+  }
+  for (const [verb, label] of [['click', 'click'], ['type', 'type_text']]) {
+    // "Load more" or a type-ahead list: the content wait saw a quiet DOM, but
+    // the page's own request answers later. Nothing recorded yet, so the
+    // settle wait runs and the late rows reach the report.
+    const env = setup();
+    let lateTimer = null;
+    const { response, elapsed } = await act(env, verb, async () => {
+      lateTimer = setTimeout(() => env.page.addRow(verb + '-late'), 250);
+      return { success: true, hadEffect: false, pageStable: true, tool: verb };
+    }, { selector: '#go' });
+    clearTimeout(lateTimer);
+    const cr = response.change_report;
+    check(env.calls.includes('_fsbWaitStableInPage') && elapsed >= 480,
+      `${label} with pageStable but nothing recorded yet: the settle wait runs (${elapsed} ms)`);
+    check(cr && cr.nodes_added.some((n) => n.selector === '#' + verb + '-late'),
+      `${label}: a result that arrives 250 ms later is in the report`);
   }
   {
     const env = setup();
     const { response } = await act(env, 'click', async () => ({
       success: false, outcome: 'unknown', mayHaveExecuted: true, hadEffect: false, pageStable: true, tool: 'click'
     }), { selector: '#go' });
-    check(!env.calls.includes('_fsbWaitStableInPage') && response.change_report,
-      'click that reported no effect after a stable wait: no second wait, report still attached for the recorder');
+    check(env.calls.includes('_fsbWaitStableInPage') && response.change_report,
+      'click that reported no effect after a stable wait: the settle wait runs, and the report is attached for the recorder');
   }
   for (const [label, result] of [
     ['pageStable false (content wait timed out)', { success: true, pageStable: false, tool: 'click' }],
