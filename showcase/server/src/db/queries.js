@@ -3,6 +3,10 @@
  */
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// The public client list covers the whole raw-event retention window.
+const POPULAR_MCP_WINDOW_MS = 7 * ONE_DAY_MS;
+// Ingest accepts ts_minute up to 5 minutes ahead of the server clock.
+const TS_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 
 function utcDayStartMs(ms) {
   const d = new Date(ms);
@@ -257,14 +261,19 @@ class Queries {
         SUM(has_trusted_active) AS trusted_active_installs
       FROM attributed
     `);
+    // Installs per MCP client. 'unknown' is not a client: presence heartbeats
+    // carry it, and so does every MCP call the extension records before it
+    // learns which client sent it (agent:register, page reads before the first
+    // action). Those installs almost always report their real client too, so
+    // counting 'unknown' would list the same installs twice. The condition
+    // matches idx_telemetry_events_labeled_ts, which holds only labelled rows.
     this.selectPopularMcpForDayRange = this.db.prepare(`
       SELECT mcp_client, COUNT(DISTINCT install_uuid) AS uniq
       FROM telemetry_events
       WHERE ts_minute >= ? AND ts_minute < ?
-        -- exclude presence heartbeats from popularity ranking (see RCA 260530-19i)
-        AND NOT (tokens_in = 0 AND tokens_out = 0 AND mcp_client = 'unknown')
+        AND mcp_client <> 'unknown'
       GROUP BY mcp_client
-      ORDER BY uniq DESC
+      ORDER BY uniq DESC, mcp_client ASC
     `);
     // Quick task 260630-hct -- region popularity for the daily rollup, mirroring
     // selectPopularMcpForDayRange exactly (GROUP BY region). uniq is
@@ -605,6 +614,12 @@ class Queries {
       active_history_since:  activeHistoryStart,
       tokens_total_lifetime: this.aggregateTokensLifetime.get()?.n || 0,
       tokens_24h:            this.aggregateTokens24h.get(snapshotMs - ONE_DAY_MS, snapshotMs)?.n || 0,
+      // Rolling 7 days of raw events, not one UTC day: a client used yesterday
+      // but not yet today still belongs on the list.
+      popular_mcp_7d:        this.selectPopularMcpForDayRange.all(
+        snapshotMs - POPULAR_MCP_WINDOW_MS,
+        snapshotMs + TS_FUTURE_TOLERANCE_MS + 1
+      ),
       latest_global:         this.selectLatestGlobalAggregate.get(todayKey) || {
         day_utc: null,
         updated_at: 0,

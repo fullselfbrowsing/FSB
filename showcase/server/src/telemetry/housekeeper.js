@@ -117,6 +117,31 @@ function applyRegionKFloor(rows, memberKey, floor) {
     : published;
 }
 
+/**
+ * Pool MCP client labels with fewer than `floor` installs into one 'Other' row.
+ *
+ * Each row's `uniq` is COUNT(DISTINCT install_uuid) for one client. 'Other'
+ * sums the installs of the small labels (not the number of labels) and is
+ * dropped when that sum is itself under the floor. At floor 1 every row
+ * passes and no 'Other' row is produced; the bucketing is kept so that raising
+ * the floor needs no other change. Used for the daily aggregate and for the
+ * public 7-day list.
+ *
+ * @param {Array<{mcp_client:string, uniq:number}>} rows
+ * @param {number} floor
+ * @returns {Array<{mcp_client:string, uniq:number}>}
+ */
+function applyMcpKFloor(rows, floor) {
+  const list = Array.isArray(rows) ? rows : [];
+  const above = list.filter((r) => (r.uniq || 0) >= floor);
+  const belowInstalls = list
+    .filter((r) => (r.uniq || 0) < floor)
+    .reduce((sum, r) => sum + (r.uniq || 0), 0);
+  return belowInstalls >= floor
+    ? [...above, { mcp_client: 'Other', uniq: belowInstalls }]
+    : above;
+}
+
 function floorToUtcDayMs(ms) {
   const d = new Date(ms);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -189,27 +214,7 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
       const g = queries.selectGlobalForDayRange.get(dayStart, dayEnd) || {};
       const popularMcpRaw = queries.selectPopularMcpForDayRange.all(dayStart, dayEnd);
 
-      // k>=K_ANONYMITY_FLOOR anonymity floor per D-07 (WR-01 fix from Phase 273
-      // review). Floor history: 5 (v0.9.69) -> 2 (v0.9.70) -> 1 (this change).
-      // At floor=1, every row from selectPopularMcpForDayRange already satisfies
-      // `uniq >= 1` (GROUP BY emits no zero-count rows), so `above` equals
-      // `popularMcpRaw`, `belowInstalls` is 0, and no "Other" bucket is ever
-      // emitted. The filter + reduce stay in place so a future bump to floor>=2
-      // (e.g. if MCP_CLIENT_ALLOWLIST ever opens to free-form labels) re-engages
-      // bucketing without further plumbing.
-      //
-      // Each row's `uniq` is COUNT(DISTINCT install_uuid) per mcp_client (see
-      // queries.js:selectPopularMcpForDayRange). The historical WR-01 fix --
-      // SUMMING below-k installs (not COUNTING below-k labels) and SUPPRESSING
-      // the bucket when the aggregate is itself < floor -- is preserved verbatim
-      // below for that future-bump case.
-      const above = popularMcpRaw.filter((r) => (r.uniq || 0) >= K_ANONYMITY_FLOOR);
-      const belowInstalls = popularMcpRaw
-        .filter((r) => (r.uniq || 0) < K_ANONYMITY_FLOOR)
-        .reduce((sum, r) => sum + (r.uniq || 0), 0);
-      const popularMcp = belowInstalls >= K_ANONYMITY_FLOOR
-        ? [...above, { mcp_client: 'Other', uniq: belowInstalls }]
-        : above; // suppress entirely when total below-k installs is itself < k
+      const popularMcp = applyMcpKFloor(popularMcpRaw, K_ANONYMITY_FLOOR);
       // Phase 274 will source per-agent popularity from the rolled-up rows; v0.9.69 leaves this empty.
       const popularAgent = [];
 
@@ -297,6 +302,7 @@ module.exports = {
   runHousekeeperTick,
   floorToUtcDayMs,
   applyRegionKFloor,
+  applyMcpKFloor,
   K_ANONYMITY_FLOOR,
   REGION_K_FLOOR,
   ROLLUP_RETENTION_DAYS,
