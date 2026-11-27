@@ -2,9 +2,11 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
-## Unreleased
+<a id="v0.95.0"></a>
 
-Not published yet. The package version is still 0.11.5 and needs a bump before these ship.
+## 0.95.0 (2026-11-27)
+
+Minor release in which `install` sets up FSB's local helper, the server keeps it current, uninstalling the last client removes it, and the local agent service becomes the extension's hub, released alongside FSB extension 0.9.99. The jump from 0.11.5 is a numbering choice only: versions still compare part by part, so every 0.11.x helper counts as older and is refreshed.
 
 ### Added
 
@@ -30,6 +32,8 @@ Not published yet. The package version is still 0.11.5 and needs a bump before t
 - `install --native-host` and `uninstall --native-host` keep working as the explicit install, repair and removal commands. The extension's repair command, which passes `--extension-id` for unpacked builds, is unchanged.
 - The first server start after updating refreshes a helper staged by an earlier package version. That version's local agent service cannot see the stop request. While it shows an open MCP session, a running tool call or a child process, the refresh leaves it alone and retries later. Once it shows none, the refresh stops it with SIGTERM: on macOS and Linux it runs its normal shutdown, which cancels any delegated run it still has, and on Windows the signal ends the process at once.
 - Removing FSB in a client's own settings, or by editing its config by hand, is invisible to the installer, so the helper stays until `uninstall --native-host` removes it.
+- Pair it with FSB extension 0.9.99, released alongside it.
+- Merging this release into `main` automatically publishes `fsb-mcp-server@0.95.0` and creates the `mcp-v0.95.0` GitHub release. Later main pushes skip publication when the MCP version is already on npm; explicit MCP release tags remain supported.
 
 <a id="v0.11.5"></a>
 

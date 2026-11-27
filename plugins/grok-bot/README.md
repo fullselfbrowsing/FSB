@@ -23,7 +23,7 @@ FSB's Chrome extension and MCP process must run **together on Grok Bot's own com
 3. Once this package is listed, open Bot's **Plugins → Marketplace**, search for **Full Self Browsing**, and install it. Team policies may restrict availability. The package does not install Node, Chrome or the extension automatically.
 4. Ask Bot to use FSB for a small browser read. If the extension shows a bridge pairing request, complete its local pairing flow. Confirm the connection targets the browser on Bot's computer before continuing.
 
-The configured server is named `fsb` and launches as `npx -y fsb-mcp-server@0.11.5`. Its first launch may download the package and dependencies. Keep one intended FSB server configuration active; an existing manual FSB connection may otherwise duplicate or override the plugin connection.
+The configured server is named `fsb` and launches as `npx -y fsb-mcp-server@0.95.0`. Its first launch may download the package and dependencies. Keep one intended FSB server configuration active; an existing manual FSB connection may otherwise duplicate or override the plugin connection.
 
 Manual MCP browsing requires no FSB API key or separate provider OAuth. Websites use the sessions in Bot's browser profile, so sign in there when needed. Optional FSB autopilot requires a configured model provider and can incur provider charges.
 
@@ -48,8 +48,8 @@ Run diagnostics **on Bot's computer**:
 ```bash
 node --version
 npx --version
-npx -y fsb-mcp-server@0.11.5 doctor
-npx -y fsb-mcp-server@0.11.5 status
+npx -y fsb-mcp-server@0.95.0 doctor
+npx -y fsb-mcp-server@0.95.0 status
 ```
 
 The doctor also checks optional model-provider configuration. A missing provider or model can produce a `config` failure even when Chrome is attached; manual MCP tools do not require that configuration. Verify a small manual page read separately.

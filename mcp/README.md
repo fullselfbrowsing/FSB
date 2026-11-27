@@ -38,6 +38,17 @@ Use this package when you want your AI client to drive the browser directly whil
 
 > **PhantomStream (engineering milestone 0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
 
+### What's New In v0.95.0
+
+- `install --<client>`, `install --all`, and a bare `install` now register FSB's native messaging host in each browser that has FSB installed, or in Chrome when none does, so a separate `install --native-host` is no longer needed. A helper problem is printed as a warning without failing the client install, and `--dry-run` previews the step.
+- `--no-native-host` writes only the client config and pauses the automatic refresh until a later `install` without the flag.
+- When an MCP client starts the server, a detached process refreshes an already registered helper that is older than the package. It never registers a helper from nothing, and `FSB_NATIVE_HOST_AUTO=0` turns it off.
+- A refresh publishes the new helper beside the old one and swaps them only after the local agent service has stopped while idle. It holds the native host's wake lock throughout, so the browser cannot start the old copy in between.
+- The long-lived local agent service owns hub port 7225. A stdio server joins it as a relay, or hands the port over once nothing is in flight.
+- Uninstalling FSB from its last client removes a helper that `install` set up, unless the extension has run a delegated agent through it. After `uninstall --all` or `uninstall --native-host`, the helper stays off until the next `install`.
+- One helper can serve several browsers, and `uninstall --native-host --browser <name>` removes only that browser's registration.
+- **Compatibility:** `fsb-mcp-server` 0.95.0 requires FSB extension 0.9.99 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+
 ### What's New In v0.11.5
 
 - `install --cline` writes `~/.cline/data/settings/cline_mcp_settings.json`, the settings file Cline's VS Code extension, JetBrains plugin, and CLI share. Earlier versions wrote a VS Code extension-storage file that current Cline ignores after its one-time import, so rerun the install if FSB never appeared in Cline.
@@ -48,7 +59,6 @@ Use this package when you want your AI client to drive the browser directly whil
 - `install --antigravity` replaces `install --windsurf` and writes `~/.gemini/config/mcp_config.json`, falling back to `~/.gemini/antigravity/mcp_config.json` on older Antigravity releases. An empty config file is treated as an empty config.
 - Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
 - Grok Build is verified against the `grok-acp-v1` integration contract instead of one exact version (see [Grok Build as the extension's AI provider](#grok-build-as-the-extensions-ai-provider)). Rerun the native-host installation after updating so the staged runtime gets the new checks.
-- **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.99 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.2
 
@@ -742,9 +752,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.5`) because it is published independently from the extension release (`0.9.99`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
+The MCP package has its own version (`0.95.0`) because it is published independently from the extension release (`0.9.99`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.5 requires extension 0.9.99 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
+Compatibility for this release: MCP 0.95.0 requires extension 0.9.99 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -758,14 +768,14 @@ Contract-sensitive changes should be covered by tests before publishing:
 - trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
 - terminal task-outcome contract: `mcp:task-status`, agent/ownership context, serialized lifecycle ordering, and `fail_task` acknowledgement semantics
 
-### Releasing 0.11.5
+### Releasing 0.95.0
 
-This 0.11.5 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
+This 0.95.0 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
 
 To publish:
 
 - Preferred: merge the versioned release into `main`; the npm workflow builds the Windows native-host artifacts, verifies the packed payload, publishes to npm, and creates the release automatically.
-- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v0.11.5 && git push origin mcp-v0.11.5`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
+- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v0.95.0 && git push origin mcp-v0.95.0`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
 - Manual MCP fallback: from the release commit, run `cd mcp && npm publish --tag latest` only after confirming `npm whoami`, `npm --prefix mcp run build`, and the MCP smoke/parity/schema gates all pass.
 
 Use the release workflow for normal releases so the native-host packaging and integrity checks run before publication.
