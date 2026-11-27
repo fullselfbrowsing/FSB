@@ -607,8 +607,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="about.actions.subtitle" datatype="html">
-        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 69-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
-        <target state="translated">按類別整理的 60 種瀏覽器動作，全部可透過自然語言執行，並作為 69 工具 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 目錄的一部分提供給代理程式。</target>
+        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 70-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
+        <target state="translated">按類別整理的 60 種瀏覽器動作，全部可透過自然語言執行，並作為 70 工具 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 目錄的一部分提供給代理程式。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/about/about-page.component.html</context>
           <context context-type="linenumber">127,128</context>
@@ -1939,8 +1939,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.hero.subtitle" datatype="html">
-        <source> Always-on agents like <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ship with a cloud computer. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> hands them yours: the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> you are already signed into, 69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools, and a verified result after every action. </source>
-        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 和 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 等全天候代理都附有雲端電腦。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 讓它們使用你的電腦：已登入的 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、69 個 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 工具，以及每次操作後經過驗證的結果。</target>
+        <source> Always-on agents like <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ship with a cloud computer. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> hands them yours: the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> you are already signed into, 70 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools, and a verified result after every action. </source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 和 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 等全天候代理都附有雲端電腦。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 讓它們使用你的電腦：已登入的 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、70 個 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 工具，以及每次操作後經過驗證的結果。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">21,23</context>
@@ -2043,8 +2043,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.with.agent.foot" datatype="html">
-        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 69 tools</source>
-        <target state="translated">透過 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 69 個工具</target>
+        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 70 tools</source>
+        <target state="translated">透過 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 70 個工具</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">102,103</context>
@@ -2083,8 +2083,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.power.card.tools.stat" datatype="html">
-        <source>69 tools</source>
-        <target state="translated">69 個工具</target>
+        <source>70 tools</source>
+        <target state="translated">70 個工具</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">136,137</context>
@@ -2459,8 +2459,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.meta.description" datatype="html">
-        <source>Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.</source>
-        <target state="translated">讓 Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex 或 Cursor 擁有真實的瀏覽器：已登入的 Chrome、69 個 MCP 工具、一行指令安裝，並使用 doctor 驗證。</target>
+        <source>Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 70 MCP tools, one-line install, verified with doctor.</source>
+        <target state="translated">讓 Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex 或 Cursor 擁有真實的瀏覽器：已登入的 Chrome、70 個 MCP 工具、一行指令安裝，並使用 doctor 驗證。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">72</context>
@@ -2475,16 +2475,16 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.description" datatype="html">
-        <source>Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 69 MCP browser tools for the FSB MCP server.</source>
-        <target state="translated">FSB 的標準 OpenClaw 與 Hermes 接入路徑。Doctor 流程、stdio 設定列印、經同意閘控的多主機安裝程式，以及面向 FSB MCP 伺服器的 69 個 MCP 瀏覽器工具。</target>
+        <source>Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 70 MCP browser tools for the FSB MCP server.</source>
+        <target state="translated">FSB 的標準 OpenClaw 與 Hermes 接入路徑。Doctor 流程、stdio 設定列印、經同意閘控的多主機安裝程式，以及面向 FSB MCP 伺服器的 70 個 MCP 瀏覽器工具。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">297</context>
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.feature.tools" datatype="html">
-        <source>69 MCP tools for browser action, observation, verification, and recovery</source>
-        <target state="translated">69 個 MCP 工具，涵蓋瀏覽器操作、觀察、驗證與復原</target>
+        <source>70 MCP tools for browser action, observation, verification, and recovery</source>
+        <target state="translated">70 個 MCP 工具，涵蓋瀏覽器操作、觀察、驗證與復原</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">299</context>
@@ -4303,8 +4303,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.meta" datatype="html">
-        <source>69 tools · no API key</source>
-        <target state="translated">69 個工具 · 無需 API 金鑰</target>
+        <source>70 tools · no API key</source>
+        <target state="translated">70 個工具 · 無需 API 金鑰</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">303,305</context>
@@ -4415,8 +4415,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.fact.tools" datatype="html">
-        <source>69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools</source>
-        <target state="translated">69 個 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 工具</target>
+        <source>70 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools</source>
+        <target state="translated">70 個 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 工具</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">354,355</context>
@@ -4631,8 +4631,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.mcp" datatype="html">
-        <source>MCP server with 69 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes</source>
-        <target state="translated">提供 69 個工具的 MCP 伺服器，適用於 Claude Code、Claude Desktop、Codex、Cursor、VS Code、Antigravity、OpenCode、Cline、OpenClaw 與 Hermes</target>
+        <source>MCP server with 70 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes</source>
+        <target state="translated">提供 70 個工具的 MCP 伺服器，適用於 Claude Code、Claude Desktop、Codex、Cursor、VS Code、Antigravity、OpenCode、Cline、OpenClaw 與 Hermes</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">313</context>
@@ -19031,8 +19031,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="support.schema.faq.mcp.a" datatype="html">
-        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Antigravity, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 69 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
-        <target state="translated">MCP（Model Context Protocol）讓您能從 Claude Code、Codex、Cursor、Antigravity 與 OpenClaw 等 AI 程式開發工具控制 FSB。MCP 伺服器以 npx -y fsb-mcp-server@latest 執行，並透過本機 WebSocket 橋接器與執行中的擴充功能配對。FSB 提供 69 個 MCP 工具（點擊、輸入、導覽、讀取 DOM、填入 Vault 憑證等）。對 OpenClaw 使用者而言，最快方式是在 ClawHub 的 https://clawhub.ai/lakshmanturlapati/full-selfbrowsing 一鍵安裝，或載入位於 skills/fsb/ 的 FSB skill；它會輸出 stdio 設定區塊並執行 doctor 診斷。完整說明請見 https://full-selfbrowsing.com/agents。</target>
+        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Antigravity, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 70 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
+        <target state="translated">MCP（Model Context Protocol）讓您能從 Claude Code、Codex、Cursor、Antigravity 與 OpenClaw 等 AI 程式開發工具控制 FSB。MCP 伺服器以 npx -y fsb-mcp-server@latest 執行，並透過本機 WebSocket 橋接器與執行中的擴充功能配對。FSB 提供 70 個 MCP 工具（點擊、輸入、導覽、讀取 DOM、填入 Vault 憑證等）。對 OpenClaw 使用者而言，最快方式是在 ClawHub 的 https://clawhub.ai/lakshmanturlapati/full-selfbrowsing 一鍵安裝，或載入位於 skills/fsb/ 的 FSB skill；它會輸出 stdio 設定區塊並執行 doctor 診斷。完整說明請見 https://full-selfbrowsing.com/agents。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/support/support-page.component.ts</context>
           <context context-type="linenumber">44</context>
@@ -19095,8 +19095,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="support.schema.faq.tools.a" datatype="html">
-        <source>FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 69 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.</source>
-        <target state="translated">FSB 透過 MCP 提供兩種模式。預設的 Manual 模式為呼叫端代理提供 69 個細粒度工具：導覽、點擊、輸入、捲動、讀取頁面狀態、截圖、用 upload_file 上傳真實本機檔案、用 trigger / get_trigger_status / list_triggers 部署觸發監視器，以及用 search_capabilities 與 invoke_capability 搜尋或呼叫受保護的第一方 API 能力。保險庫與付款助手在加密的擴充功能儲存內填寫，因此原始金鑰不會越過 MCP 橋接。Autopilot 模式（run_task）僅在使用者明確委派整項任務時才會啟動。其餘情況下，呼叫端代理在每個操作上都保持在迴圈中。</target>
+        <source>FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 70 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.</source>
+        <target state="translated">FSB 透過 MCP 提供兩種模式。預設的 Manual 模式為呼叫端代理提供 70 個細粒度工具：導覽、點擊、輸入、捲動、讀取頁面狀態、截圖、用 upload_file 上傳真實本機檔案、用 trigger / get_trigger_status / list_triggers 部署觸發監視器，以及用 search_capabilities 與 invoke_capability 搜尋或呼叫受保護的第一方 API 能力。保險庫與付款助手在加密的擴充功能儲存內填寫，因此原始金鑰不會越過 MCP 橋接。Autopilot 模式（run_task）僅在使用者明確委派整項任務時才會啟動。其餘情況下，呼叫端代理在每個操作上都保持在迴圈中。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/support/support-page.component.ts</context>
           <context context-type="linenumber">60</context>

@@ -1651,7 +1651,7 @@
     "message": "Across 17 categories"
   },
   "entry_feat_tools": {
-    "message": "69 MCP tools"
+    "message": "70 MCP tools"
   },
   "entry_feat_tools_sub": {
     "message": "From your agent"
@@ -1726,7 +1726,7 @@
     "message": "FSB writes itself into your agent's MCP config."
   },
   "entry_mcp_2b": {
-    "message": "69 tools"
+    "message": "70 tools"
   },
   "entry_mcp_2c": {
     "message": ", zero manual JSON."
@@ -1848,7 +1848,7 @@
     "message": "Tools"
   },
   "entry_sum_68": {
-    "message": "69 available"
+    "message": "70 available"
   },
   "entry_sum_access": {
     "message": "Access"
@@ -5416,5 +5416,11 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "Logged out in this browser. The local server still has the 1Password sign-in, and FSB removes it there the next time it can."
+  },
+  "panel_36fc19ad69": {
+    "message": "Anonymous usage data is NOT being sent. Click to re-enable."
+  },
+  "panel_01003693b8": {
+    "message": "Provider changed outside this panel. Refresh models to list more."
   }
 }

@@ -1651,7 +1651,7 @@
     "message": "覆盖 17 个类别"
   },
   "entry_feat_tools": {
-    "message": "69 个 MCP 工具"
+    "message": "70 个 MCP 工具"
   },
   "entry_feat_tools_sub": {
     "message": "来自你的代理"
@@ -1726,7 +1726,7 @@
     "message": "FSB 会把自己写入代理的 MCP 配置。"
   },
   "entry_mcp_2b": {
-    "message": "69 个工具"
+    "message": "70 个工具"
   },
   "entry_mcp_2c": {
     "message": "，无需手写 JSON。"
@@ -1848,7 +1848,7 @@
     "message": "工具"
   },
   "entry_sum_68": {
-    "message": "69 个可用"
+    "message": "70 个可用"
   },
   "entry_sum_access": {
     "message": "访问"
@@ -5416,5 +5416,11 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "已在此浏览器中退出登录。本地服务器仍保留 1Password 登录，FSB 会在下次可以时将其删除。"
+  },
+  "panel_36fc19ad69": {
+    "message": "未发送匿名使用数据。点击以重新启用。"
+  },
+  "panel_01003693b8": {
+    "message": "提供方已在此面板之外更改。刷新模型以列出更多。"
   }
 }

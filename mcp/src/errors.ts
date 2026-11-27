@@ -55,9 +55,15 @@ const LAYER_LABELS = {
   pageNavigation: 'Page navigation',
   visualSession: 'Visual session contract',
   sessionLookup: 'Session lookup',
+  settings: 'Settings',
   vault: '1Password',
   vaultFill: '1Password fill refused',
 } as const;
+
+// Phase 66.1: the extension writes every SETTING_ sentence, Allowed clause and
+// recovery hint; this is the one Next action used when a result carries none.
+const SETTING_NEXT_ACTION_FALLBACK =
+  'Call settings with only a key to see its type and allowed values, or with no arguments to list every setting.';
 
 // Error codes from the 1Password tools (fill_credential, use_payment_method,
 // list_credentials, list_payment_methods). Each gets its own guidance, so an
@@ -156,7 +162,11 @@ function resolveErrorKey(
   // `error` equals the resolved key, appendRawError's `errorMsg === errorKey`
   // guard suppresses the duplicate "Raw error:" line. INV-01: no MCP tool schema
   // is touched -- this is only the error passthrough regex.
-  if (explicitCode && /^(TRIGGER_.+|RECIPE_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UNAVAILABLE|REFRESH_POLL_INTERVAL_TOO_LOW)$/.test(explicitCode)) {
+  // Phase 66.1 settings tool: the SETTING_* family (SETTING_UNKNOWN_KEY,
+  // SETTING_VALUE_INVALID, ...) surfaces verbatim so a sentence naming modelName
+  // cannot become configuration_error and "not found" cannot become
+  // element_not_found. INV-01: no existing tool schema is touched.
+  if (explicitCode && /^(TRIGGER_.+|RECIPE_.+|SETTING_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UNAVAILABLE|REFRESH_POLL_INTERVAL_TOO_LOW)$/.test(explicitCode)) {
     return explicitCode;
   }
   if (explicitCode && VAULT_ERROR_CODE.test(explicitCode)) {
@@ -249,6 +259,17 @@ function buildLayeredDetail(
     : [];
   const cap = typeof fsbResult?.cap === 'number' ? fsbResult.cap : undefined;
   const active = typeof fsbResult?.active === 'number' ? fsbResult.active : undefined;
+
+  // Phase 66.1: reads only the code, the value-free sentence and recoveryHint.
+  if (errorKey.startsWith('SETTING_')) {
+    return {
+      detected: LAYER_LABELS.settings,
+      why: errorMsg ? `${errorKey}: ${errorMsg}` : errorKey,
+      nextAction: typeof fsbResult?.recoveryHint === 'string' && fsbResult.recoveryHint.trim().length > 0
+        ? fsbResult.recoveryHint
+        : SETTING_NEXT_ACTION_FALLBACK,
+    };
+  }
 
   switch (errorKey) {
     case 'package_version_mismatch':

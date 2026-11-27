@@ -67,6 +67,7 @@ const MCP_ICON_READ_MESSAGE_TYPES = new Set([
   'mcp:get-task-snapshot', 'mcp:get-status', 'mcp:get-config', 'mcp:get-site-guides',
   'mcp:get-memory', 'mcp:search-memory', 'mcp:list-sessions', 'mcp:get-session',
   'mcp:get-session-replay',
+  'mcp:get-settings',
   'mcp:get-logs', 'mcp:get-diagnostics', 'mcp:capabilities-search', 'mcp:list-agents',
   'mcp:list-credentials', 'mcp:list-payments'
 ]);
@@ -1435,6 +1436,12 @@ class MCPBridgeClient {
       case 'mcp:stop-trigger':
       case 'mcp:get-trigger-status':
       case 'mcp:list-triggers':
+        return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
+
+      // Phase 66.1 (D-06): the settings tool. Dispatcher-owned routes; the
+      // delegated-write refusal runs in handleSetSettingMessageRoute (D-20).
+      case 'mcp:get-settings':
+      case 'mcp:set-setting':
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
 
       case 'mcp:trigger':

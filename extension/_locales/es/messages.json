@@ -1651,7 +1651,7 @@
     "message": "En 17 categorías"
   },
   "entry_feat_tools": {
-    "message": "69 herramientas MCP"
+    "message": "70 herramientas MCP"
   },
   "entry_feat_tools_sub": {
     "message": "Desde tu agente"
@@ -1726,7 +1726,7 @@
     "message": "FSB se escribe solo en la configuración MCP de tu agente."
   },
   "entry_mcp_2b": {
-    "message": "69 herramientas"
+    "message": "70 herramientas"
   },
   "entry_mcp_2c": {
     "message": ", sin JSON manual."
@@ -1848,7 +1848,7 @@
     "message": "Herramientas"
   },
   "entry_sum_68": {
-    "message": "69 disponibles"
+    "message": "70 disponibles"
   },
   "entry_sum_access": {
     "message": "Acceso"
@@ -5416,5 +5416,11 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "Sesión cerrada en este navegador. El servidor local aún conserva el inicio de sesión de 1Password, y FSB lo eliminará allí en cuanto pueda."
+  },
+  "panel_36fc19ad69": {
+    "message": "NO se están enviando datos de uso anónimos. Haz clic para volver a activarlos."
+  },
+  "panel_01003693b8": {
+    "message": "El proveedor cambió fuera de este panel. Actualiza los modelos para ver más."
   }
 }
