@@ -11,11 +11,11 @@ const UAT_PATH = `${PHASE_DIR}/61-HUMAN-UAT.md`;
 const VALIDATION_PATH = `${PHASE_DIR}/61-VALIDATION.md`;
 // Both prior-chain digests were re-pinned when the Live Dashboard tests were
 // retired and their commands left the root chain.
-const PRE_PHASE61_ROOT_TEST_HASH = 'b78541f5871ec4456dd5389919a833f2539e5d1c84eab7b782cf7c4f662648c8';
+const PRE_PHASE61_ROOT_TEST_HASH = '8cd4c164d78db77c44b9737f0f9a5818a1a0e3f505905e4887cae4068f965ffb';
 const PHASE62_DIR = '.planning/milestones/v0.9.91-phases/62-ci-drift-smoke-gate-doctor-extensions';
 const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
 const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
-const PRE_PHASE62_ROOT_TEST_HASH = '47efaeca6a9657496b9eb9270b1494da6b4b00d661801ee54e797a8c23d6c254';
+const PRE_PHASE62_ROOT_TEST_HASH = '606b681dee859e2a9fa877d3f2ef60664f29d2b02beb3cce8990a38837687851';
 const PHASE63_DIR = '.planning/milestones/v0.9.91-phases/63-native-messaging-host';
 const PHASE63_UAT_PATH = `${PHASE63_DIR}/63-HUMAN-UAT.md`;
 const PHASE63_VALIDATION_PATH = `${PHASE63_DIR}/63-VALIDATION.md`;

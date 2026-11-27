@@ -47,10 +47,6 @@ const SUPPORT_FAQ = {
     q: $localize`:@@support.schema.faq.testApps.q:How does FSB help Claude Code or Codex test apps?`,
     a: $localize`:@@support.schema.faq.testApps.a:Connect FSB as an MCP server, then let the coding agent open the local app, click through real flows, observe DOM state, capture console or task errors, and report failures back into the coding session. This closes the manual loop between code generation, browser testing, logging, and fixing.`,
   },
-  remote: {
-    q: $localize`:@@support.schema.faq.remote.q:Can I control FSB remotely?`,
-    a: $localize`:@@support.schema.faq.remote.a:Yes. The Remote Dashboard at full-selfbrowsing.com lets you pair with your FSB extension via QR code, then send tasks, view a live DOM preview of the browser, and monitor current execution state from any device with a web browser.`,
-  },
   learn: {
     q: $localize`:@@support.schema.faq.learn.q:Does FSB learn from my usage?`,
     a: $localize`:@@support.schema.faq.learn.a:FSB has a local memory system with three layers: semantic memory (site navigation patterns), episodic memory (past action sequences), and procedural memory (successful workflows). This data stays on your device and helps FSB navigate familiar sites faster and avoid repeating mistakes. Memory auto-consolidates after enough sessions.`,

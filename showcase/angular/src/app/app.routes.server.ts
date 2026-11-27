@@ -9,10 +9,6 @@ import { RenderMode, ServerRoute } from '@angular/ssr';
  * 'outputMode' is specified."). The supported control surface is
  * `provideServerRouting` (or this server-routes export) with explicit
  * RenderMode per path.
- *
- * `/dashboard` MUST stay Client-rendered (D-18) -- its runtime state would be
- * baked stale, and prerendering it pulls in localStorage/chrome.storage code
- * that throws in the Node prerender environment.
  */
 export const serverRoutes: ServerRoute[] = [
   { path: '', renderMode: RenderMode.Prerender },
@@ -26,7 +22,6 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'phantom-stream', renderMode: RenderMode.Prerender },
   { path: 'prometheus', renderMode: RenderMode.Prerender },
   { path: 'sitemaps', renderMode: RenderMode.Prerender },
-  { path: 'dashboard', renderMode: RenderMode.Client },
   { path: 'stats', renderMode: RenderMode.Client },
   { path: 'legal', renderMode: RenderMode.Client },
   { path: '**', renderMode: RenderMode.Client },

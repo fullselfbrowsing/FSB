@@ -16,7 +16,6 @@
         <a routerLink="/" i18n="@@phantomStream.nav.home">Home</a>
         <a routerLink="/about" i18n="@@phantomStream.nav.about">About</a>
         <a routerLink="/agents" i18n="@@phantomStream.nav.agents">Agents</a>
-        <a routerLink="/dashboard" i18n="@@phantomStream.nav.dashboard">Dashboard</a>
         <a routerLink="/lattice" i18n="@@phantomStream.nav.lattice" [attr.translate]="'no'">Lattice</a>
         <a routerLink="/support" i18n="@@phantomStream.nav.support">Support</a>
       </div>
@@ -37,7 +36,6 @@
     <a routerLink="/" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.home">Home</a>
     <a routerLink="/about" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.about">About</a>
     <a routerLink="/agents" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.agents">Agents</a>
-    <a routerLink="/dashboard" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.dashboard">Dashboard</a>
     <a routerLink="/lattice" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.lattice" [attr.translate]="'no'">Lattice</a>
     <a routerLink="/support" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.support">Support</a>
     <a href="https://github.com/fullselfbrowsing/PhantomStream" target="_blank" rel="noopener" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.github" [attr.translate]="'no'">
@@ -155,7 +153,7 @@
         <p i18n="@@phantomStream.overview.copy2">The payoff is a mirror whose bandwidth tracks how much the page actually changes rather than the frame rate. Text renders natively at any resolution, and remote control targets real elements by their stable IDs instead of guessing at coordinates.</p>
         <div class="ps-note">
           <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-          <p i18n="@@phantomStream.overview.note"><span [attr.translate]="'no'">PhantomStream</span> began as milestone <span [attr.translate]="'no'">v0.9.9.1 &quot;Phantom Stream&quot;</span> inside <span [attr.translate]="'no'">FSB</span>, where it powers the dashboard's live preview of automated browsing sessions. This repository turns it into a standalone plug-and-play framework, an <span [attr.translate]="'no'">SDK</span> <span [attr.translate]="'no'">FSB</span> plugs back in, and the working repository for an accompanying research paper.</p>
+          <p i18n="@@phantomStream.overview.note"><span [attr.translate]="'no'">PhantomStream</span> began as milestone <span [attr.translate]="'no'">v0.9.9.1 &quot;Phantom Stream&quot;</span> inside <span [attr.translate]="'no'">FSB</span>. This repository turns it into a standalone, open-source plug-and-play framework that any project can use on its own, and the working repository for an accompanying research paper.</p>
         </div>
       </section>
 
@@ -343,7 +341,6 @@
             <h4 i18n="@@phantomStream.footer.pages.title">Pages</h4>
             <a routerLink="/" i18n="@@phantomStream.footer.pages.home">Home</a>
             <a routerLink="/about" i18n="@@phantomStream.footer.pages.about">About</a>
-            <a routerLink="/dashboard" i18n="@@phantomStream.footer.pages.dashboard">Dashboard</a>
             <a routerLink="/agents" i18n="@@phantomStream.footer.pages.agents">Agents</a>
             <a routerLink="/privacy" i18n="@@phantomStream.footer.pages.privacy">Privacy</a>
             <a routerLink="/support" i18n="@@phantomStream.footer.pages.support">Support</a>

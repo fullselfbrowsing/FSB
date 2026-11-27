@@ -15,6 +15,9 @@
  *   - The toolbar icon no longer dims for a missing relay.
  *   - The absence guards from the earlier Sync consolidation checks still
  *     hold.
+ *   - The showcase has no dashboard page, route, link or bundled viewer
+ *     script. The support page no longer offers remote control, and the
+ *     privacy page says the feature is retired.
  *
  * Each area has its own section so new areas can be appended.
  *
@@ -424,6 +427,137 @@ const optionsSource = read('extension/ui/options.js');
   const emojiRe = /[\u{10000}-\u{10FFFF}]/u;
   for (const [label, src] of [['control_panel.html', controlPanel], ['about page', about], ['support page', support]]) {
     check(!emojiRe.test(src), label + ' contains no emoji');
+  }
+}
+
+// ---- Section 8: showcase -- the dashboard page, route and links are gone ----
+
+const ANGULAR = 'showcase/angular';
+const ANGULAR_SRC = ANGULAR + '/src';
+
+function listFiles(rel, extensions) {
+  const out = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+      const child = dir + '/' + entry.name;
+      if (entry.isDirectory()) walk(child);
+      else if (extensions.some((ext) => entry.name.endsWith(ext))) out.push(child);
+    }
+  };
+  walk(rel);
+  return out;
+}
+
+{
+  for (const rel of [
+    ANGULAR_SRC + '/app/pages/dashboard',
+    ANGULAR_SRC + '/app/core/dashboard/dashboard-runtime-loader.ts',
+  ]) {
+    check(!fs.existsSync(path.join(ROOT, rel)), rel + ' is deleted');
+  }
+}
+
+{
+  const routes = read(ANGULAR_SRC + '/app/app.routes.ts');
+  const serverRoutes = read(ANGULAR_SRC + '/app/app.routes.server.ts');
+  check(!/path:\s*'dashboard'/.test(routes), "app.routes.ts has no 'dashboard' route");
+  check(!/pages\/dashboard|core\/dashboard|loadDashboardRuntime/.test(routes),
+    'app.routes.ts loads neither the dashboard page nor its runtime');
+  check(!/path:\s*'dashboard'/.test(serverRoutes), "app.routes.server.ts has no 'dashboard' render mode");
+  check(!/dashboard/i.test(serverRoutes), 'app.routes.server.ts no longer mentions the dashboard');
+  check(/path:\s*'phantom-stream'/.test(routes) && /path:\s*'phantom-stream'/.test(serverRoutes),
+    'the PhantomStream page keeps its route and its prerender entry');
+}
+
+{
+  // Covers the static form and the bound forms ([routerLink]="'/dashboard'",
+  // [routerLink]="['/dashboard']"), plus a plain href.
+  const linkRe = /\[?routerLink\]?\s*=\s*"\s*\[?\s*'?\/dashboard(?:[/?#"'\]\s,]|$)|href\s*=\s*"\/dashboard[/?#"]/;
+  const offenders = listFiles(ANGULAR_SRC, ['.html', '.ts'])
+    .filter((rel) => linkRe.test(read(rel)));
+  check(offenders.length === 0, 'no showcase template or component links to /dashboard',
+    'found in: ' + offenders.join(', '));
+}
+
+{
+  const shell = read(ANGULAR_SRC + '/app/layout/showcase-shell/showcase-shell.component.ts');
+  const cueOrder = (shell.match(/CUE_ORDER[^=]*=\s*\[([^\]]*)\]/) || [null, null])[1];
+  check(cueOrder !== null && !/'dashboard'/.test(cueOrder),
+    "the shell's depth cue list has no 'dashboard' entry");
+}
+
+{
+  const raw = read(ANGULAR + '/angular.json');
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch (_) { parsed = null; }
+  check(parsed !== null, 'angular.json still parses');
+  const globs = [];
+  const collect = (node) => {
+    if (Array.isArray(node)) node.forEach(collect);
+    else if (node && typeof node === 'object') {
+      if (typeof node.glob === 'string') globs.push(node.glob);
+      Object.values(node).forEach(collect);
+    }
+  };
+  collect(parsed);
+  const retired = globs.filter((glob) => /dashboard-runtime-state|phantom-stream-viewer/.test(glob));
+  check(retired.length === 0, 'angular.json copies no dashboard runtime or live-preview viewer script',
+    'found: ' + retired.join(', '));
+  check(!/dashboard-runtime-state|phantom-stream-viewer/.test(raw),
+    'angular.json names neither retired script anywhere');
+  check(globs.includes('fsb-knowledge-data.js') && globs.includes('knowledge-graph.js'),
+    'angular.json still copies the knowledge-graph scripts');
+}
+
+{
+  const ts = read(ANGULAR_SRC + '/app/pages/support/support-page.component.ts');
+  const html = read(ANGULAR_SRC + '/app/pages/support/support-page.component.html');
+  const faqBlock = (ts.match(/const SUPPORT_FAQ = \{([\s\S]*?)\n\}/) || [null, null])[1];
+  check(faqBlock !== null && !/^\s*remote\s*:/m.test(faqBlock),
+    "the support FAQ (and so its FAQPage JSON-LD) has no 'remote' entry");
+  check(!/@@support\.schema\.faq\.remote\./.test(ts), 'support-page.component.ts has no remote-control FAQ messages');
+  check(!/@case \('remote'\)/.test(html), "support-page.component.html has no @case ('remote') branch");
+  check(!/@@support\.faq\.links\.dashboard/.test(html), 'the support FAQ has no dashboard link');
+}
+
+{
+  const privacy = read(ANGULAR_SRC + '/app/pages/privacy/privacy-page.component.html');
+  const titleAt = privacy.indexOf('i18n="@@privacy.section.phantomStream.title"');
+  const retiredAt = privacy.indexOf('i18n="@@privacy.section.phantomStream.retired"');
+  const bodyAt = privacy.indexOf('i18n="@@privacy.section.phantomStream.body"');
+  check(retiredAt !== -1, 'the privacy page has the live-preview retirement paragraph');
+  check(titleAt !== -1 && titleAt < retiredAt && retiredAt < bodyAt,
+    'the retirement paragraph opens the Remote Dashboard section, before the old disclosures');
+  const retiredEnd = retiredAt === -1 ? -1 : privacy.indexOf('</p>', retiredAt);
+  const retired = retiredEnd === -1 ? '' : privacy.slice(retiredAt, retiredEnd);
+  check(/Retired after <span[^>]*>v0\.9\.95<\/span>/.test(retired),
+    'the retirement paragraph names v0.9.95 as the last version with the feature');
+}
+
+{
+  // The catalogs keep the release-notes history (its ids end in .dashboard)
+  // but none of the retired page, nav or FAQ messages.
+  const removedIds = [
+    'shell.nav.desktop.dashboard',
+    'shell.nav.mobile.dashboard',
+    'shell.footer.col.pages.dashboard',
+    'concierge.footer.pages.dashboard',
+    'lattice.footer.pages.dashboard',
+    'phantomStream.nav.dashboard',
+    'phantomStream.mobile.dashboard',
+    'phantomStream.footer.pages.dashboard',
+    'support.faq.links.dashboard',
+    'support.schema.faq.remote.q',
+    'support.schema.faq.remote.a',
+  ];
+  const catalogs = fs.readdirSync(path.join(ROOT, ANGULAR_SRC, 'locale'))
+    .filter((name) => /^messages(\.[A-Za-z-]+)?\.xlf$/.test(name));
+  check(catalogs.length === 8, 'the showcase has its source catalog and 7 locale catalogs');
+  for (const name of catalogs) {
+    const xlf = read(ANGULAR_SRC + '/locale/' + name);
+    const leftovers = removedIds.filter((id) => xlf.includes('trans-unit id="' + id + '"'));
+    if (/trans-unit id="dashboard\./.test(xlf)) leftovers.push('dashboard.*');
+    check(leftovers.length === 0, name + ' has no retired dashboard units', 'found: ' + leftovers.join(', '));
   }
 }
 

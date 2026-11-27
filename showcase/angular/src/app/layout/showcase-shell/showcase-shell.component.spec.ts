@@ -223,7 +223,7 @@ describe('Showcase shell on depth pages', () => {
     const current = el.querySelector('.fsb-navcue-list li.is-current a');
     expect(current?.getAttribute('href')).toBe('/agents');
     expect(current?.getAttribute('aria-current')).toBe('page');
-    expect(el.querySelectorAll('.fsb-navcue-list li').length).toBe(6);
+    expect(el.querySelectorAll('.fsb-navcue-list li').length).toBe(5);
   });
 
   it('opens on click and closes on Escape or a click elsewhere', async () => {
@@ -325,7 +325,7 @@ describe('depthPageForPath', () => {
     expect(depthPageForPath('/privacy#telemetry-disclosure')).toBe('privacy');
     expect(depthPageForPath('/support?ref=x')).toBe('support');
     expect(depthPageForPath('/agents/')).toBe('agents');
-    expect(depthPageForPath('/dashboard')).toBeNull();
+    expect(depthPageForPath('/legal')).toBeNull();
     expect(depthPageForPath('/release-notes')).toBeNull();
   });
 });

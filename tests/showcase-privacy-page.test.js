@@ -98,6 +98,38 @@ check('discloses PhantomStream media-by-reference fetch behavior',
     /fail-closed fetch policy/.test(html),
   'PhantomStream media-by-reference disclosure missing');
 
+// Remote Dashboard, remote control and live preview ended with v0.9.95. The
+// section keeps its disclosures as a record of how the feature worked, so it
+// must open with a paragraph that says so, ahead of the description itself.
+{
+  const retired = (html.match(/<p i18n="@@privacy\.section\.phantomStream\.retired">([\s\S]*?)<\/p>/) || [])[1] || '';
+  check('PhantomStream section opens with the retirement paragraph',
+    Boolean(retired) &&
+      html.indexOf('@@privacy.section.phantomStream.title') < html.indexOf('@@privacy.section.phantomStream.retired') &&
+      html.indexOf('@@privacy.section.phantomStream.retired') < html.indexOf('@@privacy.section.phantomStream.body'),
+    'retirement paragraph missing or not placed between the section title and its body');
+  check('retirement paragraph names v0.9.95 as the last version with the feature',
+    /Retired after .*v0\.9\.95/.test(retired) && /last version of .*FSB.* with .*Remote Dashboard.*, remote control, and live preview/.test(retired),
+    'retirement paragraph no longer says which version was the last one');
+  check('retirement paragraph says newer versions stay off the relay and clear the pairing',
+    /never open the relay connection/.test(retired) && /delete the stored hash key and server address/.test(retired),
+    'retirement paragraph no longer describes what newer versions do');
+  check('retirement paragraph says the server only answers older installs\' pings and stores nothing',
+    /keepalive pings/.test(retired) && /discards everything else they send without storing it/.test(retired),
+    'retirement paragraph no longer describes what the server does with older installs');
+}
+for (const phrase of [
+  'remote control now handled by the Sync tab',
+  'only contacted when you pair a Sync session',
+  'You must explicitly enable it in Options',
+  'If you pair <span',
+  'a relay server facilitates communication',
+]) {
+  check(`no present-tense claim about the retired relay: "${phrase}"`,
+    !html.includes(phrase),
+    'current builds have no Sync tab, pairing or server sync; word this for v0.9.95 and earlier');
+}
+
 // =============================================================================
 // 2. Five collected fields enumerated.
 // =============================================================================
@@ -232,6 +264,30 @@ for (const id of REQUIRED_IDS) {
   check('privacy page emits page-level structured data',
     componentTs.includes("this.pageJsonLd.set('privacy-page'") && componentTs.includes('dateModified: PRIVACY_LAST_UPDATED'),
     'WebPage JSON-LD with dateModified missing');
+}
+
+// Policy History: the newest entry keeps the text the latest update replaced, so
+// its note must name the date the page now shows. Entry ids are unit ids and
+// must stay unique.
+{
+  const visible = (html.match(/i18n="@@privacy\.header\.updated">Last updated: ([A-Z][a-z]+ \d{1,2}, \d{4})</) || [])[1];
+  const newest = archiveHtml.slice(0, archiveHtml.indexOf('</details>'));
+  const ids = [...archiveHtml.matchAll(/i18n="@@privacy\.archive\.([A-Za-z0-9]+)\.summary"/g)].map((m) => m[1]);
+  check('Policy History entries have unique ids',
+    ids.length > 0 && new Set(ids).size === ids.length &&
+      ids.every((id) => archiveHtml.includes(`i18n="@@privacy.archive.${id}.body"`)),
+    `archive ids: ${ids.join(', ')}`);
+  check('newest Policy History entry archives the text replaced by the current update',
+    Boolean(visible) && newest.includes(`before the ${visible} update.</p>`),
+    `newest archive note does not end "before the ${visible} update."`);
+  const sep29Start = archiveHtml.indexOf('i18n="@@privacy.archive.september29.body"');
+  const sep29 = sep29Start === -1 ? '' : archiveHtml.slice(sep29Start, archiveHtml.indexOf('</details>', sep29Start));
+  check('September 29, 2026 archive keeps the Remote Dashboard wording it was written with',
+    sep29.includes('as it stood from September 29, 2026, before the November 27, 2026 update.') &&
+      sep29.includes('remote control now handled by the Sync tab') &&
+      sep29.includes('Region (city-level) metric') &&
+      !/ i18n="/.test(sep29) && !/ id="/.test(sep29),
+    'september29 archive body missing, altered, or still carrying live-page ids');
 }
 
 console.log(`\n=== showcase-privacy-page.test results: ${passed} passed, ${failed} failed ===`);

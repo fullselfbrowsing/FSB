@@ -85,7 +85,7 @@ for (const locale of locales) {
   const answers = [...support.matchAll(/class="faq-answer-inner"[^>]*>\s*<p[^>]*>([\s\S]*?)<\/p>/g)]
     .map(match => text(match[1]));
   assert.deepEqual(answers, faq.mainEntity.map(question => text(question.acceptedAnswer.text)), `${locale}: visible FAQ/schema parity`);
-  assert.equal(answers.length, 15);
+  assert.equal(answers.length, 14);
   for (const route of ['', 'agents', 'support']) {
     const other = readFileSync(join(dist, prefix, route, 'index.html'), 'utf8');
     assert.equal(nodes(other).filter(node => node['@type'] === 'VideoObject').length, 0);

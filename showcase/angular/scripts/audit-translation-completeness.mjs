@@ -40,7 +40,7 @@ const DATA_OUT = join(PHASE_DIR, '52-audit-data.json');
 
 // ---------------------------------------------------------------------------
 // Stage 2: ROUTE_TABLE -- hardcoded mirror of showcase/angular/src/app/app.routes.ts
-// (12 entries; a 12-entry static table doesn't warrant a TS-AST parser).
+// (13 entries; a 13-entry static table doesn't warrant a TS-AST parser).
 // `shellless` mirrors the route's own `data: { shellless: true }` flag exactly --
 // this is the SAME field ShowcaseShellComponent.updateShellMode() reads at runtime
 // (`activeRoute.snapshot.data['shellless'] === true`), so shell/picker marker-union
@@ -48,9 +48,7 @@ const DATA_OUT = join(PHASE_DIR, '52-audit-data.json');
 // route-name list (see SUMMARY.md for why: a hardcoded "6 non-shellless routes"
 // list would have silently missed `sitemaps` and `legal`, which also lack the
 // flag and therefore also render the shared shell nav/footer).
-// Dashboard is in scope: authenticated routes must not fall back to English inside
-// an otherwise localized application shell.
-// Deliberately excludes the unrouted 13th subdirectory under src/app/pages/ (a
+// Deliberately excludes the unrouted 14th subdirectory under src/app/pages/ (a
 // dead scaffold dir with its own placeholder.* markers, zero matches in either
 // routes file) -- since marker extraction below is scoped per-route to each
 // route's own componentDir rather than a blanket walk of pages/, that directory
@@ -59,12 +57,6 @@ const DATA_OUT = join(PHASE_DIR, '52-audit-data.json');
 const ROUTE_TABLE = [
   { path: '', componentDir: 'pages/home', shellless: false, outOfScope: null },
   { path: 'about', componentDir: 'pages/about', shellless: false, outOfScope: null },
-  {
-    path: 'dashboard',
-    componentDir: 'pages/dashboard',
-    shellless: false,
-    outOfScope: null,
-  },
   { path: 'agents', componentDir: 'pages/agents', shellless: false, outOfScope: null },
   { path: 'privacy', componentDir: 'pages/privacy', shellless: false, outOfScope: null },
   { path: 'release-notes', componentDir: 'pages/release-notes', shellless: false, outOfScope: null },
@@ -449,7 +441,7 @@ function buildReport(ctx) {
     'wraps every route\'s `<router-outlet>` in `<app-showcase-shell>` unconditionally, ' +
     'so shell membership is controlled entirely by the `shellless` route-data flag, not ' +
     'by which routes happen to be named in prior planning documents. This yields **8** ' +
-    'shell-rendering routes -- home, about, dashboard, agents, privacy, support, ' +
+    'shell-rendering routes -- home, about, agents, privacy, release-notes, support, ' +
     '`sitemaps`, and `legal` -- not 6; `sitemaps` and `legal` also lack `shellless: true` ' +
     'in `app.routes.ts` and therefore also render the shared nav/footer (and hence the ' +
     '`shell.*`/`picker.*` marker set). See 52-01-SUMMARY.md for the full deviation note.'
