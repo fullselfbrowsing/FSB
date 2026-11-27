@@ -639,8 +639,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="about.actions.subtitle" datatype="html">
-        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 69-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
-        <target state="translated">60 действий в браузере, разделённых по категориям: все выполняются по командам на естественном языке и доступны агентам в составе <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-каталога из 69 инструментов.</target>
+        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 70-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
+        <target state="translated">60 действий в браузере, разделённых по категориям: все выполняются по командам на естественном языке и доступны агентам в составе <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-каталога из 70 инструментов.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/about/about-page.component.html</context>
           <context context-type="linenumber">127,128</context>
@@ -1971,8 +1971,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.hero.subtitle" datatype="html">
-        <source> Always-on agents like <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ship with a cloud computer. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> hands them yours: the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> you are already signed into, 69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools, and a verified result after every action. </source>
-        <target state="translated">Всегда активные агенты вроде <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> и <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> поставляются с облачным компьютером. А расширение <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> даёт им ваш: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, в котором вы уже вошли в аккаунты, 69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-инструментов и проверенный результат после каждого действия.</target>
+        <source> Always-on agents like <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ship with a cloud computer. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> hands them yours: the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> you are already signed into, 70 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools, and a verified result after every action. </source>
+        <target state="translated">Всегда активные агенты вроде <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> и <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> поставляются с облачным компьютером. А расширение <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> даёт им ваш: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, в котором вы уже вошли в аккаунты, 70 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-инструментов и проверенный результат после каждого действия.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">21,23</context>
@@ -2075,8 +2075,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.with.agent.foot" datatype="html">
-        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 69 tools</source>
-        <target state="translated">через <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 69 инструментов</target>
+        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 70 tools</source>
+        <target state="translated">через <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 70 инструментов</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">102,103</context>
@@ -2115,8 +2115,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.power.card.tools.stat" datatype="html">
-        <source>69 tools</source>
-        <target state="translated">69 инструментов</target>
+        <source>70 tools</source>
+        <target state="translated">70 инструментов</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">136,137</context>
@@ -2491,8 +2491,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.meta.description" datatype="html">
-        <source>Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.</source>
-        <target state="translated">Дайте Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex или Cursor настоящий браузер: Chrome, в котором вы уже вошли в аккаунты, 69 MCP-инструментов, установка одной строкой и проверка командой doctor.</target>
+        <source>Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 70 MCP tools, one-line install, verified with doctor.</source>
+        <target state="translated">Дайте Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex или Cursor настоящий браузер: Chrome, в котором вы уже вошли в аккаунты, 70 MCP-инструментов, установка одной строкой и проверка командой doctor.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">72</context>
@@ -2507,16 +2507,16 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.description" datatype="html">
-        <source>Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 69 MCP browser tools for the FSB MCP server.</source>
-        <target state="translated">Эталонный способ подключения FSB для OpenClaw и Hermes. Диагностика doctor, вывод конфигурации stdio, установщик для нескольких хостов только с согласия и 69 браузерных MCP-инструментов для MCP-сервера FSB.</target>
+        <source>Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 70 MCP browser tools for the FSB MCP server.</source>
+        <target state="translated">Эталонный способ подключения FSB для OpenClaw и Hermes. Диагностика doctor, вывод конфигурации stdio, установщик для нескольких хостов только с согласия и 70 браузерных MCP-инструментов для MCP-сервера FSB.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">297</context>
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.feature.tools" datatype="html">
-        <source>69 MCP tools for browser action, observation, verification, and recovery</source>
-        <target state="translated">69 MCP-инструментов для действий в браузере, отслеживания, проверки и восстановления</target>
+        <source>70 MCP tools for browser action, observation, verification, and recovery</source>
+        <target state="translated">70 MCP-инструментов для действий в браузере, отслеживания, проверки и восстановления</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">299</context>
@@ -6319,8 +6319,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.meta" datatype="html">
-        <source>69 tools · no API key</source>
-        <target state="translated">69 инструментов · без API-ключа</target>
+        <source>70 tools · no API key</source>
+        <target state="translated">70 инструментов · без API-ключа</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">303,305</context>
@@ -6431,8 +6431,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.fact.tools" datatype="html">
-        <source>69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools</source>
-        <target state="translated">69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-инструментов</target>
+        <source>70 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools</source>
+        <target state="translated">70 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-инструментов</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">354,355</context>
@@ -6647,8 +6647,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.mcp" datatype="html">
-        <source>MCP server with 69 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes</source>
-        <target state="translated">MCP-сервер с 69 инструментами для Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw и Hermes</target>
+        <source>MCP server with 70 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes</source>
+        <target state="translated">MCP-сервер с 70 инструментами для Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw и Hermes</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
           <context context-type="linenumber">313</context>
@@ -20999,8 +20999,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="support.schema.faq.mcp.a" datatype="html">
-        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Antigravity, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 69 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
-        <target state="translated">MCP (Model Context Protocol) позволяет управлять FSB из AI-инструментов для программирования, таких как Claude Code, Codex, Cursor, Antigravity и OpenClaw. MCP-сервер запускается командой npx -y fsb-mcp-server@latest и привязывается к работающему расширению через локальный мост WebSocket. FSB предоставляет 69 MCP-инструментов (клики, ввод текста, навигация, чтение DOM, заполнение учётных данных из хранилища и не только). Пользователям OpenClaw быстрее всего установить FSB в один клик с ClawHub: https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, или загрузить навык FSB из skills/fsb/ — он выводит блок конфигурации stdio и запускает диагностику doctor. Подробности — на странице https://full-selfbrowsing.com/agents.</target>
+        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Antigravity, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 70 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
+        <target state="translated">MCP (Model Context Protocol) позволяет управлять FSB из AI-инструментов для программирования, таких как Claude Code, Codex, Cursor, Antigravity и OpenClaw. MCP-сервер запускается командой npx -y fsb-mcp-server@latest и привязывается к работающему расширению через локальный мост WebSocket. FSB предоставляет 70 MCP-инструментов (клики, ввод текста, навигация, чтение DOM, заполнение учётных данных из хранилища и не только). Пользователям OpenClaw быстрее всего установить FSB в один клик с ClawHub: https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, или загрузить навык FSB из skills/fsb/ — он выводит блок конфигурации stdio и запускает диагностику doctor. Подробности — на странице https://full-selfbrowsing.com/agents.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/support/support-page.component.ts</context>
           <context context-type="linenumber">44</context>
@@ -21079,8 +21079,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="support.schema.faq.tools.a" datatype="html">
-        <source>FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 69 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.</source>
-        <target state="translated">FSB предоставляет через MCP два режима. Ручной режим используется по умолчанию и даёт вызывающему агенту 69 точечных инструментов: навигация, клики, ввод текста, прокрутка, чтение состояния страницы, скриншоты, загрузка настоящих локальных файлов через upload_file, запуск триггеров отслеживания через trigger / get_trigger_status / list_triggers, а также поиск и вызов защищённых возможностей собственного API сайта через search_capabilities и invoke_capability. Инструменты для учётных данных и платежей подставляют данные внутри зашифрованного хранилища расширения, поэтому секретные данные в открытом виде не проходят через мост MCP. Режим Автопилота (run_task) запускается, только если пользователь явно делегирует всю задачу. Во всех остальных случаях вызывающий агент контролирует каждое действие.</target>
+        <source>FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 70 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.</source>
+        <target state="translated">FSB предоставляет через MCP два режима. Ручной режим используется по умолчанию и даёт вызывающему агенту 70 точечных инструментов: навигация, клики, ввод текста, прокрутка, чтение состояния страницы, скриншоты, загрузка настоящих локальных файлов через upload_file, запуск триггеров отслеживания через trigger / get_trigger_status / list_triggers, а также поиск и вызов защищённых возможностей собственного API сайта через search_capabilities и invoke_capability. Инструменты для учётных данных и платежей подставляют данные внутри зашифрованного хранилища расширения, поэтому секретные данные в открытом виде не проходят через мост MCP. Режим Автопилота (run_task) запускается, только если пользователь явно делегирует всю задачу. Во всех остальных случаях вызывающий агент контролирует каждое действие.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/support/support-page.component.ts</context>
           <context context-type="linenumber">64</context>

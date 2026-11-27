@@ -1717,7 +1717,7 @@
     "message": "涵蓋 17 個類別"
   },
   "entry_feat_tools": {
-    "message": "69 個 MCP 工具"
+    "message": "70 個 MCP 工具"
   },
   "entry_feat_tools_sub": {
     "message": "來自你的程式設計代理"
@@ -1744,7 +1744,7 @@
     "message": "建議"
   },
   "entry_agent_desc": {
-    "message": "在 Claude Code、Cursor、VS Code、OpenClaw 等中把 FSB 用作 MCP 伺服器。69 個工具，無需 API 金鑰，瀏覽器裡不用設定。"
+    "message": "在 Claude Code、Cursor、VS Code、OpenClaw 等中把 FSB 用作 MCP 伺服器。70 個工具，無需 API 金鑰，瀏覽器裡不用設定。"
   },
   "entry_in_browser": {
     "message": "在此瀏覽器中"
@@ -1792,7 +1792,7 @@
     "message": "FSB 會把自己寫入代理的 MCP 設定。"
   },
   "entry_mcp_2b": {
-    "message": "69 個工具"
+    "message": "70 個工具"
   },
   "entry_mcp_2c": {
     "message": "，無需手寫 JSON。"
@@ -1908,7 +1908,7 @@
     "message": "工具"
   },
   "entry_sum_68": {
-    "message": "69 個可用"
+    "message": "70 個可用"
   },
   "entry_sum_access": {
     "message": "存取"

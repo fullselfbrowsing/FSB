@@ -3,6 +3,9 @@ export interface MCPMessage {
   id: string;          // Unique message ID for request/response correlation
   type: MCPMessageType;
   payload: Record<string, unknown>;
+  // Which connected browser the hub should hand this to. Hub routing only:
+  // the hub removes it before the frame reaches an extension.
+  browser?: string;
 }
 
 export type MCPMessageType =
@@ -84,6 +87,14 @@ export interface BridgeOptions {
   extensionHeartbeatTimeoutMs?: number;
   promotionJitterMs?: number;
   maxReconnectDelayMs?: number;
+  // How long a relay that names no browser keeps the one it was given after
+  // that browser goes away. Tests shorten it.
+  legacyRelayBindingGraceMs?: number;
+  // How long an extension socket may take to say which install it is before
+  // it is attached as a build that never does. 0 attaches every socket at once
+  // under that name, which is how the hub behaved before it kept one browser
+  // per install.
+  extensionIdentifyTimeoutMs?: number;
   allowedBrowserOrigins?: string[];
   capabilities?: BridgeCapability[];
   handleExtRequest?: ExtRequestHandler;
@@ -100,6 +111,11 @@ export interface BridgeTopologyState {
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
   extensionAttachment: ExtensionAttachmentState | null;
+  // Every attached browser. Null when this process is a relay of a hub that
+  // predates the roster, which serves one browser and cannot be told which.
+  browsers: BrowserRosterEntry[] | null;
+  refusedBrowsers: BrowserRefusal[];
+  hubVersion: string | null;
 }
 
 export interface ExtensionAttachmentState {
@@ -108,6 +124,45 @@ export interface ExtensionAttachmentState {
   installInstanceId: string;
   normalWindowCount: number;
   connectedAt: string | null;
+}
+
+// The family a browser belongs to, known by the scheme of the Origin its
+// extension connects with. Every Chromium browser (Chrome, Edge, Brave, Arc)
+// is 'chrome': they share a scheme, and nothing on the wire tells them apart.
+export type BrowserKind = 'chrome' | 'safari';
+
+/**
+ * One browser attached to the hub: one extension in one profile. `key` is what
+ * a caller names to reach it.
+ */
+export interface BrowserRosterEntry {
+  key: string;
+  kind: BrowserKind;
+  // The extension's own id: for Chrome the host of its Origin, for Safari the
+  // bundle id its state frame reports.
+  extensionId: string | null;
+  extensionVersion: string | null;
+  // Made once per profile by the extension. Null from a build that never says.
+  installInstanceId: string | null;
+  // Ordinary windows open in this profile. Null until the extension reports.
+  windows: number | null;
+  authorized: boolean;
+  // When a window of this browser last took focus, as its extension reported
+  // it. Null from an extension that does not report focus.
+  focusedAt: number | null;
+  connectedAt: number;
+  // When this browser was first attached. Unlike connectedAt it is kept across
+  // a worker restart. Absent from a hub that predates it.
+  since?: number;
+}
+
+/** Why a browser that tried to attach is not in the roster. */
+export interface BrowserRefusal {
+  kind: BrowserKind;
+  reason: string;
+  at: number;
+  // Which extension was turned away, when its Origin names one.
+  extensionId?: string | null;
 }
 
 // Relay protocol: MCP instance -> hub handshake
@@ -128,6 +183,9 @@ export interface RelayWelcome {
   lastDisconnectReason: string | null;
   extensionAttachment?: ExtensionAttachmentState | null;
   capabilities?: BridgeCapability[];
+  browsers?: BrowserRosterEntry[];
+  refusedBrowsers?: BrowserRefusal[];
+  hubVersion?: string;
 }
 
 export interface RelayState {
@@ -139,9 +197,21 @@ export interface RelayState {
   lastDisconnectReason: string | null;
   extensionAttachment?: ExtensionAttachmentState | null;
   capabilities?: BridgeCapability[];
+  browsers?: BrowserRosterEntry[];
+  refusedBrowsers?: BrowserRefusal[];
+  hubVersion?: string;
 }
 
-export type RelayMessage = RelayHello | RelayWelcome | RelayState;
+// Hub -> relay, sent just before an ext:request the hub forwards: which browser
+// the request came from. It is a frame of its own because ext:request has an
+// exact key list, and a relay from before this would refuse one more key.
+export interface RelayExtRoute {
+  type: 'relay:ext-route';
+  requestId: string;
+  browser: string;
+}
+
+export type RelayMessage = RelayHello | RelayWelcome | RelayState | RelayExtRoute;
 
 export type BridgeCapability = 'agent-spawn';
 
@@ -174,6 +244,10 @@ export type ExtMessage = ExtRequest | ExtResponse | ExtEvent;
 
 export interface ExtRequestContext {
   readonly signal: AbortSignal;
+  // The browser whose extension sent the request. A delegated run belongs to
+  // the profile that started it, so its agent is sent back there. Null when
+  // the hub could not name it, and absent from a hub that predates the roster.
+  readonly browser?: string | null;
 }
 
 export type ExtRequestHandler = (

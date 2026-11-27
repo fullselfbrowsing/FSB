@@ -310,7 +310,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       subjectOf: { '@id': `${HOST}/#online-mind2web` },
       featureList: [
         $localize`:@@home.schema.feature.benchmark:Online-Mind2Web: AI-reviewed result (277/300), 92.3%`,
-        $localize`:@@home.schema.feature.mcp:MCP server with 69 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes`,
+        $localize`:@@home.schema.feature.mcp:MCP server with 70 tools for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Antigravity, OpenCode, Cline, OpenClaw, and Hermes`,
         $localize`:@@home.schema.feature.browser:Real browser automation through a local Chrome extension`,
         $localize`:@@home.schema.feature.triggers:Trigger watchers for reactive DOM monitoring`,
         $localize`:@@home.schema.feature.capabilities:Native first-party API capability catalog with guarded invoke_capability calls`,

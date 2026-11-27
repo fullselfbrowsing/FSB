@@ -3,6 +3,7 @@ import { isAbsolute } from 'node:path';
 import type { WebSocketBridge } from './bridge.js';
 import { WebSocketBridge as Bridge } from './bridge.js';
 import { readBridgeAuthState as readPrivateBridgeAuthState } from './bridge-auth.js';
+import { matchBrowser } from './browser-routing.js';
 import type {
   AdapterAuthState,
   AdapterDetection,
@@ -786,15 +787,31 @@ function extractProbeFailure(
   return null;
 }
 
+/**
+ * The attached browser a `--browser` name means: a key from the roster, or a
+ * kind such as "chrome". A name that matches nothing is sent as written, so
+ * the hub's own refusal says it is not connected.
+ */
+function probeBrowser(bridge: DiagnosticsBridge, named: string | null | undefined): string | null {
+  if (!named) return null;
+  const roster = bridge.topology?.browsers;
+  return Array.isArray(roster) ? matchBrowser(roster, named) ?? named : named;
+}
+
 async function runBridgeProbe(
   bridge: DiagnosticsBridge,
   scope: ProbeScope,
   type: string,
   timeout: number,
+  browser: string | null = null,
 ): Promise<{ payload: Record<string, unknown> | null; note: BridgeDiagnosticNote | null }> {
   try {
+    // With several browsers attached the probe describes one of them: the
+    // named one, or the default.
     const payload = await bridge.sendAndWait(
-      { type: type as never, payload: {} },
+      browser
+        ? { type: type as never, payload: {}, browser }
+        : { type: type as never, payload: {} },
       { timeout },
     );
     return {
@@ -894,6 +911,19 @@ function getGuidanceForLayer(
 ): { why: string; nextAction: string } {
   const firstConfigNote = snapshot.probeNotes?.find((note) => note.scope === 'config');
   const firstDiagnosticsNote = snapshot.probeNotes?.find((note) => note.scope === 'diagnostics');
+
+  // --browser named one that is not attached. Every probe was refused for
+  // that reason, so whatever layer the missing answers point at is not the
+  // problem.
+  if (
+    layer !== 'package'
+    && [firstConfigNote, firstDiagnosticsNote].some((note) => note?.message === 'browser_not_connected')
+  ) {
+    return {
+      why: 'The browser named with --browser is not attached.',
+      nextAction: 'Use a name from the "Browser <name>:" lines, or leave --browser out to ask the default one.',
+    };
+  }
 
   switch (layer) {
     case 'package':
@@ -1039,6 +1069,8 @@ export async function collectBridgeDiagnostics(options: {
   waitForExtensionMs?: number;
   includeConfig?: boolean;
   includeTabs?: boolean;
+  // Which attached browser the extension probes ask. Default: the default one.
+  browser?: string | null;
 } = {}, dependencies: BridgeDiagnosticsDependencies = {}): Promise<BridgeDiagnostics> {
   const dependencyRecord = ownDataRecord(dependencies);
   const bridgeFactory = typeof dependencyRecord?.bridgeFactory === 'function'
@@ -1104,13 +1136,13 @@ export async function collectBridgeDiagnostics(options: {
     diagnostics = withTopology(diagnostics, bridge.topology);
 
     if (bridge.isConnected && options.includeConfig) {
-      const { payload, note } = await runBridgeProbe(bridge, 'config', 'mcp:get-config', 5_000);
+      const { payload, note } = await runBridgeProbe(bridge, 'config', 'mcp:get-config', 5_000, probeBrowser(bridge, options.browser));
       if (note) notes.push(note);
       diagnostics.extensionConfig = normalizeConfig(payload?.config ?? payload);
     }
 
     if (bridge.isConnected) {
-      const { payload, note } = await runBridgeProbe(bridge, 'diagnostics', 'mcp:get-diagnostics', 5_000);
+      const { payload, note } = await runBridgeProbe(bridge, 'diagnostics', 'mcp:get-diagnostics', 5_000, probeBrowser(bridge, options.browser));
       if (note) notes.push(note);
       diagnostics.activeTab = normalizeActiveTab(payload?.activeTab);
       diagnostics.contentScript = normalizeContentScript(payload?.contentScript);
@@ -1163,6 +1195,7 @@ export async function watchBridgeDiagnostics(options: {
   waitForExtensionMs?: number;
   includeConfig?: boolean;
   includeTabs?: boolean;
+  browser?: string | null;
   onUpdate: (diagnostics: BridgeDiagnostics) => void | Promise<void>;
 }, dependencies: BridgeDiagnosticsDependencies = {}): Promise<void> {
   const intervalMs = Math.max(250, options.intervalMs ?? 1000);
@@ -1181,6 +1214,7 @@ export async function watchBridgeDiagnostics(options: {
         waitForExtensionMs: options.waitForExtensionMs,
         includeConfig: options.includeConfig,
         includeTabs: options.includeTabs,
+        browser: options.browser,
       }, dependencies);
       await options.onUpdate(diagnostics);
       if (stopped) break;

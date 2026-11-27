@@ -140,9 +140,18 @@ async function loadBuildModule(relativePath) {
   return import(moduleUrl);
 }
 
+// The suites on this harness model the extension as a bare socket that never
+// says which install it is. The hub gives a socket 4s to say so before it
+// attaches it as an older build, so here such sockets are attached at once, as
+// every socket was before the hub kept one browser per install. A case that is
+// about identification passes its own extensionIdentifyTimeoutMs.
 async function loadBridgeClass() {
   const module = await loadBuildModule('bridge.js');
-  return module.WebSocketBridge;
+  return class HarnessBridge extends module.WebSocketBridge {
+    constructor(options = {}) {
+      super({ extensionIdentifyTimeoutMs: 0, ...options });
+    }
+  };
 }
 
 class BrowserLikeWebSocket {
@@ -255,6 +264,9 @@ function buildClientHarness(options = {}) {
     sendMessageWithRetry: options.sendMessageWithRetry || null,
     ensureContentScriptInjected: options.ensureContentScriptInjected || null,
     chromeQueryTabs: options.chromeQueryTabs || null,
+    // Functions the service worker defines in other files, such as
+    // background.js's getMcpAttachmentMetadata.
+    ...(options.globals || {}),
     globalThis: {},
   };
   context.globalThis = context;

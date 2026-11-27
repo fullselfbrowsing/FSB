@@ -43,7 +43,7 @@ Use this package when you want your AI client to drive the browser directly whil
 - `install --cline` writes `~/.cline/data/settings/cline_mcp_settings.json`, the settings file Cline's VS Code extension, JetBrains plugin, and CLI share. Earlier versions wrote a VS Code extension-storage file that current Cline ignores after its one-time import, so rerun the install if FSB never appeared in Cline.
 - Cline entries set `timeout: 1800` (seconds) so long `run_task` calls are not cut off by Cline's fixed 60-second request timeout.
 - Reinstalling keeps the `timeout`, `disabled`, and `autoApprove` settings Cline stores on the `fsb` entry.
-- `start_visual_session`, `end_visual_session`, and `back` are no longer registered, so the server lists 69 tools. Use `go_back` in place of `back`.
+- `start_visual_session`, `end_visual_session`, and `back` are no longer registered. Use `go_back` in place of `back`.
 - When `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, or `CLINE_DIR` points at a directory that does not exist yet, `install --cline` reports it instead of editing the legacy settings file. Reinstalling no longer rewrites a Cline or Continue config whose keys only changed order.
 - `install --antigravity` replaces `install --windsurf` and writes `~/.gemini/config/mcp_config.json`, falling back to `~/.gemini/antigravity/mcp_config.json` on older Antigravity releases. An empty config file is treated as an empty config.
 - Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
@@ -352,6 +352,8 @@ npx -y fsb-mcp-server@latest doctor
 npx -y fsb-mcp-server@latest status --watch
 ```
 
+With several browsers or profiles attached, `doctor` and `status` list each one by name, and `--browser <name>` chooses which one the detailed lines describe.
+
 `doctor` reports the primary failing layer: package, bridge, authorization, extension, active tab, content script, or configuration. Only restart or reinstall the client when the reported layer points there.
 
 `doctor` and `status` show the extension ID, extension version, persistent install instance ID, connection time, and normal-window count. The tab count comes from the diagnostic route. `NO_BROWSER_WINDOW` means the attached profile has no normal browser window; open one there. `ORIGIN_PIN_MISMATCH` means the bridge is pinned to a different extension ID; run `npx -y fsb-mcp-server@latest pair --reset` and pair again. The bridge serves one attached extension profile at a time and does not switch profiles automatically. MCP server and extension versions are released independently; compare their reported versions with each component's requirements.
@@ -463,6 +465,108 @@ The extension enforces trigger concurrency with `fsbTriggerCap`, configurable in
 
 ---
 
+## Several Browsers And Profiles On One Server
+
+One bridge on port 7225 holds every browser the extension is running in at the same time: each Chrome profile, other Chromium browsers that run the same extension (Edge, Brave, Arc), and Safari. Each one is an install, one extension in one profile, and has its own name such as `chrome-4187c196`. Agents choose between them, and several agents can work in different ones at once.
+
+Before this, the hub kept a single extension. Whichever profile connected first held it and the others were refused, so an agent could land in a profile it did not expect.
+
+### Seeing what is connected
+
+`list_browsers` returns one entry per attached browser:
+
+```json
+{
+  "browsers": [
+    {
+      "browser": "chrome-4187c196",
+      "kind": "chrome",
+      "extensionId": "badgafnfchcihdfnjneklogedcdkmjfk",
+      "extensionVersion": "0.9.95",
+      "windows": 1,
+      "tabs": 12,
+      "activeTab": { "title": "Inbox - Gmail", "url": "https://mail.google.com/mail/u/0/" },
+      "connectedAt": "2026-11-24T21:21:21.395Z",
+      "lastFocusedAt": null,
+      "paired": false,
+      "current": false,
+      "default": true
+    }
+  ],
+  "current": null,
+  "default": "chrome-4187c196",
+  "choice": true
+}
+```
+
+- `browser` is the value that names the entry. It comes from an ID the extension makes once per profile and keeps, so it is the same after a reconnect, a browser restart, or a new hub, and can be written into a client's config.
+- `kind` is `chrome` for every Chromium browser and `safari` for Safari. Nothing on the wire tells Chrome from Edge or Brave.
+- `activeTab`, `tabs`, and `windows` are how to tell one profile from another. The profile's display name is not available yet.
+- `current` is the browser this session is in. `default` is where a call that names no browser would go.
+- `notConnected` lists any browser that tried to attach and was turned away, with the reason.
+
+The call is read-only: it registers no agent anywhere and does not move the session. `status` and `doctor` print the same list, one `Browser <name>:` line each.
+
+### How a call's browser is chosen
+
+Each MCP session decides the browser for every call before it registers or sends anything. The first rule that applies decides:
+
+1. The browser the call names. `open_tab`, `list_tabs`, and `run_task` take an optional `browser` argument: a `browser` value from `list_browsers`, or a kind (`"chrome"` or `"safari"`).
+2. The browser the call's tab lives in, as far as the session has seen that tab.
+3. The browser the session's last call used. Naming a browser once is therefore the switch.
+4. `FSB_BROWSER` from the client's MCP config, which sets where a new session starts.
+5. The default: the browser focused most recently, once every attached browser reports focus. Until then, a Chromium browser before Safari, one with a window open before one without, then the one attached longest. Reporting focus needs the extension release after 0.9.95.
+
+A kind means the browser of that kind the session is already in, and otherwise the default among them. So `"chrome"` works as it did with one Chrome and never moves a session between profiles.
+
+A decided browser that is not connected is an error. A call is never sent to a different browser than the one it belongs to.
+
+An HTTP client, which shares one server with other sessions and has no environment of its own, can name its start browser in the endpoint URL instead: `http://127.0.0.1:7226/mcp?browser=chrome-4187c196`.
+
+To keep one client in one profile without the agent choosing, set the variable in that client's config:
+
+```json
+{
+  "mcpServers": {
+    "fsb": {
+      "command": "npx",
+      "args": ["-y", "fsb-mcp-server@latest"],
+      "env": { "FSB_BROWSER": "chrome-4187c196" }
+    }
+  }
+}
+```
+
+### What an agent sees
+
+- With one browser connected nothing changes.
+- With more than one, every result carries `browser`, and `list_tabs` adds `browsers`: each connected browser, which one the listing came from, and which was focused last.
+- A session keeps a separate agent identity, and separate tab ownership, in each browser it uses. Tab IDs are numbers that belong to one browser.
+- `stop_task` and `get_task_status` go to the browser running the session's task, and `stop_trigger` and `get_trigger_status` to the browser the trigger was armed in, without moving the session there.
+- A delegated agent run starts in the profile whose side panel started it, for every provider.
+
+| Error | Meaning | What to do |
+|-------|---------|------------|
+| `BROWSER_NOT_CONNECTED` | The call belongs to a browser that is not attached. It was not sent anywhere else. | Retry when the browser is back, or call `list_browsers` and name a connected one on `open_tab` or `list_tabs`. |
+| `AMBIGUOUS_TAB_BROWSER` | The tab ID was seen in more than one browser and the session is in neither. | Call `list_tabs` with `browser` set, then retry. |
+| `BROWSER_CHOICE_UNAVAILABLE` | The bridge on this machine is run by an `fsb-mcp-server` from before this feature. It serves one Chromium browser. | Restart the MCP clients on the current version so a current server runs the bridge. |
+
+### How a browser is told apart
+
+- Two profiles of one extension connect with the same `Origin`, so the hub waits for each socket's first state frame, which carries the install ID. Every extension since 0.9.92 sends it as soon as it connects: 76 to 134 ms on a cold Chromium start, 327 ms with every CPU core busy.
+- A socket that has not sent one after 4 seconds is attached as an older build, named after its extension ID (`chrome-legacy-badgafnf`). Such a build's profiles cannot be told apart, so only one of them attaches, as before. A current build that somehow misses the 4 seconds keeps that name until it reconnects.
+- A second socket from an install that is already attached is refused unless it is paired, in which case it replaces the first. Another profile is another install and is never displaced.
+- Every attached Chromium browser runs the same extension ID. A second ID (a development build beside the store build, or any other extension that opens the socket) is turned away while the first is attached, as it was when the hub held one extension. Without this, any extension in the browser could attach beside FSB and be handed the calls that name no browser. Safari's `Origin` is random, so one Safari install attaches at a time.
+- A name stays with its install for the life of the server process and is never given to another.
+- The hub holds at most 16 browsers.
+
+### Pairing and versions
+
+- With no pairing, every profile of the first extension ID to attach is admitted unpaired. With a pairing, only the paired extension attaches: every profile running it, and no other extension ID. Pairing closes any browser with another ID that was attached. `status`, `doctor`, and `list_browsers` show a browser that was turned away and why. Safari cannot be paired yet.
+- Whichever server binds port 7225 first is the hub, and the hub decides what is possible. A client from before this feature that connects to a current hub is given one browser and keeps it. If that browser stays away for a minute, the client is given the one that is left.
+- A current client behind an older hub sees one browser and `"choice": false`. `list_browsers` names that browser as a current hub would, so a session that was working in it carries on, and a session tied to a different profile is told so and is not moved.
+- `status` and `doctor` list every attached browser. `--browser <name>` chooses which one their detailed lines describe.
+
 ## Multi-Agent Contract (v0.8.0)
 
 Starting with `0.8.0`, FSB supports multiple concurrent MCP agents driving distinct tabs in the same Chrome profile. The contract is enforced inside the extension; MCP clients only need to know the rules.
@@ -518,7 +622,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ## Tools
 
-`fsb-mcp-server` registers 69 tools.
+`fsb-mcp-server` registers 70 tools.
 
 ### Autopilot (3)
 
@@ -619,6 +723,14 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 | `use_payment_method` | Fill checkout data after user confirmation. |
 
 Vault responses expose metadata only. Passwords, full card numbers, and CVV values are resolved inside the extension and are not returned to the MCP client.
+
+### Browsers And Profiles (1)
+
+| Tool | Purpose |
+|------|---------|
+| `list_browsers` | List every browser the extension is running in (each Chrome profile, other Chromium browsers, Safari) with the `browser` value that names it, its extension version, windows, tabs, and the tab in front. |
+
+`list_browsers` is answered by the MCP server and is not part of the extension's tool registry. To work in a browser, pass its `browser` value to `open_tab`, `list_tabs`, or `run_task`. See [Several Browsers And Profiles On One Server](#several-browsers-and-profiles-on-one-server).
 
 ### Tool Count Contract
 

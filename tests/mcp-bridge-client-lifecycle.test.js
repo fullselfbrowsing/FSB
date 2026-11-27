@@ -251,6 +251,15 @@ function buildClientHarness(options = {}) {
     };
   }
 
+  // background.js supplies the attachment metadata and Chrome the windows API.
+  // Without them the client sends no state frame, as every other case expects.
+  if (options.getMcpAttachmentMetadata) {
+    context.getMcpAttachmentMetadata = options.getMcpAttachmentMetadata;
+  }
+  if (options.windows) {
+    chrome.windows = options.windows;
+  }
+
   const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   const footer = `
 this.__phase198 = {
@@ -1921,6 +1930,94 @@ async function runReconnectAlarmBackstopCase() {
   assertEqual(alarm.periodInMinutes, 1, 'the alarm repeats so one onopen clear cannot end the eviction backstop');
 }
 
+// One MCP hub can hold several browsers, and a call that names none goes to the
+// one used last. Each extension says when a window of its browser last had
+// focus, in the state frame it already sends on connect and on every keepalive.
+async function runBrowserFocusReportCase() {
+  console.log('\n--- browser focus report ---');
+
+  const attachment = {
+    extensionId: 'abcdefghijklmnopabcdefghijklmnop',
+    extensionVersion: '0.9.95',
+    installInstanceId: 'install-1',
+    normalWindowCount: 1,
+  };
+  const stateFrames = (socket) => socket.sent
+    .map((raw) => JSON.parse(raw))
+    .filter((frame) => frame.type === 'mcp:extension-state');
+  const settle = async () => {
+    for (let turn = 0; turn < 6; turn++) await flushMicrotasks();
+  };
+
+  let focused = false;
+  let failing = false;
+  const harness = buildClientHarness({
+    getMcpAttachmentMetadata: async () => ({ ...attachment }),
+    windows: {
+      async getLastFocused() {
+        if (failing) throw new Error('No window');
+        return { id: 1, focused };
+      },
+    },
+  });
+  const client = harness.exports.mcpBridgeClient;
+  client.connect();
+  await flushMicrotasks();
+  const socket = harness.sockets[0];
+  socket.open();
+  await settle();
+
+  const first = stateFrames(socket)[0];
+  assert(!!first, 'the state frame is sent when the socket opens');
+  assertEqual(first.focusedAt, null, 'a browser that has not had focus reports none');
+  assertEqual(first.extensionId, attachment.extensionId, 'the rest of the frame is unchanged');
+  assert(Object.prototype.hasOwnProperty.call(first, 'connectedAt'), 'including when it connected');
+
+  focused = true;
+  const before = Date.now();
+  const ping = harness.timers.intervals.find((timer) => timer.delay === 25000 && !timer.cleared);
+  ping.fn();
+  await settle();
+  const second = stateFrames(socket)[1];
+  assert(Number.isSafeInteger(second.focusedAt) && second.focusedAt >= before, 'a focused window is reported on the next keepalive');
+  assertEqual(
+    harness.chrome.storage.session._dump().mcpBrowserFocusedAt,
+    second.focusedAt,
+    'and kept in session storage, so a worker restart still knows it',
+  );
+
+  focused = false;
+  socket.receive({ type: 'mcp:pong', ts: Date.now() });
+  ping.fn();
+  await settle();
+  assertEqual(stateFrames(socket)[2].focusedAt, second.focusedAt, 'losing focus keeps the last time it had it');
+
+  failing = true;
+  socket.receive({ type: 'mcp:pong', ts: Date.now() });
+  ping.fn();
+  await settle();
+  assertEqual(stateFrames(socket).length, 4, 'a windows API that fails does not stop the state frame');
+  assertEqual(stateFrames(socket)[3].focusedAt, second.focusedAt, 'and the last known time stands');
+
+  const restarted = buildClientHarness({
+    session: { mcpBrowserFocusedAt: 123456 },
+    getMcpAttachmentMetadata: async () => ({ ...attachment }),
+    windows: { async getLastFocused() { return { id: 1, focused: false }; } },
+  });
+  restarted.exports.mcpBridgeClient.connect();
+  await flushMicrotasks();
+  restarted.sockets[0].open();
+  await settle();
+  assertEqual(stateFrames(restarted.sockets[0])[0].focusedAt, 123456, 'a restarted worker reports the focus time it had stored');
+
+  const bare = buildClientHarness({ getMcpAttachmentMetadata: async () => ({ ...attachment }) });
+  bare.exports.mcpBridgeClient.connect();
+  await flushMicrotasks();
+  bare.sockets[0].open();
+  await settle();
+  assertEqual(stateFrames(bare.sockets[0])[0].focusedAt, null, 'with no windows API the frame is still sent, with no focus time');
+}
+
 async function run() {
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
@@ -1947,6 +2044,7 @@ async function run() {
   await runOrdinaryKeepaliveLivenessCase();
   await runStalledKeepaliveCloseCase();
   await runReconnectAlarmBackstopCase();
+  await runBrowserFocusReportCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

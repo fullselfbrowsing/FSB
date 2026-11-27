@@ -84,6 +84,7 @@ export interface ServeDelegationDependencies {
     port: number;
     bridge: ServeDelegationBridge;
     queue: unknown;
+    browserForDelegation?: (delegationId: string) => string | null;
   }) => Promise<ServeDelegationHttpServer>;
   readonly createSupervisor?: (
     endpoint: string,
@@ -173,6 +174,7 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
       port: options.port,
       bridge: options.bridge as WebSocketBridge,
       queue: options.queue as TaskQueue,
+      browserForDelegation: options.browserForDelegation,
     }),
     createSupervisor: (
       endpoint,
@@ -583,6 +585,9 @@ export async function startServeDelegation(
       port: options.port,
       bridge,
       queue,
+      // Asked when a run's agent connects, by which time the supervisor below
+      // exists and holds the run.
+      browserForDelegation: (delegationId) => supervisor?.browserForDelegation?.(delegationId) ?? null,
     });
     const directRuntimeReference = createDirectRuntimeReference(
       httpServer.endpoint,

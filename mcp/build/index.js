@@ -82,6 +82,11 @@ function readNumberFlag(flags, name, fallback) {
     }
     return fallback;
 }
+/** The browser `status` or `doctor` should ask, when one is named. */
+function readBrowserFlag(flags) {
+    const name = readStringFlag(flags, 'browser', '').trim().toLowerCase();
+    return name ? name : null;
+}
 function isJson(flags) {
     return flags.json === true;
 }
@@ -110,6 +115,9 @@ Options:
   --watch             Continuously refresh \`status\`
   --interval <ms>     Poll interval for \`status --watch\` (default: 1000)
   --json              Emit machine-readable JSON for status or doctor
+  --browser <name>    With several browsers attached, the one \`status\` or
+                      \`doctor\` asks: a name they list (chrome-4187c196),
+                      or chrome / safari (default: the one used last)
 `);
 }
 const DOCTOR_COMPATIBILITY_LABELS = {
@@ -183,6 +191,34 @@ function formatExtensionAttachment(diagnostics) {
         `Connected at: ${attachment.connectedAt ?? 'not reported'}`,
     ];
 }
+const BROWSER_REFUSAL_TEXT = {
+    extension_origin_pin_mismatch: 'bridge pairing is bound to another extension. Cure: npx -y fsb-mcp-server@latest pair --reset',
+    browser_limit_reached: 'too many browsers are attached',
+    another_extension_attached: 'another extension ID is attached, and one is served at a time. Close the browser running the other build, or disable FSB there',
+};
+/** Every attached browser, and any that tried to attach and was turned away. */
+function formatBrowsers(diagnostics) {
+    const topology = diagnostics.bridgeTopology;
+    const lines = [];
+    const browsers = Array.isArray(topology?.browsers) ? topology.browsers : [];
+    // One line per browser: each Chrome profile is its own, and the name at the
+    // start is what --browser, FSB_BROWSER and the `browser` argument take.
+    for (const browser of browsers) {
+        const facts = [
+            browser.extensionVersion ? `extension ${browser.extensionVersion}` : 'extension version unknown',
+            ...(typeof browser.windows === 'number'
+                ? [`${browser.windows} ${browser.windows === 1 ? 'window' : 'windows'}`]
+                : []),
+            browser.authorized ? 'paired' : 'unpaired',
+        ];
+        lines.push(`Browser ${browser.key}: ${facts.join(', ')}`);
+    }
+    for (const refusal of Array.isArray(topology?.refusedBrowsers) ? topology.refusedBrowsers : []) {
+        const who = refusal.extensionId ? `${refusal.kind} extension ${refusal.extensionId}` : refusal.kind;
+        lines.push(`Browser not attached: ${who} (${BROWSER_REFUSAL_TEXT[refusal.reason] ?? refusal.reason})`);
+    }
+    return lines;
+}
 function formatFieldLines(fields) {
     return fields.map(([label, value]) => `${label}: ${value}`);
 }
@@ -204,6 +240,7 @@ export function formatStatus(diagnostics) {
         lines.push(`Extension model: ${provider} / ${model}`);
     }
     lines.push(...formatExtensionAttachment(diagnostics));
+    lines.push(...formatBrowsers(diagnostics));
     if (diagnostics.tabsSummary) {
         lines.push(`Open tabs: ${diagnostics.tabsSummary.totalTabs}`);
         lines.push(`Active tab ID: ${diagnostics.tabsSummary.activeTabId ?? 'none'}`);
@@ -226,6 +263,7 @@ export function formatWatchSnapshot(diagnostics) {
         lines.push(`Active page: ${diagnostics.activeTab.pageType} (${diagnostics.activeTab.url})`);
     }
     lines.push(...formatExtensionAttachment(diagnostics));
+    lines.push(...formatBrowsers(diagnostics));
     if (diagnostics.probeNotes && diagnostics.probeNotes.length > 0) {
         lines.push(`Note: ${diagnostics.probeNotes[0].message}`);
     }
@@ -239,6 +277,7 @@ export function formatDoctor(diagnostics) {
         `Next action: ${diagnostics.nextAction}`,
         ...formatFieldLines(buildCompactStatusFields(diagnostics)),
         ...formatExtensionAttachment(diagnostics),
+        ...formatBrowsers(diagnostics),
     ];
     if (diagnostics.activeTab.url) {
         lines.push(`Active page: ${diagnostics.activeTab.pageType} (${diagnostics.activeTab.url})`);
@@ -387,6 +426,7 @@ async function runStatus(flags) {
             waitForExtensionMs,
             includeConfig: true,
             includeTabs: true,
+            browser: readBrowserFlag(flags),
             onUpdate: (diagnostics) => {
                 if (isJson(flags)) {
                     process.stdout.write(`${JSON.stringify(diagnostics)}\n`);
@@ -404,6 +444,7 @@ async function runStatus(flags) {
         waitForExtensionMs,
         includeConfig: true,
         includeTabs: true,
+        browser: readBrowserFlag(flags),
     }, productionNativeHostDiagnostics);
     if (isJson(flags)) {
         console.log(JSON.stringify(diagnostics, null, 2));
@@ -416,6 +457,7 @@ async function runDoctor(flags) {
         waitForExtensionMs: readNumberFlag(flags, 'timeout', 2500),
         includeConfig: true,
         includeTabs: true,
+        browser: readBrowserFlag(flags),
     }, productionNativeHostDiagnostics);
     if (isJson(flags)) {
         console.log(JSON.stringify(diagnostics, null, 2));

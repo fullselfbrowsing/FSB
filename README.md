@@ -113,7 +113,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Runs natural language browser tasks from the popup or side panel.
 - Supports xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, and custom OpenAI-compatible endpoints.
 - Discovers live provider model lists and falls back to bundled defaults.
-- Uses 57 shared definitions (53 browser tools plus 4 trigger tools) and 69 registered MCP tools for external clients.
+- Uses 57 shared definitions (53 browser tools plus 4 trigger tools) and 70 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
 - Searches a 128-app capability catalog and invokes verified signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
@@ -311,7 +311,9 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across autopilot, trigger watchers, manual browser control, read-only page inspection, task outcome reporting, Developer/UAT capture, capability search/invoke, observability, and vault.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 70 registered tools across autopilot, trigger watchers, manual browser control, read-only page inspection, task outcome reporting, Developer/UAT capture, capability search/invoke, observability, vault, and browser choice.
+
+One server reaches every browser the extension is running in: each Chrome profile, other Chromium browsers, and Safari. `list_browsers` shows them, and an optional `browser` argument on `open_tab`, `list_tabs`, and `run_task` picks one, so several agents can work in different profiles at once. See [Several Browsers And Profiles On One Server](./mcp/README.md#several-browsers-and-profiles-on-one-server).
 
 The extension connects to the MCP bridge on:
 
@@ -484,6 +486,7 @@ The MCP server exposes a curated public surface around that registry plus direct
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |
 | Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
+| Browsers and profiles | 1 | `list_browsers` |
 
 Read-only tools bypass the mutation queue where safe. `capture_screenshot` is semantically read-only but remains serialized because it consumes Chromium's exclusive debugger resource. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
 

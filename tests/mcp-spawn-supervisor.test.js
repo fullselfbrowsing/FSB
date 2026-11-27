@@ -901,6 +901,48 @@ function runAcceptedIdentityFoundationTests(identityModule) {
   );
 }
 
+// A delegation is known only to the profile whose side panel started it. The
+// bridge tells the handler which browser a request came from, and the
+// supervisor keeps it with the run so the run's agent can be sent back there.
+async function runDelegationBrowserTests(supervisorModule) {
+  const harness = makeHarness(supervisorModule, { adapterId: 'claude-code' });
+  const duringRun = [];
+  const emit = (event) => {
+    if (event.event === 'delegation.started') {
+      duringRun.push(harness.supervisor.browserForDelegation(event.payload.delegationId));
+    }
+    harness.emit(event);
+  };
+  const terminal = await harness.supervisor.handleExtRequest(
+    startRequest({ acceptedIdentity: acceptedIdentity('claude-code'), task: 'run started from one profile' }),
+    emit,
+    { signal: new AbortController().signal, browser: 'chrome-9a0c11d2' },
+  );
+  assert.equal(terminal.status, 'succeeded');
+  assert.deepEqual(duringRun, ['chrome-9a0c11d2'], 'a running delegation answers with the browser that started it');
+  assert.equal(
+    harness.supervisor.browserForDelegation(terminal.delegationId),
+    null,
+    'a settled delegation is no longer placed anywhere',
+  );
+  assert.equal(harness.supervisor.browserForDelegation('delegation_unknown_0001'), null, 'nor is one that never ran');
+
+  // A hub from before the roster names no browser: the run is placed nowhere
+  // and its agent starts in the default browser, as it always did.
+  const legacy = makeHarness(supervisorModule, { adapterId: 'claude-code' });
+  const unplaced = [];
+  await legacy.supervisor.handleExtRequest(
+    startRequest({ acceptedIdentity: acceptedIdentity('claude-code'), task: 'run from an older hub' }),
+    (event) => {
+      if (event.event === 'delegation.started') {
+        unplaced.push(legacy.supervisor.browserForDelegation(event.payload.delegationId));
+      }
+      legacy.emit(event);
+    },
+  );
+  assert.deepEqual(unplaced, [null], 'a request that carries no browser places its run nowhere');
+}
+
 async function runConsentBoundStartTests(supervisorModule) {
   for (const adapterId of ['claude-code', 'opencode']) {
     const task = `${adapterId} consent-bound success`;
@@ -3438,6 +3480,7 @@ async function main() {
   await runPosixLifecycleRaceTests(supervisorModule);
   await runStatusBoundsTest(supervisorModule);
   await runHappyPathTest(supervisorModule);
+  await runDelegationBrowserTests(supervisorModule);
   await runTerminalResultBarrierTests(supervisorModule);
   await runFailureBarrierTests(supervisorModule);
   await runTypedDriftDetailTests(supervisorModule, protocolDriftModule);

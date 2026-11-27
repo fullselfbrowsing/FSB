@@ -6,6 +6,15 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Added
+
+- **One MCP server drives every browser and profile the extension is in.** The bridge on port 7225 used to hold a single extension: whichever Chrome profile connected first got it and the others were refused, so an agent could land in a profile it did not expect. The bridge now keeps one browser per install (one extension in one profile), so every Chrome profile, other Chromium browsers running the same extension and Safari are attached together. A new `list_browsers` tool shows each one with the tab in front there, and an optional `browser` argument on `open_tab`, `list_tabs` and `run_task` chooses one, with every other call following its tab or the browser the agent used last. Several agents can work in different profiles at once. Setting `FSB_BROWSER` in a client's MCP config starts that client in one browser or profile. A call is never sent to a different browser than the one it belongs to, and a delegated run starts in the profile that started it. The installed extension needs no update for this. The details are in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) and [`mcp/README.md`](./mcp/README.md#several-browsers-and-profiles-on-one-server).
+- **The extension reports when its browser last had focus.** The state frame it already sends on connect and on every keepalive carries the time. Once every attached browser reports it, a call that names no browser goes to the one used last; until then it goes to a Chromium browser with a window open, the one attached longest. No new permission and no new listener.
+
+### Changed
+
+- The published MCP tool count is 70, up from 69, in the onboarding screen, the READMEs and the showcase in every language.
+
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline and Antigravity installer fixes, Grok Build capability checks, and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.

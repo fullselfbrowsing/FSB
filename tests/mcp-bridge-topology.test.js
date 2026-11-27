@@ -6,6 +6,8 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const vm = require('node:vm');
+const smoke = require('./mcp-smoke-harness');
 
 const repoRoot = path.resolve(__dirname, '..');
 const WebSocket = require(path.join(repoRoot, 'mcp', 'node_modules', 'ws'));
@@ -256,10 +258,19 @@ function instrumentUpgradeRegistration(bridge) {
   return counter;
 }
 
+// Most cases here model the extension as a bare socket that never says which
+// install it is. The hub gives a socket 4s to say so before it attaches it as
+// an older build, so here such sockets are attached at once, as every socket
+// was before the hub kept one browser per install. The cases that are about
+// identification pass their own extensionIdentifyTimeoutMs.
 async function loadBridgeClass() {
   const bridgeUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'bridge.js')).href;
   const module = await import(bridgeUrl);
-  return module.WebSocketBridge;
+  return class TopologyBridge extends module.WebSocketBridge {
+    constructor(options = {}) {
+      super({ extensionIdentifyTimeoutMs: 0, ...options });
+    }
+  };
 }
 
 async function loadAuthModule() {
@@ -1104,6 +1115,53 @@ async function runRejectsUntrustedBrowserOrigin(WebSocketBridge) {
   }
 }
 
+/**
+ * Safari port: the extension reaches :7225 either directly or through the
+ * container app's native socket, and both dial with
+ * Origin: safari-web-extension://<UUID>. The hub must classify that as an
+ * extension candidate. An Origin-less socket is still only ever a relay, which
+ * is why the native transport has to send the Origin explicitly.
+ */
+async function runAcceptsSafariExtensionOrigin(WebSocketBridge) {
+  await withTempHome('bridge-safari-origin', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'test-hub-safari-origin',
+      handshakeTimeoutMs: 25,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const safariOrigin = 'safari-web-extension://4C6E0A1B-2F3D-4E5A-9B8C-7D6E5F4A3B2C';
+
+    try {
+      await hub.connect();
+
+      for (const [label, origin] of [
+        ['safari Origin with path', `${safariOrigin}/path`],
+        ['safari Origin without host', 'safari-web-extension://'],
+      ]) {
+        const response = await rawUpgrade(port, [`Host: 127.0.0.1:${port}`, `Origin: ${origin}`]);
+        assert(response.startsWith('HTTP/1.1 403'), `${label} receives HTTP 403 before upgrade`);
+      }
+
+      const safari = await createBrowserSocket(port, { origin: safariOrigin });
+      resources.sockets.push(safari);
+      await waitFor(() => hub.topology.extensionConnected, 'safari extension registration', 1000, 10);
+      assertEqual(hub.topology.extensionConnected, true, 'hub registers a safari-web-extension:// origin as the extension');
+      assertEqual(hub.topology.relayCount, 0, 'safari extension socket is not counted as a relay');
+
+      const originless = await createOriginlessSocket(port);
+      resources.sockets.push(originless);
+      const close = await waitForSocketClose(originless);
+      assertEqual(close.code, 1008, 'origin-less socket without relay:hello is closed, never made the extension');
+      assertEqual(hub.topology.extensionConnected, true, 'safari extension survives the origin-less socket');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runRejectsNonLoopbackBind(WebSocketBridge) {
   const rejectedHosts = ['0.0.0.0', '::', '192.168.1.20', 'bridge.local', '', '127.0.0.1:7225'];
   for (const host of rejectedHosts) {
@@ -1336,9 +1394,9 @@ async function runUnprivilegedCannotDisplaceExtension(WebSocketBridge, auth) {
     });
     let extensionRegistrations = 0;
     const registerExtension = hub._registerExtensionClient.bind(hub);
-    hub._registerExtensionClient = (socket) => {
+    hub._registerExtensionClient = (...args) => {
       extensionRegistrations++;
-      return registerExtension(socket);
+      return registerExtension(...args);
     };
     const resources = { sockets: [], bridges: [hub] };
 
@@ -2496,6 +2554,1192 @@ async function runCapableRelayExitMidExtFrame(WebSocketBridge, auth) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Several browsers on one hub
+//
+// The hub keeps one slot per browser kind, told apart by the scheme of the
+// Origin each extension connects with. A call names its browser in a top-level
+// `browser` field, which is the hub's own routing and never reaches an
+// extension.
+// ---------------------------------------------------------------------------
+
+const MULTI_CHROME_ORIGIN = 'chrome-extension://multi-browser-chrome';
+const MULTI_SAFARI_ORIGIN = 'safari-web-extension://4C6E0A1B-2F3D-4E5A-9B8C-7D6E5F4A3B2C';
+// The sockets in these cases never say which install they are, so each is
+// named after its extension (Chrome) or its kind (Safari, whose Origin changes
+// on every launch). Installs that do say are covered further down.
+const CHROME_KEY = 'chrome-legacy-multibro';
+const SAFARI_KEY = 'safari-legacy';
+const BOTH_KEYS = `${CHROME_KEY},${SAFARI_KEY}`;
+
+// Stand in for an extension: remember what it is sent, answer when told to.
+function attachFakeBrowser(socket) {
+  const received = [];
+  socket.on('message', (data) => {
+    received.push(JSON.parse(data.toString()));
+  });
+  return {
+    received,
+    requests: () => received.filter((frame) => typeof frame.id === 'string'),
+    answer: (id, payload) => socket.send(JSON.stringify({ id, type: 'mcp:result', payload })),
+  };
+}
+
+async function attachBrowser(port, origin, options = {}) {
+  const socket = await createBrowserSocket(port, { origin, ...options });
+  return { socket, ...attachFakeBrowser(socket) };
+}
+
+// A relay as a client from before the roster behaves: it says hello and then
+// forwards frames that name no browser.
+async function createLegacyRelay(port, instanceId) {
+  const socket = await createOriginlessSocket(port);
+  const messages = collectSocketMessages(socket);
+  socket.send(JSON.stringify({ type: 'relay:hello', instanceId }));
+  await waitFor(() => messages.some((frame) => frame.type === 'relay:welcome'), `${instanceId} welcome`);
+  return {
+    socket,
+    messages,
+    send: (id, type = 'mcp:get-tabs') => socket.send(JSON.stringify({ id, type, payload: {} })),
+    reply: (id) => messages.find((frame) => frame.id === id) || null,
+    state: () => [...messages].reverse().find((frame) => frame.type === 'relay:state' || frame.type === 'relay:welcome'),
+  };
+}
+
+function browserKeys(bridge) {
+  return (bridge.topology.browsers || []).map((entry) => entry.key).sort().join(',');
+}
+
+async function runTwoBrowsersShareTheHub(WebSocketBridge) {
+  await withTempHome('bridge-two-browsers', async () => {
+    const resources = await createBridgePair(WebSocketBridge);
+    try {
+      const { port, hub, relay, sockets } = resources;
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      sockets.push(chrome.socket, safari.socket);
+      await waitFor(
+        () => browserKeys(hub) === BOTH_KEYS && browserKeys(relay) === BOTH_KEYS,
+        'both browsers reach the hub and relay rosters',
+      );
+
+      assertEqual(browserKeys(hub), BOTH_KEYS, 'a second browser of another kind takes its own slot');
+      assertEqual(browserKeys(relay), BOTH_KEYS, 'a relay hears of every attached browser');
+      assert(hub.isConnectedTo(CHROME_KEY) && hub.isConnectedTo(SAFARI_KEY), 'hub.isConnectedTo names each attached browser');
+      assert(relay.isConnectedTo(CHROME_KEY) && relay.isConnectedTo(SAFARI_KEY), 'relay.isConnectedTo names each attached browser');
+      assertEqual(hub.isConnectedTo('firefox'), false, 'isConnectedTo is false for a browser that is not attached');
+      assert(typeof hub.topology.hubVersion === 'string' && hub.topology.hubVersion.length > 0, 'the hub reports its package version');
+      assertEqual(relay.topology.hubVersion, hub.topology.hubVersion, 'and a relay learns it');
+      assertEqual(hub.topology.browsers.every((entry) => entry.authorized === false), true, 'unpaired browsers are listed as not authorized');
+
+      const toSafari = hub.sendAndWait({ type: 'mcp:get-tabs', payload: { n: 1 }, browser: SAFARI_KEY });
+      await waitFor(() => safari.requests().length === 1, 'safari receives the call named for it');
+      assertEqual(chrome.requests().length, 0, 'chrome is not sent a call named for safari');
+      assertEqual('browser' in safari.requests()[0], false, 'the routing field is removed before a local call reaches the extension');
+      assertEqual(safari.requests()[0].payload.n, 1, 'the payload arrives unchanged');
+      safari.answer(safari.requests()[0].id, { success: true, from: 'safari' });
+      assertEqual((await toSafari).from, 'safari', 'the call resolves with the named browser\'s answer');
+
+      const viaRelay = relay.sendAndWait({ type: 'mcp:get-tabs', payload: { n: 2 }, browser: CHROME_KEY });
+      await waitFor(() => chrome.requests().length === 1, 'chrome receives the relayed call named for it');
+      assertEqual(safari.requests().length, 1, 'safari is not sent a relayed call named for chrome');
+      assertEqual('browser' in chrome.requests()[0], false, 'the routing field is removed before a relayed call reaches the extension');
+      chrome.answer(chrome.requests()[0].id, { success: true, from: 'chrome' });
+      assertEqual((await viaRelay).from, 'chrome', 'the relayed call resolves with the named browser\'s answer');
+
+      const inChrome = hub.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: CHROME_KEY });
+      const inSafari = relay.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: SAFARI_KEY });
+      await waitFor(
+        () => chrome.requests().length === 2 && safari.requests().length === 2,
+        'one call in flight in each browser',
+      );
+      safari.answer(safari.requests()[1].id, { success: true, from: 'safari' });
+      chrome.answer(chrome.requests()[1].id, { success: true, from: 'chrome' });
+      assertEqual((await inChrome).from, 'chrome', 'two agents at once: the chrome call gets chrome\'s answer');
+      assertEqual((await inSafari).from, 'safari', 'two agents at once: the safari call gets safari\'s answer');
+      assertEqual(hub.topology.pendingRequestCount, 0, 'nothing is left pending');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runNamedBrowserThatIsAbsent(WebSocketBridge) {
+  await withTempHome('bridge-absent-browser', async () => {
+    const resources = await createBridgePair(WebSocketBridge);
+    try {
+      const { port, hub, relay, sockets } = resources;
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      sockets.push(chrome.socket);
+      await waitFor(() => browserKeys(hub) === CHROME_KEY && browserKeys(relay) === CHROME_KEY, 'chrome alone in the roster');
+
+      let error = null;
+      try {
+        await hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: SAFARI_KEY });
+      } catch (caught) {
+        error = caught;
+      }
+      assertEqual(error && error.code, 'BROWSER_NOT_CONNECTED', 'a call that names an absent browser is refused');
+      assertEqual(error && error.browser, SAFARI_KEY, 'the error names the browser that was asked for');
+      assertEqual(error && error.connectedBrowsers.join(','), CHROME_KEY, 'and the ones that are attached');
+      assertEqual(hub.topology.pendingRequestCount, 0, 'no pending entry or timer is left behind');
+
+      const relayed = await relay.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: SAFARI_KEY });
+      assertEqual(relayed.code, 'BROWSER_NOT_CONNECTED', 'a relayed call that names an absent browser is refused by the hub');
+      assertEqual(relayed.success, false, 'as a failure');
+      assertEqual((relayed.connectedBrowsers || []).join(','), CHROME_KEY, 'that lists what is attached');
+
+      const malformed = await relay.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: 'Safari; drop' });
+      assertEqual(malformed.code, 'BROWSER_NOT_CONNECTED', 'a name that is no browser key is refused the same way');
+
+      await sleep(30);
+      assertEqual(chrome.requests().length, 0, 'none of them fell back to the browser that is attached');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runOneBrowserClosingLeavesTheOther(WebSocketBridge) {
+  await withTempHome('bridge-one-closes', async () => {
+    const resources = await createBridgePair(WebSocketBridge);
+    try {
+      const { port, hub, relay, sockets } = resources;
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      sockets.push(chrome.socket, safari.socket);
+      await waitFor(() => browserKeys(relay) === BOTH_KEYS, 'both browsers in the relay roster');
+
+      let progressed = 0;
+      const localChrome = hub.sendAndWait(
+        { type: 'mcp:read-page', payload: {}, browser: CHROME_KEY },
+        { onProgress: () => { progressed += 1; } },
+      );
+      const relayedChrome = relay.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: CHROME_KEY });
+      const localSafari = hub.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: SAFARI_KEY });
+      let safariError = null;
+      localSafari.catch((caught) => { safariError = caught; });
+      await waitFor(
+        () => chrome.requests().length === 2 && safari.requests().length === 1,
+        'two calls in chrome and one in safari',
+      );
+
+      safari.socket.close();
+      await waitFor(() => safariError !== null, 'the safari call fails when safari goes');
+      assertEqual(safariError.message, 'Extension disconnected', 'with the message the sw_evicted recovery matches');
+      assertEqual(safariError.bridgeDisconnectReason, 'extension_disconnected', 'and the cause on the error');
+      assertEqual(hub.topology.extensionConnected, true, 'the hub still has a browser');
+      assertEqual(browserKeys(hub), CHROME_KEY, 'the roster drops only the browser that left');
+      await waitFor(() => browserKeys(relay) === CHROME_KEY, 'the relay roster follows');
+      assertEqual(relay.isConnected, true, 'the relay still reaches a browser');
+      assertEqual(relay.isConnectedTo(SAFARI_KEY), false, 'but not the one that left');
+      assertEqual(hub.topology.pendingRequestCount, 1, 'the chrome call is still pending on the hub');
+
+      const localId = chrome.requests()[0].id;
+      chrome.socket.send(JSON.stringify({ id: localId, type: 'mcp:progress', payload: { progress: 50 } }));
+      await waitFor(() => progressed === 1, 'the surviving call still receives its progress');
+      for (const request of chrome.requests()) chrome.answer(request.id, { success: true, from: 'chrome' });
+      assertEqual((await localChrome).from, 'chrome', 'a local chrome call survives safari closing');
+      assertEqual((await relayedChrome).from, 'chrome', 'a relayed chrome call survives safari closing');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runReplyFromAnotherBrowserIsIgnored(WebSocketBridge) {
+  await withTempHome('bridge-wrong-browser-reply', async () => {
+    const resources = await createBridgePair(WebSocketBridge);
+    try {
+      const { port, hub, relay, sockets } = resources;
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      sockets.push(chrome.socket, safari.socket);
+      await waitFor(() => browserKeys(relay) === BOTH_KEYS, 'both browsers in the relay roster');
+
+      let progressed = 0;
+      let settled = false;
+      const local = hub.sendAndWait(
+        { type: 'mcp:read-page', payload: {}, browser: CHROME_KEY },
+        { onProgress: () => { progressed += 1; } },
+      );
+      local.then(() => { settled = true; }, () => { settled = true; });
+      await waitFor(() => chrome.requests().length === 1, 'the call reaches chrome');
+      const localId = chrome.requests()[0].id;
+      safari.socket.send(JSON.stringify({ id: localId, type: 'mcp:progress', payload: { progress: 99 } }));
+      safari.answer(localId, { success: true, from: 'safari' });
+      await sleep(40);
+      assertEqual(settled, false, 'an answer from a browser that was not asked settles nothing');
+      assertEqual(progressed, 0, 'nor does its progress reach the caller');
+      chrome.answer(localId, { success: true, from: 'chrome' });
+      assertEqual((await local).from, 'chrome', 'the browser that was asked still answers');
+
+      let relayedSettled = false;
+      const relayed = relay.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: SAFARI_KEY });
+      relayed.then(() => { relayedSettled = true; }, () => { relayedSettled = true; });
+      await waitFor(() => safari.requests().length === 1, 'the relayed call reaches safari');
+      const relayedId = safari.requests()[0].id;
+      chrome.answer(relayedId, { success: true, from: 'chrome' });
+      await sleep(40);
+      assertEqual(relayedSettled, false, 'a relayed call is not settled by the other browser either');
+      safari.answer(relayedId, { success: true, from: 'safari' });
+      assertEqual((await relayed).from, 'safari', 'and resolves with the asked browser\'s answer');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runLegacyRelayKeepsItsBrowser(WebSocketBridge) {
+  await withTempHome('bridge-legacy-relay', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'legacy-relay-hub',
+      handshakeTimeoutMs: 100,
+      legacyRelayBindingGraceMs: 150,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    try {
+      await hub.connect();
+      let chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      resources.sockets.push(chrome.socket, safari.socket);
+      await waitFor(() => browserKeys(hub) === BOTH_KEYS, 'both browsers attached');
+
+      const legacy = await createLegacyRelay(port, 'legacy-relay');
+      resources.sockets.push(legacy.socket);
+      assertEqual(legacy.state().browsers.length, 2, 'an old relay is sent the roster too, and ignores it');
+
+      legacy.send('legacy-1');
+      await waitFor(() => chrome.requests().length === 1, 'a frame that names no browser goes to the default');
+      assertEqual(safari.requests().length, 0, 'with no focus reported, the default is chrome');
+      assertEqual(chrome.requests()[0].id, 'legacy-1', 'the frame arrives as the old relay sent it');
+      chrome.answer('legacy-1', { success: true, from: 'chrome' });
+      await waitFor(() => legacy.reply('legacy-1') !== null, 'the answer returns to the old relay');
+      assertEqual(legacy.reply('legacy-1').payload.from, 'chrome', 'from the browser it was given');
+
+      safari.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() }));
+      await waitFor(
+        () => hub.topology.browsers.find((entry) => entry.key === SAFARI_KEY).focusedAt !== null,
+        'safari reports focus',
+      );
+      const beforeBoth = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
+      await waitFor(() => chrome.requests().length === 2, 'while chrome reports no focus the default stays chrome');
+      assertEqual(safari.requests().length, 0, 'a browser that reports focus does not take the default from one that reports none');
+      chrome.answer(chrome.requests()[1].id, { success: true });
+      await beforeBoth;
+
+      chrome.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() - 60_000 }));
+      await waitFor(
+        () => hub.topology.browsers.find((entry) => entry.key === CHROME_KEY).focusedAt !== null,
+        'chrome reports an older focus',
+      );
+      const unnamed = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
+      await waitFor(() => safari.requests().length === 1, 'once both report, the default is the most recently focused browser');
+      safari.answer(safari.requests()[0].id, { success: true });
+      await unnamed;
+
+      legacy.send('legacy-2');
+      await waitFor(() => chrome.requests().length === 3, 'the old relay stays in the browser it was given');
+      assertEqual(safari.requests().length, 1, 'and is not moved when the default changes');
+      chrome.answer('legacy-2', { success: true });
+      await waitFor(() => legacy.reply('legacy-2') !== null, 'second answer returns');
+      assertEqual(legacy.state().extensionConnected, true, 'its state describes its own browser');
+      assertEqual(legacy.state().extensionAttachment, null, 'through the single-extension fields');
+
+      chrome.socket.close();
+      await waitFor(() => browserKeys(hub) === SAFARI_KEY, 'chrome goes away');
+      await waitFor(() => legacy.state().extensionConnected === false, 'the old relay is told its browser is gone');
+      legacy.send('legacy-3');
+      await waitFor(() => legacy.reply('legacy-3') !== null, 'a frame sent meanwhile is answered');
+      assertEqual(legacy.reply('legacy-3').payload.error, 'extension_not_connected', 'as not connected, like a worker restart always was');
+      assertEqual(safari.requests().length, 1, 'and is not handed to the other browser');
+
+      chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      resources.sockets.push(chrome.socket);
+      await waitFor(() => browserKeys(hub) === BOTH_KEYS, 'chrome comes back');
+      await waitFor(() => legacy.state().extensionConnected === true, 'the old relay is told');
+      legacy.send('legacy-4');
+      await waitFor(() => chrome.requests().length === 1, 'and its next frame goes to chrome again');
+
+      chrome.socket.close();
+      await waitFor(() => browserKeys(hub) === SAFARI_KEY, 'chrome goes away for good');
+      await waitFor(() => legacy.state().extensionConnected === false, 'the old relay is told its browser is gone');
+      // A real relay from before the roster sends nothing while it is told no
+      // extension is connected, so it has to be told again without asking.
+      await waitFor(
+        () => legacy.state().extensionConnected === true,
+        'past the grace, the old relay is told a browser is connected again, unprompted',
+        1000,
+      );
+      assertEqual(safari.requests().length, 1, 'before it has sent anything more');
+      legacy.send('legacy-5');
+      await waitFor(() => safari.requests().length === 2, 'and its next frame is given the browser that is left');
+      assertEqual(safari.requests()[1].id, 'legacy-5', 'delivered as it was sent');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runPairingClosesTheOtherBrowser(WebSocketBridge, auth) {
+  await withTempHome('bridge-pair-closes-other', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    const pairingCode = auth.formatPairingCode(auth.rotateBridgeSessionSecret(authPath, 30_000));
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'pair-closes-other-hub',
+      handshakeTimeoutMs: 100,
+    });
+    const relay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'pair-closes-other-relay',
+      handshakeTimeoutMs: 100,
+    });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    try {
+      await hub.connect();
+      await relay.connect();
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      resources.sockets.push(safari.socket);
+      await waitFor(() => browserKeys(hub) === SAFARI_KEY, 'safari attaches unpaired while nothing is pinned');
+      const pending = hub.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: SAFARI_KEY });
+      let pendingError = null;
+      pending.catch((caught) => { pendingError = caught; });
+
+      const safariClosed = waitForSocketClose(safari.socket, 1500);
+      safariClosed.catch(() => {});
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN, { pairingCode });
+      resources.sockets.push(chrome.socket);
+      const close = await safariClosed;
+      assertEqual(close.code, 1008, 'pairing chrome closes the browser that attached before the pin');
+      await waitFor(() => browserKeys(hub) === CHROME_KEY, 'only the paired browser stays attached');
+      assertEqual(
+        auth.readBridgeAuthState(authPath).allowedExtensionOrigin,
+        MULTI_CHROME_ORIGIN,
+        'the pin is bound to the paired browser',
+      );
+      assertEqual(hub.topology.browsers[0].authorized, true, 'the roster marks it authorized');
+      await waitFor(() => pendingError !== null, 'a call the closed browser was holding fails');
+      assertEqual(pendingError.bridgeDisconnectReason, 'extension_origin_pin_mismatch', 'with the pin as its cause');
+      const refusal = hub.refusedBrowsers.find((entry) => entry.kind === 'safari');
+      assertEqual(refusal && refusal.reason, 'extension_origin_pin_mismatch', 'the hub remembers why safari is not attached');
+      await waitFor(
+        () => relay.topology.refusedBrowsers.some((entry) => entry.kind === 'safari'),
+        'and tells its relays',
+      );
+
+      const response = await rawUpgrade(port, [`Host: 127.0.0.1:${port}`, `Origin: ${MULTI_SAFARI_ORIGIN}`]);
+      assert(response.startsWith('HTTP/1.1 403'), 'a later safari upgrade is refused while the pin stands');
+      assertEqual(browserKeys(hub), CHROME_KEY, 'so the outcome is the same whichever browser came first');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runSafariIdentityAndFocus(WebSocketBridge) {
+  await withTempHome('bridge-safari-identity', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'safari-identity-hub',
+      handshakeTimeoutMs: 100,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const entry = (key) => hub.topology.browsers.find((browser) => browser.key === key);
+    const state = (overrides) => JSON.stringify({
+      type: 'mcp:extension-state',
+      extensionVersion: '0.9.95',
+      installInstanceId: 'b3f6f5c2-9d0e-4f0b-8a53-0d3a2f1c9e77',
+      normalWindowCount: 1,
+      connectedAt: null,
+      ...overrides,
+    });
+    try {
+      await hub.connect();
+      let safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      resources.sockets.push(safari.socket, chrome.socket);
+      await waitFor(() => browserKeys(hub) === BOTH_KEYS, 'both browsers attached');
+
+      const safariId = 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)';
+      safari.socket.send(state({ extensionId: safariId, focusedAt: 1000 }));
+      await waitFor(() => entry(SAFARI_KEY).extensionVersion === '0.9.95', 'safari\'s identity frame is accepted');
+      assertEqual(entry(SAFARI_KEY).installInstanceId, 'b3f6f5c2-9d0e-4f0b-8a53-0d3a2f1c9e77', 'with its install id, the key for profiles later');
+      assertEqual(entry(SAFARI_KEY).focusedAt, 1000, 'and the focus time it carries');
+      assertEqual(hub.topology.extensionAttachment, null, 'with chrome reporting no focus, chrome stays the default the old fields describe');
+
+      chrome.socket.send(state({ extensionId: safariId }));
+      chrome.socket.send(state({ extensionId: 'abcdefghijklmnopabcdefghijklmnop', extensionVersion: '0.9.90' }));
+      await waitFor(() => entry(CHROME_KEY).extensionVersion === '0.9.90', 'chrome\'s identity frame is accepted');
+      assertEqual(entry(CHROME_KEY).focusedAt, null, 'a browser that reports no focus has none');
+      assertEqual(hub.topology.extensionAttachment.extensionVersion, '0.9.90', 'and the old fields carry chrome\'s identity');
+
+      safari.socket.send(state({ extensionId: 'not a bundle id!' }));
+      await sleep(30);
+      assertEqual(entry(SAFARI_KEY).extensionVersion, '0.9.95', 'a malformed safari id leaves the slot as it was');
+
+      await sleep(120);
+      const future = Date.now() + 10 * 60_000;
+      safari.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: future }));
+      await waitFor(() => entry(SAFARI_KEY).focusedAt > 1000, 'a focus report moves the time forward');
+      assert(entry(SAFARI_KEY).focusedAt <= Date.now(), 'a focus time in the future is held to now');
+
+      const held = entry(SAFARI_KEY).focusedAt;
+      safari.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: 'now' }));
+      safari.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: 5 }));
+      await sleep(40);
+      assertEqual(entry(SAFARI_KEY).focusedAt, held, 'a malformed or older report changes nothing');
+
+      await sleep(120);
+      chrome.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() }));
+      chrome.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() + 1 }));
+      await waitFor(() => entry(CHROME_KEY).focusedAt !== null, 'chrome reports focus');
+      const first = entry(CHROME_KEY).focusedAt;
+      await sleep(40);
+      assertEqual(entry(CHROME_KEY).focusedAt, first, 'a second report inside the rate limit is dropped');
+      const unnamed = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
+      await waitFor(() => chrome.requests().length === 1, 'the default follows the browser focused last');
+      chrome.answer(chrome.requests()[0].id, { success: true });
+      await unnamed;
+
+      safari.socket.close();
+      await waitFor(() => browserKeys(hub) === CHROME_KEY, 'safari\'s worker goes away');
+      safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      resources.sockets.push(safari.socket);
+      await waitFor(() => browserKeys(hub) === BOTH_KEYS, 'and comes back');
+      assertEqual(entry(SAFARI_KEY).focusedAt, held, 'its last focus still stands until it reports again');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runEachBrowserHasItsOwnReaper(WebSocketBridge) {
+  await withTempHome('bridge-per-browser-reaper', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'per-browser-reaper-hub',
+      handshakeTimeoutMs: 100,
+      extensionPingIntervalMs: 30,
+      extensionHeartbeatTimeoutMs: 60_000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    try {
+      await hub.connect();
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      let safariPings = 0;
+      safari.socket.on('ping', () => { safariPings += 1; });
+      // Registered second: its registration must not stop safari's timer.
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN, { autoPong: false });
+      resources.sockets.push(safari.socket, chrome.socket);
+      await waitFor(() => browserKeys(hub) === BOTH_KEYS, 'both browsers attached');
+
+      await waitFor(() => !hub.isConnectedTo(CHROME_KEY), 'the browser that stops answering pings is reaped', 4000);
+      assertEqual(hub.isConnectedTo(SAFARI_KEY), true, 'the browser that answers keeps its slot');
+      assertEqual(hub.topology.lastDisconnectReason, 'extension_reaped_pong_timeout', 'the reaper names its cause');
+      const before = safariPings;
+      await sleep(150);
+      assert(safariPings > before, 'and the surviving browser is still being pinged: its timer was not stopped with the other one');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runPromotedRelayStartsWithNoRoster(WebSocketBridge) {
+  await withTempHome('bridge-promoted-roster', async () => {
+    const resources = await createBridgePair(WebSocketBridge);
+    try {
+      const { port, hub, relay, sockets } = resources;
+      const chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      sockets.push(chrome.socket, safari.socket);
+      await waitFor(() => browserKeys(relay) === BOTH_KEYS, 'the relay holds the hub\'s roster');
+
+      hub.disconnect();
+      await waitFor(() => relay.currentMode === 'hub', 'the relay is promoted', 2000);
+      assertEqual(browserKeys(relay), '', 'a promoted relay does not inherit the old hub\'s roster');
+      assertEqual(relay.isConnected, false, 'and is not connected until a browser reaches it');
+
+      const again = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      sockets.push(again.socket);
+      await waitFor(() => browserKeys(relay) === SAFARI_KEY, 'a browser that reconnects to the new hub is listed');
+      const call = relay.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: SAFARI_KEY });
+      await waitFor(() => again.requests().length === 1, 'and can be named at once');
+      again.answer(again.requests()[0].id, { success: true });
+      await call;
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// One browser per install. Two profiles of one extension connect with the same
+// Origin, and each says which install it is in its first state frame. Those
+// two facts together are what a slot is keyed on.
+// ---------------------------------------------------------------------------
+
+const PROFILE_ORIGIN = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
+const INSTALL_A = '4187c196-3c4b-4778-b904-a7ad83023d2e';
+const INSTALL_B = '9a0c11d2-0f6e-4d1c-8a53-0d3a2f1c9e77';
+const KEY_A = 'chrome-4187c196';
+const KEY_B = 'chrome-9a0c11d2';
+
+function installState(installInstanceId, overrides = {}) {
+  return JSON.stringify({
+    type: 'mcp:extension-state',
+    extensionId: 'abcdefghijklmnopabcdefghijklmnop',
+    extensionVersion: '0.9.95',
+    installInstanceId,
+    normalWindowCount: 1,
+    connectedAt: null,
+    ...overrides,
+  });
+}
+
+// An extension as every build since 0.9.92 behaves: it opens its socket and
+// says which install it is.
+async function attachProfile(port, installInstanceId, options = {}) {
+  const { state, origin = PROFILE_ORIGIN, ...socketOptions } = options;
+  const profile = await attachBrowser(port, origin, socketOptions);
+  profile.socket.send(installState(installInstanceId, state));
+  return profile;
+}
+
+async function runTwoProfilesOfOneExtension(WebSocketBridge) {
+  await withTempHome('bridge-two-profiles', async () => {
+    const port = await getFreePort();
+    const options = { port, host: '127.0.0.1', handshakeTimeoutMs: 100, extensionIdentifyTimeoutMs: 2000 };
+    const hub = new WebSocketBridge({ ...options, instanceId: 'two-profiles-hub' });
+    const relay = new WebSocketBridge({ ...options, instanceId: 'two-profiles-relay' });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    const entry = (key) => hub.topology.browsers.find((browser) => browser.key === key);
+    try {
+      await hub.connect();
+      await relay.connect();
+      let profileA = await attachProfile(port, INSTALL_A);
+      const profileB = await attachProfile(port, INSTALL_B, { state: { normalWindowCount: 3, extensionVersion: '0.9.92' } });
+      resources.sockets.push(profileA.socket, profileB.socket);
+      await waitFor(
+        () => browserKeys(hub) === `${KEY_A},${KEY_B}` && browserKeys(relay) === `${KEY_A},${KEY_B}`,
+        'both profiles reach the hub and relay rosters',
+      );
+
+      assertEqual(entry(KEY_A).kind, 'chrome', 'a profile is a Chromium browser');
+      assertEqual(entry(KEY_A).extensionId, 'abcdefghijklmnopabcdefghijklmnop', 'listed with the extension its Origin names');
+      assertEqual(entry(KEY_A).installInstanceId, INSTALL_A, 'and the install it said it is');
+      assertEqual(entry(KEY_B).windows, 3, 'each profile reports its own windows');
+      assertEqual(entry(KEY_B).extensionVersion, '0.9.92', 'and its own extension version');
+      assertEqual(relay.topology.browsers.find((browser) => browser.key === KEY_B).windows, 3, 'a relay hears the same');
+      assertEqual(hub.refusedBrowsers.length, 0, 'neither profile was turned away');
+
+      const inA = hub.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: KEY_A });
+      const inB = relay.sendAndWait({ type: 'mcp:read-page', payload: {}, browser: KEY_B });
+      let errorA = null;
+      inA.catch((caught) => { errorA = caught; });
+      await waitFor(
+        () => profileA.requests().length === 1 && profileB.requests().length === 1,
+        'two agents at once: one call in each profile',
+      );
+
+      profileA.socket.close();
+      await waitFor(() => errorA !== null, 'the call in the profile that closed fails');
+      assertEqual(errorA.message, 'Extension disconnected', 'with the message the sw_evicted recovery matches');
+      assertEqual(browserKeys(hub), KEY_B, 'the roster drops only that profile');
+      profileB.answer(profileB.requests()[0].id, { success: true, from: 'b' });
+      assertEqual((await inB).from, 'b', 'the call in the other profile is untouched');
+
+      const gone = await relay.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: KEY_A });
+      assertEqual(gone.code, 'BROWSER_NOT_CONNECTED', 'a call for the profile that is away is refused');
+      assertEqual(profileB.requests().length, 1, 'and not handed to the profile that is still here');
+
+      profileA = await attachProfile(port, INSTALL_A);
+      resources.sockets.push(profileA.socket);
+      await waitFor(() => browserKeys(hub) === `${KEY_A},${KEY_B}`, 'the profile comes back under the same key');
+      const again = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: KEY_A });
+      await waitFor(() => profileA.requests().length === 1, 'and a call for it reaches its new socket');
+      profileA.answer(profileA.requests()[0].id, { success: true });
+      await again;
+
+      // A second socket that says it is a profile already attached: the same
+      // extension in the same profile, so the incumbent keeps its slot.
+      const twin = await attachProfile(port, INSTALL_B);
+      resources.sockets.push(twin.socket);
+      const twinClose = await waitForSocketClose(twin.socket);
+      assertEqual(twinClose.code, 1008, 'an unpaired second socket of one install is refused');
+      assertEqual(browserKeys(hub), `${KEY_A},${KEY_B}`, 'and the roster is unchanged');
+      const stillB = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: KEY_B });
+      await waitFor(() => profileB.requests().length === 2, 'the incumbent socket still receives its calls');
+      profileB.answer(profileB.requests()[1].id, { success: true });
+      await stillB;
+      assertEqual(hub.topology.pendingRequestCount, 0, 'nothing is left pending');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runInstallIdentification(WebSocketBridge) {
+  await withTempHome('bridge-identification', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'identification-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 250,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const entry = (key) => hub.topology.browsers.find((browser) => browser.key === key);
+    const legacyKey = 'chrome-legacy-abcdefgh';
+    try {
+      await hub.connect();
+
+      // A socket that hangs up before it is named leaves nothing behind.
+      const quitter = await attachBrowser(port, PROFILE_ORIGIN);
+      quitter.socket.close();
+      await waitForSocketClose(quitter.socket).catch(() => {});
+      await sleep(30);
+      assertEqual(hub.pendingExtensions.size, 0, 'a socket that closes unnamed is forgotten');
+
+      const quiet = await attachBrowser(port, PROFILE_ORIGIN);
+      resources.sockets.push(quiet.socket);
+      // Not a state frame the hub accepts, so it names nothing.
+      quiet.socket.send(installState(INSTALL_A, { extensionVersion: 7 }));
+      await sleep(60);
+      assertEqual(hub.topology.extensionConnected, false, 'a socket that has not said which install it is is not a browser yet');
+      assertEqual(browserKeys(hub), '', 'and no roster lists it');
+      let early = null;
+      try {
+        await hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
+      } catch (caught) {
+        early = caught;
+      }
+      assert(early instanceof Error, 'a call made meanwhile is refused as not connected');
+      assertEqual(quiet.requests().length, 0, 'and nothing is sent to the unnamed socket');
+
+      // A profile that does say is attached at once, without waiting for the other.
+      const named = await attachProfile(port, INSTALL_B);
+      resources.sockets.push(named.socket);
+      await waitFor(() => browserKeys(hub) === KEY_B, 'a socket that names its install is attached straight away', 200);
+
+      await waitFor(() => browserKeys(hub) === `${KEY_B},${legacyKey}`, 'the quiet socket is attached once its time is up', 1500);
+      assertEqual(entry(legacyKey).installInstanceId, null, 'as a build that never says which install it is');
+      assertEqual(entry(legacyKey).extensionId, 'abcdefghijklmnopabcdefghijklmnop', 'named after its extension');
+
+      quiet.socket.send(installState(INSTALL_A, { extensionVersion: '0.9.99' }));
+      await waitFor(() => entry(legacyKey) && entry(legacyKey).extensionVersion === '0.9.99', 'a late state frame is still shown');
+      assertEqual(browserKeys(hub), `${KEY_B},${legacyKey}`, 'but a slot keeps the key it was attached under');
+
+      const toQuiet = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: legacyKey });
+      await waitFor(() => quiet.requests().length === 1, 'and it can be named like any other');
+      quiet.answer(quiet.requests()[0].id, { success: true });
+      await toQuiet;
+
+      // Another profile of that old build cannot be told from the first.
+      const quietTwin = await attachBrowser(port, PROFILE_ORIGIN);
+      resources.sockets.push(quietTwin.socket);
+      const twinClose = await waitForSocketClose(quietTwin.socket, 1500);
+      assertEqual(twinClose.code, 1008, 'a second profile of a build that never says is refused, as it always was');
+      assertEqual(browserKeys(hub), `${KEY_B},${legacyKey}`, 'leaving both attached browsers in place');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runInstallKeysStayApart(WebSocketBridge) {
+  await withTempHome('bridge-install-keys', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'install-keys-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const first = 'aaaaaaaa-1111-4000-8000-000000000001';
+    const second = 'aaaaaaaa-2222-4000-8000-000000000002';
+    try {
+      await hub.connect();
+      let one = await attachProfile(port, first);
+      resources.sockets.push(one.socket);
+      await waitFor(() => browserKeys(hub) === 'chrome-aaaaaaaa', 'the first install takes the short key');
+
+      const two = await attachProfile(port, second);
+      resources.sockets.push(two.socket);
+      await waitFor(
+        () => browserKeys(hub) === 'chrome-aaaaaaaa,chrome-aaaaaaaa2222',
+        'an install whose id starts the same way is given a longer key',
+      );
+
+      one.socket.close();
+      await waitFor(() => browserKeys(hub) === 'chrome-aaaaaaaa2222', 'the first install goes away');
+      one = await attachProfile(port, first);
+      resources.sockets.push(one.socket);
+      await waitFor(
+        () => browserKeys(hub) === 'chrome-aaaaaaaa,chrome-aaaaaaaa2222',
+        'and gets its own key back, whichever of them is attached at the time',
+      );
+
+      // The same install id from another extension is another install. It can
+      // attach only once this extension has left, and a key stays with the
+      // install it was given to, so sessions that hold it are never sent here.
+      one.socket.close();
+      two.socket.close();
+      await waitFor(() => browserKeys(hub) === '', 'both installs go away');
+      const other = await attachProfile(port, first, { origin: 'chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba' });
+      resources.sockets.push(other.socket);
+      await waitFor(() => hub.topology.browsers.length === 1, 'another extension that claims the first install id attaches');
+      assertEqual(
+        hub.isConnectedTo('chrome-aaaaaaaa'),
+        false,
+        'and is not given the key that install was known by',
+      );
+      assertEqual(browserKeys(hub), 'chrome-aaaaaaaa1111', 'it takes the next one that was never anyone else\'s');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runPairedSocketReplacesItsOwnInstall(WebSocketBridge, auth) {
+  await withTempHome('bridge-paired-replaces-install', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 31_000);
+    state = auth.bindAllowedExtensionOrigin(PROFILE_ORIGIN, authPath);
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'paired-replaces-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const entry = (key) => hub.topology.browsers.find((browser) => browser.key === key);
+    try {
+      await hub.connect();
+      const profileA = await attachProfile(port, INSTALL_A);
+      const profileB = await attachProfile(port, INSTALL_B);
+      resources.sockets.push(profileA.socket, profileB.socket);
+      await waitFor(() => browserKeys(hub) === `${KEY_A},${KEY_B}`, 'two unpaired profiles of the pinned extension attach');
+      assertEqual(entry(KEY_A).authorized, false, 'neither is paired yet');
+
+      const oldClosed = waitForSocketClose(profileA.socket, 1500);
+      const paired = await attachProfile(port, INSTALL_A, { pairingCode: auth.formatPairingCode(state) });
+      resources.sockets.push(paired.socket);
+      await oldClosed;
+      await waitFor(() => entry(KEY_A) && entry(KEY_A).authorized === true, 'a paired socket takes over its own install');
+      assertEqual(browserKeys(hub), `${KEY_A},${KEY_B}`, 'under the same key');
+      assertEqual(profileB.socket.readyState, WebSocket.OPEN, 'the other profile keeps its socket');
+      assertEqual(entry(KEY_B).authorized, false, 'and is not paired by its neighbour pairing');
+
+      const toA = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: KEY_A });
+      await waitFor(() => paired.requests().length === 1, 'calls for the install go to the socket that took over');
+      assertEqual(profileA.requests().length, 0, 'not to the one it replaced');
+      paired.answer(paired.requests()[0].id, { success: true });
+      await toA;
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runExtRequestCarriesItsBrowser(WebSocketBridge, auth) {
+  await withTempHome('bridge-ext-request-browser', async (home) => {
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 32_000);
+    state = auth.bindAllowedExtensionOrigin(PROFILE_ORIGIN, authPath);
+    const pairingCode = auth.formatPairingCode(state);
+
+    // The hub runs the handler itself.
+    {
+      const port = await getFreePort();
+      const seen = [];
+      const hub = new WebSocketBridge({
+        port,
+        host: '127.0.0.1',
+        instanceId: 'ext-browser-local-hub',
+        handshakeTimeoutMs: 100,
+        extensionIdentifyTimeoutMs: 2000,
+        capabilities: ['agent-spawn'],
+        handleExtRequest: async (request, _emit, context) => {
+          seen.push({ id: request.id, browser: context.browser });
+          return { ok: true };
+        },
+      });
+      const resources = { sockets: [], bridges: [hub] };
+      try {
+        await hub.connect();
+        const profileA = await attachProfile(port, INSTALL_A, { pairingCode });
+        const profileB = await attachProfile(port, INSTALL_B, { pairingCode });
+        resources.sockets.push(profileA.socket, profileB.socket);
+        await waitFor(() => browserKeys(hub) === `${KEY_A},${KEY_B}`, 'two paired profiles attach');
+
+        profileB.socket.send(JSON.stringify({ id: 'from-b', type: 'ext:request', method: 'delegate.status', payload: {} }));
+        profileA.socket.send(JSON.stringify({ id: 'from-a', type: 'ext:request', method: 'delegate.status', payload: {} }));
+        await waitFor(() => seen.length === 2, 'both requests reach the local handler');
+        assertEqual(seen.find((call) => call.id === 'from-b').browser, KEY_B, 'the handler is told which profile a request came from');
+        assertEqual(seen.find((call) => call.id === 'from-a').browser, KEY_A, 'for each profile separately');
+      } finally {
+        await cleanup(resources);
+      }
+    }
+
+    // The hub hands the request to a relay that can run it.
+    {
+      const port = await getFreePort();
+      const seen = [];
+      const hub = new WebSocketBridge({
+        port,
+        host: '127.0.0.1',
+        instanceId: 'ext-browser-hub',
+        handshakeTimeoutMs: 100,
+        extensionIdentifyTimeoutMs: 2000,
+      });
+      const relay = new WebSocketBridge({
+        port,
+        host: '127.0.0.1',
+        instanceId: 'ext-browser-relay',
+        handshakeTimeoutMs: 100,
+        capabilities: ['agent-spawn'],
+        handleExtRequest: async (request, _emit, context) => {
+          seen.push({ id: request.id, browser: context.browser });
+          return { ok: true };
+        },
+      });
+      const resources = { sockets: [], bridges: [hub, relay] };
+      try {
+        await hub.connect();
+        await relay.connect();
+        // A relay from before the roster, to see exactly what a relay is sent.
+        const watcher = await createOriginlessSocket(port);
+        resources.sockets.push(watcher);
+        const profileA = await attachProfile(port, INSTALL_A, { pairingCode });
+        const profileB = await attachProfile(port, INSTALL_B, { pairingCode });
+        resources.sockets.push(profileA.socket, profileB.socket);
+        const replies = collectSocketMessages(profileB.socket);
+        await waitFor(() => browserKeys(relay) === `${KEY_A},${KEY_B}`, 'the relay hears of both profiles');
+
+        profileB.socket.send(JSON.stringify({ id: 'relayed-from-b', type: 'ext:request', method: 'delegate.status', payload: {} }));
+        await waitFor(() => seen.length === 1, 'the request reaches the relay\'s handler');
+        assertEqual(seen[0].browser, KEY_B, 'with the profile it came from');
+        await waitFor(() => replies.some((frame) => frame.id === 'relayed-from-b'), 'and its answer returns to that profile');
+        assertEqual(relay.relayExtRoutes.size, 0, 'the relay keeps the route no longer than the request');
+
+        const stray = { type: 'relay:ext-route', requestId: 'never-sent', browser: 'Not A Key' };
+        relay._noteRelayExtRoute(stray);
+        assertEqual(relay.relayExtRoutes.size, 0, 'a route that names no browser key is dropped');
+      } finally {
+        await cleanup(resources);
+      }
+    }
+  });
+}
+
+async function runDefaultSurvivesAWorkerRestart(WebSocketBridge) {
+  await withTempHome('bridge-default-survives-restart', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'default-restart-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const unnamed = async (profile, label) => {
+      const before = profile.requests().length;
+      const call = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
+      await waitFor(() => profile.requests().length === before + 1, label);
+      profile.answer(profile.requests()[before].id, { success: true });
+      await call;
+    };
+    try {
+      await hub.connect();
+      // The later id sorts first, so the order below is not an accident of the keys.
+      let main = await attachProfile(port, INSTALL_B);
+      resources.sockets.push(main.socket);
+      await waitFor(() => browserKeys(hub) === KEY_B, 'the profile opened first attaches');
+      await sleep(15);
+      const second = await attachProfile(port, INSTALL_A);
+      resources.sockets.push(second.socket);
+      await waitFor(() => browserKeys(hub) === `${KEY_A},${KEY_B}`, 'a second profile attaches');
+      await unnamed(main, 'with no focus reported, a call that names none goes to the profile attached longest');
+
+      main.socket.close();
+      await waitFor(() => browserKeys(hub) === KEY_A, 'that profile\'s worker restarts');
+      main = await attachProfile(port, INSTALL_B);
+      resources.sockets.push(main.socket);
+      await waitFor(() => browserKeys(hub) === `${KEY_A},${KEY_B}`, 'and reconnects');
+      await unnamed(main, 'the default is still the profile that was here first');
+
+      second.socket.send(installState(INSTALL_A, { normalWindowCount: 2 }));
+      main.socket.send(installState(INSTALL_B, { normalWindowCount: 0 }));
+      await waitFor(
+        () => hub.topology.browsers.find((browser) => browser.key === KEY_B).windows === 0,
+        'the first profile closes its last window',
+      );
+      await unnamed(second, 'a profile with no window gives the default to one that has a window');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runBrowserLimit(WebSocketBridge) {
+  await withTempHome('bridge-browser-limit', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'browser-limit-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const installOf = (index) => `${String(index).padStart(8, '0')}-0000-4000-8000-000000000000`;
+    try {
+      await hub.connect();
+      for (let index = 0; index < 16; index += 1) {
+        resources.sockets.push((await attachProfile(port, installOf(index))).socket);
+      }
+      await waitFor(() => hub.topology.browsers.length === 16, 'sixteen profiles of one extension attach');
+      const extra = await attachProfile(port, installOf(16));
+      resources.sockets.push(extra.socket);
+      const close = await waitForSocketClose(extra.socket);
+      assertEqual(close.code, 1008, 'one more is turned away');
+      assertEqual(hub.topology.browsers.length, 16, 'and the roster is unchanged');
+      const refusal = hub.refusedBrowsers.find((entry) => entry.extensionId === 'abcdefghijklmnopabcdefghijklmnop');
+      assertEqual(refusal && refusal.reason, 'browser_limit_reached', 'with the reason kept for status and list_browsers');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+// The extension's own code, not a stand-in: ws/mcp-bridge-client.js and
+// background.js's getMcpAttachmentMetadata, run once per profile. Two profiles
+// are two storage areas under one extension id, which is exactly what the hub
+// has to tell apart.
+function startRealExtension(port, profileStorage, label) {
+  const background = fs.readFileSync(path.join(repoRoot, 'extension', 'background.js'), 'utf8');
+  const start = background.indexOf('let mcpInstallInstanceIdPromise = null;');
+  const end = background.indexOf('async function collectMcpDiagnosticsSnapshot()');
+  if (start === -1 || end <= start) throw new Error('getMcpAttachmentMetadata was not found in background.js');
+
+  const chrome = smoke.createChromeMock({ local: profileStorage.local, session: smoke.createStorageArea() });
+  chrome.runtime.id = 'abcdefghijklmnopabcdefghijklmnop';
+  chrome.runtime.getManifest = () => ({ version: '0.9.95' });
+  chrome.windows = {
+    getAll: async () => profileStorage.windows.map((id) => ({ id })),
+    getLastFocused: async () => ({ focused: false }),
+  };
+  const worker = { chrome, crypto: crypto.webcrypto, Promise };
+  vm.runInNewContext(
+    `${background.slice(start, end)}\nthis.getMcpAttachmentMetadata = getMcpAttachmentMetadata;`,
+    worker,
+    { filename: 'background.js' },
+  );
+  const harness = smoke.buildClientHarness({
+    chrome,
+    bridgeUrl: `ws://127.0.0.1:${port}`,
+    reconnectBaseMs: 20,
+    reconnectMaxMs: 40,
+    globals: { getMcpAttachmentMetadata: worker.getMcpAttachmentMetadata },
+    dispatchMcpMessageRoute: async () => ({ success: true, from: label }),
+  });
+  // background.js does this once its dispatcher is loaded.
+  harness.exports.mcpBridgeClient.setInboundAuthorityReady(true);
+  harness.exports.mcpBridgeClient.connect();
+  return harness.exports.mcpBridgeClient;
+}
+
+async function runRealExtensionInTwoProfiles(WebSocketBridge) {
+  await withTempHome('bridge-real-extension-profiles', async () => {
+    const port = await getFreePort();
+    // The shipped default: the hub waits for each socket to name its install.
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'real-profiles-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: undefined,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const clients = [];
+    const work = { local: smoke.createStorageArea(), windows: [1] };
+    const home = { local: smoke.createStorageArea(), windows: [1, 2, 3] };
+    const installOf = async (profile) => (await profile.local.get('mcpInstallInstanceId')).mcpInstallInstanceId;
+    const keyOf = (installId) => `chrome-${installId.replace(/-/g, '').slice(0, 8)}`;
+    try {
+      await hub.connect();
+      const started = Date.now();
+      clients.push(startRealExtension(port, work, 'work'), startRealExtension(port, home, 'home'));
+      await waitFor(() => hub.topology.browsers.length === 2, 'the extension attaches from both profiles');
+      const elapsed = Date.now() - started;
+      assert(elapsed < 1000, `both are named by their own state frame, without waiting out the allowance for older builds (took ${elapsed}ms)`);
+
+      const workInstall = await installOf(work);
+      const homeInstall = await installOf(home);
+      assert(/^[0-9a-f-]{36}$/.test(workInstall) && workInstall !== homeInstall, 'each profile made its own install id and kept it in its own storage');
+      const workKey = keyOf(workInstall);
+      const homeKey = keyOf(homeInstall);
+      assertEqual(browserKeys(hub), [workKey, homeKey].sort().join(','), 'each profile is a browser named after its install id');
+      const entry = (key) => hub.topology.browsers.find((browser) => browser.key === key);
+      assertEqual(entry(homeKey).windows, 3, 'with the windows it reported');
+      assertEqual(entry(workKey).extensionVersion, '0.9.95', 'and its extension version');
+      assertEqual(entry(workKey).extensionId, 'abcdefghijklmnopabcdefghijklmnop', 'both under the one extension id');
+      assertEqual(hub.refusedBrowsers.length, 0, 'and neither was refused, as the second profile always was before');
+
+      const fromHome = await hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: homeKey });
+      assertEqual(fromHome.from, 'home', 'a call for one profile is answered by that profile\'s extension');
+      const fromWork = await hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: workKey });
+      assertEqual(fromWork.from, 'work', 'and a call for the other by the other');
+
+      // A service worker restart: the same storage, a new worker and socket.
+      clients[0].disconnect();
+      await waitFor(() => browserKeys(hub) === homeKey, 'one profile\'s worker goes away');
+      clients.push(startRealExtension(port, work, 'work-restarted'));
+      await waitFor(() => hub.topology.browsers.length === 2, 'and comes back');
+      assertEqual(await installOf(work), workInstall, 'a restarted worker reads the install id its profile already had');
+      assert(hub.isConnectedTo(workKey), 'so the profile returns under the same name');
+      const afterRestart = await hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: workKey });
+      assertEqual(afterRestart.from, 'work-restarted', 'and calls for it reach the new worker');
+    } finally {
+      for (const client of clients) {
+        try { client.disconnect(); } catch (_error) { /* already gone */ }
+      }
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runOneExtensionAtATime(WebSocketBridge, auth) {
+  await withTempHome('bridge-one-extension', async (home) => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'one-extension-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const otherOrigin = 'chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba';
+    const otherInstall = 'c0ffee00-1111-4000-8000-000000000001';
+    try {
+      await hub.connect();
+      const fsb = await attachProfile(port, INSTALL_A);
+      resources.sockets.push(fsb.socket);
+      await waitFor(() => browserKeys(hub) === KEY_A, 'the extension attaches');
+
+      // Any extension in the browser can open this socket and say it is an
+      // install. It must not be able to sit beside the real one and be handed
+      // the calls that name no browser.
+      const stranger = await attachProfile(port, otherInstall, { origin: otherOrigin, state: { focusedAt: Date.now() } });
+      resources.sockets.push(stranger.socket);
+      const close = await waitForSocketClose(stranger.socket);
+      assertEqual(close.code, 1008, 'a second extension id is turned away while the first is attached');
+      assertEqual(browserKeys(hub), KEY_A, 'and is not listed');
+      const refusal = hub.refusedBrowsers.find((entry) => entry.extensionId === 'ponmlkjihgfedcbaponmlkjihgfedcba');
+      assertEqual(refusal && refusal.reason, 'another_extension_attached', 'with the reason kept for status and list_browsers');
+      const unnamed = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
+      await waitFor(() => fsb.requests().length === 1, 'a call that names no browser still goes to the extension that was here');
+      fsb.answer(fsb.requests()[0].id, { success: true });
+      await unnamed;
+
+      const second = await attachProfile(port, INSTALL_B);
+      resources.sockets.push(second.socket);
+      await waitFor(() => browserKeys(hub) === `${KEY_A},${KEY_B}`, 'another profile of the same extension is still welcome');
+
+      const safari = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      resources.sockets.push(safari.socket);
+      safari.socket.send(installState('b3f6f5c2-9d0e-4f0b-8a53-0d3a2f1c9e77', {
+        extensionId: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)',
+      }));
+      await waitFor(() => hub.isConnectedTo('safari-b3f6f5c2'), 'and so is Safari, which is another kind');
+      const secondSafari = await attachBrowser(port, 'safari-web-extension://11111111-2222-4333-8444-555555555555');
+      resources.sockets.push(secondSafari.socket);
+      secondSafari.socket.send(installState('deadbeef-9d0e-4f0b-8a53-0d3a2f1c9e77', {
+        extensionId: 'com.example.other.Extension (UNSIGNED)',
+      }));
+      const safariClose = await waitForSocketClose(secondSafari.socket);
+      assertEqual(safariClose.code, 1008, 'a second Safari install cannot be told to be FSB, and is turned away');
+
+      fsb.socket.close();
+      second.socket.close();
+      await waitFor(() => browserKeys(hub) === 'safari-b3f6f5c2', 'the first extension leaves');
+      const later = await attachProfile(port, otherInstall, { origin: otherOrigin });
+      resources.sockets.push(later.socket);
+      await waitFor(() => hub.isConnectedTo('chrome-c0ffee00'), 'and only then can another extension id attach, as it always could');
+      assertEqual(hub.refusedBrowsers.some((entry) => entry.extensionId === 'ponmlkjihgfedcbaponmlkjihgfedcba'), false, 'which clears its refusal');
+
+      // Pairing still decides: a paired extension takes the bridge from an
+      // unpaired one with another id.
+      const authPath = auth.getBridgeAuthPath(home);
+      const pairingCode = auth.formatPairingCode(auth.rotateBridgeSessionSecret(authPath, 33_000));
+      const strangerClosed = waitForSocketClose(later.socket, 1500);
+      const paired = await attachProfile(port, INSTALL_A, { pairingCode });
+      resources.sockets.push(paired.socket);
+      assertEqual((await strangerClosed).code, 1008, 'a paired extension is not held out by an unpaired one with another id');
+      await waitFor(() => hub.isConnectedTo(KEY_A) && !hub.isConnectedTo('chrome-c0ffee00'), 'it attaches and the other is closed');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runBrowserKeysAreNeverReassigned(WebSocketBridge) {
+  await withTempHome('bridge-key-permanence', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'key-permanence-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const installOf = (index) => `${index.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
+    const keyOf = (index) => `chrome-${index.toString(16).padStart(8, '0')}`;
+    try {
+      await hub.connect();
+      // The hub names 256 installs in its life. Each comes and goes here.
+      for (let index = 0; index < 256; index += 1) {
+        const profile = await attachProfile(port, installOf(index));
+        await waitFor(() => hub.isConnectedTo(keyOf(index)), `install ${index} attaches`, 2000, 2);
+        profile.socket.close();
+        await waitFor(() => hub.topology.browsers.length === 0, `install ${index} leaves`, 2000, 2);
+      }
+      const late = await attachProfile(port, installOf(256));
+      resources.sockets.push(late.socket);
+      const close = await waitForSocketClose(late.socket);
+      assertEqual(close.code, 1008, 'past that, an install the hub has never seen is turned away');
+      const refusal = hub.refusedBrowsers.find((entry) => entry.reason === 'browser_key_unavailable');
+      assert(Boolean(refusal), 'with the reason kept');
+      const back = await attachProfile(port, installOf(0));
+      resources.sockets.push(back.socket);
+      await waitFor(() => hub.isConnectedTo(keyOf(0)), 'while the first install it named still gets its own key: no key was taken back to make room');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runHubExitPromotion(WebSocketBridge) {
   const resources = await createBridgePair(WebSocketBridge);
   try {
@@ -2530,6 +3774,7 @@ async function run() {
   await runCase('relay waits for extension reachability', () => runRelayWaitsForExtensionReachability(WebSocketBridge));
   await runCase('extension state broadcasts to relays', () => runExtensionStateBroadcastsToRelays(WebSocketBridge));
   await runCase('rejects untrusted browser relay origin', () => runRejectsUntrustedBrowserOrigin(WebSocketBridge));
+  await runCase('accepts safari extension origin', () => runAcceptsSafariExtensionOrigin(WebSocketBridge));
   await runCase('pre-handler Host and Origin upgrade gate', () => runPreHandlerUpgradeGate(WebSocketBridge, auth));
   await runCase('pairing authority matrix', () => runPairingAuthorityMatrix(WebSocketBridge, auth));
   await runCase('unprivileged sockets cannot displace the active extension', () => runUnprivilegedCannotDisplaceExtension(WebSocketBridge, auth));
@@ -2547,6 +3792,25 @@ async function run() {
   await runCase('hub keeps serving through an accept error', () => runHubSurvivesAcceptError(WebSocketBridge));
   await runCase('hub that loses its listener tears down and re-binds', () => runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule));
   await runCase('stdio server exits when the host closes stdin', () => runStdinShutdownHelper());
+  await runCase('two browsers share one hub', () => runTwoBrowsersShareTheHub(WebSocketBridge));
+  await runCase('a call that names an absent browser is refused', () => runNamedBrowserThatIsAbsent(WebSocketBridge));
+  await runCase('one browser closing leaves the other\'s calls alone', () => runOneBrowserClosingLeavesTheOther(WebSocketBridge));
+  await runCase('a reply from another browser is ignored', () => runReplyFromAnotherBrowserIsIgnored(WebSocketBridge));
+  await runCase('a relay that names no browser keeps the one it was given', () => runLegacyRelayKeepsItsBrowser(WebSocketBridge));
+  await runCase('pairing one browser closes the other', () => runPairingClosesTheOtherBrowser(WebSocketBridge, auth));
+  await runCase('safari identity and focus reports', () => runSafariIdentityAndFocus(WebSocketBridge));
+  await runCase('each browser has its own liveness reaper', () => runEachBrowserHasItsOwnReaper(WebSocketBridge));
+  await runCase('a promoted relay starts with no roster', () => runPromotedRelayStartsWithNoRoster(WebSocketBridge));
+  await runCase('two profiles of one extension share one hub', () => runTwoProfilesOfOneExtension(WebSocketBridge));
+  await runCase('a socket is a browser once it says which install it is', () => runInstallIdentification(WebSocketBridge));
+  await runCase('install keys stay apart', () => runInstallKeysStayApart(WebSocketBridge));
+  await runCase('a paired socket replaces only its own install', () => runPairedSocketReplacesItsOwnInstall(WebSocketBridge, auth));
+  await runCase('a reverse-channel request carries its browser', () => runExtRequestCarriesItsBrowser(WebSocketBridge, auth));
+  await runCase('the default browser survives a worker restart', () => runDefaultSurvivesAWorkerRestart(WebSocketBridge));
+  await runCase('the hub holds a bounded number of browsers', () => runBrowserLimit(WebSocketBridge));
+  await runCase('the real extension in two profiles', () => runRealExtensionInTwoProfiles(WebSocketBridge));
+  await runCase('one extension id at a time', () => runOneExtensionAtATime(WebSocketBridge, auth));
+  await runCase('a browser key is never given to another install', () => runBrowserKeysAreNeverReassigned(WebSocketBridge));
   await runCase('hub-exit-promotion', () => runHubExitPromotion(WebSocketBridge));
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

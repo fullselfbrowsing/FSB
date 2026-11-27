@@ -1,7 +1,7 @@
-<!-- generated 2026-11-15 by build-crawler-files.mjs; edit llms.source.md -->
+<!-- generated 2026-11-27 by build-crawler-files.mjs; edit llms.source.md -->
 # FSB (Full Self-Browsing)
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 60 browser actions, a 69-tool MCP surface, 130+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.95 (extension) with fsb-mcp-server 0.11.5 (npm).
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 60 browser actions, a 70-tool MCP surface, 130+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.95 (extension) with fsb-mcp-server 0.11.5 (npm).
 
 License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 
@@ -36,9 +36,9 @@ The About page embeds the public 33-second FSB trailer (uploaded September 6, 20
 ## Docs
 
 - [About](https://full-selfbrowsing.com/about): The official FSB trailer, an interactive knowledge graph of FSB's site intelligence, and a categorized library of the browser actions FSB exposes to agents.
-- [Agents](https://full-selfbrowsing.com/agents): How always-on agents (Grok Bot, Muse, Dots) and MCP hosts such as OpenClaw, Hermes, Claude Code, Codex, and Cursor drive the user's real Chrome through FSB, the FSB MCP power story (69 MCP tools, multi-agent identity, vault boundary, real Chrome session), the OpenClaw and Hermes skill, ClawHub one-click install (`https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`), a one-line `npx -y fsb-mcp-server@latest install` connect command, and grounded use cases. Autopilot (`run_task`) only fires on explicit user delegation; manual tool calls are default.
+- [Agents](https://full-selfbrowsing.com/agents): How always-on agents (Grok Bot, Muse, Dots) and MCP hosts such as OpenClaw, Hermes, Claude Code, Codex, and Cursor drive the user's real Chrome through FSB, the FSB MCP power story (70 MCP tools, multi-agent identity, vault boundary, real Chrome session), the OpenClaw and Hermes skill, ClawHub one-click install (`https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`), a one-line `npx -y fsb-mcp-server@latest install` connect command, and grounded use cases. Autopilot (`run_task`) only fires on explicit user delegation; manual tool calls are default.
 - [Support](https://full-selfbrowsing.com/support): Setup guides, MCP configuration, troubleshooting, and GitHub issues.
-- [Release notes](https://full-selfbrowsing.com/release-notes): Every FSB release illustrated, from 0.9.95 (an eight-language extension interface, a Russian site, Cline and Antigravity support, a parity-checked 69-tool MCP server, Grok Build checked by capability, a working drag_drop, and hung-page recovery on Chrome 156) and the 0.9.92 bridge recovery back to the first Chrome-extension prototype, with a sticky rail for switching between the sixteen published versions.
+- [Release notes](https://full-selfbrowsing.com/release-notes): Every FSB release illustrated, from 0.9.95 (an eight-language extension interface, a Russian site, Cline and Antigravity support, a parity-checked 70-tool MCP server, Grok Build checked by capability, a working drag_drop, and hung-page recovery on Chrome 156) and the 0.9.92 bridge recovery back to the first Chrome-extension prototype, with a sticky rail for switching between the sixteen published versions.
 - [Privacy](https://full-selfbrowsing.com/privacy): How FSB handles your data -- API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry for aggregate public stats only, automation runs locally in your browser.
 - [Lattice](https://full-selfbrowsing.com/lattice): Capability runtime SDK for multimodal AI applications -- typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.
 - [Concierge](https://full-selfbrowsing.com/concierge): Safe action layer for agent-ready web applications -- typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.
@@ -68,54 +68,54 @@ More demos on the YouTube channel:
 
 - [Full Self-Browsing | 92.3% on Online-Mind2Web | AI Browser Automation & MCP](https://full-selfbrowsing.com): FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Open-source Chrome automation that reads the actual DOM instead of relying on vision, calls APIs when it can, and connects AI agents through MCP.
 - [About FSB | Demo, Built-in Memory & Action Library](https://full-selfbrowsing.com/about): Watch the 33-second FSB demo, explore built-in memory for 130 sites, and discover 60 browser actions available to AI agents through MCP.
-- [FSB for AI Agents | MCP Browser Automation](https://full-selfbrowsing.com/agents): Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.
+- [FSB for AI Agents | MCP Browser Automation](https://full-selfbrowsing.com/agents): Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 70 MCP tools, one-line install, verified with doctor.
 - [FSB Support | Installation & MCP Setup](https://full-selfbrowsing.com/support): Find FSB installation steps, Chrome requirements, model costs, privacy answers, MCP setup, and troubleshooting for browser automation.
 
 ### es
 
 - [Full Self-Browsing | 92,3 % en Online-Mind2Web | Automatización del navegador con IA y MCP](https://full-selfbrowsing.com/es): FSB en Online-Mind2Web: resultado revisado por IA (277/300), 92,3 %. Automatización de Chrome de código abierto que lee el DOM real en lugar de depender de la visión, llama a las API cuando puede y conecta agentes de IA mediante MCP.
 - [Acerca de FSB | Demostración, memoria integrada y biblioteca de acciones](https://full-selfbrowsing.com/es/about): Mira la demostración de FSB de 33 segundos, explora la memoria integrada para 130 sitios y descubre 60 acciones del navegador disponibles para agentes de IA mediante MCP.
-- [FSB para agentes de IA | Automatización del navegador con MCP](https://full-selfbrowsing.com/es/agents): Dale a Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex o Cursor un navegador real: el Chrome donde ya has iniciado sesión, 69 herramientas MCP, instalación en una línea y verificación con doctor.
+- [FSB para agentes de IA | Automatización del navegador con MCP](https://full-selfbrowsing.com/es/agents): Dale a Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex o Cursor un navegador real: el Chrome donde ya has iniciado sesión, 70 herramientas MCP, instalación en una línea y verificación con doctor.
 - [Soporte de FSB | Instalación y configuración de MCP](https://full-selfbrowsing.com/es/support): Consulta los pasos de instalación de FSB, los requisitos de Chrome, los costes de los modelos, respuestas sobre privacidad, la configuración de MCP y la solución de problemas de automatización del navegador.
 
 ### de
 
 - [Full Self-Browsing | 92,3 % auf Online-Mind2Web | Browserautomatisierung mit KI und MCP](https://full-selfbrowsing.com/de): FSB auf Online-Mind2Web: KI-geprüftes Ergebnis (277/300), 92,3 %. Quelloffene Chrome-Automatisierung, die das echte DOM liest, statt sich auf Vision zu verlassen, APIs aufruft, wenn sie kann, und KI-Agenten über MCP verbindet.
 - [Über FSB | Demo, integriertes Gedächtnis und Aktionsbibliothek](https://full-selfbrowsing.com/de/about): Sehen Sie die 33 Sekunden lange FSB-Demo, erkunden Sie den integrierten Speicher für 130 Websites und entdecken Sie 60 Browseraktionen für KI-Agenten über MCP.
-- [FSB für KI-Agenten | Browserautomatisierung mit MCP](https://full-selfbrowsing.com/de/agents): Geben Sie Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex oder Cursor einen echten Browser: Ihren bereits angemeldeten Chrome, 69 MCP-Tools, Installation in einer Zeile, geprüft mit doctor.
+- [FSB für KI-Agenten | Browserautomatisierung mit MCP](https://full-selfbrowsing.com/de/agents): Geben Sie Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex oder Cursor einen echten Browser: Ihren bereits angemeldeten Chrome, 70 MCP-Tools, Installation in einer Zeile, geprüft mit doctor.
 - [FSB-Support | Installation und MCP-Einrichtung](https://full-selfbrowsing.com/de/support): Hier finden Sie FSB-Installationsschritte, Chrome-Anforderungen, Modellkosten, Antworten zum Datenschutz, die MCP-Einrichtung und Hilfe bei Problemen mit der Browserautomatisierung.
 
 ### ru
 
 - [Full Self-Browsing | 92,3% в Online-Mind2Web | Автоматизация браузера на базе AI и MCP](https://full-selfbrowsing.com/ru): FSB в Online-Mind2Web: результат по оценке AI (277/300), 92,3%. Автоматизация Chrome с открытым исходным кодом: читает настоящий DOM, а не полагается на компьютерное зрение, вызывает API, когда можно, и подключает AI-агентов через MCP.
 - [Об FSB | Демо, встроенная память и библиотека действий](https://full-selfbrowsing.com/ru/about): Посмотрите 33-секундное демо FSB, изучите встроенную память о 130 сайтах и откройте для себя 60 действий в браузере, доступных AI-агентам через MCP.
-- [FSB для AI-агентов | Автоматизация браузера через MCP](https://full-selfbrowsing.com/ru/agents): Дайте Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex или Cursor настоящий браузер: Chrome, в котором вы уже вошли в аккаунты, 69 MCP-инструментов, установка одной строкой и проверка командой doctor.
+- [FSB для AI-агентов | Автоматизация браузера через MCP](https://full-selfbrowsing.com/ru/agents): Дайте Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex или Cursor настоящий браузер: Chrome, в котором вы уже вошли в аккаунты, 70 MCP-инструментов, установка одной строкой и проверка командой doctor.
 - [Поддержка FSB | Установка и настройка MCP](https://full-selfbrowsing.com/ru/support): Инструкции по установке FSB, требования к Chrome, стоимость моделей, ответы на вопросы о конфиденциальности, настройка MCP и решение проблем с автоматизацией браузера.
 
 ### ja
 
 - [Full Self-Browsing | Online-Mind2Web で 92.3% | AI ブラウザー自動化と MCP](https://full-selfbrowsing.com/ja): Online-Mind2Web での FSB: AI によるレビュー結果（277/300）、92.3%。ビジョンに頼らず実際の DOM を読み取り、可能なときは API を呼び出し、MCP で AI エージェントを接続する、オープンソースの Chrome 自動化。
 - [FSB について | デモ、組み込みメモリ、アクションライブラリ](https://full-selfbrowsing.com/ja/about): 33 秒の FSB デモを視聴し、130 サイト向けの内蔵メモリーと、MCP を通じて AI エージェントが利用できる 60 のブラウザー操作をご覧ください。
-- [AI エージェント向け FSB | MCP ブラウザー自動化](https://full-selfbrowsing.com/ja/agents): Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex、Cursor に本物のブラウザーを。ログイン済みの Chrome、69 個の MCP ツール、1 行でインストール、doctor で検証。
+- [AI エージェント向け FSB | MCP ブラウザー自動化](https://full-selfbrowsing.com/ja/agents): Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex、Cursor に本物のブラウザーを。ログイン済みの Chrome、70 個の MCP ツール、1 行でインストール、doctor で検証。
 - [FSB サポート | インストールと MCP 設定](https://full-selfbrowsing.com/ja/support): FSB のインストール手順、Chrome の要件、モデルの料金、プライバシーに関する回答、MCP 設定、ブラウザー自動化のトラブルシューティングをご覧ください。
 
 ### ko
 
 - [Full Self-Browsing | Online-Mind2Web 92.3% | AI 브라우저 자동화 및 MCP](https://full-selfbrowsing.com/ko): Online-Mind2Web의 FSB: AI 검토 결과(277/300), 92.3%. 비전에 의존하지 않고 실제 DOM을 읽고, 가능하면 API를 호출하며, MCP로 AI 에이전트를 연결하는 오픈 소스 Chrome 자동화.
 - [FSB 소개 | 데모, 내장 메모리, 동작 라이브러리](https://full-selfbrowsing.com/ko/about): 33초 FSB 데모를 보고, 130개 사이트를 위한 내장 메모리와 MCP를 통해 AI 에이전트가 사용할 수 있는 60가지 브라우저 작업을 살펴보세요.
-- [AI 에이전트용 FSB | MCP 브라우저 자동화](https://full-selfbrowsing.com/ko/agents): Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, Cursor에 진짜 브라우저를 제공하세요. 이미 로그인한 Chrome, MCP 도구 69개, 한 줄 설치, doctor로 확인.
+- [AI 에이전트용 FSB | MCP 브라우저 자동화](https://full-selfbrowsing.com/ko/agents): Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, Cursor에 진짜 브라우저를 제공하세요. 이미 로그인한 Chrome, MCP 도구 70개, 한 줄 설치, doctor로 확인.
 - [FSB 지원 | 설치 및 MCP 설정](https://full-selfbrowsing.com/ko/support): FSB 설치 단계, Chrome 요구 사항, 모델 비용, 개인정보 보호 답변, MCP 설정 및 브라우저 자동화 문제 해결 방법을 확인하세요.
 
 ### zh-CN
 
 - [Full Self-Browsing | Online-Mind2Web 92.3% | AI 浏览器自动化与 MCP](https://full-selfbrowsing.com/zh-CN): FSB 在 Online-Mind2Web 上：AI 审核结果（277/300），92.3%。开源的 Chrome 自动化：读取真实的 DOM 而不依靠视觉，能调用 API 时就调用 API，并通过 MCP 连接 AI 智能体。
 - [关于 FSB | 演示、内置内存和动作库](https://full-selfbrowsing.com/zh-CN/about): 观看 33 秒的 FSB 演示，了解适用于 130 个网站的内置记忆，以及 AI 智能体可通过 MCP 使用的 60 种浏览器操作。
-- [面向 AI 智能体的 FSB | MCP 浏览器自动化](https://full-selfbrowsing.com/zh-CN/agents): 为 Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex 或 Cursor 提供真实的浏览器：已登录的 Chrome、69 个 MCP 工具、一行命令安装，并使用 doctor 验证。
+- [面向 AI 智能体的 FSB | MCP 浏览器自动化](https://full-selfbrowsing.com/zh-CN/agents): 为 Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex 或 Cursor 提供真实的浏览器：已登录的 Chrome、70 个 MCP 工具、一行命令安装，并使用 doctor 验证。
 - [FSB 支持 | 安装与 MCP 配置](https://full-selfbrowsing.com/zh-CN/support): 查看 FSB 安装步骤、Chrome 要求、模型费用、隐私问题解答、MCP 配置，以及浏览器自动化故障排查方法。
 
 ### zh-TW
 
 - [Full Self-Browsing | Online-Mind2Web 92.3% | AI 瀏覽器自動化與 MCP](https://full-selfbrowsing.com/zh-TW): FSB 在 Online-Mind2Web 上：AI 審核結果（277/300），92.3%。開源的 Chrome 自動化：讀取真實的 DOM 而不依靠視覺，能呼叫 API 時就直接呼叫，並透過 MCP 連接 AI 代理程式。
 - [關於 FSB | 示範、內建記憶與動作庫](https://full-selfbrowsing.com/zh-TW/about): 觀看 33 秒的 FSB 示範，了解適用於 130 個網站的內建記憶，以及 AI 代理程式可透過 MCP 使用的 60 種瀏覽器操作。
-- [適用於 AI 代理程式的 FSB | MCP 瀏覽器自動化](https://full-selfbrowsing.com/zh-TW/agents): 讓 Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex 或 Cursor 擁有真實的瀏覽器：已登入的 Chrome、69 個 MCP 工具、一行指令安裝，並使用 doctor 驗證。
+- [適用於 AI 代理程式的 FSB | MCP 瀏覽器自動化](https://full-selfbrowsing.com/zh-TW/agents): 讓 Grok Bot、Muse、Dots、OpenClaw、Hermes、Claude Code、Codex 或 Cursor 擁有真實的瀏覽器：已登入的 Chrome、70 個 MCP 工具、一行指令安裝，並使用 doctor 驗證。
 - [FSB 支援 | 安裝與 MCP 設定](https://full-selfbrowsing.com/zh-TW/support): 查看 FSB 安裝步驟、Chrome 要求、模型費用、隱私問題解答、MCP 設定，以及瀏覽器自動化疑難排解方法。
