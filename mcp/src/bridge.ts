@@ -1224,6 +1224,19 @@ export class WebSocketBridge {
     this.pendingExtensions.delete(ws);
     if (ws.readyState !== WebSocket.OPEN) return;
 
+    // The pin is checked when a socket upgrades, but one that upgraded before
+    // the pin was bound can still be saying which install it is when a paired
+    // browser attaches and closes what lies outside the pin. It is held to the
+    // pin here, when it would become a browser, so the outcome is the same
+    // whichever of them came first.
+    const pinnedOrigin = readBridgeAuthState()?.allowedExtensionOrigin ?? null;
+    if (pinnedOrigin !== null && pinnedOrigin !== origin) {
+      this._refuseExtension(ws, origin, 'extension_origin_pin_mismatch', 'Bridge pairing is bound to another browser');
+      // Relays learn why at once, as they do for a refused upgrade.
+      this._broadcastRelayState();
+      return;
+    }
+
     const kind = browserKindOf(origin);
     const installId = compactInstallId(report?.attachment.installInstanceId);
     const identity = this._identityOf(kind, origin, installId);
@@ -1368,6 +1381,8 @@ export class WebSocketBridge {
    * A paired browser owns the bridge: once its origin is pinned, the upgrade
    * gate refuses every other origin. A browser that attached before the pin
    * was bound is closed here, so the outcome is the same whoever came first.
+   * One still saying which install it is is held to the pin in
+   * _attachExtension, when it would become a browser.
    */
   private _closeSlotsOutsidePin(paired: ExtensionSlot): void {
     const pinnedOrigin = this.acceptedSocketMetadata.get(paired.socket)?.browserOrigin ?? null;

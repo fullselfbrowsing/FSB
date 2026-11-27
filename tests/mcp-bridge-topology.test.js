@@ -3005,6 +3005,68 @@ async function runPairingClosesTheOtherBrowser(WebSocketBridge, auth) {
   });
 }
 
+// A second Safari, as another launch or another extension would connect.
+const WAITING_SAFARI_ORIGIN = 'safari-web-extension://9F1E2D3C-4B5A-4697-8877-665544332211';
+
+// A socket that upgraded before anything was pinned can still be saying which
+// install it is when another browser pairs. Pairing closes the browsers that
+// are attached, and a socket that is still waiting is held to the pin when it
+// would become one, whether it then speaks or stays silent like an older build.
+async function runPairingTurnsAwayAWaitingBrowser(WebSocketBridge, auth) {
+  await withTempHome('bridge-pair-waiting', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    const pairingCode = auth.formatPairingCode(auth.rotateBridgeSessionSecret(authPath, 30_000));
+    const options = { port, host: '127.0.0.1', handshakeTimeoutMs: 100, extensionIdentifyTimeoutMs: 1000 };
+    const hub = new WebSocketBridge({ ...options, instanceId: 'pair-waiting-hub' });
+    const relay = new WebSocketBridge({ ...options, instanceId: 'pair-waiting-relay' });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    try {
+      await hub.connect();
+      await relay.connect();
+      const speaking = await attachBrowser(port, MULTI_SAFARI_ORIGIN);
+      const silent = await attachBrowser(port, WAITING_SAFARI_ORIGIN);
+      resources.sockets.push(speaking.socket, silent.socket);
+      await sleep(30);
+      assertEqual(browserKeys(hub), '', 'neither safari has said which install it is, so neither is listed');
+
+      const chrome = await attachProfile(port, INSTALL_A, { pairingCode });
+      resources.sockets.push(chrome.socket);
+      await waitFor(() => browserKeys(hub) === KEY_A, 'the paired chrome attaches while both are still waiting');
+      assertEqual(
+        auth.readBridgeAuthState(authPath).allowedExtensionOrigin,
+        PROFILE_ORIGIN,
+        'and binds the pin',
+      );
+
+      const speakingClosed = waitForSocketClose(speaking.socket, 1500);
+      speakingClosed.catch(() => {});
+      const silentClosed = waitForSocketClose(silent.socket, 2500);
+      silentClosed.catch(() => {});
+      speaking.socket.send(JSON.stringify({
+        type: 'mcp:extension-state',
+        extensionId: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)',
+        extensionVersion: '0.9.95',
+        installInstanceId: 'b3f6f5c2-9d0e-4f0b-8a53-0d3a2f1c9e77',
+        normalWindowCount: 1,
+        connectedAt: null,
+      }));
+      assertEqual((await speakingClosed).code, 1008, 'a safari that says which install it is once the pin is bound is turned away');
+      assertEqual((await silentClosed).code, 1008, 'and so is one that never says, once its wait is over');
+      assertEqual(browserKeys(hub), KEY_A, 'only the paired browser is attached');
+      const refusal = hub.refusedBrowsers.find((entry) => entry.kind === 'safari');
+      assertEqual(refusal && refusal.reason, 'extension_origin_pin_mismatch', 'with the pin as the reason');
+      await waitFor(
+        () => relay.topology.refusedBrowsers.some((entry) => entry.kind === 'safari'
+          && entry.reason === 'extension_origin_pin_mismatch'),
+        'and its relays are told',
+      );
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runSafariIdentityAndFocus(WebSocketBridge) {
   await withTempHome('bridge-safari-identity', async () => {
     const port = await getFreePort();
@@ -3901,6 +3963,7 @@ async function run() {
   await runCase('a relay that names no browser keeps the one it was given', () => runLegacyRelayKeepsItsBrowser(WebSocketBridge));
   await runCase('a relay that names no browser stays when the default moves', () => runLegacyRelayStaysWhenTheDefaultMoves(WebSocketBridge));
   await runCase('pairing one browser closes the other', () => runPairingClosesTheOtherBrowser(WebSocketBridge, auth));
+  await runCase('a browser still saying who it is when pairing binds is turned away', () => runPairingTurnsAwayAWaitingBrowser(WebSocketBridge, auth));
   await runCase('safari identity and focus reports', () => runSafariIdentityAndFocus(WebSocketBridge));
   await runCase('each browser has its own liveness reaper', () => runEachBrowserHasItsOwnReaper(WebSocketBridge));
   await runCase('a promoted relay starts with no roster', () => runPromotedRelayStartsWithNoRoster(WebSocketBridge));
