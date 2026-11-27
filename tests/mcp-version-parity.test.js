@@ -51,6 +51,8 @@ const phase63ExtensionPermissions = [
   'offscreen', 'nativeMessaging', 'system.memory',
 ];
 const phase63ExactProductionDependencies = Object.freeze({
+  // 1Password SDK: the FSB server's credential broker (mcp/src/onepassword).
+  '@1password/sdk': '0.5.0',
   '@modelcontextprotocol/sdk': '1.29.0',
   'smol-toml': '1.6.1',
   'strip-json-comments': '5.0.3',
@@ -59,6 +61,7 @@ const phase63ExactProductionDependencies = Object.freeze({
   zod: '3.25.76',
 });
 const phase63BundleDependencies = Object.freeze([
+  '@1password/sdk',
   '@modelcontextprotocol/sdk',
   'smol-toml',
   'strip-json-comments',

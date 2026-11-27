@@ -4753,5 +4753,803 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB는 1Password의 로그인 정보로 로그인합니다. FSB 자체는 비밀번호를 저장하지 않습니다."
+  },
+  "panel_8b70975df7": {
+    "message": "사용하면 FSB가 로그인 페이지를 감지하고 일치하는 1Password 로그인 정보로 로그인합니다."
+  },
+  "panel_818962bda5": {
+    "message": "1Password 연결을 확인하는 중..."
+  },
+  "panel_5c0a336c67": {
+    "message": "FSB가 읽을 수 있는 보관함을 선택하세요. FSB 전용 보관함이 가장 안전합니다."
+  },
+  "panel_161c79f605": {
+    "message": "새 로그인 정보 저장 위치"
+  },
+  "panel_cc6d7a8340": {
+    "message": "저장 안 함"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "보관함 접근 저장"
+  },
+  "panel_5ab21b8830": {
+    "message": "이전 FSB 보관함을 1Password로 옮기기"
+  },
+  "panel_911c744cd5": {
+    "message": "이전 FSB 보관함의 PIN을 입력하세요. 1Password로 옮긴 항목은 FSB에서 지워집니다."
+  },
+  "panel_3f6118f701": {
+    "message": "1Password로 옮기기"
+  },
+  "panel_0f5320398c": {
+    "message": "이전 보관함 삭제"
+  },
+  "panel_00f3328a04": {
+    "message": "FSB가 사용할 수 있는 보관함에 로그인 정보가 없습니다. 로그인 정보는 1Password에서 추가하거나 편집하세요."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB는 입력할 때마다 승인을 받은 뒤 1Password의 신용카드로 결제 양식을 채웁니다."
+  },
+  "panel_4875f94fbf": {
+    "message": "카드를 사용하려면 비밀번호에서 1Password를 연결하세요."
+  },
+  "panel_b9675cca57": {
+    "message": "FSB가 사용할 수 있는 보관함에 신용카드가 없습니다. 카드는 1Password에서 추가하거나 편집하세요."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password가 데스크톱 앱으로 연결되었습니다 ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password가 서비스 계정으로 연결되었습니다."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password가 연결되지 않았습니다."
+  },
+  "panel_5848961ce6": {
+    "message": "설정을 마치려면 FSB가 사용할 수 있는 보관함을 선택하세요."
+  },
+  "panel_216dcfd214": {
+    "message": "1Password 계정 이름을 입력하세요"
+  },
+  "panel_a94d6f85db": {
+    "message": "연결하는 중... 요청이 표시되면 1Password 앱에서 FSB를 승인하세요."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password가 연결되었습니다"
+  },
+  "panel_e520e3cf11": {
+    "message": "보관함을 하나 이상 선택하세요"
+  },
+  "panel_cc541e4c1e": {
+    "message": "보관함 접근이 저장되었습니다"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password 연결이 해제되었습니다"
+  },
+  "panel_e95f94cbda": {
+    "message": "이전 FSB 보관함에 FSB가 더 이상 사용하지 않는 항목이 남아 있습니다. 로그인: $LOGINS$. 카드: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "1Password로 옮겼습니다. 로그인: $LOGINS$. 카드: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "옮기지 못해 FSB에 남긴 항목: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "이전 FSB 보관함을 삭제할까요? 1Password로 옮기지 않은 항목은 모두 사라집니다."
+  },
+  "panel_ed17465290": {
+    "message": "이전 보관함이 삭제되었습니다"
+  },
+  "panel_3d763a56b2": {
+    "message": "항목: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "옮기는 중..."
+  },
+  "panel_498fd066bf": {
+    "message": "1Password에 연결할 수 없습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "로그인하려면 자격 증명을 입력하세요. FSB가 다음을 위해 1Password에 저장할 수 있습니다."
+  },
+  "copy_751ac3de88": {
+    "message": "로그인하려면 자격 증명을 입력하세요. FSB는 한 번만 사용하고 저장하지 않습니다."
+  },
+  "copy_264681c742": {
+    "message": "1Password에 저장"
+  },
+  "entry_vault_checking": {
+    "message": "1Password 확인 중"
+  },
+  "entry_vault_signing_1p": {
+    "message": "1Password로 로그인 중"
+  },
+  "entry_vault_filled_1p": {
+    "message": "1Password에서 입력함"
+  },
+  "entry_vault_signing_typed": {
+    "message": "로그인 중"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "직접 입력함 · $CLIENT$에 보내지 않음",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "직접 입력함 · 에이전트에 보내지 않음"
+  },
+  "entry_vault_filled_saved": {
+    "message": "입력함 · 1Password에 저장됨"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "입력함 · 저장 안 함"
+  },
+  "entry_vault_cancelled": {
+    "message": "취소됨 · 아무것도 입력하지 않음"
+  },
+  "entry_vault_page_changed": {
+    "message": "페이지가 바뀜 · 아무것도 입력하지 않음"
+  },
+  "entry_vault_several": {
+    "message": "로그인 정보 $COUNT$개가 일치 · $CLIENT$에서 물어봅니다",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "로그인 정보 $COUNT$개가 일치 · 에이전트가 물어봅니다",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "사용자 이름"
+  },
+  "entry_vault_chip_password": {
+    "message": "비밀번호"
+  },
+  "entry_vault_chip_code": {
+    "message": "코드"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "로그인"
+  },
+  "entry_vault_sheet_user": {
+    "message": "이메일 또는 사용자 이름"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "비밀번호 숨기기"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "저장 안 함 · 새 로그인 정보용 보관함이 설정되지 않음"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "일시 중지됨"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· 클릭해서 계속 입력"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "페이지에 일부가 가려짐"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "대신 1Password 사용"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "1Password에 추가"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "1Password에 이 사이트의 로그인 정보를 저장한 다음 계속하세요."
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "대신 여기에 입력"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "이 사이트에는 아직 저장된 항목이 없습니다."
+  },
+  "entry_vault_approve": {
+    "message": "1Password에서 FSB 허용"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "사용자를 기다리는 중"
+  },
+  "entry_vault_entering_code": {
+    "message": "코드 입력 중"
+  },
+  "entry_vault_one_time_code": {
+    "message": "일회용 코드"
+  },
+  "entry_vault_not_https": {
+    "message": "입력 안 함 · 페이지가 https가 아님"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "입력 안 함 · 카드는 https 필요"
+  },
+  "entry_vault_locked": {
+    "message": "1Password가 잠겨 있음"
+  },
+  "entry_vault_unlock": {
+    "message": "잠금을 해제하고 계속"
+  },
+  "entry_vault_unreachable": {
+    "message": "1Password에 연결할 수 없음"
+  },
+  "entry_vault_filling_card": {
+    "message": "카드 입력 중"
+  },
+  "entry_vault_card_filled": {
+    "message": "카드 입력됨 · 확인 후 결제"
+  },
+  "entry_vault_chip_number": {
+    "message": "번호"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "만료일"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "보안 코드"
+  },
+  "entry_vault_chip_name": {
+    "message": "이름"
+  },
+  "copy_e86c3bc142": {
+    "message": "어떤 계정인가요?"
+  },
+  "copy_02451a3272": {
+    "message": "$NAME$(으)로 로그인",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "대신 직접 입력"
+  },
+  "copy_bfd402b2f6": {
+    "message": "로그인"
+  },
+  "copy_2a347f1933": {
+    "message": "이메일 또는 사용자 이름"
+  },
+  "copy_50eb1b1291": {
+    "message": "1Password로 로그인함"
+  },
+  "copy_edfed2d184": {
+    "message": "$DOMAIN$에 로그인함",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "1Password에 저장됨"
+  },
+  "copy_22b3467c1b": {
+    "message": "저장 안 함"
+  },
+  "copy_8a56b97150": {
+    "message": "로그인을 건너뜀"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB는 로그인 없이 계속합니다."
+  },
+  "copy_735479c991": {
+    "message": "$DOMAIN$에 카드 입력함",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$. 확인 후 결제하세요.",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "카드 입력을 거절함"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "1Password에서 아무것도 읽지 않았습니다."
+  },
+  "copy_db8bc38f4b": {
+    "message": "카드 입력 시간이 초과됨"
+  },
+  "copy_58723d2bab": {
+    "message": "카드를 입력할까요?"
+  },
+  "copy_a2d285b352": {
+    "message": "거절"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "카드 입력"
+  },
+  "copy_2a48c44dfa": {
+    "message": "$DOMAIN$에 입력하지 않음",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "페이지가 https가 아닙니다."
+  },
+  "copy_5decaf89b7": {
+    "message": "페이지가 바뀌어 아무것도 입력하지 않음"
+  },
+  "copy_b41f042ed0": {
+    "message": "탭이 다른 사이트로 이동했습니다."
+  },
+  "copy_99955bb437": {
+    "message": "1Password가 연결되지 않음"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB가 아직 로그인하거나 카드를 입력할 수 없습니다."
+  },
+  "copy_5cbafe67aa": {
+    "message": "보관함 설정 열기"
+  },
+  "copy_270e420dd3": {
+    "message": "이 페이지"
+  },
+  "panel_5d55c415e3": {
+    "message": "보관함"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB는 1Password의 항목으로 로그인하고 결제 양식을 채웁니다. FSB는 비밀번호나 카드를 저장하지 않습니다."
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB는 1Password의 카드로 결제 양식을 채웁니다."
+  },
+  "panel_caf0111717": {
+    "message": "로컬 서버"
+  },
+  "panel_101f4d9537": {
+    "message": "이 브라우저"
+  },
+  "panel_87bdac40eb": {
+    "message": "FSB 확장 프로그램"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "접근"
+  },
+  "panel_22894e363f": {
+    "message": "FSB가 읽을 수 있는 보관함"
+  },
+  "panel_5e05243ee1": {
+    "message": "FSB 전용 보관함이 가장 안전합니다."
+  },
+  "panel_07ce99bab0": {
+    "message": "로그인 규칙"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "각 1Password 항목에서 가져옴"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "로그인 정보에 저장된 사이트에서만."
+  },
+  "panel_374082363f": {
+    "message": "https에서 http로는 절대 입력하지 않습니다."
+  },
+  "panel_059151ea45": {
+    "message": "카드 입력"
+  },
+  "panel_42e70101ec": {
+    "message": "에이전트가 먼저 물어봅니다"
+  },
+  "panel_949603eecc": {
+    "message": "MCP에서는 에이전트 앱에서, 오토파일럿에서는 사이드 패널에서 확인합니다."
+  },
+  "panel_33e5a068d8": {
+    "message": "https 페이지에서만."
+  },
+  "panel_e8cb2edbc4": {
+    "message": "에이전트가 보는 정보"
+  },
+  "panel_107fa062ba": {
+    "message": "MCP와 오토파일럿에서"
+  },
+  "panel_c53616b513": {
+    "message": "제목, 사용자 이름, 사이트, 끝 네 자리."
+  },
+  "panel_ed87d52230": {
+    "message": "비밀번호, 코드, 카드 번호는 절대 보지 못합니다."
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "항목"
+  },
+  "panel_f5b53d4968": {
+    "message": "연결한 후"
+  },
+  "panel_543eb6e59b": {
+    "message": "로그인"
+  },
+  "panel_a52fcbbc33": {
+    "message": "카드"
+  },
+  "panel_3304ef1777": {
+    "message": "제목, 사용자 이름, 사이트 검색"
+  },
+  "panel_5a80aae52c": {
+    "message": "읽기 전용입니다. 로그인 정보는 1Password에서 편집하세요."
+  },
+  "panel_547ca35987": {
+    "message": "입력할 때만 탭의 사이트에 맞춰 1Password에서 읽습니다."
+  },
+  "panel_2fdf0b746a": {
+    "message": "보관함을 하나 이상 선택하면 여기에 로그인 정보와 카드가 표시됩니다."
+  },
+  "panel_10c5739b95": {
+    "message": "승인 대기 중"
+  },
+  "panel_a424e33d90": {
+    "message": "잠김"
+  },
+  "panel_5ad99230df": {
+    "message": "연결할 수 없음"
+  },
+  "panel_dce083a2c4": {
+    "message": "거절됨"
+  },
+  "panel_67a926f700": {
+    "message": "찾을 수 없음"
+  },
+  "panel_1d09faf925": {
+    "message": "업데이트 필요"
+  },
+  "panel_53f15ea2f2": {
+    "message": "페어링 안 됨"
+  },
+  "panel_a06130a5a2": {
+    "message": "요청 한도 초과"
+  },
+  "panel_9f760ab207": {
+    "message": "사용자 대기 중"
+  },
+  "panel_8985693566": {
+    "message": "아직 연결되지 않음"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "$ACCOUNT$에 연결 중",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "서비스 계정으로 연결됨"
+  },
+  "panel_4435385a73": {
+    "message": "FSB 로컬 서버가 실행되고 있지 않음"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "1Password 앱을 찾을 수 없음"
+  },
+  "panel_9d094cbe0c": {
+    "message": "로컬 서버를 업데이트하세요"
+  },
+  "panel_b0545ee348": {
+    "message": "다시 페어링"
+  },
+  "panel_a904382fc7": {
+    "message": "잠시 기다리세요"
+  },
+  "panel_12e12023d2": {
+    "message": "1Password에 연결하지 못함"
+  },
+  "panel_a5ae6c601d": {
+    "message": "1Password 앱에서 FSB를 허용하세요."
+  },
+  "panel_f83ab4c57f": {
+    "message": "FSB가 읽을 수 있는 보관함을 선택하세요."
+  },
+  "panel_b33cf191b9": {
+    "message": "터미널에서 설정했습니다. 연결을 끊으면 저장된 토큰이 삭제되므로 먼저 확인합니다."
+  },
+  "panel_8ba387915f": {
+    "message": "계속하려면 1Password 잠금을 해제하세요. 설정은 유지됩니다."
+  },
+  "panel_041a40019f": {
+    "message": "FSB 로컬 서버를 설치한 다음 다시 시도하세요."
+  },
+  "panel_40647b20fa": {
+    "message": "허용하기 전까지 FSB는 아무것도 읽을 수 없습니다. 다시 시도한 다음 1Password에서 FSB를 허용하세요."
+  },
+  "panel_0233589be3": {
+    "message": "이 fsb-mcp-server는 1Password를 쓰기에 너무 오래되었거나 SDK를 불러올 수 없습니다."
+  },
+  "panel_01ddad80a6": {
+    "message": "서버는 실행 중이지만 더 이상 이 브라우저를 신뢰하지 않습니다. 다시 페어링하면 해결됩니다."
+  },
+  "panel_1c3eb3d073": {
+    "message": "짧은 시간에 요청이 너무 많았습니다. 계정에는 문제가 없습니다. 1분 후에 다시 시도하세요."
+  },
+  "panel_89857dc659": {
+    "message": "1Password가 FSB 사용을 허용할지 묻고 있습니다. FSB는 최대 75초 동안 기다립니다."
+  },
+  "panel_979a9a05cd": {
+    "message": "데스크톱 앱"
+  },
+  "panel_69ce0728e7": {
+    "message": "확인 요청 중"
+  },
+  "panel_14493f5f54": {
+    "message": "잠김"
+  },
+  "panel_d7da083898": {
+    "message": "서비스 계정"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password, FSB 로컬 서버, 이 브라우저 순서"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password, 로컬 서버(이 브라우저에서 연결할 수 없음)"
+  },
+  "panel_845f928640": {
+    "message": "개인"
+  },
+  "panel_535c99f759": {
+    "message": "FSB 전용"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "공유"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "개인 보관함입니다. 항목 $COUNT$개 모두 에이전트가 사용할 수 있게 됩니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "다른 사람과 공유된 보관함입니다. 항목 $COUNT$개 모두 에이전트가 사용할 수 있게 됩니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "이 보관함의 항목 $COUNT$개 모두 에이전트가 사용할 수 있게 됩니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "사이트 전체"
+  },
+  "panel_b20197643c": {
+    "message": "정확한 도메인"
+  },
+  "panel_8b8c047cc1": {
+    "message": "이 사이트에 $COUNT$개",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "일회용 코드"
+  },
+  "panel_c68b5649c4": {
+    "message": "청구지 주소 있음"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "청구지 주소 없음"
+  },
+  "panel_fdee246866": {
+    "message": "10개씩 옮깁니다. 1Password가 확인한 묶음부터 FSB에서 지웁니다."
+  },
+  "panel_72fe828489": {
+    "message": "1Password로 옮겼습니다. 로그인 정보: $LOGINS$. 카드: $CARDS$. 이전 보관함은 지워졌습니다.",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "중간에 멈춤: $MOVED$개 옮김, $KEPT$개는 FSB에 남음.",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "1Password 연결을 끊을까요? FSB가 1Password 설정을 잊습니다."
+  },
+  "panel_91fa9fd3cf": {
+    "message": "1Password 연결을 끊을까요? FSB가 1Password 설정을 잊고 저장된 서비스 계정 토큰을 삭제합니다. 다시 연결하려면 터미널이 필요합니다."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "1Password에 로그인"
+  },
+  "panel_26639e7832": {
+    "message": "계정 변경"
+  },
+  "panel_61a5454aac": {
+    "message": "계정 이름 — 1Password 사이드바 상단에 표시됩니다"
+  },
+  "panel_24f92b0c67": {
+    "message": "1Password 데스크톱 앱을 사용합니다. Settings > Developer > Integrate with 1Password SDKs가 켜져 있어야 하며(꺼져 있으면 FSB가 해당 페이지를 엽니다), 그다음 FSB를 허용하라는 요청이 표시됩니다."
+  },
+  "panel_0db703c375": {
+    "message": "1Password 설치"
+  },
+  "panel_887ff0e04c": {
+    "message": "1Password 설정 열기"
+  },
+  "panel_af67e786b5": {
+    "message": "아직 저장할 보관함이 없습니다. FSB가 새 로그인 정보를 1Password에 저장할 수 있도록 하나를 선택하세요."
+  },
+  "panel_9f088dbebd": {
+    "message": "고급"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "FSB를 이 보관함으로 제한"
+  },
+  "panel_104a4be90f": {
+    "message": "모든 보관함 사용"
+  },
+  "panel_65f5a87194": {
+    "message": "1Password의 Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "1Password에서 Integrate with 1Password SDKs를 켠 다음 돌아오세요. FSB가 2분 동안 계속 확인합니다."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs가 아직 꺼져 있습니다"
+  },
+  "panel_3facf5a8dc": {
+    "message": "관리되는 기기인가요? 관리자에게 문의하세요."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs가 꺼져 있습니다"
+  },
+  "panel_e5dab5535e": {
+    "message": "1Password에서 Integrate with 1Password SDKs를 켠 다음 돌아오세요."
+  },
+  "panel_55a8cd8239": {
+    "message": "로그인됨"
+  },
+  "panel_06e7541e0b": {
+    "message": "로그인됨 · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "10분 동안 사용하지 않거나, 잠기거나, 로컬 서버가 다시 시작되면 1Password가 FSB 허용을 다시 요청할 수 있습니다."
+  },
+  "panel_41a0e0aead": {
+    "message": "1Password에 로그인할 수 없습니다"
+  },
+  "panel_f24552b4b3": {
+    "message": "계정 이름을 확인한 다음 다시 시도하세요."
+  },
+  "panel_bf74b77b3d": {
+    "message": "계정 이름을 확인한 다음 다시 시도하세요. 세부 정보: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "1Password 앱을 설치하고 로그인한 다음 다시 시도하세요."
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password 계정: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "1Password 계정의 모든 보관함"
+  },
+  "panel_7a9e047a27": {
+    "message": "고급에서 켠 보관함만"
+  },
+  "panel_fec6b9e93d": {
+    "message": "저장된 로그인 삭제"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "이 브라우저에서 로그아웃했습니다. 로컬 서버에 아직 1Password 로그인이 남아 있으며, FSB가 다음에 가능할 때 그곳에서 삭제합니다."
   }
 }

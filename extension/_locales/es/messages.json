@@ -4753,5 +4753,803 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB inicia sesión con los inicios de sesión de tu 1Password. FSB no guarda ninguna contraseña."
+  },
+  "panel_8b70975df7": {
+    "message": "Si está activado, FSB detecta las páginas de inicio de sesión e inicia sesión con el inicio de sesión de 1Password correspondiente."
+  },
+  "panel_818962bda5": {
+    "message": "Comprobando la conexión con 1Password..."
+  },
+  "panel_5c0a336c67": {
+    "message": "Elige las bóvedas que FSB puede leer. Lo más seguro es una bóveda que solo use FSB."
+  },
+  "panel_161c79f605": {
+    "message": "Guardar nuevos inicios de sesión en"
+  },
+  "panel_cc6d7a8340": {
+    "message": "No guardar"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "Guardar acceso a bóvedas"
+  },
+  "panel_5ab21b8830": {
+    "message": "Mueve tu antigua bóveda de FSB a 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "Introduce el PIN de tu antigua bóveda de FSB. Los elementos movidos a 1Password se borran de FSB."
+  },
+  "panel_3f6118f701": {
+    "message": "Mover a 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "Eliminar bóveda antigua"
+  },
+  "panel_00f3328a04": {
+    "message": "No hay inicios de sesión en las bóvedas que FSB puede usar. Añade o edita inicios de sesión en 1Password."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB rellena los formularios de pago con tarjetas de crédito de tu 1Password, después de que apruebes cada uso."
+  },
+  "panel_4875f94fbf": {
+    "message": "Conecta 1Password en Contraseñas para usar tus tarjetas."
+  },
+  "panel_b9675cca57": {
+    "message": "No hay tarjetas de crédito en las bóvedas que FSB puede usar. Añade o edita tarjetas en 1Password."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password está conectado a través de la app de escritorio ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password está conectado con una cuenta de servicio."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password no está conectado."
+  },
+  "panel_5848961ce6": {
+    "message": "Elige las bóvedas que FSB puede usar para terminar la configuración."
+  },
+  "panel_216dcfd214": {
+    "message": "Introduce el nombre de tu cuenta de 1Password"
+  },
+  "panel_a94d6f85db": {
+    "message": "Conectando... Si se te pide, aprueba FSB en la app de 1Password."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password conectado"
+  },
+  "panel_e520e3cf11": {
+    "message": "Elige al menos una bóveda"
+  },
+  "panel_cc541e4c1e": {
+    "message": "Acceso a bóvedas guardado"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password desconectado"
+  },
+  "panel_e95f94cbda": {
+    "message": "La antigua bóveda de FSB aún contiene elementos que FSB ya no usa. Inicios de sesión: $LOGINS$. Tarjetas: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "Movido a 1Password. Inicios de sesión: $LOGINS$. Tarjetas: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "No movidos y conservados en FSB: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "¿Eliminar la antigua bóveda de FSB? Se perderá todo lo que no se haya movido a 1Password."
+  },
+  "panel_ed17465290": {
+    "message": "Bóveda antigua eliminada"
+  },
+  "panel_3d763a56b2": {
+    "message": "Elementos: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "Moviendo..."
+  },
+  "panel_498fd066bf": {
+    "message": "No se pudo acceder a 1Password: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "Introduce tus credenciales para iniciar sesión. FSB puede guardarlas en 1Password para la próxima vez."
+  },
+  "copy_751ac3de88": {
+    "message": "Introduce tus credenciales para iniciar sesión. FSB las usa una vez y no las guarda."
+  },
+  "copy_264681c742": {
+    "message": "Guardar en 1Password"
+  },
+  "entry_vault_checking": {
+    "message": "Consultando 1Password"
+  },
+  "entry_vault_signing_1p": {
+    "message": "Iniciando sesión con 1Password"
+  },
+  "entry_vault_filled_1p": {
+    "message": "Rellenado desde 1Password"
+  },
+  "entry_vault_signing_typed": {
+    "message": "Iniciando sesión"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "escrito por ti · no se envía a $CLIENT$",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "escrito por ti · no se envía a tu agente"
+  },
+  "entry_vault_filled_saved": {
+    "message": "Rellenado · guardado en 1Password"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "Rellenado · sin guardar"
+  },
+  "entry_vault_cancelled": {
+    "message": "Cancelado · no se rellenó nada"
+  },
+  "entry_vault_page_changed": {
+    "message": "La página cambió · no se rellenó nada"
+  },
+  "entry_vault_several": {
+    "message": "Coinciden $COUNT$ inicios de sesión · $CLIENT$ te preguntará",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "Coinciden $COUNT$ inicios de sesión · tu agente te preguntará",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "Usuario"
+  },
+  "entry_vault_chip_password": {
+    "message": "Contraseña"
+  },
+  "entry_vault_chip_code": {
+    "message": "Código"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "Iniciar sesión"
+  },
+  "entry_vault_sheet_user": {
+    "message": "Correo o usuario"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "Ocultar contraseña"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "No se guarda · no hay bóveda para nuevos inicios de sesión"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "En pausa"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· haz clic para seguir escribiendo"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "La página lo tapa en parte"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "Usar 1Password en su lugar"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "Añádelo en 1Password"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "Guarda un inicio de sesión para este sitio en 1Password y luego continúa."
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "Escribirlo aquí"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "Todavía no hay nada guardado para este sitio."
+  },
+  "entry_vault_approve": {
+    "message": "Aprueba FSB en 1Password"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "esperándote"
+  },
+  "entry_vault_entering_code": {
+    "message": "Introduciendo el código"
+  },
+  "entry_vault_one_time_code": {
+    "message": "código de un solo uso"
+  },
+  "entry_vault_not_https": {
+    "message": "Sin rellenar · la página no es https"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "Sin rellenar · las tarjetas requieren https"
+  },
+  "entry_vault_locked": {
+    "message": "1Password está bloqueado"
+  },
+  "entry_vault_unlock": {
+    "message": "desbloquéalo para continuar"
+  },
+  "entry_vault_unreachable": {
+    "message": "No se puede acceder a 1Password"
+  },
+  "entry_vault_filling_card": {
+    "message": "Rellenando la tarjeta"
+  },
+  "entry_vault_card_filled": {
+    "message": "Tarjeta rellenada · revisa y paga"
+  },
+  "entry_vault_chip_number": {
+    "message": "Número"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "Caducidad"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "Código CVC"
+  },
+  "entry_vault_chip_name": {
+    "message": "Nombre"
+  },
+  "copy_e86c3bc142": {
+    "message": "¿Qué cuenta?"
+  },
+  "copy_02451a3272": {
+    "message": "Iniciar sesión como $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "Escribirlo en su lugar"
+  },
+  "copy_bfd402b2f6": {
+    "message": "Iniciar sesión"
+  },
+  "copy_2a347f1933": {
+    "message": "Correo o usuario"
+  },
+  "copy_50eb1b1291": {
+    "message": "Sesión iniciada con 1Password"
+  },
+  "copy_edfed2d184": {
+    "message": "Sesión iniciada en $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "Guardado en 1Password"
+  },
+  "copy_22b3467c1b": {
+    "message": "Sin guardar"
+  },
+  "copy_8a56b97150": {
+    "message": "Inicio de sesión omitido"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB continúa sin ello."
+  },
+  "copy_735479c991": {
+    "message": "Tarjeta rellenada en $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$. Revisa y paga.",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "Rechazaste rellenar la tarjeta"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "No se leyó nada de 1Password."
+  },
+  "copy_db8bc38f4b": {
+    "message": "Se agotó el tiempo para rellenar la tarjeta"
+  },
+  "copy_58723d2bab": {
+    "message": "¿Rellenar tu tarjeta?"
+  },
+  "copy_a2d285b352": {
+    "message": "Rechazar"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "Rellenar tarjeta"
+  },
+  "copy_2a48c44dfa": {
+    "message": "Sin rellenar en $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "La página no es https."
+  },
+  "copy_5decaf89b7": {
+    "message": "La página cambió, no se rellenó nada"
+  },
+  "copy_b41f042ed0": {
+    "message": "La pestaña pasó a otro sitio."
+  },
+  "copy_99955bb437": {
+    "message": "1Password no está conectado"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB aún no puede iniciar sesión ni rellenar tarjetas."
+  },
+  "copy_5cbafe67aa": {
+    "message": "Abrir ajustes de Bóveda"
+  },
+  "copy_270e420dd3": {
+    "message": "esta página"
+  },
+  "panel_5d55c415e3": {
+    "message": "Bóveda"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB inicia sesión y rellena los pagos con elementos de tu 1Password. FSB no guarda contraseñas ni tarjetas."
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB rellena los formularios de pago con tarjetas de tu 1Password."
+  },
+  "panel_caf0111717": {
+    "message": "Servidor local"
+  },
+  "panel_101f4d9537": {
+    "message": "Este navegador"
+  },
+  "panel_87bdac40eb": {
+    "message": "Extensión FSB"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "Acceso"
+  },
+  "panel_22894e363f": {
+    "message": "Bóvedas que FSB puede leer"
+  },
+  "panel_5e05243ee1": {
+    "message": "Lo más seguro es una bóveda que solo use FSB."
+  },
+  "panel_07ce99bab0": {
+    "message": "Reglas de inicio de sesión"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "Tomadas de cada elemento de 1Password"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "Solo en los sitios guardados en un inicio de sesión."
+  },
+  "panel_374082363f": {
+    "message": "Nunca de https a http."
+  },
+  "panel_059151ea45": {
+    "message": "Relleno de tarjetas"
+  },
+  "panel_42e70101ec": {
+    "message": "Tu agente te pregunta primero"
+  },
+  "panel_949603eecc": {
+    "message": "Por MCP, en su propia app. En el piloto automático, en el panel lateral."
+  },
+  "panel_33e5a068d8": {
+    "message": "Solo en páginas https."
+  },
+  "panel_e8cb2edbc4": {
+    "message": "Lo que ven los agentes"
+  },
+  "panel_107fa062ba": {
+    "message": "Por MCP y en el piloto automático"
+  },
+  "panel_c53616b513": {
+    "message": "Títulos, usuarios, sitios y los cuatro últimos dígitos."
+  },
+  "panel_ed87d52230": {
+    "message": "Nunca una contraseña, un código ni un número de tarjeta."
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "Elementos"
+  },
+  "panel_f5b53d4968": {
+    "message": "Cuando esté conectado"
+  },
+  "panel_543eb6e59b": {
+    "message": "Inicios de sesión"
+  },
+  "panel_a52fcbbc33": {
+    "message": "Tarjetas"
+  },
+  "panel_3304ef1777": {
+    "message": "Buscar títulos, usuarios y sitios"
+  },
+  "panel_5a80aae52c": {
+    "message": "Solo lectura. Edita los inicios de sesión en 1Password."
+  },
+  "panel_547ca35987": {
+    "message": "Se lee de 1Password solo al rellenar, para el sitio de la pestaña."
+  },
+  "panel_2fdf0b746a": {
+    "message": "Los inicios de sesión y las tarjetas aparecen aquí cuando eliges al menos una bóveda."
+  },
+  "panel_10c5739b95": {
+    "message": "Esperando aprobación"
+  },
+  "panel_a424e33d90": {
+    "message": "Bloqueado"
+  },
+  "panel_5ad99230df": {
+    "message": "No disponible"
+  },
+  "panel_dce083a2c4": {
+    "message": "Rechazado"
+  },
+  "panel_67a926f700": {
+    "message": "No encontrado"
+  },
+  "panel_1d09faf925": {
+    "message": "Hay que actualizar"
+  },
+  "panel_53f15ea2f2": {
+    "message": "Sin vincular"
+  },
+  "panel_a06130a5a2": {
+    "message": "Demasiadas solicitudes"
+  },
+  "panel_9f760ab207": {
+    "message": "Esperándote"
+  },
+  "panel_8985693566": {
+    "message": "Aún no conectado"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "Conectando con $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "Conectado con una cuenta de servicio"
+  },
+  "panel_4435385a73": {
+    "message": "El servidor local de FSB no está en marcha"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "No se encontró la app de 1Password"
+  },
+  "panel_9d094cbe0c": {
+    "message": "Actualiza el servidor local"
+  },
+  "panel_b0545ee348": {
+    "message": "Vincular de nuevo"
+  },
+  "panel_a904382fc7": {
+    "message": "Más despacio"
+  },
+  "panel_12e12023d2": {
+    "message": "No se pudo acceder a 1Password"
+  },
+  "panel_a5ae6c601d": {
+    "message": "Aprueba FSB en la app de 1Password."
+  },
+  "panel_f83ab4c57f": {
+    "message": "Elige las bóvedas que FSB puede leer."
+  },
+  "panel_b33cf191b9": {
+    "message": "Configurada desde el terminal. Al desconectar se borra el token guardado, así que se pide confirmación."
+  },
+  "panel_8ba387915f": {
+    "message": "Desbloquea 1Password para continuar. Tus ajustes se conservan."
+  },
+  "panel_041a40019f": {
+    "message": "Instala el servidor local de FSB y vuelve a intentarlo."
+  },
+  "panel_40647b20fa": {
+    "message": "FSB no puede leer nada hasta que lo permitas. Vuelve a intentarlo y permite FSB en 1Password."
+  },
+  "panel_0233589be3": {
+    "message": "Este fsb-mcp-server es demasiado antiguo para 1Password o no puede cargar su SDK."
+  },
+  "panel_01ddad80a6": {
+    "message": "El servidor está en marcha, pero ya no confía en este navegador. Vincularlo de nuevo lo soluciona."
+  },
+  "panel_1c3eb3d073": {
+    "message": "Demasiadas solicitudes en poco tiempo. Tu cuenta no tiene ningún problema. Vuelve a intentarlo en un minuto."
+  },
+  "panel_89857dc659": {
+    "message": "1Password pregunta si FSB puede usarlo. FSB espera hasta 75 segundos."
+  },
+  "panel_979a9a05cd": {
+    "message": "app de escritorio"
+  },
+  "panel_69ce0728e7": {
+    "message": "preguntándote"
+  },
+  "panel_14493f5f54": {
+    "message": "bloqueado"
+  },
+  "panel_d7da083898": {
+    "message": "cuenta de servicio"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password, luego el servidor local de FSB y luego este navegador"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password y luego el servidor local, al que este navegador no llega"
+  },
+  "panel_845f928640": {
+    "message": "Privada"
+  },
+  "panel_535c99f759": {
+    "message": "Solo FSB"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "Compartida"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "Tu bóveda personal. Los $COUNT$ elementos quedarán disponibles para los agentes.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "Compartida con otras personas. Los $COUNT$ elementos quedarán disponibles para los agentes.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "Los $COUNT$ elementos de esta bóveda quedarán disponibles para los agentes.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "En todo el sitio"
+  },
+  "panel_b20197643c": {
+    "message": "Dominio exacto"
+  },
+  "panel_8b8c047cc1": {
+    "message": "$COUNT$ para este sitio",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "Código de un solo uso"
+  },
+  "panel_c68b5649c4": {
+    "message": "dirección de facturación en la tarjeta"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "sin dirección de facturación"
+  },
+  "panel_fdee246866": {
+    "message": "Se mueve en lotes de 10. Cada lote se borra de FSB cuando 1Password lo confirma."
+  },
+  "panel_72fe828489": {
+    "message": "Movido a 1Password. Inicios de sesión: $LOGINS$. Tarjetas: $CARDS$. La bóveda antigua se ha borrado.",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "Se detuvo a medias: $MOVED$ movidos, $KEPT$ conservados en FSB.",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "¿Desconectar 1Password? FSB olvidará sus ajustes de 1Password."
+  },
+  "panel_91fa9fd3cf": {
+    "message": "¿Desconectar 1Password? FSB olvidará sus ajustes de 1Password y borrará el token de la cuenta de servicio. Para volver a conectar necesitarás de nuevo el terminal."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "Iniciar sesión en 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "Cambiar de cuenta"
+  },
+  "panel_61a5454aac": {
+    "message": "Nombre de la cuenta — aparece en la parte superior de la barra lateral de 1Password"
+  },
+  "panel_24f92b0c67": {
+    "message": "Usa la app de escritorio de 1Password. Necesita Settings > Developer > Integrate with 1Password SDKs activado (FSB abre esa página si está desactivado) y después te pide que apruebes FSB."
+  },
+  "panel_0db703c375": {
+    "message": "Instalar 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "Abrir los ajustes de 1Password"
+  },
+  "panel_af67e786b5": {
+    "message": "Aún no hay bóveda para guardar. Elige una para que FSB pueda guardar nuevos inicios de sesión en 1Password."
+  },
+  "panel_9f088dbebd": {
+    "message": "Avanzado"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "Limitar FSB a estas bóvedas"
+  },
+  "panel_104a4be90f": {
+    "message": "Usar todas las bóvedas"
+  },
+  "panel_65f5a87194": {
+    "message": "Settings > Developer en 1Password"
+  },
+  "panel_f287bb0de3": {
+    "message": "Activa Integrate with 1Password SDKs en 1Password y vuelve aquí. FSB lo seguirá comprobando durante 2 minutos."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs sigue desactivado"
+  },
+  "panel_3facf5a8dc": {
+    "message": "¿Usas un dispositivo administrado? Pregunta a tu administrador."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs está desactivado"
+  },
+  "panel_e5dab5535e": {
+    "message": "Activa Integrate with 1Password SDKs en 1Password y vuelve aquí."
+  },
+  "panel_55a8cd8239": {
+    "message": "Sesión iniciada"
+  },
+  "panel_06e7541e0b": {
+    "message": "Sesión iniciada · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "1Password puede volver a pedirte que apruebes FSB tras 10 minutos de inactividad, un bloqueo o un reinicio del servidor local."
+  },
+  "panel_41a0e0aead": {
+    "message": "No se pudo iniciar sesión en 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "Comprueba el nombre de la cuenta y vuelve a intentarlo."
+  },
+  "panel_bf74b77b3d": {
+    "message": "Comprueba el nombre de la cuenta y vuelve a intentarlo. Detalles: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "Instala la app de 1Password e inicia sesión; después vuelve a intentarlo."
+  },
+  "panel_e745c8fafe": {
+    "message": "Cuenta de 1Password: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "Todas las bóvedas de tu cuenta de 1Password"
+  },
+  "panel_7a9e047a27": {
+    "message": "Solo las bóvedas activadas en Avanzado"
+  },
+  "panel_fec6b9e93d": {
+    "message": "Olvidar el inicio de sesión guardado"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "Sesión cerrada en este navegador. El servidor local aún conserva el inicio de sesión de 1Password, y FSB lo eliminará allí en cuanto pueda."
   }
 }

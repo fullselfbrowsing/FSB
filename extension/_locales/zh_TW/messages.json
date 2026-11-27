@@ -4753,5 +4753,803 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB 使用你 1Password 中的登入資訊登入。FSB 本身不儲存任何密碼。"
+  },
+  "panel_8b70975df7": {
+    "message": "啟用後，FSB 會偵測登入頁面，並使用相符的 1Password 登入資訊登入。"
+  },
+  "panel_818962bda5": {
+    "message": "正在檢查 1Password 連線..."
+  },
+  "panel_5c0a336c67": {
+    "message": "選擇 FSB 可以讀取的保險庫。僅供 FSB 使用的保險庫最安全。"
+  },
+  "panel_161c79f605": {
+    "message": "新登入資訊儲存至"
+  },
+  "panel_cc6d7a8340": {
+    "message": "不儲存"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "儲存保險庫存取權限"
+  },
+  "panel_5ab21b8830": {
+    "message": "將舊的 FSB 保險庫移至 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "輸入舊 FSB 保險庫的 PIN。已移至 1Password 的項目會從 FSB 中清除。"
+  },
+  "panel_3f6118f701": {
+    "message": "移至 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "刪除舊保險庫"
+  },
+  "panel_00f3328a04": {
+    "message": "FSB 可用的保險庫中沒有登入資訊。請在 1Password 中新增或編輯登入資訊。"
+  },
+  "panel_c6e98715b7": {
+    "message": "每次填寫前經你核准後，FSB 會用你 1Password 中的信用卡填寫結帳表單。"
+  },
+  "panel_4875f94fbf": {
+    "message": "請在「密碼」中連接 1Password 以使用你的卡片。"
+  },
+  "panel_b9675cca57": {
+    "message": "FSB 可用的保險庫中沒有信用卡。請在 1Password 中新增或編輯卡片。"
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password 已透過桌面應用程式連線（$ACCOUNT$）。",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password 已透過服務帳號連線。"
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password 尚未連線。"
+  },
+  "panel_5848961ce6": {
+    "message": "請選擇 FSB 可以使用的保險庫以完成設定。"
+  },
+  "panel_216dcfd214": {
+    "message": "請輸入你的 1Password 帳號名稱"
+  },
+  "panel_a94d6f85db": {
+    "message": "正在連線... 如有提示，請在 1Password 應用程式中核准 FSB。"
+  },
+  "panel_616c3a2010": {
+    "message": "1Password 已連線"
+  },
+  "panel_e520e3cf11": {
+    "message": "請至少選擇一個保險庫"
+  },
+  "panel_cc541e4c1e": {
+    "message": "保險庫存取權限已儲存"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password 已中斷連線"
+  },
+  "panel_e95f94cbda": {
+    "message": "舊的 FSB 保險庫中仍有 FSB 不再使用的項目。登入資訊：$LOGINS$。卡片：$CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "已移至 1Password。登入資訊：$LOGINS$。卡片：$CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "未移動並保留在 FSB 中：$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "要刪除舊的 FSB 保險庫嗎？所有未移至 1Password 的內容都將遺失。"
+  },
+  "panel_ed17465290": {
+    "message": "舊保險庫已刪除"
+  },
+  "panel_3d763a56b2": {
+    "message": "項目：$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "正在移動..."
+  },
+  "panel_498fd066bf": {
+    "message": "無法連線至 1Password：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "輸入憑證以登入。FSB 可以將其儲存至 1Password 供下次使用。"
+  },
+  "copy_751ac3de88": {
+    "message": "輸入憑證以登入。FSB 只使用一次，不會儲存。"
+  },
+  "copy_264681c742": {
+    "message": "儲存至 1Password"
+  },
+  "entry_vault_checking": {
+    "message": "正在檢查 1Password"
+  },
+  "entry_vault_signing_1p": {
+    "message": "正在使用 1Password 登入"
+  },
+  "entry_vault_filled_1p": {
+    "message": "已從 1Password 填入"
+  },
+  "entry_vault_signing_typed": {
+    "message": "正在登入"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "由你輸入 · 不會傳送給 $CLIENT$",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "由你輸入 · 不會傳送給你的代理"
+  },
+  "entry_vault_filled_saved": {
+    "message": "已填入 · 已儲存至 1Password"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "已填入 · 未儲存"
+  },
+  "entry_vault_cancelled": {
+    "message": "已取消 · 未填入任何內容"
+  },
+  "entry_vault_page_changed": {
+    "message": "頁面已變更 · 未填入任何內容"
+  },
+  "entry_vault_several": {
+    "message": "$COUNT$ 筆登入資訊相符 · $CLIENT$ 會詢問你",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "$COUNT$ 筆登入資訊相符 · 你的代理會詢問你",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "使用者名稱"
+  },
+  "entry_vault_chip_password": {
+    "message": "密碼"
+  },
+  "entry_vault_chip_code": {
+    "message": "驗證碼"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "登入"
+  },
+  "entry_vault_sheet_user": {
+    "message": "電子郵件或使用者名稱"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "隱藏密碼"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "不儲存 · 未設定新登入資訊的保險庫"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "已暫停"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· 點一下繼續輸入"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "被頁面部分遮住"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "改用 1Password"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "在 1Password 中新增"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "請在 1Password 中儲存此網站的登入資訊，然後繼續。"
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "改為在此輸入"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "此網站仍未儲存任何內容。"
+  },
+  "entry_vault_approve": {
+    "message": "在 1Password 中核准 FSB"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "正在等你"
+  },
+  "entry_vault_entering_code": {
+    "message": "正在輸入驗證碼"
+  },
+  "entry_vault_one_time_code": {
+    "message": "一次性驗證碼"
+  },
+  "entry_vault_not_https": {
+    "message": "未填入 · 頁面不是 https"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "未填入 · 卡片需要 https"
+  },
+  "entry_vault_locked": {
+    "message": "1Password 已鎖定"
+  },
+  "entry_vault_unlock": {
+    "message": "解鎖後繼續"
+  },
+  "entry_vault_unreachable": {
+    "message": "無法連線到 1Password"
+  },
+  "entry_vault_filling_card": {
+    "message": "正在填入卡片"
+  },
+  "entry_vault_card_filled": {
+    "message": "已填入卡片 · 請確認後付款"
+  },
+  "entry_vault_chip_number": {
+    "message": "卡號"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "有效期限"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "安全碼"
+  },
+  "entry_vault_chip_name": {
+    "message": "持卡人"
+  },
+  "copy_e86c3bc142": {
+    "message": "哪個帳號？"
+  },
+  "copy_02451a3272": {
+    "message": "以 $NAME$ 登入",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "改為手動輸入"
+  },
+  "copy_bfd402b2f6": {
+    "message": "登入"
+  },
+  "copy_2a347f1933": {
+    "message": "電子郵件或使用者名稱"
+  },
+  "copy_50eb1b1291": {
+    "message": "已使用 1Password 登入"
+  },
+  "copy_edfed2d184": {
+    "message": "已登入 $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "已儲存至 1Password"
+  },
+  "copy_22b3467c1b": {
+    "message": "未儲存"
+  },
+  "copy_8a56b97150": {
+    "message": "已略過登入"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB 會在不登入的情況下繼續。"
+  },
+  "copy_735479c991": {
+    "message": "已在 $DOMAIN$ 填入卡片",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$。請確認後付款。",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "你拒絕了填入卡片"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "未從 1Password 讀取任何內容。"
+  },
+  "copy_db8bc38f4b": {
+    "message": "填入卡片已逾時"
+  },
+  "copy_58723d2bab": {
+    "message": "填入你的卡片？"
+  },
+  "copy_a2d285b352": {
+    "message": "拒絕"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "填入卡片"
+  },
+  "copy_2a48c44dfa": {
+    "message": "未在 $DOMAIN$ 填入",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "頁面不是 https。"
+  },
+  "copy_5decaf89b7": {
+    "message": "頁面已變更，未填入任何內容"
+  },
+  "copy_b41f042ed0": {
+    "message": "分頁已移到其他網站。"
+  },
+  "copy_99955bb437": {
+    "message": "1Password 未連線"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB 暫時無法登入或填入卡片。"
+  },
+  "copy_5cbafe67aa": {
+    "message": "開啟保險庫設定"
+  },
+  "copy_270e420dd3": {
+    "message": "此頁面"
+  },
+  "panel_5d55c415e3": {
+    "message": "保險庫"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB 使用你 1Password 中的項目登入並填入結帳資訊。FSB 本身不儲存任何密碼或卡片。"
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB 使用你 1Password 中的卡片填入結帳表單。"
+  },
+  "panel_caf0111717": {
+    "message": "本機伺服器"
+  },
+  "panel_101f4d9537": {
+    "message": "此瀏覽器"
+  },
+  "panel_87bdac40eb": {
+    "message": "FSB 擴充功能"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "存取權限"
+  },
+  "panel_22894e363f": {
+    "message": "FSB 可以讀取的保險庫"
+  },
+  "panel_5e05243ee1": {
+    "message": "僅供 FSB 使用的保險庫最安全。"
+  },
+  "panel_07ce99bab0": {
+    "message": "登入規則"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "取自每個 1Password 項目"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "僅限登入資訊中儲存的網站。"
+  },
+  "panel_374082363f": {
+    "message": "絕不從 https 用到 http。"
+  },
+  "panel_059151ea45": {
+    "message": "填入卡片"
+  },
+  "panel_42e70101ec": {
+    "message": "你的代理會先詢問你"
+  },
+  "panel_949603eecc": {
+    "message": "透過 MCP 時在代理自己的應用程式中詢問，自動駕駛時在側邊面板中詢問。"
+  },
+  "panel_33e5a068d8": {
+    "message": "僅限 https 頁面。"
+  },
+  "panel_e8cb2edbc4": {
+    "message": "代理能看到什麼"
+  },
+  "panel_107fa062ba": {
+    "message": "透過 MCP 和自動駕駛"
+  },
+  "panel_c53616b513": {
+    "message": "標題、使用者名稱、網站、末四碼。"
+  },
+  "panel_ed87d52230": {
+    "message": "絕不會看到密碼、驗證碼或卡號。"
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "項目"
+  },
+  "panel_f5b53d4968": {
+    "message": "連線之後"
+  },
+  "panel_543eb6e59b": {
+    "message": "登入資訊"
+  },
+  "panel_a52fcbbc33": {
+    "message": "卡片"
+  },
+  "panel_3304ef1777": {
+    "message": "搜尋標題、使用者名稱和網站"
+  },
+  "panel_5a80aae52c": {
+    "message": "唯讀。請在 1Password 中編輯登入資訊。"
+  },
+  "panel_547ca35987": {
+    "message": "僅在填入時為分頁中的網站從 1Password 讀取。"
+  },
+  "panel_2fdf0b746a": {
+    "message": "至少選擇一個保險庫後，登入資訊和卡片會顯示在這裡。"
+  },
+  "panel_10c5739b95": {
+    "message": "等待核准"
+  },
+  "panel_a424e33d90": {
+    "message": "已鎖定"
+  },
+  "panel_5ad99230df": {
+    "message": "無法連線"
+  },
+  "panel_dce083a2c4": {
+    "message": "已拒絕"
+  },
+  "panel_67a926f700": {
+    "message": "找不到"
+  },
+  "panel_1d09faf925": {
+    "message": "需要更新"
+  },
+  "panel_53f15ea2f2": {
+    "message": "未配對"
+  },
+  "panel_a06130a5a2": {
+    "message": "請求過多"
+  },
+  "panel_9f760ab207": {
+    "message": "等你操作"
+  },
+  "panel_8985693566": {
+    "message": "尚未連線"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "正在連線 $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "已透過服務帳號連線"
+  },
+  "panel_4435385a73": {
+    "message": "FSB 本機伺服器未執行"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "找不到 1Password 應用程式"
+  },
+  "panel_9d094cbe0c": {
+    "message": "請更新本機伺服器"
+  },
+  "panel_b0545ee348": {
+    "message": "重新配對"
+  },
+  "panel_a904382fc7": {
+    "message": "請放慢速度"
+  },
+  "panel_12e12023d2": {
+    "message": "無法連線到 1Password"
+  },
+  "panel_a5ae6c601d": {
+    "message": "請在 1Password 應用程式中核准 FSB。"
+  },
+  "panel_f83ab4c57f": {
+    "message": "選擇 FSB 可以讀取的保險庫。"
+  },
+  "panel_b33cf191b9": {
+    "message": "透過終端機設定。中斷連線會刪除已儲存的權杖，因此會先詢問你。"
+  },
+  "panel_8ba387915f": {
+    "message": "解鎖 1Password 以繼續。你的設定會保留。"
+  },
+  "panel_041a40019f": {
+    "message": "請安裝 FSB 本機伺服器，然後重試。"
+  },
+  "panel_40647b20fa": {
+    "message": "在你允許之前，FSB 無法讀取任何內容。請重試，然後在 1Password 中允許 FSB。"
+  },
+  "panel_0233589be3": {
+    "message": "此 fsb-mcp-server 版本過舊，無法用於 1Password，或無法載入其 SDK。"
+  },
+  "panel_01ddad80a6": {
+    "message": "伺服器正在執行，但不再信任此瀏覽器。重新配對即可解決。"
+  },
+  "panel_1c3eb3d073": {
+    "message": "短時間內請求過多。你的帳號沒有問題。請一分鐘後重試。"
+  },
+  "panel_89857dc659": {
+    "message": "1Password 正在詢問是否允許 FSB 使用它。FSB 最多等待 75 秒。"
+  },
+  "panel_979a9a05cd": {
+    "message": "桌面應用程式"
+  },
+  "panel_69ce0728e7": {
+    "message": "正在詢問你"
+  },
+  "panel_14493f5f54": {
+    "message": "已鎖定"
+  },
+  "panel_d7da083898": {
+    "message": "服務帳號"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password，然後是 FSB 本機伺服器，再到此瀏覽器"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password，然後是本機伺服器（此瀏覽器無法連線）"
+  },
+  "panel_845f928640": {
+    "message": "個人"
+  },
+  "panel_535c99f759": {
+    "message": "僅 FSB"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "共享"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "你的個人保險庫。全部 $COUNT$ 個項目都會對代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "與他人共享。全部 $COUNT$ 個項目都會對代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "此保險庫中的全部 $COUNT$ 個項目都會對代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "整個網站"
+  },
+  "panel_b20197643c": {
+    "message": "精確網域"
+  },
+  "panel_8b8c047cc1": {
+    "message": "此網站有 $COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "一次性驗證碼"
+  },
+  "panel_c68b5649c4": {
+    "message": "卡上有帳單地址"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "未儲存帳單地址"
+  },
+  "panel_fdee246866": {
+    "message": "以每批 10 個移動。1Password 確認後，每一批都會從 FSB 中刪除。"
+  },
+  "panel_72fe828489": {
+    "message": "已移到 1Password。登入資訊：$LOGINS$。卡片：$CARDS$。舊保險庫已刪除。",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "中途停止：已移動 $MOVED$ 個，$KEPT$ 個保留在 FSB 中。",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "中斷 1Password 連線？FSB 會忘記其 1Password 設定。"
+  },
+  "panel_91fa9fd3cf": {
+    "message": "中斷 1Password 連線？FSB 會忘記其 1Password 設定，並刪除已儲存的服務帳號權杖。重新連線需要再次使用終端機。"
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "登入 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "變更帳號"
+  },
+  "panel_61a5454aac": {
+    "message": "帳號名稱 — 顯示在 1Password 側邊欄頂端"
+  },
+  "panel_24f92b0c67": {
+    "message": "使用 1Password 桌面應用程式。需要開啟 Settings > Developer > Integrate with 1Password SDKs（若未開啟，FSB 會為你開啟該頁面），之後 1Password 會請你核准 FSB。"
+  },
+  "panel_0db703c375": {
+    "message": "安裝 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "開啟 1Password 設定"
+  },
+  "panel_af67e786b5": {
+    "message": "尚未選擇儲存用的保險庫。請選擇一個，讓 FSB 能將新登入資訊儲存至 1Password。"
+  },
+  "panel_9f088dbebd": {
+    "message": "進階"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "將 FSB 限制在這些保險庫"
+  },
+  "panel_104a4be90f": {
+    "message": "使用所有保險庫"
+  },
+  "panel_65f5a87194": {
+    "message": "1Password 中的 Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "請在 1Password 中開啟 Integrate with 1Password SDKs，然後回到這裡。FSB 會持續檢查 2 分鐘。"
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs 仍未開啟"
+  },
+  "panel_3facf5a8dc": {
+    "message": "使用的是受管理的裝置？請聯絡你的管理員。"
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs 未開啟"
+  },
+  "panel_e5dab5535e": {
+    "message": "請在 1Password 中開啟 Integrate with 1Password SDKs，然後回到這裡。"
+  },
+  "panel_55a8cd8239": {
+    "message": "已登入"
+  },
+  "panel_06e7541e0b": {
+    "message": "已登入 · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "閒置 10 分鐘、鎖定或本機伺服器重新啟動後，1Password 可能會再次請你核准 FSB。"
+  },
+  "panel_41a0e0aead": {
+    "message": "無法登入 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "請檢查帳號名稱，然後再試一次。"
+  },
+  "panel_bf74b77b3d": {
+    "message": "請檢查帳號名稱，然後再試一次。詳細資訊：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "請安裝 1Password 應用程式並登入，然後再試一次。"
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password 帳號：$ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "你的 1Password 帳號中的所有保險庫"
+  },
+  "panel_7a9e047a27": {
+    "message": "僅限在「進階」中開啟的保險庫"
+  },
+  "panel_fec6b9e93d": {
+    "message": "忘記已儲存的登入"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "已在此瀏覽器中登出。本機伺服器仍保留 1Password 登入，FSB 會在下次可以時將其移除。"
   }
 }

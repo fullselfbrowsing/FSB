@@ -120,7 +120,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Searches a 128-app capability catalog and invokes verified signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
-- Includes secure credential and payment vault flows for supervised autofill.
+- Signs in and fills checkout forms with logins, one-time codes, and cards from the user's 1Password, without exposing them to the model.
 - Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Antigravity, Cline, and other MCP clients can drive the browser.
 
 Background agents were removed in v0.9.45rc1. When the extension updates, it deletes the saved agent definitions and alarms they left behind. For scheduled or recurring work, use [OpenClaw](https://github.com/openclaw/openclaw) or [Claude Routines](https://www.anthropic.com/claude/routines).
@@ -146,11 +146,11 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, direct JavaScript, and real file uploads. |
 | Capability catalog | Searches the 128-app catalog and invokes verified signed, audited, denylist-gated T1/T1b first-party API capabilities through `search_capabilities` and `invoke_capability`. Catalog-tail hits remain learn-pending, discovery-pending, or guarded fail-closed until proven. Sensitive origins are flagged, while denylisted origins remain blocked. |
 | Verification | Checks post-action state, loading behavior, DOM stability, and stuck-action repetition. |
-| UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, vault, and sync controls. |
+| UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, 1Password connection, and sync controls. |
 | Model support | Hosted providers, OpenRouter routing, LM Studio local models, custom endpoints, and live model discovery. |
 | Output rendering | Markdown, sanitized HTML, Mermaid diagrams, Chart.js charts, and task progress messages. |
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
-| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, capability signature/audit gates, origin denylisting, upload-path denylisting, and restricted-tab recovery messaging. |
+| Security | Encrypted keys, 1Password-backed credential fills, redaction helpers, DOMPurify, capability signature/audit gates, origin denylisting, upload-path denylisting, and restricted-tab recovery messaging. |
 | Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
 | DOM live preview | PhantomStream-backed capture, renderer, protocol, media mirroring, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
@@ -220,9 +220,6 @@ Top level deploy and validation files:
 #### API Configuration
 <img src="extension/assets/screenshots/api-configuration.png" alt="API configuration panel with provider selection and key entry" width="100%" />
 
-#### Passwords Manager
-<img src="extension/assets/screenshots/passwords-manager.png" alt="Passwords manager for storing site credentials used during automation" width="100%" />
-
 #### Memory and Site Explorer
 <img src="extension/assets/screenshots/memory-site-explorer.png" alt="Memory viewer and site explorer showing crawled site structure" width="100%" />
 
@@ -283,6 +280,14 @@ For an unpacked build, record the ID on `chrome://extensions/`. A different inst
 
 If a site uses heavy client rendering, custom canvas controls, or unusual shadow DOM, start by asking FSB to read the page and identify available controls. That gives the model a better first snapshot and makes failures easier to debug.
 
+### Connect 1Password (Optional)
+
+FSB has no password vault of its own. To let it sign in and fill checkouts from your 1Password, open the control panel's **Vault** page and press **Log in to 1Password**. This needs the 1Password desktop app and the FSB local server (`fsb-mcp-server`), which holds the 1Password connection.
+
+One button does not remove 1Password's own steps. 1Password needs its **Settings > Developer > Integrate with 1Password SDKs** setting turned on (FSB opens that pane for you), possibly your account name, and your approval. It asks for that approval again after 10 idle minutes, after the app locks, and after the local server restarts.
+
+FSB reads all of your vaults by default; you can limit it to some under **Advanced** on the Vault page. Logins you choose to save go to your Personal vault unless you pick another one. Passwords, one-time codes, and card numbers are typed into the page and never reach the model. For a headless machine, set up a 1Password service account from the terminal instead; see [1Password for logins and cards](mcp/README.md#1password-for-logins-and-cards).
+
 ### Quick Troubleshooting
 
 | Problem | Check |
@@ -294,6 +299,7 @@ If a site uses heavy client rendering, custom canvas controls, or unusual shadow
 | Typed text does not stick | Prefer `type_text` over JavaScript value assignment on controlled inputs. |
 | MCP tools are missing | Restart the host client and run `npx -y fsb-mcp-server@latest doctor`. |
 | MCP tools time out | Check `status --watch`, active tab readiness, and whether another task is queued. |
+| 1Password does not connect | Unlock the 1Password app, check **Settings > Developer > Integrate with 1Password SDKs**, then press **Log in to 1Password** on the Vault page again. |
 
 Most failures are recoverable by inspecting the current page, refreshing selectors, or restarting the local MCP bridge. Reinstalling the MCP config should be the last step, not the first.
 
@@ -445,7 +451,7 @@ graph TB
 - **AI layer** (`extension/ai/`): universal OpenAI-compatible request engine, provider settings, model discovery, tool definitions, transcripts, and action history.
 - **Memory** (`extension/lib/memory/`): stores episodic, semantic, and procedural records, then retrieves relevant prior context for later tasks.
 - **Visualization** (`extension/lib/visualization/`): D3/site graph views for guide and memory exploration.
-- **Vault** (`extension/config/secure-config.js` plus UI flows): encrypts API keys and saved user data in Chrome storage.
+- **Secrets** (`extension/config/secure-config.js`, `extension/utils/onepassword-client.js`, `mcp/src/onepassword/`): encrypts API keys in Chrome storage; logins and cards come from the user's 1Password through the local MCP server.
 - **MCP package** (`mcp/`): TypeScript server that translates MCP calls into extension bridge messages.
 
 ### Automation Flow
@@ -485,7 +491,7 @@ The MCP server exposes a curated public surface around that registry plus direct
 | Developer / UAT | 1 | `capture_screenshot` |
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |
-| Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
+| Vault (1Password) | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
 
 Read-only tools bypass the mutation queue where safe. `capture_screenshot` is semantically read-only but remains serialized because it consumes Chromium's exclusive debugger resource. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
 
@@ -583,7 +589,7 @@ Memory and site maps are especially useful for:
 ## Security And Safety
 
 - API keys are encrypted with AES-GCM and stored in Chrome storage.
-- Credential and payment vault flows avoid sending raw secrets over the MCP bridge.
+- Logins and cards resolve from 1Password inside FSB; passwords, one-time codes, and card data are never returned to MCP clients.
 - Rendered chat output is sanitized with DOMPurify.
 - Automation is scoped to the active session tab where possible.
 - Logs can be reviewed or disabled for sensitive use cases.

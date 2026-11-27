@@ -4753,5 +4753,803 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB meldet sich mit Anmeldedaten aus deinem 1Password an. FSB selbst speichert keine Passwörter."
+  },
+  "panel_8b70975df7": {
+    "message": "Wenn aktiviert, erkennt FSB Anmeldeseiten und meldet sich mit den passenden Anmeldedaten aus 1Password an."
+  },
+  "panel_818962bda5": {
+    "message": "1Password-Verbindung wird geprüft..."
+  },
+  "panel_5c0a336c67": {
+    "message": "Wähle die Tresore, die FSB lesen darf. Am sichersten ist ein Tresor, den nur FSB nutzt."
+  },
+  "panel_161c79f605": {
+    "message": "Neue Anmeldedaten speichern in"
+  },
+  "panel_cc6d7a8340": {
+    "message": "Nicht speichern"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "Tresorzugriff speichern"
+  },
+  "panel_5ab21b8830": {
+    "message": "Alten FSB-Tresor nach 1Password verschieben"
+  },
+  "panel_911c744cd5": {
+    "message": "Gib die PIN deines alten FSB-Tresors ein. Nach 1Password verschobene Einträge werden aus FSB gelöscht."
+  },
+  "panel_3f6118f701": {
+    "message": "Nach 1Password verschieben"
+  },
+  "panel_0f5320398c": {
+    "message": "Alten Tresor löschen"
+  },
+  "panel_00f3328a04": {
+    "message": "In den Tresoren, die FSB nutzen darf, gibt es keine Anmeldedaten. Füge sie in 1Password hinzu oder bearbeite sie dort."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB füllt Bezahlformulare mit Kreditkarten aus deinem 1Password aus, nachdem du jedes Ausfüllen bestätigt hast."
+  },
+  "panel_4875f94fbf": {
+    "message": "Verbinde 1Password unter Passwörter, um deine Karten zu nutzen."
+  },
+  "panel_b9675cca57": {
+    "message": "In den Tresoren, die FSB nutzen darf, gibt es keine Kreditkarten. Füge Karten in 1Password hinzu oder bearbeite sie dort."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password ist über die Desktop-App verbunden ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password ist mit einem Dienstkonto verbunden."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password ist nicht verbunden."
+  },
+  "panel_5848961ce6": {
+    "message": "Wähle die Tresore, die FSB nutzen darf, um die Einrichtung abzuschließen."
+  },
+  "panel_216dcfd214": {
+    "message": "Gib den Namen deines 1Password-Kontos ein"
+  },
+  "panel_a94d6f85db": {
+    "message": "Verbindung wird hergestellt... Bestätige FSB in der 1Password-App, falls du gefragt wirst."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password verbunden"
+  },
+  "panel_e520e3cf11": {
+    "message": "Wähle mindestens einen Tresor"
+  },
+  "panel_cc541e4c1e": {
+    "message": "Tresorzugriff gespeichert"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password getrennt"
+  },
+  "panel_e95f94cbda": {
+    "message": "Der alte FSB-Tresor enthält noch Einträge, die FSB nicht mehr nutzt. Anmeldedaten: $LOGINS$. Karten: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "Nach 1Password verschoben. Anmeldedaten: $LOGINS$. Karten: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "Nicht verschoben und in FSB behalten: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "Alten FSB-Tresor löschen? Alles, was nicht nach 1Password verschoben wurde, geht verloren."
+  },
+  "panel_ed17465290": {
+    "message": "Alter Tresor gelöscht"
+  },
+  "panel_3d763a56b2": {
+    "message": "Einträge: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "Wird verschoben..."
+  },
+  "panel_498fd066bf": {
+    "message": "1Password ist nicht erreichbar: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "Gib deine Anmeldedaten ein, um dich anzumelden. FSB kann sie für das nächste Mal in 1Password speichern."
+  },
+  "copy_751ac3de88": {
+    "message": "Gib deine Anmeldedaten ein, um dich anzumelden. FSB verwendet sie einmal und speichert sie nicht."
+  },
+  "copy_264681c742": {
+    "message": "In 1Password speichern"
+  },
+  "entry_vault_checking": {
+    "message": "1Password wird geprüft"
+  },
+  "entry_vault_signing_1p": {
+    "message": "Anmeldung mit 1Password"
+  },
+  "entry_vault_filled_1p": {
+    "message": "Aus 1Password ausgefüllt"
+  },
+  "entry_vault_signing_typed": {
+    "message": "Anmeldung läuft"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "von dir eingegeben · nicht an $CLIENT$ gesendet",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "von dir eingegeben · nicht an deinen Agenten gesendet"
+  },
+  "entry_vault_filled_saved": {
+    "message": "Ausgefüllt · in 1Password gespeichert"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "Ausgefüllt · nicht gespeichert"
+  },
+  "entry_vault_cancelled": {
+    "message": "Abgebrochen · nichts ausgefüllt"
+  },
+  "entry_vault_page_changed": {
+    "message": "Seite geändert · nichts ausgefüllt"
+  },
+  "entry_vault_several": {
+    "message": "$COUNT$ Anmeldedaten passen · $CLIENT$ fragt dich",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "$COUNT$ Anmeldedaten passen · dein Agent fragt dich",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "Benutzername"
+  },
+  "entry_vault_chip_password": {
+    "message": "Passwort"
+  },
+  "entry_vault_chip_code": {
+    "message": "Einmalcode"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "Anmelden"
+  },
+  "entry_vault_sheet_user": {
+    "message": "E-Mail oder Benutzername"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "Passwort verbergen"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "Nicht gespeichert · kein Tresor für neue Anmeldedaten festgelegt"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "Pausiert"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· zum Weitertippen klicken"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "Teilweise von der Seite verdeckt"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "Stattdessen 1Password verwenden"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "In 1Password hinzufügen"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "Speichere Anmeldedaten für diese Website in 1Password und fahre dann fort."
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "Stattdessen hier eingeben"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "Für diese Website ist noch nichts gespeichert."
+  },
+  "entry_vault_approve": {
+    "message": "FSB in 1Password erlauben"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "wartet auf dich"
+  },
+  "entry_vault_entering_code": {
+    "message": "Code wird eingegeben"
+  },
+  "entry_vault_one_time_code": {
+    "message": "Einmalcode"
+  },
+  "entry_vault_not_https": {
+    "message": "Nicht ausgefüllt · Seite ist nicht https"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "Nicht ausgefüllt · Karten nur über https"
+  },
+  "entry_vault_locked": {
+    "message": "1Password ist gesperrt"
+  },
+  "entry_vault_unlock": {
+    "message": "zum Fortfahren entsperren"
+  },
+  "entry_vault_unreachable": {
+    "message": "1Password nicht erreichbar"
+  },
+  "entry_vault_filling_card": {
+    "message": "Karte wird ausgefüllt"
+  },
+  "entry_vault_card_filled": {
+    "message": "Karte ausgefüllt · prüfen und bezahlen"
+  },
+  "entry_vault_chip_number": {
+    "message": "Nummer"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "Ablauf"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "Prüfcode"
+  },
+  "entry_vault_chip_name": {
+    "message": "Inhaber"
+  },
+  "copy_e86c3bc142": {
+    "message": "Welches Konto?"
+  },
+  "copy_02451a3272": {
+    "message": "Als $NAME$ anmelden",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "Stattdessen eingeben"
+  },
+  "copy_bfd402b2f6": {
+    "message": "Anmelden"
+  },
+  "copy_2a347f1933": {
+    "message": "E-Mail oder Benutzername"
+  },
+  "copy_50eb1b1291": {
+    "message": "Mit 1Password angemeldet"
+  },
+  "copy_edfed2d184": {
+    "message": "Bei $DOMAIN$ angemeldet",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "In 1Password gespeichert"
+  },
+  "copy_22b3467c1b": {
+    "message": "Nicht gespeichert"
+  },
+  "copy_8a56b97150": {
+    "message": "Anmeldung übersprungen"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB macht ohne Anmeldung weiter."
+  },
+  "copy_735479c991": {
+    "message": "Karte auf $DOMAIN$ ausgefüllt",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$. Prüfen und bezahlen.",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "Du hast das Ausfüllen der Karte abgelehnt"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "Aus 1Password wurde nichts gelesen."
+  },
+  "copy_db8bc38f4b": {
+    "message": "Zeit zum Ausfüllen der Karte abgelaufen"
+  },
+  "copy_58723d2bab": {
+    "message": "Karte ausfüllen?"
+  },
+  "copy_a2d285b352": {
+    "message": "Ablehnen"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "Karte ausfüllen"
+  },
+  "copy_2a48c44dfa": {
+    "message": "Auf $DOMAIN$ nicht ausgefüllt",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "Die Seite ist nicht https."
+  },
+  "copy_5decaf89b7": {
+    "message": "Seite geändert, nichts ausgefüllt"
+  },
+  "copy_b41f042ed0": {
+    "message": "Der Tab ist auf eine andere Website gewechselt."
+  },
+  "copy_99955bb437": {
+    "message": "1Password ist nicht verbunden"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB kann noch keine Anmeldungen oder Karten ausfüllen."
+  },
+  "copy_5cbafe67aa": {
+    "message": "Tresor-Einstellungen öffnen"
+  },
+  "copy_270e420dd3": {
+    "message": "diese Seite"
+  },
+  "panel_5d55c415e3": {
+    "message": "Tresor"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB meldet sich an und füllt Kassen mit Einträgen aus deinem 1Password aus. FSB selbst speichert keine Passwörter oder Karten."
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB füllt Kassenformulare mit Karten aus deinem 1Password aus."
+  },
+  "panel_caf0111717": {
+    "message": "Lokaler Server"
+  },
+  "panel_101f4d9537": {
+    "message": "Dieser Browser"
+  },
+  "panel_87bdac40eb": {
+    "message": "FSB-Erweiterung"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "Zugriff"
+  },
+  "panel_22894e363f": {
+    "message": "Tresore, die FSB lesen darf"
+  },
+  "panel_5e05243ee1": {
+    "message": "Am sichersten ist ein Tresor, den nur FSB nutzt."
+  },
+  "panel_07ce99bab0": {
+    "message": "Anmelderegeln"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "Aus jedem 1Password-Eintrag übernommen"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "Nur auf den Websites, die in Anmeldedaten gespeichert sind."
+  },
+  "panel_374082363f": {
+    "message": "Nie von https zu http."
+  },
+  "panel_059151ea45": {
+    "message": "Karten ausfüllen"
+  },
+  "panel_42e70101ec": {
+    "message": "Dein Agent fragt dich zuerst"
+  },
+  "panel_949603eecc": {
+    "message": "Über MCP in seiner eigenen App. Im Autopiloten in der Seitenleiste."
+  },
+  "panel_33e5a068d8": {
+    "message": "Nur auf https-Seiten."
+  },
+  "panel_e8cb2edbc4": {
+    "message": "Was Agenten sehen"
+  },
+  "panel_107fa062ba": {
+    "message": "Über MCP und im Autopiloten"
+  },
+  "panel_c53616b513": {
+    "message": "Titel, Benutzernamen, Websites, letzte vier Ziffern."
+  },
+  "panel_ed87d52230": {
+    "message": "Nie ein Passwort, Code oder eine Kartennummer."
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "Einträge"
+  },
+  "panel_f5b53d4968": {
+    "message": "Nach dem Verbinden"
+  },
+  "panel_543eb6e59b": {
+    "message": "Anmeldedaten"
+  },
+  "panel_a52fcbbc33": {
+    "message": "Karten"
+  },
+  "panel_3304ef1777": {
+    "message": "Titel, Benutzernamen und Websites suchen"
+  },
+  "panel_5a80aae52c": {
+    "message": "Nur lesen. Anmeldedaten bearbeitest du in 1Password."
+  },
+  "panel_547ca35987": {
+    "message": "Wird erst beim Ausfüllen aus 1Password gelesen, für die Website im Tab."
+  },
+  "panel_2fdf0b746a": {
+    "message": "Anmeldedaten und Karten erscheinen hier, sobald du mindestens einen Tresor auswählst."
+  },
+  "panel_10c5739b95": {
+    "message": "Wartet auf Freigabe"
+  },
+  "panel_a424e33d90": {
+    "message": "Gesperrt"
+  },
+  "panel_5ad99230df": {
+    "message": "Nicht erreichbar"
+  },
+  "panel_dce083a2c4": {
+    "message": "Abgelehnt"
+  },
+  "panel_67a926f700": {
+    "message": "Nicht verfügbar"
+  },
+  "panel_1d09faf925": {
+    "message": "Update nötig"
+  },
+  "panel_53f15ea2f2": {
+    "message": "Nicht gekoppelt"
+  },
+  "panel_a06130a5a2": {
+    "message": "Zu viele Anfragen"
+  },
+  "panel_9f760ab207": {
+    "message": "Wartet auf dich"
+  },
+  "panel_8985693566": {
+    "message": "Noch nicht verbunden"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "Verbindung zu $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "Mit einem Dienstkonto verbunden"
+  },
+  "panel_4435385a73": {
+    "message": "Der lokale FSB-Server läuft nicht"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "1Password-App nicht gefunden"
+  },
+  "panel_9d094cbe0c": {
+    "message": "Lokalen Server aktualisieren"
+  },
+  "panel_b0545ee348": {
+    "message": "Erneut koppeln"
+  },
+  "panel_a904382fc7": {
+    "message": "Etwas langsamer"
+  },
+  "panel_12e12023d2": {
+    "message": "1Password nicht erreicht"
+  },
+  "panel_a5ae6c601d": {
+    "message": "Erlaube FSB in der 1Password-App."
+  },
+  "panel_f83ab4c57f": {
+    "message": "Wähle die Tresore, die FSB lesen darf."
+  },
+  "panel_b33cf191b9": {
+    "message": "Im Terminal eingerichtet. Beim Trennen wird das gespeicherte Token gelöscht, deshalb fragt FSB vorher."
+  },
+  "panel_8ba387915f": {
+    "message": "Entsperre 1Password, um fortzufahren. Deine Einstellungen bleiben erhalten."
+  },
+  "panel_041a40019f": {
+    "message": "Installiere den lokalen FSB-Server und versuche es dann erneut."
+  },
+  "panel_40647b20fa": {
+    "message": "FSB kann nichts lesen, bis du es erlaubst. Versuche es erneut und erlaube FSB dann in 1Password."
+  },
+  "panel_0233589be3": {
+    "message": "Dieser fsb-mcp-server ist für 1Password zu alt oder kann sein SDK nicht laden."
+  },
+  "panel_01ddad80a6": {
+    "message": "Der Server läuft, vertraut diesem Browser aber nicht mehr. Erneutes Koppeln behebt das."
+  },
+  "panel_1c3eb3d073": {
+    "message": "Zu viele Anfragen in kurzer Zeit. Mit deinem Konto ist alles in Ordnung. Versuche es in einer Minute erneut."
+  },
+  "panel_89857dc659": {
+    "message": "1Password fragt, ob FSB es verwenden darf. FSB wartet bis zu 75 Sekunden."
+  },
+  "panel_979a9a05cd": {
+    "message": "Desktop-App"
+  },
+  "panel_69ce0728e7": {
+    "message": "fragt dich"
+  },
+  "panel_14493f5f54": {
+    "message": "gesperrt"
+  },
+  "panel_d7da083898": {
+    "message": "Dienstkonto"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password, dann der lokale FSB-Server, dann dieser Browser"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password, dann der lokale Server, den dieser Browser nicht erreicht"
+  },
+  "panel_845f928640": {
+    "message": "Persönlich"
+  },
+  "panel_535c99f759": {
+    "message": "Nur FSB"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "Geteilt"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "Dein persönlicher Tresor. Alle $COUNT$ Einträge werden für Agenten verfügbar.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "Mit anderen geteilt. Alle $COUNT$ Einträge werden für Agenten verfügbar.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "Alle $COUNT$ Einträge in diesem Tresor werden für Agenten verfügbar.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "Überall auf der Website"
+  },
+  "panel_b20197643c": {
+    "message": "Genaue Domain"
+  },
+  "panel_8b8c047cc1": {
+    "message": "$COUNT$ für diese Website",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "Einmalcode"
+  },
+  "panel_c68b5649c4": {
+    "message": "Rechnungsadresse auf der Karte"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "keine Rechnungsadresse gespeichert"
+  },
+  "panel_fdee246866": {
+    "message": "Wird in Gruppen zu 10 übertragen. Jede Gruppe wird aus FSB gelöscht, sobald 1Password sie bestätigt."
+  },
+  "panel_72fe828489": {
+    "message": "In 1Password übertragen. Anmeldedaten: $LOGINS$. Karten: $CARDS$. Der alte Tresor ist gelöscht.",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "Unterwegs gestoppt: $MOVED$ übertragen, $KEPT$ in FSB behalten.",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "1Password trennen? FSB vergisst seine 1Password-Einstellungen."
+  },
+  "panel_91fa9fd3cf": {
+    "message": "1Password trennen? FSB vergisst seine 1Password-Einstellungen und löscht das gespeicherte Dienstkonto-Token. Zum erneuten Verbinden brauchst du wieder das Terminal."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "Bei 1Password anmelden"
+  },
+  "panel_26639e7832": {
+    "message": "Konto ändern"
+  },
+  "panel_61a5454aac": {
+    "message": "Kontoname – steht oben in der Seitenleiste von 1Password"
+  },
+  "panel_24f92b0c67": {
+    "message": "Nutzt die 1Password-Desktop-App. Dort muss Settings > Developer > Integrate with 1Password SDKs aktiviert sein (FSB öffnet die Seite, falls nicht). Danach bittet 1Password dich, FSB zu erlauben."
+  },
+  "panel_0db703c375": {
+    "message": "1Password installieren"
+  },
+  "panel_887ff0e04c": {
+    "message": "1Password-Einstellungen öffnen"
+  },
+  "panel_af67e786b5": {
+    "message": "Noch kein Tresor zum Speichern. Wähle einen, damit FSB neue Anmeldedaten in 1Password speichern kann."
+  },
+  "panel_9f088dbebd": {
+    "message": "Erweitert"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "FSB auf diese Tresore beschränken"
+  },
+  "panel_104a4be90f": {
+    "message": "Alle Tresore verwenden"
+  },
+  "panel_65f5a87194": {
+    "message": "In 1Password: Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "Aktiviere Integrate with 1Password SDKs in 1Password und komm dann zurück. FSB prüft 2 Minuten lang weiter."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs ist noch aus"
+  },
+  "panel_3facf5a8dc": {
+    "message": "Wird dein Gerät verwaltet? Frag deinen Admin."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs ist aus"
+  },
+  "panel_e5dab5535e": {
+    "message": "Aktiviere Integrate with 1Password SDKs in 1Password und komm dann zurück."
+  },
+  "panel_55a8cd8239": {
+    "message": "Angemeldet"
+  },
+  "panel_06e7541e0b": {
+    "message": "Angemeldet · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "1Password fragt nach 10 Minuten Inaktivität, einer Sperre oder einem Neustart des lokalen Servers eventuell erneut, ob FSB zugreifen darf."
+  },
+  "panel_41a0e0aead": {
+    "message": "Anmeldung bei 1Password fehlgeschlagen"
+  },
+  "panel_f24552b4b3": {
+    "message": "Prüfe den Kontonamen und versuche es dann erneut."
+  },
+  "panel_bf74b77b3d": {
+    "message": "Prüfe den Kontonamen und versuche es dann erneut. Details: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "Installiere die 1Password-App, melde dich an und versuche es dann erneut."
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password-Konto: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "Alle Tresore in deinem 1Password-Konto"
+  },
+  "panel_7a9e047a27": {
+    "message": "Nur die unter „Erweitert“ aktivierten Tresore"
+  },
+  "panel_fec6b9e93d": {
+    "message": "Gespeicherte Anmeldung entfernen"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "In diesem Browser abgemeldet. Der lokale Server hat die 1Password-Anmeldung noch, und FSB entfernt sie dort, sobald es kann."
   }
 }

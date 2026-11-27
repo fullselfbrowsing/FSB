@@ -55,7 +55,7 @@ The goal of this page: get a new user from a clean machine to a green doctor in 
    Notes:
    - What these commands do: each invocation spawns the `fsb-mcp-server` Node package via npx. `install --list` only prints detected MCP hosts and exits. `install --<host>` writes the FSB stdio block into that host's MCP config file and nothing else. Run only the host installers you actually want configured; decline prompts otherwise.
    - By default, `npx -y fsb-mcp-server@latest` resolves to the latest published bridge so security fixes ship without re-running the installer. If you prefer review-before-upgrade, pin a release by replacing `fsb-mcp-server` with `fsb-mcp-server@x.y.z` (see releases at `https://www.npmjs.com/package/fsb-mcp-server`) in the stdio block printed by `node scripts/print-stdio.mjs` and in any host-specific install command. The bridge accepts the same arguments either way.
-   - Zero environment variables are needed. Vault values (passwords, payment methods) resolve inside the FSB Chrome extension's encrypted storage and never cross into the MCP server process or the OpenClaw host process. See `references/vault-boundary.md` for the boundary rules.
+   - Zero environment variables are needed. Logins and cards come from the user's 1Password, connected in FSB with the Log in to 1Password button on the Vault page (or `npx fsb-mcp-server onepassword --service-account` on a headless machine); values resolve inside FSB and are never returned to the OpenClaw host process or the model. See `references/vault-boundary.md` for the boundary rules.
 
 3. **Verify with the doctor.**
 

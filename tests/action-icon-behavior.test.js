@@ -461,13 +461,14 @@ const cutOf = (group, size) => {
       bounded: /bounded:/.test(body)
     };
   }
-  assertEq(Object.keys(iconStates).length, 4, 'icon defines exactly 4 states');
+  // The fifth state, ask, is the 1Password typed-login sheet's key badge.
+  assertEq(Object.keys(iconStates).length, 5, 'icon defines exactly 5 states');
   // The key IS the form. Under the tool-category model the old phase names
   // (acting / thinking) would misname the animations outright -- orbit means
   // reading now, so a key called "acting" pointing at it is a trap.
   assertEq(
-    ['sweep', 'orbit', 'ring', 'breathe'].map((s) => iconStates[s] && iconStates[s].form).join(','),
-    'sweep,orbit,ring,breathe',
+    ['sweep', 'orbit', 'ring', 'breathe', 'ask'].map((s) => iconStates[s] && iconStates[s].form).join(','),
+    'sweep,orbit,ring,breathe,ask',
     'every state is keyed by the form it draws'
   );
 

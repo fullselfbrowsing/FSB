@@ -3134,213 +3134,139 @@ class MCPBridgeClient {
   }
 
   // --------------------------------------------------------------------------
-  // Vault handlers (Phase 195) -- secrets never leave the extension
+  // Credential handlers -- 1Password via the FSB local server.
+  // Results carry ids, titles, hosts, usernames, vault names, and card brand,
+  // last 4, cardholder name, and expiry only.
+  // Passwords, one-time codes, card numbers, and CVVs go from the server to
+  // the page fill and are never part of a reply on this socket.
   // --------------------------------------------------------------------------
 
+  _onePassword() {
+    return (typeof globalThis !== 'undefined' && globalThis.fsbOnePassword) || null;
+  }
+
+  _onePasswordFailure(result, fallback) {
+    const out = {
+      success: false,
+      errorCode: (result && result.errorCode) || 'onepassword_request_failed',
+      error: (result && result.error) || fallback,
+    };
+    // Why a sign-in failed (locked, declined, app_missing): the agent's next step depends on it.
+    if (result && typeof result.reason === 'string') out.reason = result.reason;
+    if (result && Array.isArray(result.candidates)) out.candidates = result.candidates;
+    return out;
+  }
+
+  async _resolveAgentTab(payload) {
+    // Phase 246 D-13: credential tools are agent-scoped. The resolver picks the
+    // tab; the site is always derived from that tab's URL, never the payload.
+    const agentId = (payload && payload.agentId) || null;
+    const params = (payload && payload.params) || payload || {};
+    return (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
+      ? globalThis.resolveAgentTabOrError(agentId, params, this)
+      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+  }
+
   async _handleListCredentials() {
-    const status = await this._dispatchToBackground({ action: 'getCredentialVaultStatus' });
-    if (!status || status.success === false) {
-      return { success: false, errorCode: 'vault_status_unavailable', error: status?.error || 'Credential vault status unavailable' };
-    }
-    if (!status.configured) {
-      return { success: false, errorCode: 'vault_not_configured', error: 'Credential vault is not configured' };
-    }
-    if (!status.unlocked) {
-      return { success: false, errorCode: 'vault_locked', error: 'Credential vault is locked' };
-    }
-    const response = await this._dispatchToBackground({ action: 'getAllCredentials' });
-    if (!response || !response.success) {
-      return { success: false, error: response?.error || 'Failed to list credentials' };
-    }
-    // Strip passwords -- return domain + username only (MCP-01)
-    const credentials = (response.credentials || []).map(c => ({
-      domain: c.domain,
-      username: c.username,
+    const onePassword = this._onePassword();
+    if (!onePassword) return { success: false, errorCode: 'onepassword_unavailable', error: '1Password support did not load' };
+    const response = await onePassword.listLogins();
+    if (!response || !response.ok) return this._onePasswordFailure(response, 'Failed to list 1Password logins');
+    const credentials = (response.logins || []).map(c => ({
+      id: String(c.id || ''),
+      title: String(c.title || ''),
+      domain: Array.isArray(c.domains) && c.domains.length ? String(c.domains[0]) : '',
+      domains: Array.isArray(c.domains) ? c.domains.map(String) : [],
+      username: String(c.username || ''),
     }));
     return { success: true, credentials };
   }
 
   async _handleFillCredential(payload) {
-    // Phase 246 D-13 vault overturn: vault tools join the agent-scoped
-    // surface. Resolver picks the tab; URL still derived from chrome.tabs.get
-    // (we need the URL for domain derivation; resolver returns only tabId).
-    const agentId = (payload && payload.agentId) || null;
-    const params = (payload && payload.params) || payload || {};
-    const resolved = await (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
-      ? globalThis.resolveAgentTabOrError(agentId, params, this)
-      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    const onePassword = this._onePassword();
+    if (!onePassword) return { success: false, errorCode: 'onepassword_unavailable', error: '1Password support did not load' };
+    const resolved = await this._resolveAgentTab(payload);
     if (resolved.success === false) {
       return resolved;
     }
-    let tab;
+    const params = (payload && payload.params) || payload || {};
+    const itemId = typeof params.credentialId === 'string' ? params.credentialId : undefined;
+    const tabId = resolved.tabId;
+    const client = await this._visualClientLabel(tabId);
+    // With nothing saved for the site, the user may type a login on the page
+    // (askUser). The agent never sees what they type.
+    return onePassword.fillLoginInTab(
+      tabId,
+      { itemId, requireUnique: true, askUser: true, client },
+      (target, message) => this._sendToContentScript(target, message),
+      this._vaultPillHooks(tabId, client),
+    );
+  }
+
+  // The MCP client's display name for the tab ("Claude", "Codex", ...), as the
+  // visual session recorded it. Credential tools carry no client of their own.
+  async _visualClientLabel(tabId) {
     try {
-      tab = await chrome.tabs.get(resolved.tabId);
+      const key = 'mcpVisualSession:' + tabId;
+      const stored = chrome.storage && chrome.storage.session ? await chrome.storage.session.get(key) : null;
+      const entry = stored && stored[key];
+      return entry && typeof entry.client === 'string' ? entry.client : '';
     } catch (_e) {
-      return { success: false, error: 'Resolved tabId ' + resolved.tabId + ' could not be loaded' };
+      return '';
     }
-    if (!tab?.url) return { success: false, error: 'No URL on resolved tab' };
+  }
 
-    let domain;
-    try {
-      domain = new URL(tab.url).hostname;
-    } catch {
-      return { success: false, error: 'Cannot determine domain from resolved tab URL' };
-    }
-
-    // Lookup credential in vault (stays in extension)
-    const credResponse = await this._dispatchToBackground({
-      action: 'getFullCredential',
-      domain,
-    });
-    if (!credResponse?.success || !credResponse.credential) {
-      return { success: false, error: 'No credential found for ' + domain };
-    }
-
-    // Send fill command to content script -- password travels bg->content only (MCP-02)
-    const result = await this._sendToContentScript(resolved.tabId, {
-      action: 'executeAction',
-      tool: 'fillCredentialFields',
-      params: {
-        username: credResponse.credential.username,
-        password: credResponse.credential.password,
-      },
-    });
-    return result || { success: false, error: 'Fill failed' };
+  // Status pill updates for 1Password work on the tab, plus the toolbar key
+  // badge while the page asks the user to type a login.
+  _vaultPillHooks(tabId, client) {
+    const icon = globalThis.fsbActionIcon;
+    return {
+      status: async (state) => {
+        const asking = !!state && state.phase === 'ask';
+        if (icon && typeof icon.setAsking === 'function') icon.setAsking(tabId, asking);
+        const reply = await this._sendToContentScript(tabId, { action: 'vaultPill', state: { ...state, client } });
+        return reply && typeof reply === 'object' ? reply : null;
+      }
+    };
   }
 
   async _handleListPayments() {
-    const status = await this._dispatchToBackground({ action: 'getPaymentVaultStatus' });
-    if (!status || status.success === false) {
-      return { success: false, errorCode: 'vault_status_unavailable', error: status?.error || 'Payment vault status unavailable' };
-    }
-    if (!status.configured) {
-      return { success: false, errorCode: 'vault_not_configured', error: 'Payment vault is not configured' };
-    }
-    if (!status.unlocked || !status.paymentUnlocked) {
-      return { success: false, errorCode: 'vault_locked', error: 'Payment vault is locked' };
-    }
-    const response = await this._dispatchToBackground({ action: 'getAllPaymentMethods' });
-    if (!response || !response.success) {
-      return { success: false, error: response?.error || 'Failed to list payment methods' };
-    }
-    // Return masked metadata only -- no full card or CVV (MCP-03)
-    const paymentMethods = (response.paymentMethods || []).map(pm => ({
-      id: pm.id,
-      cardBrand: pm.cardBrand,
-      last4: pm.last4,
-      cardholderName: pm.cardholderName,
-      expiryMonth: pm.expiryMonth,
-      expiryYearLast2: pm.expiryYearLast2,
+    const onePassword = this._onePassword();
+    if (!onePassword) return { success: false, errorCode: 'onepassword_unavailable', error: '1Password support did not load' };
+    const response = await onePassword.listCards();
+    if (!response || !response.ok) return this._onePasswordFailure(response, 'Failed to list 1Password cards');
+    const paymentMethods = (response.cards || []).map(pm => ({
+      id: String(pm.id || ''),
+      title: String(pm.title || ''),
+      cardBrand: String(pm.cardBrand || 'unknown'),
+      last4: String(pm.last4 || ''),
+      cardholderName: String(pm.cardholderName || ''),
+      expiryMonth: String(pm.expiryMonth || ''),
+      expiryYearLast2: String(pm.expiryYearLast2 || ''),
     }));
     return { success: true, paymentMethods };
   }
 
   async _handleUsePaymentMethod(payload) {
-    const { paymentMethodId } = payload;
+    const { paymentMethodId } = payload || {};
     if (!paymentMethodId) return { success: false, error: 'paymentMethodId is required' };
-
-    // Phase 246 D-13 vault overturn: vault tools join the agent-scoped
-    // surface. Resolver picks the tab; URL still derived from chrome.tabs.get.
-    const agentId = (payload && payload.agentId) || null;
-    const params = (payload && payload.params) || payload || {};
-    const resolved = await (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
-      ? globalThis.resolveAgentTabOrError(agentId, params, this)
-      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    const onePassword = this._onePassword();
+    if (!onePassword) return { success: false, errorCode: 'onepassword_unavailable', error: '1Password support did not load' };
+    const resolved = await this._resolveAgentTab(payload);
     if (resolved.success === false) {
       return resolved;
     }
-    let tab;
-    try {
-      tab = await chrome.tabs.get(resolved.tabId);
-    } catch (_e) {
-      return { success: false, error: 'Resolved tabId ' + resolved.tabId + ' could not be loaded' };
-    }
-    if (!tab?.url) return { success: false, error: 'No URL on resolved tab' };
-
-    // Derive merchant domain from resolved tab (MCP-04: not from MCP payload)
-    let merchantDomain;
-    try {
-      merchantDomain = new URL(tab.url).hostname;
-    } catch {
-      merchantDomain = tab.url;
-    }
-
-    // Lookup full payment method in vault (stays in extension)
-    const pmResponse = await this._dispatchToBackground({
-      action: 'getFullPaymentMethod',
-      id: paymentMethodId,
-    });
-    if (!pmResponse?.success || !pmResponse.paymentMethod) {
-      return { success: false, error: 'Payment method not found' };
-    }
-    const pm = pmResponse.paymentMethod;
-
-    // Confirmation gate: two-phase broadcast + listener (MCP-04)
-    // Pattern: register listener FIRST, then send confirmation request
-    const confirmResult = await new Promise((resolve) => {
-      const timeoutId = setTimeout(() => {
-        chrome.runtime.onMessage.removeListener(confirmHandler);
-        resolve({ approved: false, reason: 'timeout' });
-      }, 120_000);
-
-      function confirmHandler(request, sender, sendResponse) {
-        if (request.action === 'paymentFillApproved' && request.paymentMethodId === paymentMethodId) {
-          clearTimeout(timeoutId);
-          chrome.runtime.onMessage.removeListener(confirmHandler);
-          resolve({ approved: true });
-          sendResponse({ received: true });
-        } else if (request.action === 'paymentFillDenied' && request.paymentMethodId === paymentMethodId) {
-          clearTimeout(timeoutId);
-          chrome.runtime.onMessage.removeListener(confirmHandler);
-          resolve({ approved: false, reason: 'user_declined' });
-          sendResponse({ received: true });
-        }
-      }
-
-      chrome.runtime.onMessage.addListener(confirmHandler);
-
-      chrome.runtime.sendMessage({
-        action: 'paymentFillConfirmation',
-        paymentMethodId,
-        cardBrand: pm.cardBrand || 'unknown',
-        last4: pm.last4 || (pm.cardNumber ? pm.cardNumber.slice(-4) : '****'),
-        merchantDomain,
-      }).catch(() => {
-        clearTimeout(timeoutId);
-        chrome.runtime.onMessage.removeListener(confirmHandler);
-        resolve({ approved: false, reason: 'sidepanel_unavailable' });
-      });
-    });
-    if (!confirmResult.approved) {
-      const reason = confirmResult.reason || 'user_declined';
-      const errorMsg = reason === 'sidepanel_unavailable'
-        ? 'Payment confirmation requires the FSB sidepanel to be open'
-        : reason === 'timeout'
-          ? 'Payment confirmation timed out (2 minutes)'
-          : 'User declined payment fill';
-      return { success: false, error: errorMsg };
-    }
-
-    // Fill payment fields on the resolved tab -- full card data travels bg->content only
-    const result = await this._sendToContentScript(resolved.tabId, {
-      action: 'executeAction',
-      tool: 'fillPaymentFields',
-      params: {
-        cardNumber: pm.cardNumber,
-        expiryMonth: pm.expiryMonth,
-        expiryYear: pm.expiryYear,
-        cvv: pm.cvv,
-        cardholderName: pm.cardholderName,
-        billingName: pm.billingName,
-        addressLine1: pm.addressLine1,
-        addressLine2: pm.addressLine2,
-        city: pm.city,
-        stateRegion: pm.stateRegion,
-        postalCode: pm.postalCode,
-        country: pm.country,
-      },
-    });
-    return result || { success: false, error: 'Payment fill failed' };
+    // Over MCP the agent asks the user in its own app before this call, so
+    // FSB shows status only (confirm: 'agent'); autopilot keeps the side panel.
+    const tabId = resolved.tabId;
+    const client = await this._visualClientLabel(tabId);
+    return onePassword.fillCardInTab(
+      tabId,
+      String(paymentMethodId),
+      (target, message) => this._sendToContentScript(target, message),
+      { confirm: 'agent' },
+      this._vaultPillHooks(tabId, client),
+    );
   }
 }
 

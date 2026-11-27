@@ -6030,14 +6030,86 @@ const tools = {
   };
 
   // =========================================================================
-  // VAULT FILL: fillCredentialFields -- fill login form using classified inputs
+  // 1PASSWORD FILL: fillCredentialFields -- fill login form using classified inputs
   // Uses FSB.inferElementPurpose to detect credential-input fields by role/intent.
-  // Params: { username, password } -- decrypted values from background vault lookup.
+  // Params: { username, password, oneTimeCode } -- resolved from 1Password by the
+  // background; any of them may be empty. One-time codes go into
+  // autocomplete="one-time-code" inputs or OTP-looking fields, including split
+  // one-digit boxes.
   // Returns: { success, filled, fieldsFound } or { success: false, error }.
   // =========================================================================
+  const OTP_FIELD_PATTERN = /(^|[^a-z])(otp|totp|one.?time|2fa|mfa|two.?factor|verification.?code|verify.?code|auth(entication|enticator)?.?code|security.?code|passcode|login.?code|sign.?in.?code)([^a-z]|$)/i;
+  const OTP_EXCLUDE_PATTERN = /cvv|cvc|csc|card|cc-|zip|postal|phone|promo|coupon|gift/i;
+
+  // The background resolved these values from 1Password for one origin. If the
+  // tab navigated before this message landed, this is another document: refuse
+  // before any value touches the page. A missing origin is refused too.
+  function fillOriginRefusal(params, errorCode) {
+    const expected = params && typeof params.expectedOrigin === 'string' ? params.expectedOrigin : '';
+    if (expected && expected === window.location.origin) return null;
+    return { success: false, errorCode, error: 'The page changed before the fill; nothing was filled' };
+  }
+
+  function credentialSetValue(element, value) {
+    element.focus();
+    const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) setter.call(element, value);
+    else element.value = value;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return element.value === value;
+  }
+
+  function isOneTimeCodeInput(input) {
+    const type = (input.getAttribute('type') || 'text').toLowerCase();
+    if (!['text', 'tel', 'number', 'password', ''].includes(type)) return false;
+    const autocomplete = (input.getAttribute('autocomplete') || '').toLowerCase();
+    if (autocomplete.includes('one-time-code')) return true;
+    if (autocomplete.startsWith('cc-')) return false;
+    // A page that marks the field as its password is believed over its label
+    // ("Passcode", "Security code").
+    if (autocomplete.includes('current-password') || autocomplete.includes('new-password')) return false;
+    const descriptor = [
+      input.name, input.id, input.getAttribute('placeholder'),
+      input.getAttribute('aria-label'), input.getAttribute('data-testid'),
+      input.labels && input.labels[0] ? input.labels[0].textContent : ''
+    ].filter(Boolean).join(' ');
+    return OTP_FIELD_PATTERN.test(descriptor) && !OTP_EXCLUDE_PATTERN.test(descriptor);
+  }
+
+  // Nearest ancestor holding every box, a few levels up at most. Boxes may be
+  // siblings or each sit in its own wrapper element.
+  const SPLIT_CODE_MAX_DEPTH = 4;
+  function splitCodeContainer(group) {
+    let node = group[0].parentElement;
+    for (let depth = 0; node && depth < SPLIT_CODE_MAX_DEPTH; depth += 1) {
+      if (node === document.body || node === document.documentElement) return null;
+      if (group.every((input) => node.contains(input))) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  // Split code boxes: several visible, adjacent maxlength=1 inputs.
+  function findSplitCodeInputs(inputs, length) {
+    const singles = inputs.filter((input) => input.offsetParent && Number(input.getAttribute('maxlength')) === 1
+      && ['text', 'tel', 'number', 'password', ''].includes((input.getAttribute('type') || 'text').toLowerCase()));
+    if (singles.length < length) return null;
+    for (let start = 0; start + length <= singles.length; start += 1) {
+      const group = singles.slice(start, start + length);
+      if (splitCodeContainer(group)) return group;
+    }
+    return null;
+  }
+
   tools.fillCredentialFields = async (params) => {
-    const { username, password } = params;
-    if (!username && !password) {
+    const refusal = fillOriginRefusal(params, 'page_changed');
+    if (refusal) return refusal;
+    const username = params && params.username ? String(params.username) : '';
+    const password = params && params.password ? String(params.password) : '';
+    const oneTimeCode = params && /^\d{4,10}$/.test(String(params.oneTimeCode || '')) ? String(params.oneTimeCode) : '';
+    if (!username && !password && !oneTimeCode) {
       return { success: false, error: 'No credentials provided' };
     }
 
@@ -6045,9 +6117,16 @@ const tools = {
     const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"])'));
     let usernameField = null;
     let passwordField = null;
+    let codeField = null;
 
     for (const input of inputs) {
       if (!input.offsetParent && input.type !== 'password') continue; // skip invisible (except password which may be in visible form)
+      // Only with a code to fill: otherwise a password box labelled
+      // "Passcode" would be set aside and never get the password.
+      if (oneTimeCode && !codeField && input.offsetParent && isOneTimeCodeInput(input)) {
+        codeField = input;
+        continue;
+      }
       const classification = FSB.inferElementPurpose(input);
       if (!classification) continue;
 
@@ -6064,26 +6143,40 @@ const tools = {
     const filled = [];
 
     if (usernameField && username) {
-      usernameField.focus();
-      usernameField.value = username;
-      usernameField.dispatchEvent(new Event('input', { bubbles: true }));
-      usernameField.dispatchEvent(new Event('change', { bubbles: true }));
+      credentialSetValue(usernameField, username);
       filled.push('username');
     }
 
     if (passwordField && password) {
-      passwordField.focus();
-      passwordField.value = password;
-      passwordField.dispatchEvent(new Event('input', { bubbles: true }));
-      passwordField.dispatchEvent(new Event('change', { bubbles: true }));
+      credentialSetValue(passwordField, password);
       filled.push('password');
+    }
+
+    let splitCode = null;
+    if (oneTimeCode && !codeField && !passwordField) {
+      splitCode = findSplitCodeInputs(inputs, oneTimeCode.length);
+    }
+    if (oneTimeCode && codeField) {
+      credentialSetValue(codeField, oneTimeCode);
+      filled.push('one-time-code');
+    } else if (oneTimeCode && splitCode) {
+      splitCode.forEach((input, index) => credentialSetValue(input, oneTimeCode[index]));
+      filled.push('one-time-code');
     }
 
     if (filled.length === 0) {
       return { success: false, error: 'No login fields detected on this page' };
     }
 
-    return { success: true, filled, fieldsFound: { username: !!usernameField, password: !!passwordField } };
+    return {
+      success: true,
+      filled,
+      fieldsFound: {
+        username: !!usernameField,
+        password: !!passwordField,
+        oneTimeCode: !!(codeField || splitCode)
+      }
+    };
   };
 
   // =========================================================================
@@ -6094,6 +6187,8 @@ const tools = {
   // Returns: { success, filled, totalFieldsDetected } or { success: false, error }.
   // =========================================================================
   tools.fillPaymentFields = async (params) => {
+    const refusal = fillOriginRefusal(params, 'merchant_changed');
+    if (refusal) return refusal;
     const { cardNumber, cvv, expiryMonth, expiryYear, cardholderName, billingAddress } = params;
 
     const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select'));

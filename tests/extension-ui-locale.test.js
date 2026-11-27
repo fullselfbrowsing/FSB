@@ -308,15 +308,24 @@ for (const [file, exactMap, texts] of [
   ['extension/ui/options.js', controlPanelMap, [
     'Model Required', 'Models Required', 'API Key Required', 'Connection Failed', 'Connection Error', 'Test failed',
     'Provide an API key before saving this provider', 'Load an available model from this provider before saving',
-    'Changes discarded', 'Logs cleared', 'Session deleted', 'Vault unlocked', 'Incorrect PIN', 'Credential saved',
-    'Credential updated', 'Credential deleted', 'Access granted', 'Request denied', 'Memory deleted', 'Memories exported',
+    'Changes discarded', 'Logs cleared', 'Session deleted', '1Password connected', 'Vault access saved',
+    '1Password disconnected', 'Old vault deleted', 'Choose at least one vault', 'Access granted', 'Request denied', 'Memory deleted', 'Memories exported',
     '$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.',
     '$NAME$ connection', 'FSB uses $NAME$\'s existing local sign-in. Test Connection sends one small no-tools validation request.',
     'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.',
     '$ACTIVE$ of $CAP$ active', 'Step $CURRENT$ of $TOTAL$', 'Load next 500 events',
     'Not connected', 'Sign-in failed', 'Sign-in cancelled', 'Connected with browser OAuth',
-    'Sign-in status unavailable', 'Opening Grok sign-in...', 'Waiting for browser sign-in...', 'Edit Credential',
-    'Add Credential', 'Edit Payment Method', 'Add Payment Method', 'No models match search', 'No models available',
+    'Sign-in status unavailable', 'Opening Grok sign-in...', 'Waiting for browser sign-in...', 'Enter your 1Password account name',
+    'Not connected yet', 'Choose the vaults FSB may read.', 'No models match search', 'No models available',
+    'Logged in', 'Logged in · $ACCOUNT$', '1Password account: $ACCOUNT$',
+    '1Password may ask you to approve FSB again after 10 idle minutes, a lock, or a local-server restart.',
+    'Settings > Developer in 1Password', 'Integrate with 1Password SDKs is off', 'Integrate with 1Password SDKs is still off',
+    'Turn on Integrate with 1Password SDKs in 1Password, then come back.',
+    'Turn on Integrate with 1Password SDKs in 1Password, then come back. FSB keeps checking for 2 minutes.',
+    'On a managed device? Ask your admin.', 'Install the 1Password app and sign in, then try again.',
+    'Could not log in to 1Password', 'Check the account name, then try again.',
+    'Check the account name, then try again. Details: $ERROR$',
+    'All vaults in your 1Password account', 'Only the vaults turned on under Advanced',
     '$COUNT$ pending', '$NAME$ is not installed or is not on PATH.', '$NAME$ must be updated to a supported version.',
     '$NAME$ was found at a supported version, but its isolation or protocol profile could not be verified.',
     '$NAME$ could not start the required strict sandbox. Resolve the local sandbox environment problem and try again.',
@@ -471,7 +480,6 @@ for (const file of [
   'extension/ui/control_panel.html',
   'extension/ui/sidepanel.html',
   'extension/ui/popup.html',
-  'extension/ui/unlock.html',
   'extension/ui/microphone-permission.html',
   'extension/ui/onboarding.html'
 ]) {
@@ -1392,22 +1400,19 @@ function sidepanelMessageContext(api) {
     'line() leaves domains and provider names as sent');
 
   const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
-  const nodes = {
-    paymentFillConfirmOverlay: { classList: { add() {}, remove() {} } },
-    pfcBrand: fakeNode({}, ''),
-    pfcLast4: fakeNode({}, ''),
-    pfcDomain: fakeNode({}, ''),
-    pfcAllow: { addEventListener() {}, removeEventListener() {} },
-    pfcDeny: { addEventListener() {}, removeEventListener() {} }
-  };
   const context = {
     fsbUiLocale: shipped,
-    document: { createElement: () => fakeNode({}, ''), getElementById: (id) => nodes[id] || null }
+    VP_SVG: { lock: '', clock: '' },
+    escapeHtml: (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
+    document: { createElement: () => fakeNode({}, ''), getElementById: () => null }
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const name of ['spLine', '_delegationElement', '_delegationStoppedHeadingParts', 'showPaymentFillConfirmation']) {
+  for (const name of ['escapeAttr', 'spLine', '_delegationElement', '_delegationStoppedHeadingParts', 'paymentSheetMarkup']) {
     vm.runInContext(extractNamedFunction(panelSource, name), context);
+  }
+  for (const name of ['spExactKey', 'spSubsJson', 'spHtml']) {
+    if (panelSource.includes('function ' + name + '(')) vm.runInContext(extractNamedFunction(panelSource, name), context);
   }
   const stopped = context._delegationStoppedHeadingParts({ terminal: { releasedTabCount: 2 } });
   const stoppedHeading = context._delegationElement('span', '', stopped.template, stopped.subs);
@@ -1415,16 +1420,16 @@ function sidepanelMessageContext(api) {
   check(stoppedHeading.textContent === de.copy_4b8cbffa31.replace('$COUNT$', '2')
       && startFailure.textContent === de.copy_2b4b8c0560.replace('$NAME$', 'Grok Build'),
     'the stopped-run heading and the start-failure line render as templates');
-  context.showPaymentFillConfirmation({ cardBrand: 'visa', last4: '4242', merchantDomain: 'shop.example' });
-  check(nodes.pfcBrand.textContent === 'Visa' && nodes.pfcDomain.textContent === de.copy_9fabe26076.replace('$DOMAIN$', 'shop.example'),
-    'the payment confirmation keeps the brand and domain and translates the words around them');
-  const brand = nodes.pfcBrand;
-  const domain = nodes.pfcDomain;
-  nodes.pfcBrand = fakeNode({}, '');
-  nodes.pfcDomain = fakeNode({}, '');
-  context.showPaymentFillConfirmation({ last4: '4242' });
-  check(nodes.pfcBrand.textContent === de.panel_be3702e3f1 && nodes.pfcDomain.textContent === de.copy_c36ee348ff,
-    'the payment confirmation translates the Card and this-page fallbacks in the side panel');
+  const sheetKey = (english) => 'copy_' + require('node:crypto').createHash('sha256').update(english).digest('hex').slice(0, 10);
+  const sheet = context.paymentSheetMarkup({ cardBrand: 'visa', last4: '4242', merchantDomain: 'shop.example', expiryMonth: '08', expiryYearLast2: '28' });
+  check(sheet.includes(de[sheetKey('Fill your card?')]) && sheet.includes(de[sheetKey('Decline')]) && sheet.includes(de[sheetKey('Fill card')])
+      && sheet.includes('<span>shop.example</span>') && sheet.includes('<b>Visa</b>') && sheet.includes('•••• 4242 · 08/28'),
+    'the card check keeps the brand, last 4 and merchant and translates the words around them');
+  const bare = context.paymentSheetMarkup({ last4: '4242' });
+  check(bare.includes(de.panel_be3702e3f1) && bare.includes(de[sheetKey('this page')]),
+    'the card check translates the Card and this-page fallbacks in the side panel');
+  check(!context.paymentSheetMarkup({ title: '<img src=x>', last4: '1<b>', merchantDomain: 'a<b>' }).includes('<img'),
+    'card titles, digits and merchants are escaped');
 
   const optionsSource = fs.readFileSync(path.join(root, 'extension/ui/options.js'), 'utf8');
   const title = fakeNode({}, '');
@@ -1449,13 +1454,10 @@ function sidepanelMessageContext(api) {
     'the API-key detail and the Grok Build fallback render in the active language');
 
   shipped.setOverride('ja');
-  shipped.apply(fakeDoc([stoppedHeading, startFailure, brand, domain, nodes.pfcBrand, nodes.pfcDomain, title, detail, badge]));
+  shipped.apply(fakeDoc([stoppedHeading, startFailure, title, detail, badge]));
   check(stoppedHeading.textContent === ja.copy_4b8cbffa31.replace('$COUNT$', '2')
       && startFailure.textContent === ja.copy_2b4b8c0560.replace('$NAME$', 'Grok Build'),
     'a language change re-renders the stopped-run heading and the start-failure line');
-  check(brand.textContent === 'Visa' && domain.textContent === ja.copy_9fabe26076.replace('$DOMAIN$', 'shop.example')
-      && nodes.pfcBrand.textContent === ja.panel_be3702e3f1 && nodes.pfcDomain.textContent === ja.copy_c36ee348ff,
-    'a language change re-renders the payment confirmation');
   check(title.textContent === ja.copy_6bec306893 && detail.textContent === ja.copy_ec6c5d7132.replace('$NAME$', 'OpenAI'),
     'a language change re-renders the API-key title and detail');
   check(badge.textContent === ja.copy_62c33d7a6c,
@@ -1898,9 +1900,7 @@ function sidepanelMessageContext(api) {
     [name, fs.readFileSync(path.join(root, `extension/ui/${name}.js`), 'utf8')]));
   const occurrences = (source, text) => source.split(text).length - 1;
   for (const [file, text, count] of [
-    ['options', "'Failed to save: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
-    ['options', "'Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 2],
-    ['options', "'Error saving payment method: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
+    ['options', "'Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } }", 2],
     ['options', "'Failed to start explorer: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
     ['options', "'Failed to load more session events: $ERROR$', { error: { english: error.message } }", 1],
     ['options', "'Could not generate pairing code: $ERROR$', { error: { english: error.message } }", 2],
@@ -2707,7 +2707,8 @@ async function asyncChecks() {
     const makeContext = (withLocale) => {
       const ctx = {
         console, JSON, Object, Array, String, Number, Math,
-        setTimeout() {}, currentStatusMessage: null, completeStatusMessage() {}, scrollToBottom() {}, removePaymentPrompt() {},
+        setTimeout() {}, currentStatusMessage: null, completeStatusMessage() {}, scrollToBottom() {},
+        VP_SVG: { lock: '', eye: '', clock: '' },
         formatSessionDate: () => 'now', chatMessages: { appendChild(node) { appended = node; } },
         document: { createElement: makeElement, getElementById: (id) => (id === 'historyList' ? historyNode : null) },
         chrome: { storage: { local: { get: async () => storedSessions } } }
@@ -2715,7 +2716,7 @@ async function asyncChecks() {
       if (withLocale) ctx.fsbUiLocale = shipped;
       ctx.globalThis = ctx;
       vm.createContext(ctx);
-      for (const name of ['escapeHtml', 'escapeAttr', 'spLine', 'showLoginPrompt', 'showPaymentPrompt']) vm.runInContext(extractNamedFunction(panelSource, name), ctx);
+      for (const name of ['escapeHtml', 'escapeAttr', 'spLine', 'vpChip', 'vpChips', 'showLoginPrompt']) vm.runInContext(extractNamedFunction(panelSource, name), ctx);
       for (const name of ['spExactKey', 'spSubsJson', 'spHtml', 'spAttr']) {
         if (panelSource.includes('function ' + name + '(')) vm.runInContext(extractNamedFunction(panelSource, name), ctx);
       }
@@ -2749,64 +2750,40 @@ async function asyncChecks() {
     shipped.setOverride('es');
     ctx.showLoginPrompt('Ready', { usernameType: 'email' });
     const login = parse(appended.innerHTML);
-    const loginCopy = ['Login Required', 'Enter your credentials to sign in. They will be encrypted and saved for future use.',
-      'Email', 'Password', 'Save for future use', 'Sign In', 'Skip'];
-    check(loginCopy.every((english) => shows(login, 'es', english)), 'the login prompt renders each label and button in the active language');
-    check(attrShows(login, 'es', 'placeholder', 'Email') && attrShows(login, 'es', 'placeholder', 'Password'),
-      'the login prompt renders its placeholders in the active language');
+    const loginCopy = ['Sign in', 'Skip'];
+    check(loginCopy.every((english) => shows(login, 'es', english)), 'the login card renders its title and buttons in the active language');
+    check(attrShows(login, 'es', 'placeholder', 'Email or username') && attrShows(login, 'es', 'placeholder', 'Password'),
+      'the login card renders its placeholders in the active language');
     switchTo('de', login);
-    check(loginCopy.every((english) => shows(login, 'de', english)), 'a language change rewrites an open login prompt');
-    check(attrShows(login, 'de', 'placeholder', 'Email') && attrShows(login, 'de', 'placeholder', 'Password'),
+    check(loginCopy.every((english) => shows(login, 'de', english)), 'a language change rewrites an open login card');
+    check(attrShows(login, 'de', 'placeholder', 'Email or username') && attrShows(login, 'de', 'placeholder', 'Password'),
       'a language change rewrites the login placeholders');
-    check(login.html.includes('<div class="login-prompt-domain">Ready</div>'), 'a site name stays as sent, even when it matches FSB copy');
+    check(login.html.includes('<span>Ready</span>'), 'a site name stays as sent, even when it matches FSB copy');
+    check(!login.html.includes('loginPromptSave'), 'without a 1Password save vault the login card offers no save switch');
+
+    shipped.setOverride('es');
+    ctx.showLoginPrompt('Ready', { usernameType: 'email' }, true);
+    const saving = parse(appended.innerHTML);
+    check(shows(saving, 'es', 'Save to 1Password') && saving.html.includes('id="loginPromptSave"'),
+      'with a 1Password save vault the login card offers Save to 1Password in the active language');
 
     shipped.setOverride('es');
     ctx.showLoginPrompt('', {});
     const anonymous = parse(appended.innerHTML);
     switchTo('de', anonymous);
-    check(shows(anonymous, 'de', 'this site') && shows(anonymous, 'de', 'Username / Email')
-        && attrShows(anonymous, 'de', 'placeholder', 'Username / Email'),
-      'the login prompt defaults follow a language change too');
-
-    const unavailableStates = { no_saved_methods: 'No saved cards', feature_disabled: 'Payments disabled', vault_not_configured: 'Vault setup required',
-      vault_locked: 'Vault locked', payment_locked: 'Payment access locked', other: 'Saved payments unavailable' };
-    for (const [state, english] of Object.entries(unavailableStates)) {
-      shipped.setOverride('es');
-      ctx.showPaymentPrompt('', { available: false, state, primaryAction: 'open_payments_section' });
-      const page = parse(appended.innerHTML);
-      switchTo('de', page);
-      check(['Checkout Detected', 'this checkout', english, 'Saved payment methods are not available for this checkout.', 'Open Payments', 'Dismiss']
-        .every((copy) => shows(page, 'de', copy)), `an open payment prompt in state ${state} follows a language change`);
-    }
+    check(shows(anonymous, 'de', 'this site'), 'the login card default site follows a language change too');
 
     shipped.setOverride('es');
-    ctx.showPaymentPrompt('Ready', { available: false, state: 'vault_locked', detail: 'Ready', primaryAction: 'open_payments_section', primaryActionLabel: 'Skip' });
-    const sentByCaller = appended.innerHTML;
-    check(sentByCaller.includes('<div class="login-prompt-domain">Ready</div>') && sentByCaller.includes('login-prompt-subtext">Ready</div>')
-        && sentByCaller.includes('id="paymentPromptPrimaryAction">Skip</button>'),
-      'a site name, detail and action label sent with the prompt stay as sent, even when they match FSB copy');
-    ctx.showPaymentPrompt('', { available: false, state: 'vault_locked', blockedReason: 'Ready <b>' });
-    check(appended.innerHTML.includes('login-prompt-subtext">Ready &lt;b&gt;</div>'), 'a blocked reason is shown as sent and escaped');
-
-    shipped.setOverride('es');
-    ctx.showPaymentPrompt('shop.example', { available: true, methods: [
-      { id: 'a', cardBrand: 'mystery', last4: '<img src=x>', expiryMonth: '07', expiryYearLast2: '29' },
-      { id: 'b', cardBrand: 'visa', nickname: 'Ready', maskedNumber: '<b>1111', billingSummary: 'Skip' }
-    ] });
-    const cards = parse(appended.innerHTML);
-    const brandLine = liveFor(cards, '$BRAND$ ending in $LAST$');
-    switchTo('de', cards);
-    check(shows(cards, 'de', 'Fill Saved Card') && shows(cards, 'de', 'Skip') && shows(cards, 'de', 'Billing profile stored')
-        && shows(cards, 'de', 'Exp $MONTH$/$YEAR$', { month: '07', year: '29' }) && shows(cards, 'de', 'Checkout Detected'),
-      'an open card list follows a language change');
-    check(!!brandLine && brandLine.textContent === catalogText('de', '$BRAND$ ending in $LAST$', { brand: catalogText('de', 'Unknown'), last: '<img src=x>' })
-        && cards.live.some((node) => node.getAttribute('data-i18n-en') === 'Unknown'),
-      'an unknown card brand follows a language change, in its badge and inside the title');
-    check(!cards.html.includes('<img src=x>') && !cards.html.includes('<b>1111') && cards.html.includes('&lt;b&gt;1111'),
-      'a card value cannot inject markup through a live node or the masked number');
-    check(cards.html.includes('payment-prompt-option-title">Ready</span>') && cards.html.includes('payment-prompt-option-billing">Skip</div>')
-        && cards.html.includes('payment-card-brand visa">Visa</span>'),
-      'a nickname, billing summary and brand name stay as saved');
+    ctx.showLoginPrompt('github.com', {}, false, [
+      { id: 'v:1', title: 'GitHub', username: 'maya-reyes' },
+      { id: 'v:2', title: 'GitHub (work)', username: 'maya-ic' }
+    ]);
+    const chooser = parse(appended.innerHTML);
+    check(shows(chooser, 'es', 'Which account?') && shows(chooser, 'es', 'Type it instead')
+        && shows(chooser, 'es', 'Sign in as $NAME$', { name: 'maya-reyes' }),
+      'several matching logins open the account chooser in the active language');
+    check(chooser.html.includes('<b>GitHub (work)</b><span>maya-ic</span>') && !chooser.html.includes('loginPromptPassword'),
+      'the chooser lists titles and usernames as saved and asks for nothing to type');
 
     shipped.setOverride('es');
     storedSessions = { fsbSessionIndex: [] };

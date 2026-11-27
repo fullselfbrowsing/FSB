@@ -124,7 +124,7 @@ This is the FSB v0.9.60 milestone release. The headline change is the new multi-
 - Route-aware tool dispatch and centralized parameter mapping.
 - Layered diagnostics through `doctor` and `status --watch`.
 - Persistent visual session glow across content script reinjection.
-- Secure vault tools that avoid sending raw secrets over the bridge.
+- 1Password-backed login and card tools that never return secrets to the MCP client.
 - One-command installer coverage for 21 platforms.
 
 Background-agent MCP tools were retired with the extension's background-agent sunset. The last tool left in that module, `back`, duplicated `go_back` and has been removed.
@@ -281,6 +281,36 @@ Extension IDs are browser-installation-specific. Omitted `--extension-id` uses t
 A helper serves one extension ID. When `install` set it up for the Web Store ID and no browser profile has the Web Store build, for example while only an unpacked build is installed, `install --native-host --extension-id <extension-id>` replaces it with one for that ID. A helper `install` set up for any other ID is kept, because an unpacked build cannot be detected and may still use it. That helper, one you installed with `install --native-host`, one an installed extension still uses, and one newer than the running package are refused instead; remove it with `uninstall --native-host` first. If a replacement stops after removing the old helper, or some of its registrations, it says the helper was only partly replaced; run the same command again to finish.
 
 `--browser` selects one browser's user-scoped native-messaging registration. One helper can be registered in several browsers with the same extension ID. `uninstall --native-host --browser <name>` removes only that browser's registration, and the helper's files go with its last registration. To add a browser where you have since installed FSB, run `install` again.
+
+### 1Password for logins and cards
+
+FSB keeps no passwords or cards of its own. `fill_credential`, `use_payment_method`, and their list tools read the user's 1Password. This server signs in to 1Password with the [1Password JavaScript SDK](https://www.npmjs.com/package/@1password/sdk) and hands values to the extension over the paired loopback bridge; the extension fills the page. The 1Password connection lives in this server, so the extension has to reach it over the paired bridge. When it cannot, the Vault page shows the command that installs the local helper.
+
+**Log in from the extension.** Open the FSB control panel, choose **Vault**, and press **Log in to 1Password**. The button does not skip 1Password's own steps; it walks you through them:
+
+1. **The 1Password desktop app**, installed and signed in. When it is missing, the Vault page links to the download.
+2. **Settings > Developer > Integrate with 1Password SDKs** in the 1Password app. FSB opens that pane for you (`onepassword://settings/developers`) and continues once the setting is on. On a managed device, your administrator may have to allow it.
+3. **Your account name**, if FSB asks for it: the name at the top of the 1Password sidebar, such as `my.1password.com`.
+4. **Your approval** in the 1Password app. 1Password asks again after 10 idle minutes, after the app locks, and after this server restarts.
+
+After you approve, the Vault page lists the logins and cards FSB can use: titles, usernames, and sites, and for cards the brand, last 4 digits, cardholder name, and expiry. It is read-only; add, edit, and delete items in 1Password.
+
+**Which vaults FSB reads.** By default, every vault the account can see, except transfer vaults and vault types the SDK does not support. To narrow it to some vaults, choose them under **Advanced** on the Vault page, or run `npx fsb-mcp-server onepassword --allow <id,id>`; **Use all vaults** there, or `--all-vaults`, goes back to every vault. "Save to 1Password" writes new logins to your Personal vault unless you choose another save vault. If 1Password reports no Personal vault, the Vault page asks you to pick one; `--save-vault <id>` sets it from a terminal. FSB offers "Save to 1Password" only while it has a save vault it can read.
+
+**Headless: a service account, from the terminal only.** For a machine where nobody is at the 1Password app, create a 1Password service account with read access to the vaults FSB should use, then:
+
+```bash
+npx fsb-mcp-server onepassword --service-account   # token is read hidden, or from OP_SERVICE_ACCOUNT_TOKEN
+npx fsb-mcp-server onepassword --vaults            # list vault ids
+npx fsb-mcp-server onepassword --allow <vaultId>   # limit FSB to that vault
+npx fsb-mcp-server onepassword --all-vaults        # or: let FSB use every vault it can see again
+npx fsb-mcp-server onepassword --save-vault <vaultId>   # optional: where "Save to 1Password" writes
+npx fsb-mcp-server onepassword                     # show the current setup
+```
+
+Service accounts cannot read Personal vaults, so set `--save-vault` if you want "Save to 1Password". The Vault page does not set up service accounts, but it shows one set up this way as connected and offers Disconnect.
+
+Settings live in `~/.fsb/onepassword.json` (owner-only). A service-account token is stored there and never sent to the extension. `--desktop <account>` sets up the desktop app from the CLI, and `--reset` forgets everything. Logins are released only for a site one of their saved websites matches, following the item's 1Password autofill setting, and a website saved as `https://` is never matched by a plain-`http://` page. Cards fill only on `https` pages and only while the tab stays on the site it was on. Over MCP, FSB shows no card prompt of its own, so the agent asks the user before calling `use_payment_method`. In autopilot, FSB asks in the side panel.
 
 ### Grok Build as the extension's AI provider
 
@@ -657,12 +687,12 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 
 | Tool | Purpose |
 |------|---------|
-| `list_credentials` | List saved credential metadata without passwords. |
-| `fill_credential` | Fill a login form with an unlocked saved credential. |
-| `list_payment_methods` | List saved payment metadata without full card data. |
-| `use_payment_method` | Fill checkout data after user confirmation. |
+| `list_credentials` | List the 1Password logins FSB may use: id, title, site domains, username. |
+| `fill_credential` | Fill username, password, and one-time code from the 1Password login saved for the tab's site. With none saved, FSB asks the user to type one on the page. |
+| `list_payment_methods` | List 1Password credit cards: id, title, brand, last 4, cardholder name, expiry. |
+| `use_payment_method` | Fill a checkout form with a 1Password card on an `https` page. FSB shows no prompt of its own, so ask the user first. |
 
-Vault responses expose metadata only. Passwords, full card numbers, and CVV values are resolved inside the extension and are not returned to the MCP client.
+These tools read the user's 1Password once it is connected, usually with **Log in to 1Password** on the extension's Vault page (see [1Password](#1password-for-logins-and-cards)). Responses expose metadata only. Passwords, one-time codes, full card numbers, and CVV values go from 1Password to this server to the extension to the page, and are never returned to the MCP client.
 
 ### Tool Count Contract
 

@@ -176,6 +176,10 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/server-jev-gateway-boot.test.js',
   'node --test tests/content-click-single-activation.test.js',
   'node tests/onboarding-depth-adopt.test.js',
+  'node tests/onepassword-broker.test.js',
+  'node tests/onepassword-client.test.js',
+  'node tests/onepassword-credential-sheet.test.js',
+  'node tests/onepassword-mcp-errors.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
