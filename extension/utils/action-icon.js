@@ -681,8 +681,9 @@
     ctx.lineWidth = width;
     ctx.lineCap = 'butt';
     ctx.strokeStyle = mixColor(rgb, rgb, 0, 1);
-    ctx.beginPath();
-    ctx.rect(half, half, size - width, size - width);
+    // The tile's rounded outline, as the capability ring draws it, so the
+    // corner cut in renderFrame never clips the ring's corners.
+    tilePath(ctx, size, half);
     ctx.stroke();
     var pulse = progress < 0.5 ? easeInOut(progress / 0.5) : 1 - easeInOut((progress - 0.5) / 0.5);
     var radius = Math.max(2.5, size * 0.22);

@@ -1088,6 +1088,37 @@ const cutOf = (group, size) => {
   }
 
   // -------------------------------------------------------------------------
+  console.log('\nICON-05e: asking is a rounded inset ring with a key dot, inside the corner cut');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => false });
+    w.resetOps(16);
+    w.resetOps(32);
+    w.api.setAsking(1, true);
+    await flush();
+    const frames = w.groups(32);
+    assertEq(frames.length, Math.round(1600 / 66), 'asking builds one cycle of frames');
+    const f0 = frames[0] || [];
+    const ring = opsOf(f0, 'stroke')[0];
+    const path = (ring && ring.path) || [];
+    const move = path.find((p) => p.kind === 'moveTo');
+    const corners = path.filter((p) => p.kind === 'arcTo');
+    const half = ring ? ring.lineWidth / 2 : NaN;
+    assert(/255, 140, 0/.test(ring && ring.strokeStyle || ''), 'the ask ring uses the design orange');
+    assertEq(corners.length, 4, 'the ask ring traces the tile\'s rounded outline, as the capability ring does');
+    assert(!!move && move.y === half && corners.length === 4 && corners[3].x1 === half,
+      'the ask ring is inset by half its stroke width, so it sits fully inside the tile');
+    assertClose(corners[0] ? corners[0].r : NaN, CORNER_RATIO * 32 - half, 1e-9,
+      'its corners are the tile\'s curve shrunk by the same inset');
+    const dot = opsOf(f0, 'arc')[0];
+    assert(!!dot && dot.cx + dot.r <= 32 && dot.cy + dot.r <= 32, 'the key dot sits inside the tile');
+    assert(frames.every((f) => !!cutOf(f, 32)), 'every ask frame ends with the corner cut');
+    w.api.setAsking(1, false);
+  }
+
+  // -------------------------------------------------------------------------
   console.log('\nICON-06: the breathe loops for as long as a watch is armed');
   // -------------------------------------------------------------------------
 
