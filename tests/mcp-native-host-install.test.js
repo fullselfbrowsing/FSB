@@ -5553,6 +5553,15 @@ async function runProductionEnsure() {
       equal(current.outcome, 'current', 'a second production ensure finds the helper current');
       check(!fs.existsSync(`${stableRoot}.lock`), 'production ensure releases its lock');
       deepEqual(siblings(), [], 'production install leaves no sibling directories');
+      // macOS's default volume ignores letter case, so a HOME spelled another
+      // way than its folder on disk is the same home and finds the same helper.
+      const respelled = path.join(root, 'HOME');
+      if (process.platform === 'darwin' && fs.existsSync(respelled) && fs.realpathSync.native(respelled) === home) {
+        const [again] = runProductionSteps(respelled, [ensureRefresh]);
+        equal(again.outcome, 'current', 'a HOME spelled in another letter case finds the same current helper');
+      } else {
+        console.log('  SKIP: a HOME spelled in another letter case needs a case-insensitive volume');
+      }
     }
     {
       lowerVersion();

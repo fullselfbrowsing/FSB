@@ -1202,7 +1202,10 @@ function resolveContextSync(options: NativeHostProductionOptions): ProductionCon
   const requestedHome = options.homeDirectory ?? homedir();
   let homeDirectory = requestedHome;
   try {
-    homeDirectory = realpathSync(requestedHome);
+    // The native realpath, as every path check here compares against: the JS
+    // one keeps the spelling it is given, so a HOME that differs from its
+    // folder on disk only in letter case (macOS) would fail every one of them.
+    homeDirectory = realpathSync.native(requestedHome);
   } catch {
     homeDirectory = requestedHome;
   }

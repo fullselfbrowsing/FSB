@@ -307,12 +307,13 @@ function stableRootOfThisProcess(): string | null {
   const entryScript = process.argv[1];
   if (typeof entryScript !== 'string' || entryScript.length === 0) return null;
   try {
-    // The installer derives the stable root from the resolved home directory,
-    // so the stop-request path has to be derived the same way to match.
+    // The installer derives the stable root from the home directory resolved
+    // with the native realpath, so the stop-request path has to be derived the
+    // same way to match.
     return stableRootForServeEntry({
       platform,
       entryScript,
-      homeDirectory: realpathSync(homedir()),
+      homeDirectory: realpathSync.native(homedir()),
       ...(process.env.LOCALAPPDATA ? { localAppData: process.env.LOCALAPPDATA } : {}),
       execPath: process.execPath,
     });
