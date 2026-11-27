@@ -51,7 +51,8 @@ function createTelemetryRateLimiter(db) {
     max,
     standardHeaders: 'draft-7',     // RFC 9239 RateLimit-* headers
     legacyHeaders: false,
-    // BLOCKER #2 alignment: bucket key = HMAC-SHA256(canonicalised_ip, todays_salt).
+    // BLOCKER #2 alignment: bucket key = the first 64 bits of
+    // HMAC-SHA256(canonicalised_ip, todays_salt), as hashIp() returns it.
     // The canonicalisation runs through express-rate-limit's ipKeyGenerator helper
     // which collapses IPv6 to a /56 subnet and resolves IPv4-mapped-IPv6 forms
     // (CVE-2026-30827 fix). clientIp(req) prefers Fly-Client-IP so we do not

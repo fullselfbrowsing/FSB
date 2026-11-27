@@ -22,16 +22,27 @@ const crypto = require('crypto');
 const { getOrMintTodaySalt } = require('./telemetry-salt');
 
 /**
- * HMAC-SHA256(plaintextIp, todaysSalt) -> 64-char hex string.
+ * Length of the stored hash: the first 64 bits of the HMAC, as hex. The value
+ * is only ever compared for equality (the rate-limit key, the per-IP daily
+ * budgets, the active tracker's source key and the per-source active cap), so
+ * the remaining bits carry nothing anyone reads. At a few hundred sources a
+ * day, the chance that two of them share 64 bits is about 1e-15 per day.
+ */
+const IP_HASH_HEX_CHARS = 16;
+
+/**
+ * HMAC-SHA256(plaintextIp, todaysSalt), truncated to its first 64 bits
+ * -> 16-char hex string.
  *
  * @param {string} plaintextIp request IP (clientIp(req): Fly-Client-IP, else req.ip)
  * @param {Database} db better-sqlite3 instance
- * @returns {string} 64-char hex digest
+ * @returns {string} 16-char hex digest
  */
 function hashIp(plaintextIp, db) {
   const { salt_hex } = getOrMintTodaySalt(db);
   const key = Buffer.from(salt_hex, 'hex');
-  return crypto.createHmac('sha256', key).update(String(plaintextIp), 'utf8').digest('hex');
+  return crypto.createHmac('sha256', key).update(String(plaintextIp), 'utf8').digest('hex')
+    .slice(0, IP_HASH_HEX_CHARS);
 }
 
 // UUIDv4 shape: 8-4-4-4-12 hex with version=4 nibble + variant bits 10xx in clock_seq_hi.
@@ -46,4 +57,4 @@ function isValidUuidV4(str) {
   return typeof str === 'string' && UUID_V4_RE.test(str);
 }
 
-module.exports = { hashIp, isValidUuidV4 };
+module.exports = { hashIp, isValidUuidV4, IP_HASH_HEX_CHARS };
