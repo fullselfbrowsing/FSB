@@ -71,7 +71,7 @@
 }
 
 .rn-hero-ver {
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.46em;
   font-weight: 700;
   letter-spacing: 0.28em;
@@ -101,7 +101,7 @@
 }
 
 .rn-rail-title {
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -126,7 +126,7 @@
 }
 
 .rn-rail-ver {
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.1em;
   color: var(--dim);
@@ -375,11 +375,11 @@ img[src*="xai"] { filter: invert(1); }
   .ps-fbar{flex-shrink:0;display:flex;align-items:center;gap:5px;padding:7px 11px;border-bottom:1px solid rgba(255,255,255,0.07)}
   .ps-fdot{width:7px;height:7px;border-radius:50%;background:rgba(234,235,238,0.22)}
   .ps-frame-src .ps-fdot:first-child{background:#3b82f6}
-  .ps-flabel{margin-left:auto;font-family:'SF Mono','Monaco',monospace;font-size:0.56rem;letter-spacing:0.04em;text-transform:uppercase}
+  .ps-flabel{margin-left:auto;font-family: var(--font-mono);font-size:0.56rem;letter-spacing:0.04em;text-transform:uppercase}
   .ps-frame-src .ps-flabel{color:#60a5fa}
   .ps-frame-mir .ps-flabel{color:#a7a9ad}
   .ps-mini{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:6px 10px;text-align:center;overflow:hidden}
-  .ps-mini-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;font-family:'Space Mono',monospace;font-size:5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase}
+  .ps-mini-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;font-family: var(--font-mono);font-size:5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase}
   .ps-mini-dot{width:4px;height:4px;border-radius:50%}
   .ps-mini-word{font-family:'Poppins',system-ui,sans-serif;font-size:18px;line-height:1;letter-spacing:-0.03em}
   .ps-mini-word .pro{font-weight:300}.ps-mini-word .rest{font-weight:800}
@@ -387,7 +387,7 @@ img[src*="xai"] { filter: invert(1); }
   .ps-mini-count{display:flex;align-items:flex-start;gap:4px;margin-top:2px}
   .ps-mini-unit{display:flex;flex-direction:column;align-items:center;gap:3px}
   .ps-mini-num{font-family:'Poppins',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-weight:600;font-size:12px;line-height:1;padding:5px 0;width:24px;border-radius:5px}
-  .ps-mini-ul{font-family:'Space Mono',monospace;font-size:4px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
+  .ps-mini-ul{font-family: var(--font-mono);font-size:4px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
   .ps-mini-colon{font-family:'Poppins',system-ui,sans-serif;font-weight:300;font-size:10px;padding-top:4px}
   .ps-frame-src .ps-mini-badge{background:var(--primary-soft);border:1px solid rgba(255,107,53,0.34);color:var(--primary-tint)}
   .ps-frame-src .ps-mini-dot{background:var(--primary)}
@@ -406,7 +406,7 @@ img[src*="xai"] { filter: invert(1); }
   .ps-frame-mir .ps-mini-num{background:rgba(234,235,238,0.05);border:1px solid rgba(234,235,238,0.13);color:#b6b8bc}
   .ps-frame-mir .ps-mini-ul{color:#74777c}
   .ps-frame-mir .ps-mini-colon{color:rgba(234,235,238,0.3)}
-  .ps-pkt{position:absolute;font-family:'SF Mono','Monaco',monospace;font-size:7px;font-weight:700;letter-spacing:0.22em;color:#9cc2ff;text-shadow:0 0 6px rgba(59,130,246,0.75),0 0 2px rgba(59,130,246,0.9);white-space:nowrap;opacity:0;z-index:1;transform-origin:center}
+  .ps-pkt{position:absolute;font-family: var(--font-mono);font-size:7px;font-weight:700;letter-spacing:0.22em;color:#9cc2ff;text-shadow:0 0 6px rgba(59,130,246,0.75),0 0 2px rgba(59,130,246,0.9);white-space:nowrap;opacity:0;z-index:1;transform-origin:center}
   .ps-pkt .bits{color:inherit}
   .ps-pkt-sec{left:46%;top:83%;--tx:106px;--ty:-214px;--rot:-63deg;animation:rnPsPktFly 1s ease-in-out infinite}
   .ps-pkt-load{animation:rnPsPktFly 0.72s ease-in-out both}
@@ -449,7 +449,7 @@ img[src*="xai"] { filter: invert(1); }
   .cap-marquee--mini .cap-logo { gap: 7px; padding: 5px 11px; border-radius: 999px; }
   .cap-marquee--mini .cap-logo-img { width: 14px; height: 14px; }
   .cap-marquee--mini .cap-logo-name { font-size: 0.7rem; font-weight: 600; letter-spacing: .01em; }
-  .cap-credit--mini { font-family: 'Space Mono', monospace; font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; gap: 6px; }
+  .cap-credit--mini { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; gap: 6px; }
   .cap-credit--mini .cap-credit-logo { width: 12px; height: 12px; }
   .cap-credit--mini .cap-credit-name { font-weight: 700; letter-spacing: .06em; }
   .rn-rail::-webkit-scrollbar { width: 0; height: 0; }

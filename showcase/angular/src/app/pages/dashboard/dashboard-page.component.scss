@@ -90,7 +90,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   outline: none;
   transition: border-color var(--transition-fast);
@@ -288,7 +288,7 @@
 .dash-agent-url {
   font-size: 0.8rem;
   color: var(--text-muted);
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -388,7 +388,7 @@
 
 .dash-run-time {
   color: var(--text-muted);
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
 }
 
@@ -449,14 +449,14 @@
 .dash-run-duration {
   color: var(--text-muted);
   text-align: right;
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
 }
 
 .dash-run-cost {
   color: var(--text-muted);
   text-align: right;
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
 }
 
@@ -625,7 +625,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   min-width: 36px;
   text-align: right;
 }
@@ -652,7 +652,7 @@
 .dash-task-eta,
 .dash-task-elapsed {
   font-size: 12px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   color: var(--text-muted);
 }
 
@@ -812,7 +812,7 @@
 .dash-agent-cost-saved {
   font-size: 0.8rem;
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 .dash-agent-last-run {
@@ -939,7 +939,7 @@
 }
 
 .dash-detail-mono {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
 }
 
@@ -965,7 +965,7 @@
 }
 
 .dash-detail-cost-highlight {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   color: var(--success);
 }
 
@@ -1033,7 +1033,7 @@
 .dash-detail-script-list {
   margin: 0;
   padding-left: 24px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-secondary);
   line-height: 1.8;
@@ -1119,7 +1119,7 @@
 }
 
 .dash-input-mono {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 .dash-modal-footer {
@@ -1761,7 +1761,7 @@
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   pointer-events: none;
   z-index: 4;
   backdrop-filter: blur(8px);
@@ -2049,7 +2049,7 @@
   outline: none;
   color: var(--text-primary);
   font-size: 12px;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   height: 24px;
   min-width: 0;
 }
@@ -2105,7 +2105,7 @@
   color: var(--text-primary);
 }
 .dash-preview-restricted-url {
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   font-size: 11px;
   color: rgba(255, 241, 232, 0.55);
   word-break: break-all;
@@ -2313,7 +2313,7 @@ body.dash-layout-maximized #dash-task-progress {
 
 :host ::ng-deep .dash-action-feed-ts {
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   flex-shrink: 0;
   opacity: 0.7;
@@ -2380,7 +2380,7 @@ body.dash-layout-maximized #dash-task-progress {
   .dash-result-elapsed {
     font-size: 0.8rem;
     color: var(--text-muted);
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-family: var(--font-mono);
   }
 
   .dash-result-metrics {

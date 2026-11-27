@@ -16,31 +16,31 @@
     "extension/ui/markdown.css": {
       "colors": 39,
       "zIndex": 0,
-      "fontFamily": 1,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "extension/ui/onboarding.css": {
       "colors": 10,
       "zIndex": 4,
-      "fontFamily": 13,
+      "fontFamily": 3,
       "tokenForks": 0
     },
     "extension/ui/options.css": {
       "colors": 47,
       "zIndex": 1,
-      "fontFamily": 9,
+      "fontFamily": 3,
       "tokenForks": 3
     },
     "extension/ui/popup.css": {
       "colors": 18,
       "zIndex": 0,
-      "fontFamily": 2,
+      "fontFamily": 1,
       "tokenForks": 21
     },
     "extension/ui/sidepanel.css": {
       "colors": 94,
       "zIndex": 0,
-      "fontFamily": 7,
+      "fontFamily": 1,
       "tokenForks": 21
     },
     "showcase/angular/src/app/components/pixel-loader/pixel-loader.component.scss": {
@@ -52,13 +52,13 @@
     "showcase/angular/src/app/layout/depth/depth-end.component.scss": {
       "colors": 2,
       "zIndex": 0,
-      "fontFamily": 1,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/layout/depth/depth-rail.component.scss": {
       "colors": 0,
       "zIndex": 0,
-      "fontFamily": 1,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/layout/language-picker/language-picker.component.scss": {
@@ -70,67 +70,67 @@
     "showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss": {
       "colors": 2,
       "zIndex": 0,
-      "fontFamily": 1,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/about/about-page.component.scss": {
       "colors": 9,
       "zIndex": 1,
-      "fontFamily": 1,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/agents/agents-page.component.scss": {
       "colors": 0,
       "zIndex": 0,
-      "fontFamily": 10,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/concierge/concierge-page.component.scss": {
       "colors": 98,
       "zIndex": 1,
-      "fontFamily": 21,
+      "fontFamily": 5,
       "tokenForks": 9
     },
     "showcase/angular/src/app/pages/dashboard/dashboard-page.component.scss": {
       "colors": 97,
       "zIndex": 9,
-      "fontFamily": 18,
+      "fontFamily": 3,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/home/home-page.component.scss": {
       "colors": 12,
       "zIndex": 2,
-      "fontFamily": 13,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/lattice/lattice-page.component.scss": {
       "colors": 65,
       "zIndex": 1,
-      "fontFamily": 16,
+      "fontFamily": 4,
       "tokenForks": 5
     },
     "showcase/angular/src/app/pages/legal/legal-page.component.scss": {
       "colors": 0,
       "zIndex": 0,
-      "fontFamily": 2,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/phantom-stream/phantom-stream-page.component.scss": {
       "colors": 106,
       "zIndex": 3,
-      "fontFamily": 22,
+      "fontFamily": 7,
       "tokenForks": 8
     },
     "showcase/angular/src/app/pages/privacy/privacy-page.component.scss": {
       "colors": 0,
       "zIndex": 0,
-      "fontFamily": 3,
+      "fontFamily": 0,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/prometheus/prometheus-page.component.scss": {
       "colors": 28,
       "zIndex": 1,
-      "fontFamily": 10,
+      "fontFamily": 3,
       "tokenForks": 8
     },
     "showcase/angular/src/app/pages/reference-placeholder/reference-placeholder-page.component.scss": {
@@ -142,7 +142,7 @@
     "showcase/angular/src/app/pages/release-notes/release-notes-page.component.scss": {
       "colors": 78,
       "zIndex": 0,
-      "fontFamily": 11,
+      "fontFamily": 3,
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/sitemaps/sitemaps-page.component.scss": {
@@ -166,7 +166,7 @@
     "showcase/angular/src/styles.scss": {
       "colors": 2,
       "zIndex": 0,
-      "fontFamily": 8,
+      "fontFamily": 6,
       "tokenForks": 0
     },
     "showcase/angular/src/styles/depth.scss": {

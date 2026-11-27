@@ -171,11 +171,12 @@ function createHarness(initialStore, options) {
   );
   // Rolled when onboarding's brand-orange transparencies moved to the four
   // steps (design-system/decisions/0018); every changed computed value was
-  // traced to that decision.
+  // traced to that decision. Rolled again when Space Mono was retired for
+  // --font-mono and its @font-face rules were removed (decision 0012).
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),
-    'f970f484b52a748232cc0e20cb81f0b5197e3935c5ff8f024cf90237028a89b0',
-    'onboarding.css hash rolled: the wordmark B is 0.74em tall, level with the black S, as in the showcase fsb-wordmark.css; brand-orange transparencies sit on the four steps'
+    'd94cdbececf1833174986796c88bcac58dd96dbb0ca13e3fa678ef88d4676cc8',
+    'onboarding.css hash rolled: the wordmark B is 0.74em tall, level with the black S, as in the showcase fsb-wordmark.css; monospace labels use the platform stack'
   );
 
   console.log('--- durable count, timestamps, and sibling preservation ---');

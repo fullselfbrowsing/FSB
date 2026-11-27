@@ -39,10 +39,10 @@ Onboarding uses the site palette, not the product palette ([0002](../decisions/0
 - **One unused token.** No rule reads `--transition-slow`.
 - **Literal colours left:** white text on the hovered primary button (`.ob-btn-primary:hover`), the 8% success tint on `.ob-btn.done`, the 55% orange border on a hovered fan item, the cue's 85% orange text (`.ob3-cue`), and the orange in shadows, which keep their own alphas.
 - **Fonts** ([typography.md](../foundations/typography.md), [0004](../decisions/0004-type-system-font-poppins-wordmark-space-mono.md)):
-  - Four `@font-face` rules self-host Poppins 100 and 900 and Space Mono 400 and 700 from `../assets/onboarding/fonts/*.ttf`. The control panel's options.css loads the same four files, and the status pill loads `space-mono-400.ttf` as a web-accessible resource (`PILL_MONO_URL` in [`visual-feedback.js`](../../extension/content/visual-feedback.js)).
+  - Two `@font-face` rules self-host Poppins 100 and 900 from `../assets/onboarding/fonts/*.ttf`.
   - Poppins draws the wordmark's `.fsb-f` and `.fsb-s`, in the top bar and in the done plane's `.ob3-end-mark`.
-  - Space Mono sets `.ob-top-tag`, `.ob-ver`, `.ob-eyebrow`, `.version-tag`, `.ob-mcp-step .n`, `.mono` and the rail's `.fsb-depth-go`.
-  - Body text uses the system stack; inputs and commands use `"SF Mono", Monaco, "Roboto Mono"` (`.ob-input`, `.install-cmd`, `.install-fan-flag`).
+  - `--font-mono`, the platform stack, sets every monospace label ([0012](../decisions/0012-platform-mono-for-technical-text.md)): `.ob-top-tag`, `.ob-ver`, `.ob-eyebrow`, `.version-tag`, `.ob-mcp-step .n`, `.mono`, the rail's `.fsb-depth-go`, the key and URL inputs (`.ob-input`), and the install commands and flags (`.install-cmd`, `.install-fan-flag`).
+  - Body text uses the system stack.
 - **Icons.** onboarding.html links a vendored Font Awesome from `extension/assets/onboarding/fontawesome`, the same release the other pages fetch from cdnjs ([iconography.md](../foundations/iconography.md), [0005](../decisions/0005-font-awesome-icons-no-emoji.md)).
 - **Client and provider marks.** Client and agent marks are CSS masks: `.install-glyph` with one of thirteen `.ob-lg-*` classes. Provider logos are `<img>` files from `assets/onboarding/providers`; LM Studio uses Font Awesome's `fa-cube`.
 
@@ -206,7 +206,6 @@ The design checks hold it too.
 
 ## Known issues
 
-- **Space Mono.** Onboarding self-hosts Space Mono and sets seven rules in it: the top tag, the step counter, the eyebrows, the version tags, the MCP step numbers, `.mono` values and the rail's `.fsb-depth-go`, though [typography.md](../foundations/typography.md) forbids Space Mono in new CSS. Under [0012](../decisions/0012-platform-mono-for-technical-text.md) these move to the platform stack (`--font-mono`) and the two Space Mono `@font-face` rules go; the font files stay while options.css and the status pill load them. onboarding.css is hash-pinned, so that change recomputes the pin.
 - **Ignores the theme setting.** `setupTheme()` follows the OS only. A user who picked Dark or Light in the control panel (`fsb-theme` in `localStorage`, `fsbThemePreference` in storage) still gets the OS theme here.
 - **Theme scope.** The theme attribute sits on `.ob`, not `<html>`, so `body` keeps the dark `--bg-body` in light theme.
 - **Site status colours.** Onboarding uses the site's success `#22c55e` and danger `#ef4444`, not the product's `#10b981` and `#dc2626`. The site palette was outside [0014](../decisions/0014-product-status-colours-one-per-role.md).

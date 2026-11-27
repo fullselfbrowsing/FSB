@@ -16,22 +16,6 @@
   src: url("../assets/onboarding/fonts/poppins-900.ttf") format("truetype");
 }
 
-@font-face {
-  font-family: "Space Mono";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../assets/onboarding/fonts/space-mono-400.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Space Mono";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("../assets/onboarding/fonts/space-mono-700.ttf") format("truetype");
-}
-
 :root {
   /* Color System */
   --primary-color: var(--fsb-primary);
@@ -1075,7 +1059,7 @@ textarea.form-input {
   font-weight: 700;
   color: var(--primary-color);
   font-size: 0.85rem;
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   background: var(--primary-light);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
@@ -1264,7 +1248,7 @@ textarea.form-input {
   border: none;
   background: transparent;
   text-align: center;
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-weight: 700;
   font-size: 0.86rem;
   color: var(--text-primary);
@@ -1458,7 +1442,7 @@ textarea.form-input {
 
 .logs-display {
   padding: var(--space-lg);
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-size: 0.875rem;
   line-height: 1.6;
 }
@@ -1739,7 +1723,7 @@ textarea.form-input {
 }
 
 .version-tag {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--fsb-font-mono);
   letter-spacing: 0.4em;
 }
 
@@ -2440,7 +2424,7 @@ textarea.form-input {
 .session-logs-content {
   margin: 0;
   padding: var(--space-lg);
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-size: 0.8rem;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -2563,7 +2547,7 @@ textarea.form-input {
 }
 
 .step-detail {
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-size: 0.85rem;
   margin: var(--space-xs) 0;
   color: var(--text-primary);
@@ -2776,7 +2760,7 @@ textarea.form-input {
   height: 56px;
   text-align: center;
   font-size: 24px;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fsb-font-mono);
   border: 2px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
@@ -2928,7 +2912,7 @@ textarea.form-input {
 }
 
 .credential-card-password {
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-size: 0.85rem;
   color: var(--text-secondary);
   min-width: 100px;
@@ -3196,7 +3180,7 @@ textarea.form-input {
 }
 
 .payment-method-number {
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-size: 0.85rem;
   color: var(--text-secondary);
 }
@@ -3364,7 +3348,7 @@ textarea.form-input {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 0.875rem;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--fsb-font-mono);
   background: var(--bg-secondary);
   color: var(--text-primary);
   transition: border-color 0.2s;
@@ -3462,7 +3446,7 @@ textarea.form-input {
 .explorer-current-url {
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--fsb-font-mono);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -3539,7 +3523,7 @@ textarea.form-input {
 
 .crawler-current-url {
   font-size: 0.75rem;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--fsb-font-mono);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -4044,7 +4028,7 @@ textarea.form-input {
 }
 
 .agent-conn-meta {
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--fsb-font-mono);
   font-size: 0.58rem;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -4060,7 +4044,7 @@ textarea.form-input {
   padding: 5px 11px;
   border: 1px solid var(--border-color);
   border-radius: 999px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--fsb-font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -4101,7 +4085,7 @@ textarea.form-input {
 
 .agent-conn-row dt {
   padding-top: 2px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--fsb-font-mono);
   font-size: 0.57rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -4782,7 +4766,7 @@ textarea.form-input {
 }
 
 .memory-detail-panel .detail-code {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fsb-font-mono);
   background: var(--bg-accent);
   padding: 2px 6px;
   border-radius: 4px;
@@ -5647,7 +5631,7 @@ textarea.form-input {
 .token-row .token-count {
   color: var(--text-secondary);
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-size: 0.8125rem;
 }
 
@@ -5764,7 +5748,7 @@ textarea.form-input {
 }
 
 .diff-display {
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
   font-size: 0.8125rem;
   white-space: pre-wrap;
   line-height: 1.6;
@@ -5938,7 +5922,7 @@ textarea.form-input {
 .sync-key-input {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-mono);
+  font-family: var(--fsb-font-mono);
 }
 
 .sync-key-row .control-btn {

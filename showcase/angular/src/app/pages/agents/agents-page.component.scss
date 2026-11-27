@@ -90,7 +90,7 @@
   border: 1px solid var(--border-color);
   border-radius: 999px;
   background: var(--bg-card);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -214,7 +214,7 @@
 }
 
 .ag-node-label {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -337,7 +337,7 @@
 }
 
 .ag-agent-maker {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.66rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -365,7 +365,7 @@
   gap: 8px;
   padding-top: 14px;
   border-top: 1px dashed var(--border-color);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -388,7 +388,7 @@
 .ag-more-label {
   width: 100%;
   margin-bottom: 6px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.1em;
   text-align: center;
@@ -461,7 +461,7 @@
 .power-card-stat {
   display: inline-block;
   margin-bottom: 14px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -595,7 +595,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-body);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.84rem;
   color: var(--text-primary);
   text-align: left;
@@ -651,7 +651,7 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-body);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--text-secondary);
   cursor: pointer;
@@ -707,7 +707,7 @@
 }
 
 .prompt-card-label {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -725,7 +725,7 @@
 .prompt-caret {
   display: inline-block;
   margin-right: 8px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
   color: var(--primary);
   user-select: none;

@@ -33,7 +33,7 @@ The side panel uses the product palette ([0002](../decisions/0002-three-palettes
 - **Type** ([typography.md](../foundations/typography.md)):
   - `body` uses the system stack;
   - `.brand-row h1` is plain 16px/700 text, not the wordmark;
-  - `.status-text` is 11px uppercase, `.message` 14px (15px at 500px and wider), `.message.action` 12px in an SF Mono stack;
+  - `.status-text` is 11px uppercase, `.message` 14px (15px at 500px and wider), `.message.action` 12px in the platform mono stack (`--fsb-font-mono`);
   - no Poppins or Space Mono.
 - **Icons.** Font Awesome loads from cdnjs through the `<link>` in the sidepanel.html head ([iconography.md](../foundations/iconography.md), [0005](../decisions/0005-font-awesome-icons-no-emoji.md)).
 

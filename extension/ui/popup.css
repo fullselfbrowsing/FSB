@@ -302,7 +302,7 @@ body {
   align-self: stretch;
   background: var(--action-bg);
   color: var(--action-text);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
   font-size: 12px;
   border-radius: 12px;
   border-left: 3px solid var(--action-border);

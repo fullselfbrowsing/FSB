@@ -49,6 +49,9 @@
   --max-width: 1200px;
   --section-padding: 80px 0;
 
+  /* Technical text: the platform monospace stack (design-system/decisions/0012). */
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+
   /* Stacking layers of the shell, lowest first (design-system/decisions/0013). */
   --z-rail: 30;
   --z-nav-mobile: 999;
@@ -171,7 +174,7 @@ p {
 
 code,
 .mono {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 .container {
@@ -544,8 +547,9 @@ body:lang(zh-TW), body:lang(zh-Hant) {
 :lang(zh-Hans) code, :lang(zh-Hans) .mono,
 :lang(zh-TW) code, :lang(zh-TW) .mono,
 :lang(zh-Hant) code, :lang(zh-Hant) .mono {
+  /* design-literal-ok: CJK fallbacks have to sit between the platform mono stack and the generic family */
   font-family:
-    'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono',
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
     'Hiragino Sans', 'PingFang SC', 'PingFang TC', 'Apple SD Gothic Neo',
     'Microsoft YaHei', 'Microsoft JhengHei', 'Malgun Gothic',
     monospace;

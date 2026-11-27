@@ -14,22 +14,6 @@
   src: url("../assets/onboarding/fonts/poppins-900.ttf") format("truetype");
 }
 
-@font-face {
-  font-family: "Space Mono";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../assets/onboarding/fonts/space-mono-400.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Space Mono";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("../assets/onboarding/fonts/space-mono-700.ttf") format("truetype");
-}
-
 :root {
   --primary: #ff6b35;
   --primary-hover: #e55a2b;
@@ -59,6 +43,7 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
   --shadow-glow: 0 0 20px rgba(255, 107, 53, 0.15);
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
 [data-theme="light"] {
@@ -158,7 +143,7 @@ a:hover {
 }
 
 .ob-top-tag {
-  font-family: "Space Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.22em;
   color: var(--text-muted);
@@ -167,7 +152,7 @@ a:hover {
 }
 
 .ob-ver {
-  font-family: "Space Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   color: var(--text-muted);
@@ -207,7 +192,7 @@ a:hover {
 }
 
 .ob-eyebrow {
-  font-family: "Space Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.64rem;
   letter-spacing: 0.18em;
   color: var(--primary);
@@ -356,7 +341,7 @@ a:hover {
 }
 
 .version-tag {
-  font-family: "Space Mono", monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.4em;
 }
 
@@ -722,7 +707,7 @@ a:hover {
   padding: 12px 40px 12px 14px;
   color: var(--text-primary);
   font-size: 0.88rem;
-  font-family: "SF Mono", Monaco, "Roboto Mono", monospace;
+  font-family: var(--font-mono);
   transition: border-color var(--transition-fast);
 }
 
@@ -845,7 +830,7 @@ a:hover {
   font-size: 0.64rem;
   font-weight: 700;
   color: var(--text-secondary);
-  font-family: "Space Mono", monospace;
+  font-family: var(--font-mono);
 }
 
 .ob-mcp-step b {
@@ -1036,7 +1021,7 @@ a:hover {
   border: none;
   padding: 0;
   cursor: pointer;
-  font-family: "SF Mono", Monaco, "Roboto Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.92rem;
   text-align: left;
   overflow: hidden;
@@ -1172,7 +1157,7 @@ a:hover {
 }
 
 .install-fan-flag {
-  font-family: "SF Mono", Monaco, "Roboto Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.71rem;
   font-weight: 500;
   color: var(--primary);
@@ -1357,7 +1342,7 @@ a:hover {
 }
 
 .mono {
-  font-family: "Space Mono", "SF Mono", monospace;
+  font-family: var(--font-mono);
 }
 
 .vok {
@@ -2095,7 +2080,7 @@ a:hover {
   min-height: 40px;
   padding: 0 0 0 12px;
   color: var(--text-muted);
-  font-family: "Space Mono",monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 400;
   letter-spacing: .14em;

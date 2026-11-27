@@ -81,7 +81,7 @@
   color: #e83e8c;
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
   font-size: 0.9em;
 }
 

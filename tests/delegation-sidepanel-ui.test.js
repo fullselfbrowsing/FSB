@@ -780,9 +780,10 @@ const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice
 // Rolled for the owner's colour decisions (design-system/decisions/0014-0018):
 // one red, green and amber; softer status colours and the core's surfaces in
 // dark mode; indigo folded into the brand orange; four transparency steps.
-// Every changed computed value was traced to one of those decisions.
+// Every changed computed value was traced to one of those decisions. Rolled
+// again when monospace stacks moved to --fsb-font-mono (decision 0012).
 assert.equal(sha256(delegationCssSource),
-  '3edc23ea64336a9b79ea7997099fe97e9a0a30935149230e6e447117ced6f0b1',
+  '79dfa3452e7504ba00dc7e215e2e44cce9ef9a8011dd5a21faa20d2c35c37fef',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

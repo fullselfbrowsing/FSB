@@ -38,7 +38,7 @@ The colours are literals inside the shadow-root stylesheets of `visual-feedback.
 | Crawl card | `--fsb-ov-crawl*` | `#38bdf8`, fill `#0ea5e9` to `#38bdf8`, slate `rgba(15, 23, 42, 0.92)`: blue because crawling does not act on the page |
 
 - **Untokened.** The highlight (`HighlightManager.show`: `#FF8C00` outline, `rgba(255, 140, 0, 0.8)` glow) and the inspector (`#FF8C00` pill and header, white `#fff` panel, `#333` text) have no tokens. Each pill state sets its own accent and ring on `.pl-host` (`--c1`, `--ring`; see States); only the thinking and blocked accents have tokens. The crawl ring `rgba(56, 189, 248, 0.3)` is a literal too.
-- **Type.** The system stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`) everywhere but the pill. The pill's status line is `500 12.5px system-ui` (`PILL_STATUS_FONT`); its agent name, timer, count and third row use `PILL_MONO`, `'fsb-pill-mono', 'Space Mono', 'SFMono-Regular', Consolas, Menlo, monospace`. `ensurePillFont()` registers `fsb-pill-mono` on the document from `assets/onboarding/fonts/space-mono-400.ttf`, which `manifest.json` lists as web-accessible, because `@font-face` inside a shadow root is ignored. The pill's wordmark is drawn as outlines for the same reason (`PILL_WORDMARK_SVG`).
+- **Type.** The system stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`) everywhere but the pill. The pill's status line is `500 12.5px system-ui` (`PILL_STATUS_FONT`); its agent name, timer, count and third row use `PILL_MONO`, the platform stack of [0012](../decisions/0012-platform-mono-for-technical-text.md), which draws Monaco on macOS. A shadow root ignores `@font-face`, so the pill uses only fonts the system has, and its wordmark is drawn as outlines (`PILL_WORDMARK_SVG`).
 
 ## Anatomy
 
@@ -175,13 +175,12 @@ Several pins match exact source text, comments included.
 3. **The highlight has no caller.** Nothing sends `highlightElement`; only `hide()` calls remain. When used, it rewrites the element's inline `outline`, `box-shadow`, `z-index` and `position`.
 4. **Reduced motion is partly ignored.** The viewport glow's bead keeps travelling, though its fade and transitions stop; the crawl card and the highlight ignore the setting. The only off switch for the glow is Animated Action Highlights, and MCP manual actions light it regardless.
 5. **The pill overshoots.** The spawn pop (`cubic-bezier(0.3, 1.5, 0.5, 1)` from 30% scale), the grow curve (`1.22`) and the status line's scale-in from 110% go against the no-bounce and no scale-in rules in the [motion foundation](../foundations/motion.md). They come from the PillMotion board, so they need a recorded exception or a change.
-6. **The pill sets its labels in Space Mono,** loaded from onboarding's font file, against [0012](../decisions/0012-platform-mono-for-technical-text.md).
-7. **Focusable but hidden.** The pill's Stop can take keyboard focus inside an `aria-hidden` host. The inspector's close button, "x", has no name.
-8. **8× reads as 1×.** The player and `FSB_REPLAY_SPEEDS` in `background.js` allow 8×, but `buildReplayControl` in `overlay-state.js` accepts 0.5, 1, 2 and 4 and falls back to 1, so the next status redraws 8× as 1×.
-9. **Two pause glyphs.** `create()` writes `&#10074;&#10074;`; `update()` writes U+2161.
-10. **English left over.** "Waiting for next automation update" and "Reconnecting to the active page" come from `messaging.js`, outside the gate and `OVERLAY_LABELS`, and show in the pill's status line. The inspector's "OK", "FAIL", "[unique]" and "x" have no keys.
-11. **Keys left from the card.** `entry_automating`, `entry_initializing` and `entry_actions` stay in the eight catalogs, but no script reads them.
-12. **Silence differs by layer.** The page removes the pill 180s after the last status, while the worker's replay plan clears a stored session after 120s. The pill boards say 120s. No test pins the page watchdog.
+6. **Focusable but hidden.** The pill's Stop can take keyboard focus inside an `aria-hidden` host. The inspector's close button, "x", has no name.
+7. **8× reads as 1×.** The player and `FSB_REPLAY_SPEEDS` in `background.js` allow 8×, but `buildReplayControl` in `overlay-state.js` accepts 0.5, 1, 2 and 4 and falls back to 1, so the next status redraws 8× as 1×.
+8. **Two pause glyphs.** `create()` writes `&#10074;&#10074;`; `update()` writes U+2161.
+9. **English left over.** "Waiting for next automation update" and "Reconnecting to the active page" come from `messaging.js`, outside the gate and `OVERLAY_LABELS`, and show in the pill's status line. The inspector's "OK", "FAIL", "[unique]" and "x" have no keys.
+10. **Keys left from the card.** `entry_automating`, `entry_initializing` and `entry_actions` stay in the eight catalogs, but no script reads them.
+11. **Silence differs by layer.** The page removes the pill 180s after the last status, while the worker's replay plan clears a stored session after 120s. The pill boards say 120s. No test pins the page watchdog.
 
 ## Sources
 

@@ -272,7 +272,7 @@ body {
   align-self: stretch;
   background: var(--action-bg);
   color: var(--action-text);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
   font-size: 12px;
   border-radius: 12px;
   border-left: 3px solid var(--action-border);
@@ -1166,7 +1166,7 @@ body {
 .recon-progress {
   font-size: 0.75rem;
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
 }
 
 /* Action summary collapse group */
@@ -1425,7 +1425,7 @@ body {
   background: rgba(8, 145, 178, 0.10);
   color: #0b6073;
   border: 1px solid rgba(8, 145, 178, 0.18);
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--fsb-font-mono);
 }
 
 [data-theme="dark"] .history-cost {
@@ -1628,7 +1628,7 @@ body[data-sidepanel-view="history"] .author-footer {
 
 .payment-fill-confirm-last4 {
   color: var(--text-secondary);
-  font-family: monospace;
+  font-family: var(--fsb-font-mono);
   font-size: 14px;
 }
 
@@ -1887,7 +1887,7 @@ body[data-sidepanel-view="history"] .author-footer {
   border-radius: 8px;
   background: var(--fsb-surface-muted);
   color: var(--fsb-text-primary);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -1926,7 +1926,7 @@ body[data-sidepanel-view="history"] .author-footer {
 }
 
 .delegation-machine-value {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
   word-break: break-all;
 }
 

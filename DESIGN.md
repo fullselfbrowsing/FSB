@@ -257,7 +257,7 @@ FSB has no component library. The design tool's prototyping kit lives in `design
 ## Overlays
 
 - **Hosting.** Each overlay is a shadow-root host promoted to the top layer. Hosts are click-through except where the user must click.
-- **Fonts** inside a shadow root are ignored, so overlays use the system stack or draw outlines. The status pill registers Space Mono on the document instead (`fsb-pill-mono`, `ensurePillFont`).
+- **Fonts** inside a shadow root are ignored, so overlays use the system stack or draw outlines. The status pill sets its labels in the platform monospace stack.
 - **Silence:** after 60s without an update the page's overlays show a waiting state, and the page removes them 120s after that, 180s after the last update (the overlay watchdog in `extension/content/messaging.js`). The service worker keeps its own 60s and 120s clocks (`MCP_VISUAL_SESSION_DEGRADE_AFTER_MS`, `MCP_VISUAL_SESSION_ORPHAN_CLEAR_AFTER_MS` in `extension/utils/mcp-visual-session.js`).
 - **What raises an overlay:** action tools, which carry a visual reason and the calling client. Reads such as `read_page` stay silent.
 - **The status pill** replaced the progress card ([decision 0008](design-system/decisions/0008-status-pill-replaces-progress-card.md)). It grows from a seed in the top-right corner and plays the toolbar icon's motions on one clock.
@@ -300,7 +300,7 @@ These are open, or decided and not yet applied. Each has a home in a foundation 
 1. **Product pages keep page-only dark tones.** Every product page takes its dark surfaces and status colours from the core ([0011](design-system/decisions/0011-product-dark-is-near-black.md), [0015](design-system/decisions/0015-status-colours-soften-in-dark-mode.md), [0017](design-system/decisions/0017-side-panel-uses-core-dark-surfaces.md)). The side panel and popup still declare their own message tones (system, AI, error, action), and the control panel its 14% status washes and `--shadow-xl`. `sidepanel.css` is hash-pinned.
 2. **Google Fonts never load on the showcase.** Its Content-Security-Policy refuses them, so Outfit, Space Mono and `'Poppins'` outside the wordmark render in their fallbacks. The wordmark's F and S are one-glyph `data:` faces in `fsb-wordmark.css`.
 3. **The status pill draws its own wordmark.** Its outlined B is a 0.68em B, short of the 0.74em every other copy uses, and its F is Poppins 200. `fsb-wordmark-parity.test.js` does not read it.
-4. **Space Mono is still in shipped CSS** until the migration in [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md) lands: onboarding, the control panel's version tag, six showcase pages and the release-notes template's inline styles.
+4. **Space Mono survives only in the release-notes template.** Its 522 inline styles still name it; the stylesheets, the status pill and both font files moved to the platform stack ([decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md)). The font never loads on the site, so those labels already draw a fallback.
 5. **Control panel timings differ.** options.css uses 150/200/300ms ease-in-out under the site's token names.
 6. **Status gaps:**
    - The control panel's `.status-toast` carries errors, and the side panel's checkboxes use `#f97316`.
@@ -314,7 +314,7 @@ These are open, or decided and not yet applied. Each has a home in a foundation 
    - The conflicts named in [0013](design-system/decisions/0013-name-values-before-changing-them.md) are settled ([0014](design-system/decisions/0014-product-status-colours-one-per-role.md) to [0018](design-system/decisions/0018-brand-orange-transparencies-four-steps.md)), except shadows, which need a scale first. Shadows and focus rings keep literal alphas.
 9. **Overlay gaps against these rules:**
     - The viewport glow's bead keeps travelling under `prefers-reduced-motion`, and the crawl card and the element highlight ignore it.
-    - The status pill overshoots as it pops in and grows, and scales new text in, against the motion rules. Its labels use Space Mono, against [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md).
+    - The status pill overshoots as it pops in and grows, and scales new text in, against the motion rules.
 
     See `@design-system/surfaces/overlays.md#known-issues`.
 

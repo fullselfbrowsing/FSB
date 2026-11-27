@@ -393,8 +393,9 @@
   const PILL_ENDED = Object.freeze({ done: true, error: true, partial: true, stopped: true });
   const PILL_ACTING_PHASES = Object.freeze({ acting: true, writing: true, switching_tab: true });
   const PILL_STATUS_FONT = "500 12.5px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-  const PILL_MONO = "'fsb-pill-mono', 'Space Mono', 'SFMono-Regular', Consolas, Menlo, monospace";
-  const PILL_MONO_URL = 'assets/onboarding/fonts/space-mono-400.ttf';
+  // The platform monospace stack (design-system/decisions/0012). A shadow root
+  // ignores font-face rules, so the pill uses fonts the system already has.
+  const PILL_MONO = "'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace";
 
   // The wordmark as outlines: F from Poppins ExtraLight, S from Poppins Black
   // (both SIL Open Font License 1.1) and B the brand path. Drawn rather than set
@@ -635,27 +636,11 @@
     return Math.ceil(text.length * 6.8) + 6;
   }
 
-  // The name, the timer and the count are set in Space Mono, so their widths
-  // follow from the character count whatever font has loaded.
+  // The name, the timer and the count are set in a monospace font, so their widths
+  // follow from the character count. The per-character widths were measured for
+  // Space Mono (0.612em); the platform fonts are no wider (Monaco 0.606em).
   function pillMonoWidth(text, perChar) {
     return text ? Math.ceil(text.length * perChar) : 0;
-  }
-
-  // Space Mono for the name and timer, registered on the document because a
-  // font-face rule inside a shadow root is ignored. Until it loads, or if it
-  // cannot, the fallback monospace stack takes its place.
-  var pillFontRequested = false;
-  function ensurePillFont() {
-    if (pillFontRequested) return;
-    pillFontRequested = true;
-    try {
-      if (typeof FontFace !== 'function' || !document.fonts || typeof document.fonts.add !== 'function') return;
-      var face = new FontFace('fsb-pill-mono', 'url("' + chrome.runtime.getURL(PILL_MONO_URL) + '") format("truetype")', { style: 'normal', weight: '400', display: 'swap' });
-      document.fonts.add(face);
-      face.load().catch(function () { /* the fallback stack stays in use */ });
-    } catch (e) {
-      // the fallback stack stays in use
-    }
   }
 
   function pillSetStyle(el, cache, key, prop, value) {
@@ -1075,7 +1060,6 @@
      */
     create() {
       if (this.host) return; // Already created
-      ensurePillFont();
 
       // Create host element
       this.host = markOverlayElement(document.createElement('div'), 'progress-host');

@@ -36,7 +36,7 @@ The control panel uses the product palette ([0002](../decisions/0002-three-palet
 
 - **Density scale.** `.dashboard-container` sets a 14px base and re-declares `--space-*` smaller (0.2rem to 1.85rem). It adds `--dashboard-heading-xl/lg/md/sm` (1.5, 1.15, 1 and 0.88rem), `--dashboard-body-lg/md/sm` (0.92, 0.8 and 0.72rem), `--dashboard-sidebar-width` (80px) and `--dashboard-content-max-width` (1120px).
 - **Dark surfaces.** A `[data-theme="dark"] body, .dashboard-container, ...` rule paints six regions `#050505`.
-- **Fonts.** options.css self-hosts Poppins (100, 900) and Space Mono (400, 700) with `@font-face`, from `../assets/onboarding/fonts/`. `.version-tag` uses Space Mono; no rule uses Poppins ([typography.md](../foundations/typography.md)).
+- **Fonts.** options.css self-hosts Poppins (100, 900) with `@font-face`, from `../assets/onboarding/fonts/`. `.version-tag`, logs and code read `--fsb-font-mono`, the platform stack ([typography.md](../foundations/typography.md), [0012](../decisions/0012-platform-mono-for-technical-text.md)).
 - **Icons.** Font Awesome loads from cdnjs through the `<link>` in the control_panel.html head ([iconography.md](../foundations/iconography.md)).
 
 ## Anatomy
@@ -143,7 +143,7 @@ No test hashes these files. They pin rule bodies, markup and function bodies ins
 - **Filled status controls.** In dark mode the Beta badge uses dark ink on the softer amber ([0015](../decisions/0015-status-colours-soften-in-dark-mode.md)). The "Stop all" button still has white text on the softer red (2.99:1); its `#b91c1c` hover needs the white. In light mode the Beta badge's white label is 3.0:1 at 0.6rem, below AA.
 - **Light text differs from the core.** `--text-primary` is `--gray-900` (`#171312`), not `--fsb-text-primary` (`#1f1a17`); secondary and muted are darker too.
 - **Off-grid spacing.** The `.dashboard-container` scale breaks the 4px grid: 0.2rem is 3.2px and 0.6rem is 9.6px ([spacing-layout.md](../foundations/spacing-layout.md)).
-- **Fonts.** `.version-tag` still names Space Mono and options.css still self-hosts it. Under [0012](../decisions/0012-platform-mono-for-technical-text.md) both go, and `.version-tag` takes `--font-mono`. The Poppins `@font-face` rules load for nothing.
+- **Fonts.** The Poppins `@font-face` rules load for nothing: no control-panel rule uses Poppins.
 - **Toasts carry errors.** `.status-toast.error` exists and options.js raises dozens of error toasts; failures belong inline, next to the control. The toast also:
   - has no live region;
   - dismisses with a bare "X";

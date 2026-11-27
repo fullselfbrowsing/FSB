@@ -177,7 +177,7 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.95rem;
   text-align: left;
   overflow: hidden;
@@ -318,7 +318,7 @@
 }
 
 .install-fan-flag {
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 500;
   color: var(--primary);
@@ -381,7 +381,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -436,7 +436,7 @@
 }
 
 .lb-rank {
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-muted);
 }
@@ -482,7 +482,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--text-secondary);
@@ -531,7 +531,7 @@
   position: relative;
   height: 18px;
   margin-right: 64px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--text-muted);
 }
@@ -568,7 +568,7 @@
   align-items: center;
   gap: 6px 10px;
   margin-top: 6px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
@@ -1050,7 +1050,7 @@
 }
 
 .eng-num {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -1064,7 +1064,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1075,7 +1075,7 @@
   background: var(--primary);
   border-radius: 10px;
   color: var(--on-primary);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.06em;
 }
@@ -1207,7 +1207,7 @@
 }
 
 .eng-node-label {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1274,7 +1274,7 @@
   background: var(--primary-faint);
   border: 1px solid var(--primary-glow);
   border-radius: var(--radius-sm);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   color: var(--text-primary);
 }
@@ -1321,7 +1321,7 @@
 }
 
 .eng-chip small {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.64rem;
   color: var(--primary);
 }

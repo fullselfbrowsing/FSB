@@ -118,7 +118,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
-  font-family: var(--font-mono, "SF Mono", Monaco, monospace);
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
@@ -595,7 +595,7 @@
   border: 1px solid var(--border-color);
   border-radius: 999px;
   color: var(--text-secondary);
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   font-size: 0.75rem;
 }
 

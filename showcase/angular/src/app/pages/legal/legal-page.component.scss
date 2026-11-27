@@ -34,7 +34,7 @@
 .legal-last-updated {
   font-size: 0.85rem;
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 /* ---------- Content ---------- */
@@ -155,7 +155,7 @@
 
 /* ---------- Inline code ---------- */
 .legal-content code {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.85em;
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);

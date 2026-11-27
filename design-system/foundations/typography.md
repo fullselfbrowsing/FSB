@@ -32,7 +32,7 @@ System font for reading, Poppins for the wordmark, the platform monospace stack 
 
 The control panel has its own scale: `--dashboard-heading-*` and `--dashboard-body-*` inside `.dashboard-container` in options.css.
 
-The product core ships `--fsb-font-mono` (the 0012 stack), with a `--font-mono` alias that the control panel reads ([0013](../decisions/0013-name-values-before-changing-them.md)). The site's `--font-mono` stays proposed for now. The dashboard and stats pages already read `var(--font-mono, …)` with a Menlo fallback, so defining it would change them; it ships with the Space Mono migration.
+The 0012 stack ships as `--fsb-font-mono` in the product core, with a `--font-mono` alias, and as `--font-mono` on the site and in onboarding's copy. Every monospace `font-family` in the stylesheets reads one of them. Only the CJK code rule keeps a literal, so that its CJK fallbacks come before `monospace`.
 
 ## Specimens
 
@@ -41,8 +41,7 @@ The product core ships `--fsb-font-mono` (the 0012 stack), with a `--font-mono` 
 ## Known gaps
 
 - **Poppins outside the wordmark never loads on the showcase.** No face named `'Poppins'` exists on the site (the wordmark's two glyphs are their own family), and the Content-Security-Policy blocks the Google Fonts imports. Text set in `'Poppins'` elsewhere, against the rule above, draws in its fallback: Concierge's `.con-mark`, all of Prometheus through `.pr-page`, and the `.ps-mini-*` mocks on PhantomStream and release notes. Outfit, imported by lattice, concierge and phantom-stream, falls back the same way.
-- **Space Mono is still in shipped CSS** until the migration in [0012](../decisions/0012-platform-mono-for-technical-text.md) lands: onboarding.css, the control panel's `.version-tag`, the status pill's `PILL_MONO` stack, six showcase page stylesheets and the release-notes template's inline styles. The showcase's own Space Mono declarations already fall back, because the font never loads there.
-- **The showcase's mono stack is not `--font-mono`.** `code, .mono` in styles.scss and the shell's `.version-tag` use `'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace`, which names no Cascadia Code, Consolas or Courier New.
+- **Space Mono remains in the release-notes template's inline styles** (522). The font never loads on the site, so they draw a fallback. Moving them changes the extracted i18n messages in all eight locales ([0012](../decisions/0012-platform-mono-for-technical-text.md)).
 - **Many literal sizes:** 85 distinct literal font sizes in the extension's `ui/` and `shared/` CSS and 83 in the showcase SCSS, not counting `clamp()`, `var()` and other functions. `scripts/check-style-literals.mjs` counts literal `font-family` stacks; it does not yet count sizes.
 - Phase design specs disagree on the product scale (a 24px heading in one, a 14px/600 label in another). The rule above is the common ground, not a contract.
 
