@@ -11,27 +11,21 @@
   --fsb-primary-hover: #e55a2b;
   --fsb-primary-tint: #ff8c42;
   --fsb-on-primary: #ffffff;
+  /* Brand-orange transparencies: four steps (decisions/0018). */
   --fsb-primary-faint: rgba(255, 107, 53, 0.08);
   --fsb-primary-soft: rgba(255, 107, 53, 0.12);
-  --fsb-primary-soft-strong: rgba(255, 107, 53, 0.18);
   --fsb-primary-glow: rgba(255, 107, 53, 0.24);
   --fsb-primary-glow-strong: rgba(255, 107, 53, 0.4);
 
+  /* One red, one green, one amber (decisions/0014); softer in dark mode (0015). */
   --fsb-success: #10b981;
-  --fsb-warning: #f59e0b;
+  --fsb-warning: #d97706;
   --fsb-danger: #dc2626;
   --fsb-info: #0891b2;
 
-  /* Status hues the pages use today beside the four above. Migration only:
-     new code uses the four semantic names (decisions/0013). */
-  --fsb-red-500: #ef4444;
-  --fsb-green-500: #22c55e;
-  --fsb-yellow-500: #eab308;
+  /* The login prompt's amber text pair, kept by decision 0014. Not for new code. */
   --fsb-amber-400: #fbbf24;
-  --fsb-amber-600: #d97706;
   --fsb-amber-800: #92400e;
-  --fsb-indigo-500: #6366f1;
-  --fsb-blue-400: #60a5fa;
 
   --fsb-gray-50: #faf8f6;
   --fsb-gray-100: #f5f1ed;
@@ -105,7 +99,7 @@
 
   --primary-color: var(--fsb-primary);
   --primary-color-dark: var(--fsb-primary-tint);
-  --primary-light: rgba(255, 107, 53, 0.10);
+  --primary-light: var(--fsb-primary-soft);
 
   --success-color: var(--fsb-success);
   --warning-color: var(--fsb-warning);
@@ -164,6 +158,12 @@
   --fsb-text-secondary: #d2c1b4;
   --fsb-text-muted: #a99283;
   --fsb-text-inverse: #141110;
+
+  /* Softer status colours read better on near-black (decisions/0015). */
+  --fsb-success: #81c784;
+  --fsb-warning: #e6b844;
+  --fsb-danger: #e57373;
+  --fsb-info: #4dd0e1;
 
   --fsb-border-subtle: rgba(255, 255, 255, 0.08);
   --fsb-border-strong: rgba(255, 255, 255, 0.14);

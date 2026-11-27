@@ -40,13 +40,13 @@
   --secondary-color: var(--fsb-gray-500);
   --secondary-hover: var(--fsb-gray-600);
   --success-color: var(--fsb-success);
-  --success-light: rgba(16, 185, 129, 0.10);
+  --success-light: color-mix(in srgb, var(--success-color) 10%, transparent);
   --warning-color: var(--fsb-warning);
-  --warning-light: rgba(245, 158, 11, 0.10);
+  --warning-light: color-mix(in srgb, var(--warning-color) 10%, transparent);
   --error-color: var(--fsb-danger);
-  --error-light: rgba(220, 38, 38, 0.08);
+  --error-light: color-mix(in srgb, var(--error-color) 8%, transparent);
   --info-color: var(--fsb-info);
-  --info-light: rgba(8, 145, 178, 0.10);
+  --info-light: color-mix(in srgb, var(--info-color) 10%, transparent);
   
   /* Neutral Colors */
   --gray-50: var(--fsb-gray-50);
@@ -113,25 +113,20 @@
 
 /* Dark Theme Variables */
 [data-theme="dark"] {
-  --bg-accent: rgba(255, 107, 53, 0.08);
-  
+  --bg-accent: var(--fsb-primary-faint);
+
   --text-primary: var(--fsb-text-primary);
   --text-secondary: var(--fsb-text-secondary);
   --text-muted: var(--fsb-text-muted);
-  
-  
+
   --shadow-xl: 0 20px 36px rgba(0, 0, 0, 0.32);
 
-  --success-color: #81c784;
-  --success-light: rgba(129, 199, 132, 0.14);
-  --warning-color: #e6b844;
-  --warning-light: rgba(230, 184, 68, 0.14);
-  --error-color: #e57373;
-  --error-light: rgba(229, 115, 115, 0.14);
-  --info-color: #4dd0e1;
-  --info-light: rgba(77, 208, 225, 0.14);
-
-
+  /* The status colours themselves come from the core's dark block
+     (design-system/decisions/0015); only their washes are stronger here. */
+  --success-light: color-mix(in srgb, var(--success-color) 14%, transparent);
+  --warning-light: color-mix(in srgb, var(--warning-color) 14%, transparent);
+  --error-light: color-mix(in srgb, var(--error-color) 14%, transparent);
+  --info-light: color-mix(in srgb, var(--info-color) 14%, transparent);
 }
 
 /* Reset & Base Styles */
@@ -285,7 +280,7 @@ body {
 }
 
 .status-dot.disconnected {
-  color: var(--fsb-red-500); /* Light red */
+  color: var(--fsb-danger); /* Light red */
 }
 
 .status-dot.checking {
@@ -1379,7 +1374,7 @@ textarea.form-input {
 }
 
 [data-theme="dark"] .setting-value-display {
-  background: rgba(255, 107, 53, 0.15);
+  background: var(--fsb-primary-soft);
 }
 
 [data-theme="dark"] .modern-toggle {
@@ -2716,10 +2711,15 @@ textarea.form-input {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: var(--fsb-amber-600);
+  background: var(--fsb-warning);
   color: white;
   vertical-align: middle;
   margin-left: 4px;
+}
+
+/* Dark ink keeps the label readable on the softer dark amber (design-system/decisions/0015). */
+[data-theme="dark"] .feature-badge.beta {
+  color: var(--fsb-text-inverse);
 }
 
 /* Credentials toolbar */
@@ -3246,12 +3246,12 @@ textarea.form-input {
 
 .payment-card-brand.amex {
   background: rgba(8, 145, 178, 0.12);
-  color: var(--fsb-info);
+  color: #0891b2; /* design-literal-ok: card network colour, fixed in both themes; not the info status */
 }
 
 .payment-card-brand.discover {
   background: rgba(217, 119, 6, 0.12);
-  color: var(--fsb-amber-600);
+  color: #d97706; /* design-literal-ok: card network colour, fixed in both themes; not the warning status */
 }
 
 .payment-card-brand.diners,
@@ -3284,8 +3284,8 @@ textarea.form-input {
   margin-top: var(--space-sm);
   padding: var(--space-md);
   border-radius: var(--radius-md);
-  background: rgba(217, 119, 6, 0.08);
-  border: 1px solid rgba(217, 119, 6, 0.18);
+  background: color-mix(in srgb, var(--fsb-warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fsb-warning) 18%, transparent);
 }
 
 [data-theme="dark"] .payment-method-card {
@@ -3499,9 +3499,9 @@ textarea.form-input {
 }
 
 .crawler-stop-btn {
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--fsb-danger) 10%, transparent);
   color: var(--error-color);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid color-mix(in srgb, var(--fsb-danger) 30%, transparent);
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 0.75rem;
@@ -3510,7 +3510,7 @@ textarea.form-input {
 }
 
 .crawler-stop-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--fsb-danger) 20%, transparent);
 }
 
 .crawler-progress-info {
@@ -3658,7 +3658,7 @@ textarea.form-input {
 
 .research-pagination button:hover:not(:disabled) {
   background: var(--bg-tertiary);
-  border-color: var(--fsb-indigo-500);
+  border-color: var(--fsb-primary);
 }
 
 .research-pagination button:disabled {
@@ -3667,9 +3667,9 @@ textarea.form-input {
 }
 
 .research-pagination button.active {
-  background: var(--fsb-indigo-500);
+  background: var(--fsb-primary);
   color: var(--text-inverse);
-  border-color: var(--fsb-indigo-500);
+  border-color: var(--fsb-primary);
 }
 
 .research-pagination .pagination-info {
@@ -3761,12 +3761,12 @@ textarea.form-input {
 }
 
 .control-btn.danger {
-  color: var(--fsb-red-500);
-  border-color: var(--fsb-red-500);
+  color: var(--fsb-danger);
+  border-color: var(--fsb-danger);
 }
 
 .control-btn.danger:hover {
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--fsb-danger) 10%, transparent);
 }
 
 .control-btn.small {
@@ -3907,8 +3907,8 @@ textarea.form-input {
 }
 
 .agent-status-badge.active {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--fsb-green-500);
+  background: color-mix(in srgb, var(--fsb-success) 15%, transparent);
+  color: var(--fsb-success);
 }
 
 .agent-status-badge.disabled {
@@ -3951,11 +3951,11 @@ textarea.form-input {
 }
 
 .run-status-success {
-  color: var(--fsb-green-500);
+  color: var(--fsb-success);
 }
 
 .run-status-failed {
-  color: var(--fsb-red-500);
+  color: var(--fsb-danger);
 }
 
 /* Agent CLI connection card: hairline card, mono micro-labels, status pill */
@@ -4200,13 +4200,13 @@ textarea.form-input {
 }
 
 .history-entry.success {
-  border-color: var(--fsb-green-500);
-  background: rgba(34, 197, 94, 0.05);
+  border-color: var(--fsb-success);
+  background: color-mix(in srgb, var(--fsb-success) 5%, transparent);
 }
 
 .history-entry.failed {
-  border-color: var(--fsb-red-500);
-  background: rgba(239, 68, 68, 0.05);
+  border-color: var(--fsb-danger);
+  background: color-mix(in srgb, var(--fsb-danger) 5%, transparent);
 }
 
 .history-entry-header {
@@ -4231,7 +4231,7 @@ textarea.form-input {
 }
 
 .history-error {
-  color: var(--fsb-red-500) !important;
+  color: var(--fsb-danger) !important;
 }
 
 .history-iterations {
@@ -4257,9 +4257,9 @@ textarea.form-input {
 }
 
 .replay-badge.active {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--fsb-green-500);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: color-mix(in srgb, var(--fsb-success) 15%, transparent);
+  color: var(--fsb-success);
+  border: 1px solid color-mix(in srgb, var(--fsb-success) 30%, transparent);
 }
 
 .replay-badge.inactive {
@@ -4274,7 +4274,7 @@ textarea.form-input {
 }
 
 .cost-saved {
-  color: var(--fsb-green-500);
+  color: var(--fsb-success);
 }
 
 .control-btn.tiny {
@@ -4293,13 +4293,13 @@ textarea.form-input {
 }
 
 .mode-badge.replay {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--fsb-green-500);
+  background: color-mix(in srgb, var(--fsb-success) 15%, transparent);
+  color: var(--fsb-success);
 }
 
 .mode-badge.fallback {
-  background: rgba(234, 179, 8, 0.15);
-  color: var(--fsb-yellow-500);
+  background: color-mix(in srgb, var(--fsb-warning) 15%, transparent);
+  color: var(--fsb-warning);
 }
 
 .mode-badge.ai {
@@ -4309,7 +4309,7 @@ textarea.form-input {
 
 .history-replay-fail {
   font-size: 0.8em;
-  color: var(--fsb-yellow-500);
+  color: var(--fsb-warning);
   margin-left: 4px;
 }
 
@@ -4320,11 +4320,11 @@ textarea.form-input {
 }
 
 .connection-status.connected {
-  color: var(--fsb-green-500);
+  color: var(--fsb-success);
 }
 
 .connection-status.error {
-  color: var(--fsb-red-500);
+  color: var(--fsb-danger);
 }
 
 
@@ -4351,22 +4351,22 @@ textarea.form-input {
   white-space: nowrap;
 }
 .memory-badge.ai-enhanced {
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--fsb-indigo-500);
+  background: var(--fsb-primary-soft);
+  color: var(--fsb-primary);
 }
 .memory-badge.basic {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--fsb-amber-600);
-  border: 1px dashed rgba(245, 158, 11, 0.4);
+  background: color-mix(in srgb, var(--fsb-warning) 10%, transparent);
+  color: var(--fsb-warning);
+  border: 1px dashed color-mix(in srgb, var(--fsb-warning) 40%, transparent);
 }
 [data-theme="dark"] .memory-badge.ai-enhanced {
-  background: rgba(99, 102, 241, 0.2);
-  color: #818cf8;
+  background: var(--fsb-primary-glow);
+  color: var(--fsb-primary);
 }
 [data-theme="dark"] .memory-badge.basic {
-  background: rgba(245, 158, 11, 0.15);
+  background: color-mix(in srgb, var(--fsb-warning) 15%, transparent);
   color: var(--fsb-amber-400);
-  border-color: rgba(245, 158, 11, 0.4);
+  border-color: color-mix(in srgb, var(--fsb-warning) 40%, transparent);
 }
 /* Outcome badge pill styles */
 .outcome-badge {
@@ -4378,8 +4378,8 @@ textarea.form-input {
   line-height: 1.4;
 }
 .outcome-badge-success { background: rgba(5, 150, 105, 0.15); color: var(--success-color); }
-.outcome-badge-failure { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-.outcome-badge-partial { background: rgba(217, 119, 6, 0.15); color: var(--warning-color); }
+.outcome-badge-failure { background: color-mix(in srgb, var(--fsb-danger) 15%, transparent); color: var(--danger); }
+.outcome-badge-partial { background: color-mix(in srgb, var(--fsb-warning) 15%, transparent); color: var(--warning-color); }
 .outcome-badge-unknown { background: rgba(115, 115, 115, 0.15); color: var(--text-muted); }
 .outcome-badge-lg { font-size: 0.9rem; padding: 4px 14px; border-radius: 12px; }
 
@@ -4454,14 +4454,14 @@ textarea.form-input {
   margin-top: 10px;
   padding: 8px 10px;
   border-left: 3px solid var(--danger);
-  background: rgba(239, 68, 68, 0.05);
+  background: color-mix(in srgb, var(--fsb-danger) 5%, transparent);
   border-radius: 0 6px 6px 0;
 }
 .recon-ai-note {
   margin-top: 8px;
   padding: 8px 10px;
   border-left: 3px solid var(--primary);
-  background: rgba(99, 102, 241, 0.04);
+  background: var(--fsb-primary-faint);
   border-radius: 0 6px 6px 0;
 }
 .recon-procedure-item {
@@ -5020,7 +5020,7 @@ textarea.form-input {
 }
 
 .overflow-item.danger:hover {
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--fsb-danger) 10%, transparent);
 }
 
 /* ==========================================
@@ -5920,11 +5920,11 @@ textarea.form-input {
 }
 
 .pairing-qr-expired {
-  color: var(--fsb-red-500);
+  color: var(--fsb-danger);
 }
 
 .pairing-qr-success {
-  color: var(--fsb-green-500);
+  color: var(--fsb-success);
 }
 
 /* Sync tab layout: key-generation row, action row, and the inline note about

@@ -26,7 +26,7 @@ Onboarding uses the site palette, not the product palette ([0002](../decisions/0
 
 | Group | Tokens | Dark (`:root`) | Light |
 |---|---|---|---|
-| Accent | `--primary`, `--primary-hover`, `--primary-gradient`, `--primary-glow` | `#ff6b35`, `#e55a2b`, 135° to `#ff8c42`, orange at 30% | not overridden |
+| Accent | `--primary`, `--primary-hover`, `--primary-gradient`, `--primary-glow` and the other transparency steps | `#ff6b35`, `#e55a2b`, 135° to `#ff8c42`, orange at 8, 12, 24 and 40% | not overridden |
 | Surfaces | `--bg-body`, `--bg-card`, `--bg-elevated` | `#000000`, `#0a0a0a`, `#141414` | `#ffffff`, `#f8f9fa`, `#f1f5f9` |
 | Text (slate) | `--text-primary`, `--text-secondary`, `--text-muted` | `#f1f5f9`, `#94a3b8`, `#64748b` | `#0f172a`, `#475569`, `#64748b` |
 | Borders | `--border-color`, `--border-hover` | white at 8% and 15% | black at 8% and 15% |
@@ -35,12 +35,9 @@ Onboarding uses the site palette, not the product palette ([0002](../decisions/0
 | Shadow | `--shadow-sm`, `--shadow-md`, `--shadow-lg`, `--shadow-glow` | black at 40–60%, orange glow at 15% | softer |
 
 - **Checked against the site.** [`verify-design-system.mjs`](../../scripts/verify-design-system.mjs) compares both blocks with the site tokens in [`colors.css`](../tokens/colors.css) and its siblings, in `subset` mode: every name onboarding copies must keep the site's value.
+- **Status and accent tokens.** Success and error read the site's `--success` and `--danger`, which onboarding copies into its `:root`. Brand-orange transparencies use the four steps, faint, soft, glow and glow-strong ([0018](../decisions/0018-brand-orange-transparencies-four-steps.md)), the depth planes' glow, bloom and end mark included.
 - **One unused token.** No rule reads `--transition-slow`.
-- **Literal colours outside the tokens:**
-  - success `#22c55e` and its 8% tint (`.ob-status .ok`, `.ob-status-msg.ok`, `.ob-btn.done`, `.vok`);
-  - error `#ef4444` (`.ob-status .bad`, `.ob-status-msg.bad`);
-  - `#fff` text on orange fills, such as `.ob-btn-primary`, `.ob-badge` and `.ob-done-badge`;
-  - the brand orange as `rgba(255, 107, 53, …)` at many alphas: the glows, `.ob3-bloom`, tints, and the cue's warm colour.
+- **Literal colours left:** white text on the hovered primary button (`.ob-btn-primary:hover`), the 8% success tint on `.ob-btn.done`, the 55% orange border on a hovered fan item, the cue's 85% orange text (`.ob3-cue`), and the orange in shadows, which keep their own alphas.
 - **Fonts** ([typography.md](../foundations/typography.md), [0004](../decisions/0004-type-system-font-poppins-wordmark-space-mono.md)):
   - Four `@font-face` rules self-host Poppins 100 and 900 and Space Mono 400 and 700 from `../assets/onboarding/fonts/*.ttf`. The control panel's options.css loads the same four files, and the status pill loads `space-mono-400.ttf` as a web-accessible resource (`PILL_MONO_URL` in [`visual-feedback.js`](../../extension/content/visual-feedback.js)).
   - Poppins draws the wordmark's `.fsb-f` and `.fsb-s`, in the top bar and in the done plane's `.ob3-end-mark`.
@@ -212,7 +209,7 @@ The design checks hold it too.
 - **Space Mono.** Onboarding self-hosts Space Mono and sets seven rules in it: the top tag, the step counter, the eyebrows, the version tags, the MCP step numbers, `.mono` values and the rail's `.fsb-depth-go`, though [typography.md](../foundations/typography.md) forbids Space Mono in new CSS. Under [0012](../decisions/0012-platform-mono-for-technical-text.md) these move to the platform stack (`--font-mono`) and the two Space Mono `@font-face` rules go; the font files stay while options.css and the status pill load them. onboarding.css is hash-pinned, so that change recomputes the pin.
 - **Ignores the theme setting.** `setupTheme()` follows the OS only. A user who picked Dark or Light in the control panel (`fsb-theme` in `localStorage`, `fsbThemePreference` in storage) still gets the OS theme here.
 - **Theme scope.** The theme attribute sits on `.ob`, not `<html>`, so `body` keeps the dark `--bg-body` in light theme.
-- **Literal status colours.** Success `#22c55e` and error `#ef4444` are literals. The product's success colour is `#10b981` (`--fsb-success`).
+- **Site status colours.** Onboarding uses the site's success `#22c55e` and danger `#ef4444`, not the product's `#10b981` and `#dc2626`. The site palette was outside [0014](../decisions/0014-product-status-colours-one-per-role.md).
 - **Counts in copy.** `entry_feat_tools`, `entry_feat_guides`, `entry_feat_guides_sub`, `entry_mcp_2b` and the Tools row of `getSummary()` (`entry_sum_68`, whose key and English already disagree on the count) hard-code counts. [`mcp-version-parity.test.js`](../../tests/mcp-version-parity.test.js) holds the tool counts in onboarding.js's English to the built server. Nothing checks the eight catalogs, which are what the page shows, or the guide and category counts.
 - **English outside the catalog.**
   - `discoverLmStudioModels()` builds `'Loaded model: '` and `' chat models found — choose one'`.

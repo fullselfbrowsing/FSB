@@ -38,7 +38,7 @@ Chosen option 2. Nothing visible changes. The new tokens are:
 
 Rules that come with them:
 
-- **Hue names are for migration only.** New code uses `--fsb-success`, `--fsb-warning`, `--fsb-danger` and `--fsb-info`. Step 3 folds each hue into a semantic token or renames it to its role.
+- **Hue names are for migration only.** New code uses `--fsb-success`, `--fsb-warning`, `--fsb-danger` and `--fsb-info`. Step 3 folded each hue into a semantic token ([0014](0014-product-status-colours-one-per-role.md), [0016](0016-indigo-folds-into-brand-orange.md)). Only the login prompt's amber pair (`--fsb-amber-400`, `--fsb-amber-800`) remains.
 - **Layers are named by role and keep today's numbers.** z-index values below 10 order siblings inside one component; they stay literal, and the literal count no longer counts them.
 - **Only exact matches move.** A literal moves to a token only when the token resolves to the same value on every page that loads the file, in every theme its rule applies in.
 - **Dead fallbacks go.** In `var(--x, #literal)` where `--x` is always defined on that page, only the literal is dropped.
@@ -55,14 +55,14 @@ Rules that come with them:
 - **The site's `--font-mono` waits for step 4.** The dashboard and stats pages already read `var(--font-mono, …)` with a Menlo fallback, so defining it would change those pages.
 - **No shadow tokens.** No whole shadow value repeats three times, so naming them would only make single-use tokens. Shadows join the step-3 decisions.
 - **Adding a name needs a check.** An existing `var(--x)` that named a missing `x` changes when `x` is defined. The new names were checked against every older reference: the only ones, the dashboard's `var(--danger, #ef4444)`, already rendered the new value.
-- **Step 3 decides each conflict as one token value:**
-  - the product's reds;
-  - greens and ambers;
-  - indigo and blue;
-  - the control panel's softer dark status colours;
-  - the side panel's flatter dark;
-  - the brand transparencies, collapsed to four steps;
-  - shadows.
+- **Step 3 decided each conflict as one token value** on 2026-11-25:
+  - one red, one green and one amber: [0014](0014-product-status-colours-one-per-role.md);
+  - softer status colours in dark mode: [0015](0015-status-colours-soften-in-dark-mode.md);
+  - indigo into the brand orange and light blue into info: [0016](0016-indigo-folds-into-brand-orange.md);
+  - the side panel's dark surfaces: [0017](0017-side-panel-uses-core-dark-surfaces.md);
+  - four brand-orange transparency steps: [0018](0018-brand-orange-transparencies-four-steps.md).
+
+  Shadows are still open: no shadow value repeats, so they need a scale first.
 
 ## Evidence
 

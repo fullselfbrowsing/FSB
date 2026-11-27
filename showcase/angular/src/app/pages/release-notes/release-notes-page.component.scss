@@ -505,7 +505,7 @@ img[src*="xai"] { filter: invert(1); }
   width: 260px;
   height: 180px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(ellipse at center, var(--primary-soft-strong), transparent 68%);
+  background: radial-gradient(ellipse at center, var(--primary-soft), transparent 68%);
   pointer-events: none;
 }
 

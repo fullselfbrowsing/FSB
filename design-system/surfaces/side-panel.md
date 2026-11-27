@@ -15,13 +15,13 @@ The side panel is FSB's main extension surface: chat with the in-browser agent, 
 The side panel uses the product palette ([0002](../decisions/0002-three-palettes-one-brand-orange.md), [color.md](../foundations/color.md)).
 
 - **Core tokens.** It links [`fsb-ui-core.css`](../../extension/shared/fsb-ui-core.css) first. Its `:root` holds the `--fsb-*` tokens and the compatibility aliases (`--primary`, `--bg-card`), and `[data-theme="dark"]` flips them. [`product-surface.css`](../tokens/product-surface.css) mirrors both blocks.
-- **Local tokens.** sidepanel.css declares 23 tokens on `:root` and overrides 21 of them under `[data-theme="dark"]`:
+- **Local tokens.** sidepanel.css declares 23 tokens on `:root` and overrides only its 12 message tones under `[data-theme="dark"]`. Dark surfaces and hairlines come from the core ([0017](../decisions/0017-side-panel-uses-core-dark-surfaces.md)):
 
 | Group | Tokens | Light | Dark |
 |---|---|---|---|
-| Surfaces | `--bg-primary`, `--bg-secondary`, `--bg-tertiary` | `--fsb-surface-elevated`, `--fsb-surface-base`, `--fsb-surface-muted-2` | `#050505`, `#050505`, `#121212` |
-| Text | `--text-primary`, `--text-secondary`, `--text-muted` | `--fsb-text-*` | `--fsb-text-*` |
-| Borders | `--border-color`, `--border-hover` | `--fsb-border-subtle`, `--fsb-border-strong` | white at 6% and 14% |
+| Surfaces | `--bg-primary`, `--bg-secondary`, `--bg-tertiary` | `--fsb-surface-elevated`, `--fsb-surface-base`, `--fsb-surface-muted-2` | the same tokens: `#0d0d0d`, `#050505`, `#141414` |
+| Text | `--text-primary`, `--text-secondary`, `--text-muted` | `--fsb-text-*` | the same tokens |
+| Borders | `--border-color`, `--border-hover` | `--fsb-border-subtle`, `--fsb-border-strong` | the same tokens: white at 8% and 14% |
 | Accent | `--primary-color`, `--primary-hover` | `--fsb-primary`, `--fsb-primary-hover` | not overridden |
 | Shadow | `--shadow-sm` | `--fsb-shadow-sm` (the core alias points at `--fsb-shadow-xs`) | same |
 | Message tones | `--system-*`, `--ai-*`, `--error-*`, `--action-*` | tinted washes; AI, error and action text `#0f5c6a`, `#991b1b`, `#166534` | text `#8ed9e7`, `#f4aaaa`, `#b8e4ba` |
@@ -150,19 +150,15 @@ The design checks also hold this surface. [`check-style-literals.mjs`](../../scr
 
 ## Known issues
 
-- **Its own dark block.** The page's dark overrides differ from the core's ramp ([0011](../decisions/0011-product-dark-is-near-black.md)):
-  - `--bg-primary` is the page base `#050505` (the core's alias gives `#0d0d0d`);
-  - `--bg-tertiary` is `#121212` (core `#141414`);
-  - `--border-color` is white at 6% (core 8%).
-
-  Only `--bg-secondary` and `--border-hover` repeat the core. Delegated-run cards read the core tokens directly, so they sit at `#0d0d0d` on the `#050505` panel. Dropping the block would lift the chat's surfaces to `#0d0d0d`, which is a design decision, not a cleanup. sidepanel.css is hash-pinned, so any edit recomputes the pin.
+- **Dark mode follows the core.** Since [0017](../decisions/0017-side-panel-uses-core-dark-surfaces.md) the input field, status pill and history rows sit at `#0d0d0d` and `#141414` with 8% hairlines, while the forced near-black rule keeps the large regions at `#050505`. Status colours soften in dark mode ([0015](../decisions/0015-status-colours-soften-in-dark-mode.md)), so the recording mic uses dark ink there. sidepanel.css is hash-pinned, so any edit recomputes the pin.
 - **markdown.css uses no tokens.** Its `[data-theme="dark"] .message.system`, `.message.ai`, `.message.error` and `.message.action` rules load after sidepanel.css with equal specificity. In dark mode they replace the page's tones with literals: `.message.system` becomes `#303030`, `.message.error` `#451a1a` and `.message.action` `#1a2e1a`. Its links are blue (`#1a73e8`) and its inline code pink (`#e83e8c`).
 - **44px only for delegated controls.** The header and composer buttons stay under 44px, and a test pins the composer at 36px.
 - **Off-brand colours.**
   - `.login-prompt-save-label input[type="checkbox"]` sets `accent-color: #f97316`, not `#ff6b35`.
   - `--accent-color` is never declared, so `.payment-fill-confirm-btn.allow` and the confirm icon fall back to purple `#7c5cff`.
   - `--text-tertiary` is undeclared and falls back to `#666`.
-  - The login and payment prompts bring their own amber (`#fff7ed`, `#fb923c`) and blue (`#eff6ff`, `#60a5fa`) ramps.
+  - The login and payment prompts bring their own tonal ramps: amber (`#fff7ed`, `#fb923c`, and the `--fsb-amber-400` / `--fsb-amber-800` text pair) and blue (`#eff6ff`, `#1d4ed8`, `#2563eb`). Their light-blue accents now read `--fsb-info` ([0016](../decisions/0016-indigo-folds-into-brand-orange.md)).
+  - The recon button uses the brand orange, not indigo ([0016](../decisions/0016-indigo-folds-into-brand-orange.md)). Card-network labels (Amex, Discover) are fixed literals.
 - **Dead selectors.** `body[data-ui-state="running"]`, `body[data-ui-state="error"]` and `body[data-sidepanel-view="history"]` style states that no script sets. `.message.ai`, the visible `.message.status-message` and `.message.completed` have no caller in sidepanel.js, so the `--ai-*` and `--status-bg` tokens paint nothing.
 - **Restricted-page notice.** `showChromepageError()` appends to `#messages`, which does not exist (the list is `#chatMessages`). The notice throws instead of rendering, and its styles are inline.
 - **Accessibility gaps.**

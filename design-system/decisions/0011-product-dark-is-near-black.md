@@ -31,12 +31,7 @@ Chosen option 2, by the owner. It is the dark mode users already know from the p
 - **New core dark surfaces:** `--fsb-surface-base` `#050505`, `--fsb-surface-elevated` `#0d0d0d`, `--fsb-surface-muted` `#121212`, `--fsb-surface-muted-2` `#141414`, `--fsb-surface-ink` `#000000`.
 - **Borders and chrome:** borders become white at 8% (`--fsb-border-subtle`) and 14% (`--fsb-border-strong`). `--bg-nav` becomes `rgba(5, 5, 5, 0.72)`, and the core's dark header gradient moved to near-black too.
 - **Cards** that read core tokens turn from brown to near-black and now match the panel around them. That covers the side panel's delegated-run cards and the control panel's shared primitives.
-- **Page overrides.** The control panel's dark surface block in `options.css` now equals the core and can be removed with no visible change. The side panel and popup keep a flatter dark block:
-  - `--bg-primary` is `#050505`, where the core's alias gives `#0d0d0d`;
-  - `--bg-tertiary` is `#121212` against `#141414`;
-  - hairlines are 6% against 8%.
-
-  Removing those blocks would lift the chat's surfaces, so it needs its own decision. `sidepanel.css` is pinned by a sha256 test, so any edit to it recomputes the pin.
+- **Page overrides.** The control panel's dark surface block went first, with no visible change. The side panel and popup kept a flatter dark block (`#050505` primary, `#121212` raised, 6% hairlines) until [0017](0017-side-panel-uses-core-dark-surfaces.md) moved them onto the core's surfaces as well.
 - **Light mode** is unchanged.
 
 ## Evidence

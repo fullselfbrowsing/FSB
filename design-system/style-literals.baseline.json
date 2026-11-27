@@ -20,28 +20,28 @@
       "tokenForks": 0
     },
     "extension/ui/onboarding.css": {
-      "colors": 26,
+      "colors": 10,
       "zIndex": 4,
       "fontFamily": 13,
       "tokenForks": 0
     },
     "extension/ui/options.css": {
-      "colors": 73,
+      "colors": 47,
       "zIndex": 1,
       "fontFamily": 9,
-      "tokenForks": 16
+      "tokenForks": 3
     },
     "extension/ui/popup.css": {
-      "colors": 20,
+      "colors": 18,
       "zIndex": 0,
       "fontFamily": 2,
-      "tokenForks": 26
+      "tokenForks": 21
     },
     "extension/ui/sidepanel.css": {
-      "colors": 113,
+      "colors": 94,
       "zIndex": 0,
       "fontFamily": 7,
-      "tokenForks": 26
+      "tokenForks": 21
     },
     "showcase/angular/src/app/components/pixel-loader/pixel-loader.component.scss": {
       "colors": 1,
@@ -50,7 +50,7 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/layout/depth/depth-end.component.scss": {
-      "colors": 3,
+      "colors": 2,
       "zIndex": 0,
       "fontFamily": 1,
       "tokenForks": 0
@@ -74,7 +74,7 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/about/about-page.component.scss": {
-      "colors": 11,
+      "colors": 9,
       "zIndex": 1,
       "fontFamily": 1,
       "tokenForks": 0
@@ -98,7 +98,7 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/home/home-page.component.scss": {
-      "colors": 20,
+      "colors": 12,
       "zIndex": 2,
       "fontFamily": 13,
       "tokenForks": 0
@@ -146,7 +146,7 @@
       "tokenForks": 0
     },
     "showcase/angular/src/app/pages/sitemaps/sitemaps-page.component.scss": {
-      "colors": 3,
+      "colors": 2,
       "zIndex": 0,
       "fontFamily": 0,
       "tokenForks": 0

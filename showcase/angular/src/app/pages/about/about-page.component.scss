@@ -165,8 +165,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--primary-wash);
-  border: 1px solid rgba(255, 107, 53, 0.2);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-glow);
   border-radius: var(--radius-sm);
   color: var(--primary);
   font-size: 1.1rem;
@@ -196,8 +196,8 @@
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  background: var(--primary-wash);
-  border: 1px solid rgba(255, 107, 53, 0.25);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-glow);
   border-radius: 999px;
   color: var(--primary);
   font-size: 0.7rem;

@@ -25,7 +25,7 @@ The control panel uses the product palette ([0002](../decisions/0002-three-palet
 | Group | Tokens | Light (`:root`) | Dark |
 |---|---|---|---|
 | Accent | `--primary-color`, `--primary-hover`, `--primary-light`, `--primary-color-dark` | `--fsb-primary`, `--fsb-primary-hover`, `--fsb-primary-soft`, `#ff8c42` | not overridden |
-| Semantic | `--success-color`, `--warning-color`, `--error-color`, `--info-color`, their `-light` washes, `--danger` | `--fsb-success`, `--fsb-warning`, `--fsb-danger`, `--fsb-info` | `#81c784`, `#e6b844`, `#e57373`, `#4dd0e1` |
+| Semantic | `--success-color`, `--warning-color`, `--error-color`, `--info-color`, their `-light` washes, `--danger` | `--fsb-success`, `--fsb-warning`, `--fsb-danger`, `--fsb-info`; washes are `color-mix` at 10% (error 8%) | the same tokens, softer in dark mode ([0015](../decisions/0015-status-colours-soften-in-dark-mode.md)): `#81c784`, `#e6b844`, `#e57373`, `#4dd0e1`; washes 14% |
 | Neutrals | `--gray-50` to `--gray-900`, `--secondary-color` | `--fsb-gray-*` | not overridden |
 | Surfaces | `--bg-primary`, `--bg-secondary`, `--bg-tertiary`, `--card-bg`, `--hover-bg` | core surfaces | `#0d0d0d`, `#050505`, `#141414` |
 | Text | `--text-primary`, `--text-secondary`, `--text-muted` | `--gray-900`, `--gray-600`, `--gray-500` | `--fsb-text-*` |
@@ -67,7 +67,7 @@ The control panel uses the product palette ([0002](../decisions/0002-three-palet
   - Outside clicks call `closeFsbSelect()`.
 - **Unsaved changes.** `markUnsavedChanges()` calls `showSaveBar()`, which slides `.save-bar.show` up. `handleKeyboardShortcuts()` maps Cmd or Ctrl+S to save, Escape to discard and Cmd or Ctrl+T to the provider test.
 - **Toast.** `showToast(message, type)` sets `.status-toast` plus `success`, `info`, `warning` or `error`. The toast stays 2, 3, 4 or 6 seconds by type; success, error and warning tint the border, fill and text.
-- **Connection.** `updateConnectionStatus()` sets `.status-dot.connected` (`#10b981`), `.disconnected` (`#ef4444`) or `.checking` (`#f59e0b`, pulsing).
+- **Connection.** `updateConnectionStatus()` sets `.status-dot.connected` (`--fsb-success`), `.disconnected` (`--fsb-danger`) or `.checking` (`--fsb-warning`, pulsing).
 - **Theme.** `#themeModeToggle` is a `role="radiogroup"` of `.detail-btn[data-theme-mode]` radios: System, Dark and Light.
   - `setThemePreference()` stores the `fsb-theme` key in `localStorage`. `setupTheme()` calls it on load with the stored value.
   - It also calls `mirrorThemePreference()`, which copies the choice to `chrome.storage.local` as `fsbThemePreference`, where the service worker reads it for the toolbar icon. Only Light puts the icon on its white tile ([`action-icon.js`](../../extension/utils/action-icon.js) `tileFor`).
@@ -140,7 +140,7 @@ No test hashes these files. They pin rule bodies, markup and function bodies ins
 
 ## Known issues
 
-- **Dark semantic colours.** The dark block's near-black surfaces now match the core's ramp ([0011](../decisions/0011-product-dark-is-near-black.md)), but it still swaps in its own pastel semantic colours instead of the core's.
+- **Filled status controls.** In dark mode the Beta badge uses dark ink on the softer amber ([0015](../decisions/0015-status-colours-soften-in-dark-mode.md)). The "Stop all" button still has white text on the softer red (2.99:1); its `#b91c1c` hover needs the white. In light mode the Beta badge's white label is 3.0:1 at 0.6rem, below AA.
 - **Light text differs from the core.** `--text-primary` is `--gray-900` (`#171312`), not `--fsb-text-primary` (`#1f1a17`); secondary and muted are darker too.
 - **Off-grid spacing.** The `.dashboard-container` scale breaks the 4px grid: 0.2rem is 3.2px and 0.6rem is 9.6px ([spacing-layout.md](../foundations/spacing-layout.md)).
 - **Fonts.** `.version-tag` still names Space Mono and options.css still self-hosts it. Under [0012](../decisions/0012-platform-mono-for-technical-text.md) both go, and `.version-tag` takes `--font-mono`. The Poppins `@font-face` rules load for nothing.
@@ -154,7 +154,7 @@ No test hashes these files. They pin rule bodies, markup and function bodies ins
   - `.fsb-select` opens from the keyboard, but its options cannot be reached or picked, and it sets no `aria-expanded`. That leaves the language picker mouse-only.
 - **No navigation below 1025px.** At 1024px and below the rail slides off-screen and `#menuToggle` appears, but no script references `menuToggle` or `dashboardSidebar`. A headless capture at 1000px shows the hamburger and no rail. The comment above `.menu-toggle, .sidebar-overlay` says the rail stays docked at every width.
 - **Stale comment.** options.css calls `.fsb-select` unused, but `initFsbSelects()` builds one for every select.
-- **Off-brand colour.** `--accent-color` is never declared, so `.research-pagination` buttons fall back to indigo `#6366f1`.
+- **Research pagination** uses the brand orange since [0016](../decisions/0016-indigo-folds-into-brand-orange.md); before that, an undeclared `--accent-color` fell back to indigo.
 - **Colour-only status.** The header dot shows connection by colour alone; `updateConnectionStatus(status, text)` ignores `text`.
 - **Untranslated titles.** "Toggle Menu", "Toggle visibility" and "More actions" have no keys; two-word attributes slip past the copy gate.
 

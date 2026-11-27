@@ -11,14 +11,11 @@
   --primary-tint: #ff8c42;
   --on-primary: #ffffff;
   --primary-gradient: linear-gradient(135deg, #ff6b35, #ff8c42);
-  --primary-glow: rgba(255, 107, 53, 0.3);
-  /* Brand transparencies in use today; decisions/0013. */
+  /* Brand-orange transparencies: four steps (decisions/0018). */
   --primary-faint: rgba(255, 107, 53, 0.08);
-  --primary-wash: rgba(255, 107, 53, 0.1);
   --primary-soft: rgba(255, 107, 53, 0.12);
-  --primary-soft-strong: rgba(255, 107, 53, 0.18);
+  --primary-glow: rgba(255, 107, 53, 0.24);
   --primary-glow-strong: rgba(255, 107, 53, 0.4);
-  --primary-wash-border: rgba(255, 107, 53, 0.28); /* proposed */
 
   --bg-body: #000000;
   --bg-card: #0a0a0a;

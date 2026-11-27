@@ -1,4 +1,4 @@
-<!-- @dsCard group="Colors" viewport="700x190" subtitle="One orange, four expressions" name="Accent" -->
+<!-- @dsCard group="Colors" viewport="700x330" subtitle="One orange, four transparency steps" name="Accent" -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -22,7 +22,11 @@ body { padding: 20px 22px; background: var(--bg-body); }
 <div class="sw"><div class="fill" style="background:#ff6b35"></div><div class="m"><b>Primary</b><span class="var">--primary</span><span class="lbl">#ff6b35</span></div></div>
 <div class="sw"><div class="fill" style="background:#e55a2b"></div><div class="m"><b>Hover</b><span class="var">--primary-hover</span><span class="lbl">#e55a2b</span></div></div>
 <div class="sw"><div class="fill" style="background:linear-gradient(135deg,#ff6b35,#ff8c42)"></div><div class="m"><b>Gradient</b><span class="var">--primary-gradient</span><span class="lbl">135deg → #ff8c42</span></div></div>
-<div class="sw"><div class="fill" style="background:rgba(255,107,53,.1)"></div><div class="m"><b>Wash</b><span class="var">--primary-wash</span><span class="lbl">orange @ 0.1</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--primary-tint)"></div><div class="m"><b>Tint</b><span class="var">--primary-tint</span><span class="lbl">#ff8c42</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--primary-faint)"></div><div class="m"><b>Faint</b><span class="var">--primary-faint</span><span class="lbl">orange at 8%</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--primary-soft)"></div><div class="m"><b>Soft</b><span class="var">--primary-soft</span><span class="lbl">orange at 12%</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--primary-glow)"></div><div class="m"><b>Glow</b><span class="var">--primary-glow</span><span class="lbl">orange at 24%</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--primary-glow-strong)"></div><div class="m"><b>Glow strong</b><span class="var">--primary-glow-strong</span><span class="lbl">orange at 40%</span></div></div>
 </div>
 </body>
 </html>

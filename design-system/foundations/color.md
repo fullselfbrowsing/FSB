@@ -14,7 +14,7 @@ One brand orange, three palettes. See [0002](../decisions/0002-three-palettes-on
 - **The accent appears in four ways only:**
   - flat;
   - the 135° gradient to `#ff8c42` (buttons, toggle tracks, gradient text);
-  - a 10–12% wash behind icon tiles and eyebrow pills;
+  - a transparency behind icon tiles, pills and selected rows, at one of four steps: faint 8%, soft 12%, glow 24%, glow-strong 40% ([0018](../decisions/0018-brand-orange-transparencies-four-steps.md));
   - a glow for emphasis.
 - **SHOULD** use at most two background colours per screen. Gradients belong to the accent, never to a surface.
 - **MUST** keep both themes:
@@ -22,7 +22,9 @@ One brand orange, three palettes. See [0002](../decisions/0002-three-palettes-on
   - product pages are light by default, and `[data-theme="dark"]` flips them to near-black under warm light text ([0011](../decisions/0011-product-dark-is-near-black.md));
   - the accent never changes with the theme.
 - **Semantic colour.**
-  - **MUST** use semantic colours for meaning only: product success `--fsb-success`, warning `--fsb-warning`, danger `--fsb-danger`, info `--fsb-info`.
+  - **MUST** use semantic colours for meaning only: product success `--fsb-success`, warning `--fsb-warning`, danger `--fsb-danger`, info `--fsb-info`. There is one hue per role ([0014](../decisions/0014-product-status-colours-one-per-role.md)), softer in dark mode ([0015](../decisions/0015-status-colours-soften-in-dark-mode.md)).
+  - **MUST** write a status wash as `color-mix(in srgb, var(--fsb-danger) 10%, transparent)` (any alpha), so it follows the token in both themes.
+  - **MUST** give a filled status control dark ink (`--fsb-text-inverse`) in dark mode; white fails on the softer fills.
   - On the site, red marks competitor and warning states.
   - **MUST NOT** use colour as the only signal; pair it with text or an icon.
 - **MUST** keep text contrast at WCAG AA (4.5:1 for body text, 3:1 for large text and UI parts) in both themes.
@@ -45,16 +47,16 @@ Key values:
 | Secondary text | `#94a3b8` / `#475569` | `#6a584d` / `#d2c1b4` |
 | Hairline | white 8% / black 8% | warm 10% / white 8% |
 
-Values named so far without being settled ([0013](../decisions/0013-name-values-before-changing-them.md)):
+Accent and status tokens ([0013](../decisions/0013-name-values-before-changing-them.md) named them; [0014](../decisions/0014-product-status-colours-one-per-role.md) to [0018](../decisions/0018-brand-orange-transparencies-four-steps.md) settled them):
 
-| Role | Site | Product |
+| Role | Site | Product (light / dark) |
 |---|---|---|
 | Gradient end | `--primary-tint` `#ff8c42` | `--fsb-primary-tint` |
 | Text on the orange (both themes) | `--on-primary` `#ffffff` | `--fsb-on-primary` |
-| Orange transparencies | `--primary-faint` 8%, `--primary-wash` 10%, `--primary-soft` 12%, `--primary-soft-strong` 18%, `--primary-glow` 30%, `--primary-glow-strong` 40% | `--fsb-primary-faint` 8%, `-soft` 12%, `-soft-strong` 18%, `-glow` 24%, `-glow-strong` 40% |
-| Status | `--danger` `#ef4444`, `--danger-wash`, `--success` `#22c55e`, `--warning` `#eab308` | semantic `--fsb-success`, `-warning`, `-danger`, `-info`, plus migration-only hues `--fsb-red-500`, `-green-500`, `-yellow-500`, `-amber-400/600/800`, `-indigo-500`, `-blue-400` |
+| Orange transparencies | `--primary-faint` 8%, `--primary-soft` 12%, `--primary-glow` 24%, `--primary-glow-strong` 40% | `--fsb-primary-faint`, `-soft`, `-glow`, `-glow-strong` at the same steps |
+| Status | `--danger` `#ef4444`, `--danger-wash`, `--success` `#22c55e`, `--warning` `#eab308` | `--fsb-success` `#10b981` / `#81c784`, `--fsb-warning` `#d97706` / `#e6b844`, `--fsb-danger` `#dc2626` / `#e57373`, `--fsb-info` `#0891b2` / `#4dd0e1` |
 
-**MUST NOT** use the migration-only hues in new code. Each one is waiting for a decision that folds it into a semantic token or renames it to its role.
+`--fsb-amber-400` and `--fsb-amber-800` remain only as the login prompt's amber text pair. **MUST NOT** use them in new code.
 
 ## Specimens
 
@@ -62,9 +64,12 @@ Values named so far without being settled ([0013](../decisions/0013-name-values-
 
 ## Known gaps
 
-- **Product pages keep their own dark blocks.** The control panel's dark surfaces now equal the core's near-black ramp ([0011](../decisions/0011-product-dark-is-near-black.md)) and can be removed with no visible change. The side panel and popup differ: `--bg-primary` is the page base `#050505` (the core's alias gives `#0d0d0d`), `--bg-tertiary` is `#121212` (core `#141414`) and `--border-color` is white at 6% (core 8%). Removing their blocks lifts the chat's surfaces, so it is a design decision; `sidepanel.css` is hash-pinned.
+- **Page-only dark tones.** Every product page takes its dark surfaces and status colours from the core ([0011](../decisions/0011-product-dark-is-near-black.md), [0015](../decisions/0015-status-colours-soften-in-dark-mode.md), [0017](../decisions/0017-side-panel-uses-core-dark-surfaces.md)). The side panel and popup still declare their message tones, and the control panel its 14% status washes.
 - **The site re-declares four product names:** `--fsb-primary-soft`, `--fsb-border-subtle`, `--fsb-border-accent`, `--fsb-focus-ring`. The first now reads the site's own `--primary-soft`; the other three still carry their own values and should become site names.
-- **The danger red differs** between palettes: `#ef4444` on the site, `#dc2626` in the product core, `#e57373` in the control panel's dark mode.
+- **The danger red differs between palettes:** `#ef4444` on the site; `#dc2626` on product pages, or `#e57373` in their dark mode. The site's status colours were not part of [0014](../decisions/0014-product-status-colours-one-per-role.md).
+- **Small status text.** Green and amber fail AA as small text on white (2.5:1 and 3.2:1); text in these roles needs a darker shade.
+- **Orange text on light surfaces.** `#ff6b35` is 2.84:1 on white and 2.47:1 on its soft wash, so small orange text on a light product page fails AA (the transcribing mic, the recon button, the AI memory badge). A darker text orange is an open decision.
+- **Tonal shades stay literal:** alert text on tints (`#991b1b` on `#fee2e2`), the payment prompt's blue ramp, and the Visa, Amex and Discover labels (fixed card colours).
 - **Off-palette colours:**
   - the side panel's checkboxes use `accent-color: #f97316`, which is not the brand orange;
   - `markdown.css` (message rendering) uses no tokens at all.

@@ -169,13 +169,13 @@ function createHarness(initialStore, options) {
     'c2b75c8a5ca86333e4a73200136bb118a1d5f3845d88e59cd5a7296bddd5c3e3',
     'onboarding.html hash rolled: the stage label no longer mentions scrolling, which the wheel no longer does'
   );
-  // Rolled when onboarding's brand transparencies, white text on orange and
-  // status colours moved to site tokens holding the same values (no visible
-  // change; computed styles were compared before and after).
+  // Rolled when onboarding's brand-orange transparencies moved to the four
+  // steps (design-system/decisions/0018); every changed computed value was
+  // traced to that decision.
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),
-    'e659f22f61f4cfa57d20ebf5123fac4bbd957b7ae842b53ef08c29f96b322b31',
-    'onboarding.css hash rolled: the wordmark B is 0.74em tall, level with the black S, as in the showcase fsb-wordmark.css; literals equal to a site token read the token'
+    'f970f484b52a748232cc0e20cb81f0b5197e3935c5ff8f024cf90237028a89b0',
+    'onboarding.css hash rolled: the wordmark B is 0.74em tall, level with the black S, as in the showcase fsb-wordmark.css; brand-orange transparencies sit on the four steps'
   );
 
   console.log('--- durable count, timestamps, and sibling preservation ---');

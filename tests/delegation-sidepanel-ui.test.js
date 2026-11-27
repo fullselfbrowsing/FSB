@@ -777,12 +777,12 @@ const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
 assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
   'the session-replay CSS block has stable boundaries');
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
-// Rolled when colour and z-index literals became var(--fsb-*) references:
-// first those that already equalled a core token, then new core tokens that
-// hold today's values (status hues, white on the brand orange, stacking layers).
-// Computed styles were compared before and after: no visible change.
+// Rolled for the owner's colour decisions (design-system/decisions/0014-0018):
+// one red, green and amber; softer status colours and the core's surfaces in
+// dark mode; indigo folded into the brand orange; four transparency steps.
+// Every changed computed value was traced to one of those decisions.
 assert.equal(sha256(delegationCssSource),
-  '41b8f01087f395e1ed156f1e39be4b3def3ee237091feaa685f3490807b2929b',
+  '3edc23ea64336a9b79ea7997099fe97e9a0a30935149230e6e447117ced6f0b1',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

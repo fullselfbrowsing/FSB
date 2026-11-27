@@ -33,7 +33,7 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 20%, var(--primary-soft-strong) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 20%, var(--primary-soft) 0%, transparent 70%),
     radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255, 140, 66, 0.12) 0%, transparent 60%);
   animation: statsGlow 12s ease-in-out infinite;
 }
@@ -538,7 +538,7 @@
   border-color: rgba(255, 107, 53, 0.55);
   background: color-mix(in srgb, var(--bg-card) 88%, transparent);
   color: var(--text-primary);
-  box-shadow: var(--shadow-lg), 0 0 18px var(--primary-soft-strong);
+  box-shadow: var(--shadow-lg), 0 0 18px var(--primary-soft);
   transform: translateY(var(--dy, 0px)) scale(1.08);
   z-index: 2;
 }

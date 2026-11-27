@@ -6,13 +6,12 @@
   --primary: #ff6b35;
   --primary-hover: #e55a2b;
   --primary-gradient: linear-gradient(135deg, #ff6b35, #ff8c42);
-  --primary-glow: rgba(255, 107, 53, 0.3);
   --primary-tint: #ff8c42;
   --on-primary: #ffffff;
+  /* Brand-orange transparencies: four steps (design-system/decisions/0018). */
   --primary-faint: rgba(255, 107, 53, 0.08);
-  --primary-wash: rgba(255, 107, 53, 0.1);
   --primary-soft: rgba(255, 107, 53, 0.12);
-  --primary-soft-strong: rgba(255, 107, 53, 0.18);
+  --primary-glow: rgba(255, 107, 53, 0.24);
   --primary-glow-strong: rgba(255, 107, 53, 0.4);
 
   --bg-body: #000000;
@@ -233,7 +232,7 @@ code,
 }
 
 .btn-outline:hover {
-  background: var(--primary-wash);
+  background: var(--primary-soft);
   color: var(--primary);
   transform: translateY(-2px);
 }

@@ -18,13 +18,13 @@ The popup is a compact chat launcher: the [side panel](side-panel.md)'s chat wit
 The popup uses the product palette ([0002](../decisions/0002-three-palettes-one-brand-orange.md), [color.md](../foundations/color.md)).
 
 - **Core tokens.** It links [`fsb-ui-core.css`](../../extension/shared/fsb-ui-core.css), mirrored by [`product-surface.css`](../tokens/product-surface.css).
-- **Local tokens.** popup.css repeats sidepanel.css's token block: the same 23 names on `:root` and the same 21 overrides under `[data-theme="dark"]`, value for value. The table is on the [side panel page](side-panel.md). Dark surfaces are `#050505` and `#121212`, in line with the core's near-black ramp ([0011](../decisions/0011-product-dark-is-near-black.md)).
+- **Local tokens.** popup.css repeats sidepanel.css's token block: the same 23 names on `:root` and the same 12 message-tone overrides under `[data-theme="dark"]`, value for value. The table is on the [side panel page](side-panel.md). Dark surfaces and hairlines come from the core ([0017](../decisions/0017-side-panel-uses-core-dark-surfaces.md)).
 - **Forced near-black.** A `[data-theme="dark"] body, .chat-container, .chat-header, .chat-messages-area, .chat-input-area, .author-footer` rule sets `#050505 !important`.
 - **Popup-only colours:**
-  - `.status-dot.owned` is `#f59e0b` and does not animate;
+  - `.status-dot.owned` reads `--fsb-warning` and does not animate;
   - `#pinBtn.pinned` mixes `--fsb-primary` into its border and `--fsb-primary-soft` into its fill;
-  - `.message.partial-result` is `#fffbeb` with a `#f59e0b` rule;
-  - `.retry-btn` is a literal `#ff6b35`.
+  - `.message.partial-result` is `#fffbeb` with a `--fsb-warning` rule;
+  - `.retry-btn` reads `--fsb-primary` with `--fsb-on-primary` text.
 - **Type** matches the side panel: the system stack on `body`, a 16px/700 `.brand-row h1`, an 11px uppercase `.status-text` and 14px `.message` ([typography.md](../foundations/typography.md)).
 - **Icons.** Font Awesome loads from cdnjs through the `<link>` in the popup.html head ([iconography.md](../foundations/iconography.md)).
 
@@ -98,7 +98,7 @@ No test hashes popup.html or popup.css. Edits are cheap, but the token block mus
 
 | Test | What it pins | In `npm test` |
 |---|---|---|
-| [owner-chip.test.js](../../tests/owner-chip.test.js) | `.status-dot.owned` with `color: #f59e0b` and `animation: none`; popup.html loads owner-chip.js and has one `.status-text`; only popup.js calls `_setHeaderOwner` | no |
+| [owner-chip.test.js](../../tests/owner-chip.test.js) | `.status-dot.owned` with `color: var(--fsb-warning)` and `animation: none`; popup.html loads owner-chip.js and has one `.status-text`; only popup.js calls `_setHeaderOwner` | no |
 | [extension-ui-locale.test.js](../../tests/extension-ui-locale.test.js) | popup.html static text matches the English catalog; no inline `<script>` | yes |
 | [agent-sunset-control-panel.test.js](../../tests/agent-sunset-control-panel.test.js) | no supplementary-plane characters (emoji) and no `/agent` command code in popup.js | yes |
 | [onboarding-first-run.test.js](../../tests/onboarding-first-run.test.js) | onboarding keeps the `ui/popup.html` fallback URL | no |
@@ -113,7 +113,6 @@ No test hashes popup.html or popup.css. Edits are cheap, but the token block mus
 - **No reduced motion** anywhere on the page, and `.message.new` overshoots, against the no-bounce rule.
 - **Copied tokens.** The 23-token block is a copy of sidepanel.css; nothing checks that the two stay equal.
 - **Shared problems with the side panel:**
-  - a dark block that differs from the core's ramp ([0011](../decisions/0011-product-dark-is-near-black.md)): `#050505` primary, `#121212` tertiary and 6% hairlines, the same values as the side panel;
   - markdown.css replacing the dark message tones with literals;
   - `showChromepageError()` appending to a `#messages` element that does not exist, so the restricted-page notice throws.
 

@@ -32,7 +32,7 @@ export function Card({ variant = 'feature', icon, title, badge, recommended, foo
   };
 
   const iconTile = {
-    feature: { width: 34, height: 34, fontSize: '0.95rem', borderRadius: 'var(--radius-sm)', background: 'var(--primary-wash)', color: 'var(--primary)' },
+    feature: { width: 34, height: 34, fontSize: '0.95rem', borderRadius: 'var(--radius-sm)', background: 'var(--primary-soft)', color: 'var(--primary)' },
     provider: { width: 46, height: 46, fontSize: '1.35rem', margin: '0 auto 14px', color: 'var(--text-secondary)' },
     competitor: { width: 40, height: 40, fontSize: '1.2rem', margin: '0 auto 12px', color: 'var(--text-secondary)' },
   }[variant];

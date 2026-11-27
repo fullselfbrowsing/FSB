@@ -39,7 +39,7 @@
 }
 
 .fsb-end-mark::before {
-  background: radial-gradient(closest-side, rgba(255, 107, 53, .14), transparent);
+  background: radial-gradient(closest-side, var(--primary-soft), transparent);
   content: '';
   height: 90%;
   left: 50%;

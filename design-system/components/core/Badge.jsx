@@ -3,7 +3,7 @@ import React from 'react';
 const VARIANTS = {
   eyebrow: {
     display: 'inline-flex', alignItems: 'center', gap: '9px', padding: '6px 14px',
-    background: 'var(--primary-wash)', border: '1px solid var(--primary-wash-border)',
+    background: 'var(--primary-soft)', border: '1px solid var(--primary-glow)',
     borderRadius: 'var(--radius-pill)', color: 'var(--primary)', fontSize: '0.72rem',
     fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
   },

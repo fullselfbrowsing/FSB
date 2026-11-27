@@ -35,8 +35,12 @@ colors:
       on-surface: "#f6efe9"
       on-surface-variant: "#d2c1b4"
       on-surface-muted: "#a99283"
+      success: "#81c784"
+      warning: "#e6b844"
+      error: "#e57373"
+      info: "#4dd0e1"
     success: "#10b981"
-    warning: "#f59e0b"
+    warning: "#d97706"
     error: "#dc2626"
     info: "#0891b2"
   overlay:
@@ -158,9 +162,9 @@ There are three palettes, each tied to where it ships ([decision 0002](design-sy
 - **The orange appears four ways and no others:**
   - flat;
   - the 135° gradient to `#ff8c42`;
-  - a 10–12% wash;
-  - a glow.
-- **Semantic colours carry meaning only.** On product pages: success, warning, danger and info (`--fsb-success` etc.). On the site, red marks competitor and warning states.
+  - a transparency at one of four steps: faint 8%, soft 12%, glow 24%, glow-strong 40% (`--primary-*`, `--fsb-primary-*`; [decision 0018](design-system/decisions/0018-brand-orange-transparencies-four-steps.md));
+  - a glow (shadows keep their own alphas until a shadow scale exists).
+- **Semantic colours carry meaning only.** On product pages there is one hue per role: success `#10b981`, warning `#d97706`, danger `#dc2626`, info `#0891b2` (`--fsb-success` etc.; [decision 0014](design-system/decisions/0014-product-status-colours-one-per-role.md)). Dark mode uses a softer set ([0015](design-system/decisions/0015-status-colours-soften-in-dark-mode.md)), and a filled status control uses dark ink there. On the site, red marks competitor and warning states.
 - **Tokens:** `@design-system/tokens/colors.css` (site), `@design-system/tokens/product-surface.css` (product), `@design-system/tokens/overlay.css` (overlays). Rules: `@design-system/foundations/color.md`.
 
 ## Typography
@@ -293,16 +297,21 @@ Rules: `@design-system/foundations/accessibility.md`.
 
 These are open, or decided and not yet applied. Each has a home in a foundation or surface page.
 
-1. **Product pages keep their own dark blocks.** The control panel's dark surfaces now equal the core ([decision 0011](design-system/decisions/0011-product-dark-is-near-black.md)) and can be removed with no visible change. The side panel's and popup's cannot: in dark mode they set `--bg-primary` to the page base `#050505` (the core's alias gives `#0d0d0d`), `--bg-tertiary` to `#121212` (core `#141414`) and `--border-color` to white at 6% (core 8%). Removing them lifts the chat's surfaces, so keeping that flatter look is a design decision, not a cleanup. `sidepanel.css` is hash-pinned.
+1. **Product pages keep page-only dark tones.** Every product page takes its dark surfaces and status colours from the core ([0011](design-system/decisions/0011-product-dark-is-near-black.md), [0015](design-system/decisions/0015-status-colours-soften-in-dark-mode.md), [0017](design-system/decisions/0017-side-panel-uses-core-dark-surfaces.md)). The side panel and popup still declare their own message tones (system, AI, error, action), and the control panel its 14% status washes and `--shadow-xl`. `sidepanel.css` is hash-pinned.
 2. **Google Fonts never load on the showcase.** Its Content-Security-Policy refuses them, so Outfit, Space Mono and `'Poppins'` outside the wordmark render in their fallbacks. The wordmark's F and S are one-glyph `data:` faces in `fsb-wordmark.css`.
 3. **The status pill draws its own wordmark.** Its outlined B is a 0.68em B, short of the 0.74em every other copy uses, and its F is Poppins 200. `fsb-wordmark-parity.test.js` does not read it.
 4. **Space Mono is still in shipped CSS** until the migration in [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md) lands: onboarding, the control panel's version tag, six showcase pages and the release-notes template's inline styles.
 5. **Control panel timings differ.** options.css uses 150/200/300ms ease-in-out under the site's token names.
-6. **The control panel's `.status-toast` carries errors**, and the side panel's checkboxes use `#f97316`.
+6. **Status gaps:**
+   - The control panel's `.status-toast` carries errors, and the side panel's checkboxes use `#f97316`.
+   - Green, amber and the Beta badge's white label fail AA as small text on white (2.5:1, 3.2:1 and 3.0:1). Text in these roles needs a darker shade.
+   - Orange text on a light surface fails AA: `#ff6b35` is 2.84:1 on white and 2.47:1 on its soft wash (the transcribing mic, the recon button and the AI memory badge). A darker text orange is an open decision.
+   - The control panel's "Stop all" button is white on the softer dark red (2.99:1); its `#b91c1c` hover needs the white.
+   - Tonal alert shades (`#991b1b` on `#fee2e2` and similar) and the payment prompt's blue ramp are still literals ([0014](design-system/decisions/0014-product-status-colours-one-per-role.md), [0016](design-system/decisions/0016-indigo-folds-into-brand-orange.md)).
 7. **No type-size or motion tokens ship yet.** Stacking layers have tokens now (`--fsb-z-*`, `--z-*`; [decision 0013](design-system/decisions/0013-name-values-before-changing-them.md)). The site still re-declares three `--fsb-*` names with its own values; `--fsb-primary-soft` now reads the site's `--primary-soft`.
-8. **Raw values are common, and many hold today's conflicts.**
+8. **Raw values remain.**
    - `design-system/style-literals.baseline.json` records them per file, and the counts may only fall. HTML inline styles are not counted yet.
-   - The migration-only hue tokens (`--fsb-red-500` and the rest) and the six brand transparencies name values that still conflict. Each will be settled as one token value ([decision 0013](design-system/decisions/0013-name-values-before-changing-them.md)).
+   - The conflicts named in [0013](design-system/decisions/0013-name-values-before-changing-them.md) are settled ([0014](design-system/decisions/0014-product-status-colours-one-per-role.md) to [0018](design-system/decisions/0018-brand-orange-transparencies-four-steps.md)), except shadows, which need a scale first. Shadows and focus rings keep literal alphas.
 9. **Overlay gaps against these rules:**
     - The viewport glow's bead keeps travelling under `prefers-reduced-motion`, and the crawl card and the element highlight ignore it.
     - The status pill overshoots as it pops in and grows, and scales new text in, against the motion rules. Its labels use Space Mono, against [decision 0012](design-system/decisions/0012-platform-mono-for-technical-text.md).

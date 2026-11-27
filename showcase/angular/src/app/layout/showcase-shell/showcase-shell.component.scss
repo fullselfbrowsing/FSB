@@ -333,7 +333,7 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 20%, var(--primary-soft-strong) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 20%, var(--primary-soft) 0%, transparent 70%),
     radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255, 140, 66, 0.12) 0%, transparent 60%);
   animation: statsGlow 12s ease-in-out infinite;
 }
