@@ -3945,6 +3945,78 @@ async function runOneExtensionAtATime(WebSocketBridge, auth) {
   });
 }
 
+async function runRefusalEndsWhenItsBrowserStopsTrying(WebSocketBridge, auth) {
+  await withTempHome('bridge-refusal-ends', async (home) => {
+    const port = await getFreePort();
+    const ttlMs = 600;
+    const options = {
+      port,
+      host: '127.0.0.1',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+      browserRefusalTtlMs: ttlMs,
+    };
+    const hub = new WebSocketBridge({ ...options, instanceId: 'refusal-ends-hub' });
+    const relay = new WebSocketBridge({ ...options, instanceId: 'refusal-ends-relay' });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    const otherId = 'ponmlkjihgfedcbaponmlkjihgfedcba';
+    const otherOrigin = `chrome-extension://${otherId}`;
+    const otherInstall = 'c0ffee00-1111-4000-8000-000000000002';
+    const refusalOf = (bridge, reason) => bridge.refusedBrowsers
+      .find((entry) => entry.extensionId === otherId && entry.reason === reason);
+    const turnedAway = async () => {
+      const other = await attachProfile(port, otherInstall, { origin: otherOrigin });
+      resources.sockets.push(other.socket);
+      assertEqual((await waitForSocketClose(other.socket)).code, 1008, 'the other extension id is turned away');
+    };
+    try {
+      await hub.connect();
+      await relay.connect();
+      const fsb = await attachProfile(port, INSTALL_A);
+      resources.sockets.push(fsb.socket);
+      await waitFor(() => browserKeys(relay) === KEY_A, 'the extension attaches');
+
+      await turnedAway();
+      const first = refusalOf(hub, 'another_extension_attached');
+      assert(first, 'the refusal is listed while the other build is trying');
+      // Any frame from an attached browser tells relays the hub's state.
+      fsb.socket.send(installState(INSTALL_A));
+      await waitFor(() => refusalOf(relay, 'another_extension_attached'), 'relays are told of it');
+
+      // A browser still trying stays listed: every try is noted afresh.
+      await sleep(300);
+      await turnedAway();
+      const renewed = refusalOf(hub, 'another_extension_attached');
+      assert(renewed && renewed.at > first.at, 'each try is noted afresh');
+      await sleep(Math.max(0, first.at + ttlMs + 100 - Date.now()));
+      assert(refusalOf(hub, 'another_extension_attached'), 'so it is still listed after its first try would have aged out');
+
+      // The user closes the browser running the other build. Nothing more
+      // arrives from it, or from anyone: the relay ages it out on its own.
+      await waitFor(
+        () => !refusalOf(hub, 'another_extension_attached') && !refusalOf(relay, 'another_extension_attached'),
+        'a browser that stops trying is no longer listed by the hub or a relay',
+        ttlMs * 3,
+      );
+
+      // A refusal for the pin is not aged: it lasts as long as the pin.
+      const authPath = auth.getBridgeAuthPath(home);
+      auth.rotateBridgeSessionSecret(authPath, 30_000);
+      auth.bindAllowedExtensionOrigin(PROFILE_ORIGIN, authPath);
+      const upgrade = await rawUpgrade(port, [`Host: 127.0.0.1:${port}`, `Origin: ${otherOrigin}`]);
+      assert(upgrade.startsWith('HTTP/1.1 403'), 'the other extension id is refused at upgrade while the pin stands');
+      await waitFor(() => refusalOf(relay, 'extension_origin_pin_mismatch'), 'relays are told of the pin refusal');
+      await sleep(ttlMs + 200);
+      assert(refusalOf(hub, 'extension_origin_pin_mismatch'), 'a pin refusal is still listed by the hub past the time');
+      assert(refusalOf(relay, 'extension_origin_pin_mismatch'), 'and by a relay');
+      auth.resetBridgePairing(authPath, 31_000);
+      assertEqual(refusalOf(hub, 'extension_origin_pin_mismatch'), undefined, 'it ends with the pin, as before');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runBrowserKeysAreNeverReassigned(WebSocketBridge) {
   await withTempHome('bridge-key-permanence', async () => {
     const port = await getFreePort();
@@ -4060,6 +4132,7 @@ async function run() {
   await runCase('the hub holds a bounded number of browsers', () => runBrowserLimit(WebSocketBridge));
   await runCase('the real extension in two profiles', () => runRealExtensionInTwoProfiles(WebSocketBridge));
   await runCase('one extension id at a time', () => runOneExtensionAtATime(WebSocketBridge, auth));
+  await runCase('a refusal ends when its browser stops trying', () => runRefusalEndsWhenItsBrowserStopsTrying(WebSocketBridge, auth));
   await runCase('a browser key is never given to another install', () => runBrowserKeysAreNeverReassigned(WebSocketBridge));
   await runCase('hub-exit-promotion', () => runHubExitPromotion(WebSocketBridge));
 

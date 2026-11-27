@@ -125,6 +125,12 @@ const MAX_REMEMBERED_IDENTITIES = 256;
 const MAX_RELAY_EXT_ROUTES = 64;
 const BROWSER_STATE_MIN_INTERVAL_MS = 100;
 const MAX_REFUSAL_REASON_LENGTH = 64;
+// A browser that is turned away tries again on its own backoff, never more
+// than 30 s apart, and each try is turned away and noted afresh. One that has
+// not tried for this long has stopped: its browser was closed, or FSB was
+// disabled there, which is what the refusal told the user to do.
+const BROWSER_REFUSAL_TTL_MS = 120_000;
+const PIN_REFUSAL = 'extension_origin_pin_mismatch';
 const SAFARI_EXTENSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*(?: \([A-Za-z0-9]+\))?$/;
 
 function browserKindOf(origin: string): BrowserKind {
@@ -274,6 +280,15 @@ function parseRefusals(value: unknown): BrowserRefusal[] {
   return refusals;
 }
 
+/**
+ * Whether a refusal still describes a browser that is trying to attach. One
+ * for the pin is not aged: it lasts as long as the pin does, because that
+ * browser is turned away again whenever it comes back.
+ */
+function isRefusalCurrent(refusal: BrowserRefusal, now: number, ttlMs: number): boolean {
+  return refusal.reason === PIN_REFUSAL || now - refusal.at <= ttlMs;
+}
+
 export class WebSocketBridge {
   // Identity
   private instanceId: string;
@@ -288,6 +303,7 @@ export class WebSocketBridge {
   private maxReconnectDelayMs: number;
   private legacyRelayBindingGraceMs: number;
   private extensionIdentifyTimeoutMs: number;
+  private browserRefusalTtlMs: number;
   private allowedBrowserOrigins: string[];
   private capabilities: Set<BridgeCapability>;
   private handleExtRequest: ExtRequestHandler | null;
@@ -365,6 +381,11 @@ export class WebSocketBridge {
       && Number.isFinite(identifyTimeout) && identifyTimeout >= 0
       ? identifyTimeout
       : EXTENSION_IDENTIFY_TIMEOUT_MS;
+    const refusalTtl = options.browserRefusalTtlMs;
+    this.browserRefusalTtlMs = typeof refusalTtl === 'number'
+      && Number.isFinite(refusalTtl) && refusalTtl >= 0
+      ? refusalTtl
+      : BROWSER_REFUSAL_TTL_MS;
     // Safari Web Extensions send Origin: safari-web-extension://<UUID>, both
     // from a direct WebSocket and from the container app's native socket.
     this.allowedBrowserOrigins = options.allowedBrowserOrigins ??
@@ -547,7 +568,11 @@ export class WebSocketBridge {
 
   /** Browsers that tried to attach and were turned away, with the reason. */
   get refusedBrowsers(): BrowserRefusal[] {
-    return this.mode === 'hub' ? this._currentRefusals() : this.relayRefusedBrowsers;
+    if (this.mode === 'hub') return this._currentRefusals();
+    // Aged here too: the hub may send nothing more once a refused browser
+    // stops trying, for instance when the last browser left right after it.
+    const now = Date.now();
+    return this.relayRefusedBrowsers.filter((refusal) => isRefusalCurrent(refusal, now, this.browserRefusalTtlMs));
   }
 
   /** Current operating mode. */
@@ -700,16 +725,23 @@ export class WebSocketBridge {
    * launch attaching never clears what an earlier one was refused for, and a
    * session in that Safari would go on being told to release a pairing that
    * no longer exists. The pin is read only while such a refusal is listed.
+   *
+   * Any other refusal holds only while its browser keeps trying. Every try is
+   * noted afresh, so one not renewed within the TTL is from a browser that has
+   * stopped, and the user is no longer told to close what is already closed.
    */
   private _currentRefusals(): BrowserRefusal[] {
-    const pinRefusal = 'extension_origin_pin_mismatch';
-    if ([...this.browserRefusals.values()].some((refusal) => refusal.reason === pinRefusal)) {
+    if ([...this.browserRefusals.values()].some((refusal) => refusal.reason === PIN_REFUSAL)) {
       const pinnedOrigin = readBridgeAuthState()?.allowedExtensionOrigin ?? null;
       for (const [origin, refusal] of this.browserRefusals) {
-        if (refusal.reason === pinRefusal && (pinnedOrigin === null || pinnedOrigin === origin)) {
+        if (refusal.reason === PIN_REFUSAL && (pinnedOrigin === null || pinnedOrigin === origin)) {
           this.browserRefusals.delete(origin);
         }
       }
+    }
+    const now = Date.now();
+    for (const [origin, refusal] of this.browserRefusals) {
+      if (!isRefusalCurrent(refusal, now, this.browserRefusalTtlMs)) this.browserRefusals.delete(origin);
     }
     return [...this.browserRefusals.values()];
   }

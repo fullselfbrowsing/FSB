@@ -503,7 +503,7 @@ Before this, the hub kept a single extension. Whichever profile connected first 
 - `kind` is `chrome` for every Chromium browser and `safari` for Safari. Nothing on the wire tells Chrome from Edge or Brave.
 - `activeTab`, `tabs`, and `windows` are how to tell one profile from another. The profile's display name is not available yet.
 - `current` is the browser this session is in. `default` is where a call that names no browser would go.
-- `notConnected` lists any browser that tried to attach and was turned away, with the reason.
+- `notConnected` lists any browser that is trying to attach and is being turned away, with the reason. A browser that stops trying drops off the list after two minutes. One refused for the pairing stays listed while that pairing stands.
 
 The call is read-only: it registers no agent anywhere and does not move the session. `status` and `doctor` print the same list, one `Browser <name>:` line each.
 

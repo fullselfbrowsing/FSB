@@ -95,6 +95,9 @@ export interface BridgeOptions {
   // under that name, which is how the hub behaved before it kept one browser
   // per install.
   extensionIdentifyTimeoutMs?: number;
+  // How long a browser that was turned away for any reason but the pin stays
+  // listed after its last try. Tests shorten it.
+  browserRefusalTtlMs?: number;
   allowedBrowserOrigins?: string[];
   capabilities?: BridgeCapability[];
   handleExtRequest?: ExtRequestHandler;
