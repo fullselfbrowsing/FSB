@@ -5940,6 +5940,39 @@ async function runWakeLockCompatibility() {
       ['wake.lock'],
       'no pending or quarantined lock directory is left beside the lock',
     );
+
+    // A lock left by a wake that died, which cannot be moved aside (here an
+    // immutable directory), is waited for and given up on at the deadline.
+    if (process.platform === 'darwin') {
+      const { execFileSync } = require('node:child_process');
+      fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({
+        schema: 1,
+        token: hexToken(0xbeef),
+        createdAt: 1,
+      }));
+      execFileSync('/usr/bin/chflags', ['uchg', lockPath]);
+      try {
+        // A wait that never returns would otherwise hang the suite without a word.
+        const stuck = await Promise.race([
+          production.holdNativeHostWakeLock(stableRoot, hexToken(0xabe)),
+          new Promise((resolve) => {
+            const timer = setTimeout(() => resolve('timed-out'), 30_000);
+            timer.unref?.();
+          }),
+        ]);
+        equal(stuck, null, 'a dead wake\'s lock that cannot be moved aside is given up on at the deadline');
+        equal(JSON.parse(fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8')).token, hexToken(0xbeef), 'a wake lock that cannot be moved aside is left as it was');
+        deepEqual(
+          fs.readdirSync(stableRoot),
+          ['wake.lock'],
+          'no pending or quarantined lock directory is left beside a lock that cannot be moved aside',
+        );
+      } finally {
+        execFileSync('/usr/bin/chflags', ['nouchg', lockPath]);
+      }
+    } else {
+      console.log('  SKIP: an immutable lock directory needs chflags, which only macOS has without root');
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -5981,6 +6014,40 @@ async function runStableRootLock() {
       'no temporary lock file is left beside an unreadable lock',
     );
     fs.rmdirSync(lockPath);
+
+    // A dead holder's lock that cannot be moved aside, here an immutable file,
+    // is waited for like a live holder's and given up on at the deadline.
+    if (process.platform === 'darwin') {
+      const { execFileSync, spawnSync } = require('node:child_process');
+      const exitedPid = spawnSync(process.execPath, ['-e', '']).pid;
+      const deadRecord = `${JSON.stringify({
+        version: 1,
+        pid: exitedPid,
+        token: hexToken(0xdead),
+        startedAt: 1,
+        heartbeatAt: 1,
+      })}\n`;
+      fs.writeFileSync(lockPath, deadRecord, { mode: 0o600 });
+      execFileSync('/usr/bin/chflags', ['uchg', lockPath]);
+      try {
+        startedAt = Date.now();
+        const stuck = await within(production.acquireNativeHostStableRootLock(stableRoot, 300), 5000);
+        const stuckFor = Date.now() - startedAt;
+        equal(stuck, null, 'a dead holder\'s lock that cannot be moved aside gives no lease');
+        check(stuckFor >= 300 && stuckFor < 5000, 'a lock that cannot be moved aside is given up on at the deadline');
+        equal(fs.readFileSync(lockPath, 'utf8'), deadRecord, 'a stable-root lock that cannot be moved aside is left as it was');
+        deepEqual(
+          fs.readdirSync(root).filter((name) => name !== 'native-host.lock'),
+          [],
+          'no temporary lock file is left beside a lock that cannot be moved aside',
+        );
+      } finally {
+        execFileSync('/usr/bin/chflags', ['nouchg', lockPath]);
+        fs.rmSync(lockPath, { force: true });
+      }
+    } else {
+      console.log('  SKIP: an immutable lock file needs chflags, which only macOS has without root');
+    }
 
     // A heartbeat every millisecond is nearly always writing when release
     // runs, so a release that does not wait for it would leave the lock.

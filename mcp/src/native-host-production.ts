@@ -1474,12 +1474,14 @@ async function breakStaleLock(lockPath: string, observed: string): Promise<boole
 /**
  * The cross-process lock at `${stableRoot}.lock`. The holder refreshes its
  * heartbeat every thirty seconds. A lock whose holder process is gone is
- * stale. A live holder's lock is never taken just because its heartbeat looks
- * old, since a laptop that slept or a process that was paused looks exactly
- * like that: a caller that does not wait leaves it alone, and a waiting caller
- * takes it over only after it stays unchanged for more than another heartbeat
- * (a holder frozen for good, or a pid reused by another program). Each step
- * that moves or deletes a tree re-reads the lock first through `held()`.
+ * stale; one that cannot be moved aside is waited for until the deadline, like
+ * a live holder's. A live holder's lock is never taken just because its
+ * heartbeat looks old, since a laptop that slept or a process that was paused
+ * looks exactly like that: a caller that does not wait leaves it alone, and a
+ * waiting caller takes it over only after it stays unchanged for more than
+ * another heartbeat (a holder frozen for good, or a pid reused by another
+ * program). Each step that moves or deletes a tree re-reads the lock first
+ * through `held()`.
  */
 async function acquireStableRootLock(
   stableRoot: string,
@@ -1538,8 +1540,12 @@ async function acquireStableRootLock(
         stale = Date.now() - observed.since > LOCK_SILENT_HOLDER_MS;
       }
       if (stale) {
-        if (await breakStaleLock(lockPath, raw) && record) staleTokens.push(record.token);
-        continue;
+        if (await breakStaleLock(lockPath, raw)) {
+          if (record) staleTokens.push(record.token);
+          continue;
+        }
+        // Not moved aside: it changed meanwhile, or it keeps refusing the
+        // rename. Either way it is waited for like a live holder's lock.
       }
     }
     if (Date.now() >= deadline) return null;
@@ -1664,7 +1670,7 @@ async function readWakeLockOwner(lockPath: string): Promise<
  * serve process from the tree while it is being stopped and moved. A wake
  * already in progress is waited for; a lock left behind by a wake that died is
  * moved aside and deleted. Resolves null when a live wake keeps the lock past
- * the wait.
+ * the wait, or when a dead wake's lock cannot be moved aside before then.
  */
 async function holdWakeLock(stableRoot: string, token: string): Promise<NativeHostWakeLockHold | null> {
   if (!TOKEN_PATTERN.test(token)) throw new Error('invalid-token');
@@ -1721,14 +1727,18 @@ async function holdWakeLock(stableRoot: string, token: string): Promise<NativeHo
     }
     if (!fresh) {
       const aside = `${lockPath}.quarantine-${randomBytes(16).toString('hex')}`;
+      let movedAside = false;
       try {
         await rename(lockPath, aside);
+        movedAside = true;
       } catch {
+        // A lock that refuses to move is waited for below, up to the deadline.
+      }
+      if (movedAside) {
+        await rm(aside, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+          .catch(() => undefined);
         continue;
       }
-      await rm(aside, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
-        .catch(() => undefined);
-      continue;
     }
     if (Date.now() >= deadline) return null;
     await wait(LOCK_POLL_MS);
