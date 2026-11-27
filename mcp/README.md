@@ -48,7 +48,7 @@ Use this package when you want your AI client to drive the browser directly whil
 - `install --antigravity` replaces `install --windsurf` and writes `~/.gemini/config/mcp_config.json`, falling back to `~/.gemini/antigravity/mcp_config.json` on older Antigravity releases. An empty config file is treated as an empty config.
 - Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
 - Grok Build is verified against the `grok-acp-v1` integration contract instead of one exact version (see [Grok Build as the extension's AI provider](#grok-build-as-the-extensions-ai-provider)). Rerun the native-host installation after updating so the staged runtime gets the new checks.
-- **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.95 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+- **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.99 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.2
 
@@ -742,9 +742,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.5`) because it is published independently from the extension release (`0.9.95`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
+The MCP package has its own version (`0.11.5`) because it is published independently from the extension release (`0.9.99`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.5 requires extension 0.9.95 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
+Compatibility for this release: MCP 0.11.5 requires extension 0.9.99 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 

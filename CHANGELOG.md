@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.95`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.99`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
 The independently published `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
@@ -8,8 +8,35 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ### Changed
 
-- **Installing FSB into an MCP client also sets up the local helper.** `fsb-mcp-server install` for any client whose config file FSB writes now registers the native messaging host the extension uses to start its local agent service, in each browser where FSB is installed, and FSB's server keeps that helper current when it starts. `--no-native-host` skips it, uninstalling the last client removes a helper that `install` set up unless the extension has run delegated agents through it, and `uninstall --native-host` removes it outright. The extension's repair command, `install --native-host` with the extension ID, is unchanged. See [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for the installer details.
+- **Installing FSB into an MCP client also sets up the local helper.** `fsb-mcp-server install` for any client whose config file FSB writes now registers the native messaging host the extension uses to start its local agent service, in each browser where FSB is installed, and FSB's server keeps that helper current when it starts. `--no-native-host` skips it, uninstalling the last client removes a helper that `install` set up unless the extension has run delegated agents through it, and `uninstall --native-host` removes it outright. The extension's repair command, `install --native-host` with the extension ID, is unchanged. See [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for the installer details. This ships with the next `fsb-mcp-server` release; 0.11.5 does not include it.
+
+## v0.9.99 — While We Were Here — 2026-11-26
+
+The extension, showcase, skill, documentation, and store metadata align at `0.9.99`. The independently versioned `fsb-mcp-server` stays at `0.11.5`; its native-host installer changes are listed under [Unreleased] and in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) until its next release. MCP tool schemas and bridge messages are unchanged, and the extension asks for no new permissions.
+
+### Added
+
+- **The progress card is now a status pill.** The in-page card becomes a compact pill: the FSB wordmark, the agent name and a timer on top, the status underneath, never wider than 248px. It spawns from a seed, folds to its top line 2.6 seconds after an action ends, and opens a third row for a capability call, a blocked site, or the agent ID on hover. Done fills the track green, holds for 3 seconds and plays the spawn backwards; a new call during the exit brings it back. The pill plays the toolbar icon's motion (sweep, orbit, ring, breathe) from the icon's own clock, also when an MCP host leaves out `tab_id` for the one tab it owns; with reduced motion on, the motion holds still. The viewport glow fades in and out with the pill and stays up between calls while a session runs.
+- **Onboarding flies through depth planes.** Each wizard step is a plane on the z axis. Choosing a card or button flies the camera through it, and a step rail replaces the stepper. Rail ticks go forward as well as back, as far as Next would, and stop at a step that still needs an answer. Swipes, the arrow and Page keys, Space, the buttons and the rail move between steps; the mouse wheel no longer does. The welcome cue reads "Begin", and every step rests at 95% of its fitted size. The agent path names Grok Bot, Muse, Dots, OpenClaw and Hermes with their marks, and the MCP client list shows Gemini CLI in place of OpenClaw. New copy is in all eight extension languages.
+- **The toolbar icon matches the rest of FSB.** Its corners are rounded like the showcase tiles (a radius of 30/128 of its side) in every state and animation, cut with the static icon's own alpha. Choosing Light in FSB's settings moves the icon onto a white tile with a hairline edge, so it still shows on a white toolbar; System and Dark keep the black icon. The Store listing and manifest icons are unchanged.
+- **Five showcase pages are 3D depth pages.** Home, about, agents, privacy and support place their sections on planes along the z axis, and scrolling moves the camera through them. A plane taller than the window scrolls inside itself first, a desktop swipe moves exactly one plane, and on an iPhone tapping a rail entry gives a haptic tick.
+- **A hosted Jev decision gateway on the FSB server, off by default.** `POST /api/jev/decide` answers a typed 503 "disabled" before reading any body unless `JEV_ENABLED` is true and its upstream, model and credential are valid, so current installs see no change.
+
+### Changed
+
 - **The privacy policy says how the helper gets registered.** The Local Agent Service section now says the messaging host is registered only when you run `fsb-mcp-server install`, either for an MCP client or with `--native-host`. Adding a client registers it in each browser where FSB is installed, or in Chrome when none is found; `--native-host` registers Chrome unless you pass `--browser`. Each registration names one permitted extension origin. It also says that FSB's local server only refreshes a host that is already registered and never registers one, that the extension cannot install it, and how to skip or remove it. The policy is dated November 24, 2026, and the September 29, 2026 text is archived under Policy History in all eight site languages.
+- The consent note on a blocked site reads "Blocked. This site needs your approval before FSB can act here."
+- The manifest gains one web-accessible resource, the Space Mono font the status pill uses.
+
+### Fixed
+
+- **One click on a toggle counts as its effect.** Click verification now reads a toggle's own state: `aria-checked`, `aria-pressed`, `aria-selected`, `data-state`, `open`, `checked`, a clicked label's control, a summary's details, the nearest toggle-like ancestor, and the target's text. A correct single click on a switch no longer reads as an unconfirmed outcome that invites a second click and flips it back, including a click on a label with no control inside a switch row. The synthetic mouse events are composed, so listeners outside a shadow root see them.
+- **Onboarding key checks can't be overtaken.** Only the newest connection check may change the step, so an answer for a provider or key that has since changed is ignored. A rail tick can no longer skip an API key, LM Studio URL or model that was edited after it validated, and choosing another LM Studio model clears the previous model's check in place. The step rail no longer covers a step's controls between 360 and 1050px.
+- The toolbar icon's 30-second watchdog no longer restarts a running animation, so the icon and the status pill stop jumping back to their first frame.
+- The viewport glow fades out when a session ends instead of vanishing while the pill still holds Done, and an action that finishes after the session ended no longer brings it back.
+- The status pill finishes its exit when a trigger pulse arrives, and ordinary mouse moves across the page no longer close its hover row.
+- The showcase's FSB wordmark renders in Poppins. The site's content security policy refused Google Fonts, so the F and S drew in the system font.
+- The showcase concierge footer shows the current extension version instead of 0.9.90.
 
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
