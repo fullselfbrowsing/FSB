@@ -1,13 +1,13 @@
 # FSB Showcase
 
-`showcase/` contains the public site for [full-selfbrowsing.com](https://full-selfbrowsing.com) plus the production Express relay used by dashboard pairing.
+`showcase/` contains the public site for [full-selfbrowsing.com](https://full-selfbrowsing.com) plus the production Express server that hosts it.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
 | `angular/` | Angular 20 app with static prerender for `/`, `/about`, `/privacy`, and `/support`. |
-| `server/` | Express + better-sqlite3 + ws backend for pairing, auth, PhantomStream-compatible relay, and dashboard data. |
+| `server/` | Express + better-sqlite3 backend that serves the site, telemetry ingest, public stats, and the hosted Jev gateway, plus a temporary `ws` sink for pre-retirement extensions (see below). |
 | `assets/` | Images, logos, provider artwork, OpenTabs art, and Lattice artwork copied into the Angular build. |
 | `css/`, `js/`, `*.html` | Legacy static surfaces plus shared runtime visualizations still kept beside the Angular app. |
 | `dist/` | Build output, populated as `showcase/dist/showcase-angular/`. |
@@ -86,13 +86,13 @@ The production container is built in two stages. The first stage builds the Angu
 
 The Express backend handles:
 
-- dashboard pairing
-- authenticated dashboard routes
-- WebSocket relay behavior, including PhantomStream-compatible stream frame classification and limits
-- SQLite persistence for paired dashboard state
-- serving prerendered Angular assets in production
+- serving prerendered Angular assets in production, with locale routing, legacy `.html` redirects, and a localized 404
+- anonymous telemetry ingest (`/api/telemetry`) with an hourly housekeeper for retention and rollups
+- public aggregate stats for the `/stats` page (`/api/public-stats`), including cached GitHub stats from a server-side poller
+- the hosted Jev decision gateway (`/api/jev`), off unless `JEV_ENABLED` is set and the upstream is configured
+- SQLite persistence for all of the above
 
-The static and Angular dashboard preview surfaces use the shared PhantomStream viewer wrapper for snapshot rendering and mutation application. FSB host code still owns dashboard state, pairing, task/status traffic, progress/client badges, frozen overlays, and remote-control affordances.
+The Live Dashboard was retired after v0.9.95. Installs still on v0.9.95 or earlier keep opening its relay socket, so `server/src/ws/legacy-relay-sink.js` holds those sockets open, answers their pings, and discards everything else; `/api/auth` and `/api/pair` answer `410 Gone`, and `/dashboard` redirects to the home page. The sink logs an hourly count of open sockets and can be deleted once that count nears zero.
 
 Local CI crawler smoke serves the built static output and runs the route checks against localhost:
 

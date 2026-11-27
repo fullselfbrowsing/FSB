@@ -2,23 +2,21 @@ const path = require('path');
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
-const { URL } = require('url');
 const Database = require('better-sqlite3');
-const { WebSocketServer } = require('ws');
 
 // Load environment variables
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const { initializeDatabase } = require('./src/db/schema');
 const Queries = require('./src/db/queries');
-const authMiddleware = require('./src/middleware/auth');
-const createAuthRouter = require('./src/routes/auth');
-const createPairRouter = require('./src/routes/pair');
-const { setupWSHandler } = require('./src/ws/handler');
-const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-compat');
+const { attachLegacyRelaySink, createRetiredDashboardRouter } = require('./src/ws/legacy-relay-sink');
 const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-language');
 const { createLegacyHtmlRedirectHandler } = require('./src/middleware/legacy-html-redirects');
-const { createShowcaseRouteFallback } = require('./src/middleware/showcase-route-fallback');
+const {
+  createShowcaseRouteFallback,
+  splitLocaleFromPath,
+  withoutTrailingSlash,
+} = require('./src/middleware/showcase-route-fallback');
 const { createStaticCachePolicy } = require('./src/middleware/static-cache-policy');
 const { createGlobalJsonParser } = require('./src/middleware/global-json-parser');
 const { loadJevConfig } = require('./src/jev/config');
@@ -48,10 +46,9 @@ app.disable('x-powered-by');
 // CSP keeps 'unsafe-inline' for scripts/styles because the showcase ships
 // inline JSON-LD scripts (per page), an inline theme-bootstrap script in
 // index.html, and Angular's component-scoped <style> emissions. Nonces are
-// not viable without per-request server rendering. The only outside host left
-// is unpkg, for the dashboard's lazy-loaded html5-qrcode/lz-string scripts:
-// the icon fonts (Font Awesome, Phosphor) and the capability logos are served
-// from this origin, so styles, fonts and images need no CDN allowance.
+// not viable without per-request server rendering. The icon fonts (Font
+// Awesome, Phosphor) and the capability logos are served from this origin, so
+// scripts, styles, fonts and images need no CDN allowance.
 // NOTE: script-src-attr is intentionally NOT set to 'none' here. Angular 20
 // emits the lazy-CSS pattern `<link rel="stylesheet" media="print"
 // onload="this.media='all'">` for the global styles bundle; setting
@@ -65,7 +62,7 @@ app.disable('x-powered-by');
 // showcase/server/src/telemetry/github-poller.js (quick task 260516-7l5).
 const SHOWCASE_CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://unpkg.com",
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   // i.ytimg.com is the /about YouTube thumbnails.
@@ -91,7 +88,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), interest-cohort=()');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
   res.setHeader('Content-Security-Policy', SHOWCASE_CSP);
   next();
 });
@@ -99,8 +96,7 @@ app.use((req, res, next) => {
 // Middleware
 app.use(cors({
   origin: true,
-  credentials: true,
-  exposedHeaders: ['X-FSB-Hash-Key']
+  credentials: true
 }));
 app.use(createGlobalJsonParser());
 
@@ -116,12 +112,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes - auth (no middleware required for register)
-app.use('/api/auth', createAuthRouter(queries));
-
-// Routes - protected (require hash key)
-const auth = authMiddleware(queries);
-app.use('/api/pair', createPairRouter(queries, auth));
+// The Live Dashboard's hash-key and pairing endpoints, retired after v0.9.95.
+// Old installs still call them, so they answer 410 Gone with a JSON body
+// (see src/ws/legacy-relay-sink.js).
+const retiredDashboardRouter = createRetiredDashboardRouter();
+app.use('/api/auth', retiredDashboardRouter);
+app.use('/api/pair', retiredDashboardRouter);
 
 // Phase 273 / INGEST-01..13 -- anonymous telemetry ingest (PUBLIC, no auth).
 // Mount order: AFTER trust-proxy line (top of file), AFTER existing routes
@@ -167,11 +163,28 @@ if (!staticPath) {
   console.warn('[server] No showcase build found at', publicPath, 'or', angularDistPath, '- run `npm --prefix showcase/angular run build` first.');
 }
 
+const NON_SOURCE_LOCALE_SUBPATHS = LOCALES
+  .filter(function(loc) { return loc !== SOURCE_LOCALE; })
+  .map(function(loc) { return LOCALE_SUBPATHS[loc]; })
+  .filter(Boolean);
+
+// The retired Live Dashboard: /dashboard, /dashboard/ and /dashboard.html go
+// to the home page, and /<locale>/dashboard to that locale's home. The target
+// depends only on the path, so the redirect is permanent; the bare / still
+// applies the locale cookie and Accept-Language. Paths that merely start with
+// "dashboard" (/dashboards, /dashboard-x) are not matched.
+const RETIRED_DASHBOARD_ROUTES = new Set(['/dashboard', '/dashboard.html']);
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  const { localeSubPath, routeWithinLocale } = splitLocaleFromPath(req.path, NON_SOURCE_LOCALE_SUBPATHS);
+  if (!RETIRED_DASHBOARD_ROUTES.has(withoutTrailingSlash(routeWithinLocale))) return next();
+  res.redirect(301, localeSubPath ? `/${localeSubPath}` : '/');
+});
+
 // Legacy .html redirects (per D-05)
 const htmlRedirects = {
   '/index.html': '/',
   '/about.html': '/about',
-  '/dashboard.html': '/dashboard',
   '/privacy.html': '/privacy',
   '/support.html': '/support',
 };
@@ -213,7 +226,7 @@ if (staticPath) {
 
 // Phase 216 SRV-01 / SRV-02 / D-09 / D-10 + locale-aware extension (2026-05-21):
 // Prefer per-route prerendered HTML for marketing routes; whitelist exact-match
-// client-shell routes (/dashboard, /stats, /legal) for Angular's dedicated
+// client-shell routes (/stats, /legal) for Angular's dedicated
 // index.csr.html shell; fall through to a 404 otherwise. Client routes must not
 // receive the prerendered root index.html because it contains the Home DOM and
 // metadata. The fallback middleware also canonicalizes trailing slashes and
@@ -236,19 +249,13 @@ const marketingRoutes = new Set([
   '/sitemaps'
 ]);
 const clientShellRoutes = new Set([
-  '/dashboard',
   '/stats',
   '/legal'
 ]);
 const noIndexClientRoutes = new Set([
-  '/dashboard',
   '/stats',
   '/legal'
 ]);
-const NON_SOURCE_LOCALE_SUBPATHS = LOCALES
-  .filter(function(loc) { return loc !== SOURCE_LOCALE; })
-  .map(function(loc) { return LOCALE_SUBPATHS[loc]; })
-  .filter(Boolean);
 
 app.use(createShowcaseRouteFallback({
   staticPath,
@@ -314,61 +321,14 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Create HTTP server and WebSocket server
+// Create the HTTP server. Its only upgrade handler is the legacy relay sink,
+// which holds old installs' dashboard sockets open and refuses everything else.
 const server = http.createServer(app);
-const wss = new WebSocketServer({
-  noServer: true,
-  maxPayload: RELAY_PER_MESSAGE_LIMIT_BYTES + 1024
-});
-
-// Set up WS message handling
-setupWSHandler(wss);
-
-// WebSocket upgrade handler - authenticate via query params
-server.on('upgrade', (request, socket, head) => {
-  try {
-    const url = new URL(request.url, `http://${request.headers.host}`);
-
-    // Only accept upgrades on /ws path
-    if (url.pathname !== '/ws') {
-      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-
-    const hashKey = url.searchParams.get('key');
-    const role = url.searchParams.get('role') || 'dashboard';
-
-    if (!hashKey) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-
-    // Validate hash key
-    const keyRecord = queries.validateHashKey(hashKey);
-    if (!keyRecord) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-
-    // Upgrade the connection
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request, { hashKey, role });
-    });
-  } catch (err) {
-    console.error('WebSocket upgrade error:', err.message);
-    socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
-    socket.destroy();
-  }
-});
+const legacyRelaySink = attachLegacyRelaySink(server);
 
 // Start server
 server.listen(PORT, () => {
   console.log(`[FSB Server] Running on http://localhost:${PORT}`);
-  console.log(`[FSB Server] Dashboard: http://localhost:${PORT}/dashboard`);
-  console.log(`[FSB Server] WebSocket: ws://localhost:${PORT}/ws`);
   console.log(`[FSB Server] Database: ${DB_PATH}`);
 });
 
@@ -389,7 +349,7 @@ process.on('SIGINT', () => {
   console.log('\n[FSB Server] Shutting down...');
   clearInterval(housekeeperInterval);
   clearInterval(githubPollerInterval);
-  wss.close();
+  legacyRelaySink.close();
   server.close();
   db.close();
   process.exit(0);
@@ -398,7 +358,7 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   clearInterval(housekeeperInterval);
   clearInterval(githubPollerInterval);
-  wss.close();
+  legacyRelaySink.close();
   server.close();
   db.close();
   process.exit(0);

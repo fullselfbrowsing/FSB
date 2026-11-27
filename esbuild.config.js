@@ -54,7 +54,6 @@ const fs = require('fs');
 
 const REPO_ROOT = __dirname;
 const SRC_ROOT = path.join(REPO_ROOT, 'extension');
-const SHOWCASE_ROOT = path.join(REPO_ROOT, 'showcase');
 const OUT_ROOT = path.join(REPO_ROOT, 'extension', 'dist');
 
 /**
@@ -169,18 +168,6 @@ const ENTRIES = [
     legalComments: 'none',
     allowOverwrite: true,
     optional: true, // canvas-interceptor.js is small + may not always be present
-  },
-  {
-    name: 'showcase-phantom-stream-viewer',
-    entryPoints: [path.join(SHOWCASE_ROOT, 'js', 'phantom-stream-viewer-entry.js')],
-    outfile: path.join(SHOWCASE_ROOT, 'js', 'phantom-stream-viewer.js'),
-    format: 'iife',
-    sourcemap: false,
-    platform: 'browser',
-    target: ['chrome120'],
-    bundle: true,
-    legalComments: 'none',
-    allowOverwrite: true,
   },
 ];
 

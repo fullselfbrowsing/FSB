@@ -20,40 +20,6 @@ class Queries {
   }
 
   _prepareStatements() {
-    // Hash keys
-    this.insertHashKey = this.db.prepare(
-      'INSERT INTO hash_keys (hash_key) VALUES (?)'
-    );
-    this.getHashKey = this.db.prepare(
-      'SELECT * FROM hash_keys WHERE hash_key = ?'
-    );
-    this.updateLastSeen = this.db.prepare(
-      "UPDATE hash_keys SET last_seen_at = datetime('now') WHERE hash_key = ?"
-    );
-
-    // Pairing tokens
-    this.insertPairingToken = this.db.prepare(
-      'INSERT INTO pairing_tokens (token, hash_key, expires_at) VALUES (?, ?, ?)'
-    );
-    this.selectPairingToken = this.db.prepare(
-      'SELECT * FROM pairing_tokens WHERE token = ?'
-    );
-    this.markTokenUsed = this.db.prepare(
-      'UPDATE pairing_tokens SET used = 1, session_token = ?, session_expires_at = ? WHERE token = ?'
-    );
-    this.invalidateTokensByHashKey = this.db.prepare(
-      'UPDATE pairing_tokens SET used = 1 WHERE hash_key = ? AND used = 0'
-    );
-    this.selectSessionByToken = this.db.prepare(
-      'SELECT * FROM pairing_tokens WHERE session_token = ? AND used = 1'
-    );
-    this.cleanExpiredTokens = this.db.prepare(
-      "DELETE FROM pairing_tokens WHERE expires_at < datetime('now') AND used = 0"
-    );
-    this.deleteSessionByToken = this.db.prepare(
-      'DELETE FROM pairing_tokens WHERE session_token = ?'
-    );
-
     // -----------------------------------------------------------------------
     // Phase 273 / INGEST-07/08/11/12 -- anonymous telemetry pipeline statements.
     // Additive; existing statements untouched. Uses INSERT OR IGNORE on event_id
@@ -461,48 +427,6 @@ class Queries {
     this.selectGithubEtag = this.db.prepare(
       'SELECT etag FROM github_cache WHERE endpoint_id = ? AND is_complete = 1'
     );
-  }
-
-  // Hash key operations
-  createHashKey(hashKey) {
-    return this.insertHashKey.run(hashKey);
-  }
-
-  validateHashKey(hashKey) {
-    const row = this.getHashKey.get(hashKey);
-    if (row) {
-      this.updateLastSeen.run(hashKey);
-    }
-    return row || null;
-  }
-
-  // Pairing token operations
-  createPairingToken(token, hashKey, expiresAt) {
-    return this.insertPairingToken.run(token, hashKey, expiresAt);
-  }
-
-  getPairingToken(token) {
-    return this.selectPairingToken.get(token) || null;
-  }
-
-  consumePairingToken(token, sessionToken, sessionExpiresAt) {
-    return this.markTokenUsed.run(sessionToken, sessionExpiresAt, token);
-  }
-
-  invalidatePairingTokens(hashKey) {
-    return this.invalidateTokensByHashKey.run(hashKey);
-  }
-
-  getSessionByToken(sessionToken) {
-    return this.selectSessionByToken.get(sessionToken) || null;
-  }
-
-  cleanExpiredPairingTokens() {
-    return this.cleanExpiredTokens.run();
-  }
-
-  revokeSession(sessionToken) {
-    return this.deleteSessionByToken.run(sessionToken);
   }
 
   // -----------------------------------------------------------------------

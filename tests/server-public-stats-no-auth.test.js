@@ -1,8 +1,8 @@
 /**
  * Phase 274 / STATS-04 + T-274-09 -- public-stats no-auth + no-cookie + no-PII.
  *
- * Mounts the public /api/public-stats router next to /api/auth in the same
- * Express app, then asserts:
+ * Mounts the public /api/public-stats router behind the same CORS layer as
+ * server.js, then asserts:
  *  - GET /api/public-stats/global with NO auth headers returns 200.
  *  - No Set-Cookie or WWW-Authenticate header on the public response.
  *  - The public bodies carry no PII signatures.
@@ -22,7 +22,6 @@ const cors = require(require.resolve('cors', { paths: [SERVER_NM] }));
 
 const { initializeDatabase } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'schema'));
 const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'queries'));
-const createAuthRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'auth'));
 const createPublicStatsRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'public-stats'));
 const activeTracker = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'active-tracker'));
 const { resetPerUuidBudget } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'telemetry-rate-limit'));
@@ -35,11 +34,9 @@ const queries = new Queries(db);
 
 const app = express();
 // Reproduce the server.js cors layer so we surface any Set-Cookie injection paths.
-app.use(cors({ origin: true, credentials: true, exposedHeaders: ['X-FSB-Hash-Key'] }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// Mount /api/auth next to the public /api/public-stats router, as server.js does.
-app.use('/api/auth', createAuthRouter(queries));
 app.use('/api/public-stats', createPublicStatsRouter(db, queries));
 
 const server = http.createServer(app).listen(0);

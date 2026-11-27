@@ -18,11 +18,19 @@
  *   - The showcase has no dashboard page, route, link or bundled viewer
  *     script. The support page no longer offers remote control, and the
  *     privacy page says the feature is retired.
+ *   - fsb-server has no relay, pairing or hash-key code, and the legacy
+ *     static dashboard files are gone. What is left for installs still on
+ *     v0.9.95 is a quiet sink: /dashboard redirects home, the hash-key and
+ *     pairing endpoints answer 410 Gone, and the old relay socket is held
+ *     open and answered with a pong while everything else it sends is
+ *     dropped.
  *
  * Each area has its own section so new areas can be appended.
  *
- * Plain Node + assert + fs. Static checks plus sandboxed runs of the cleanup
- * and of the control panel's section-id normalizer.
+ * Plain Node + assert + fs. Static checks, sandboxed runs of the cleanup and
+ * of the control panel's section-id normalizer, the sink on an in-process
+ * HTTP server, and a spawned fsb-server on a free port with a temporary
+ * database.
  */
 
 'use strict';
@@ -31,6 +39,11 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
+const crypto = require('crypto');
+const http = require('http');
+const net = require('net');
+const os = require('os');
+const { spawn } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -560,6 +573,438 @@ function listFiles(rel, extensions) {
     check(leftovers.length === 0, name + ' has no retired dashboard units', 'found: ' + leftovers.join(', '));
   }
 }
+
+// ---- Section 9: fsb-server and the legacy static files -- the relay code is gone ----
+
+const SERVER_DIR = 'showcase/server';
+
+{
+  for (const rel of [
+    SERVER_DIR + '/src/routes/auth.js',
+    SERVER_DIR + '/src/routes/pair.js',
+    SERVER_DIR + '/src/middleware/auth.js',
+    SERVER_DIR + '/src/ws/handler.js',
+    SERVER_DIR + '/src/ws/phantomstream-relay-compat.js',
+    'showcase/dashboard.html',
+    'showcase/css/dashboard.css',
+    'showcase/js/dashboard.js',
+    'showcase/js/dashboard-runtime-state.js',
+    'showcase/js/phantom-stream-viewer.js',
+    'showcase/js/phantom-stream-viewer-entry.js',
+    'showcase/js/lz-string.min.js',
+  ]) {
+    check(!fs.existsSync(path.join(ROOT, rel)), rel + ' is deleted');
+  }
+  check(!/phantom-stream-viewer/.test(read('esbuild.config.js')),
+    'esbuild.config.js has no live-preview viewer bundle entry');
+}
+
+const serverSource = read(SERVER_DIR + '/server.js');
+const sinkSource = read(SERVER_DIR + '/src/ws/legacy-relay-sink.js');
+
+function setEntries(source, name) {
+  const match = source.match(new RegExp('const\\s+' + name + '\\s*=\\s*new\\s+Set\\(\\s*\\[([\\s\\S]*?)\\]\\s*\\)'));
+  return match ? [...match[1].matchAll(/'([^']*)'/g)].map((m) => m[1]) : null;
+}
+
+{
+  const required = [...serverSource.matchAll(/require\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]);
+  const retired = required.filter((mod) => (
+    /\/routes\/(?:auth|pair)(?:\.js)?$|\/middleware\/auth(?:\.js)?$|\/ws\/handler(?:\.js)?$|phantomstream-relay-compat/.test(mod)
+  ));
+  check(retired.length === 0, 'server.js requires none of the deleted relay, pairing or auth modules',
+    'found: ' + retired.join(', '));
+  check(required.includes('./src/ws/legacy-relay-sink'), 'server.js loads the legacy relay sink');
+  check(!/new\s+WebSocketServer\b/.test(serverSource) && /attachLegacyRelaySink\(server\)/.test(serverSource),
+    'server.js has no WebSocket server of its own; the sink is its only upgrade handler');
+
+  // The redirect's own key set may name /dashboard; the page sets may not.
+  for (const name of ['marketingRoutes', 'clientShellRoutes', 'noIndexClientRoutes']) {
+    const entries = setEntries(serverSource, name);
+    check(entries !== null && !entries.some((route) => /dashboard/.test(route)),
+      'server.js ' + name + ' has no dashboard route');
+  }
+  const htmlRedirects = (serverSource.match(/const htmlRedirects = \{([\s\S]*?)\};/) || [null, null])[1];
+  check(htmlRedirects !== null && !/dashboard/.test(htmlRedirects),
+    'the legacy .html redirect map has no dashboard entry');
+
+  check(!serverSource.includes('unpkg.com'), 'the CSP no longer allows scripts from unpkg.com');
+  check(/camera=\(\)/.test(serverSource) && !/camera=\(self\)/.test(serverSource),
+    'Permissions-Policy denies the camera the QR scanner used');
+  check(!serverSource.includes('X-FSB-Hash-Key'), 'CORS no longer exposes the hash-key header');
+}
+
+{
+  const queriesSource = read(SERVER_DIR + '/src/db/queries.js');
+  const leftovers = [
+    'createHashKey', 'validateHashKey', 'createPairingToken', 'getPairingToken', 'consumePairingToken',
+    'invalidatePairingTokens', 'getSessionByToken', 'cleanExpiredPairingTokens', 'revokeSession',
+  ].filter((name) => queriesSource.includes(name));
+  check(leftovers.length === 0, 'queries.js has no hash-key or pairing queries', 'found: ' + leftovers.join(', '));
+
+  const hashSource = read(SERVER_DIR + '/src/utils/hash.js');
+  check(!hashSource.includes('generateHashKey') && hashSource.includes('isValidHashKeyFormat'),
+    'hash.js keeps only the key-format check');
+
+  // The data stays: the tables are still created, so existing rows are kept.
+  const schemaSource = read(SERVER_DIR + '/src/db/schema.js');
+  const missing = ['hash_keys', 'pairing_tokens', 'agents', 'agent_runs']
+    .filter((table) => !schemaSource.includes('CREATE TABLE IF NOT EXISTS ' + table + ' ('));
+  check(missing.length === 0, 'schema.js still creates the dashboard-era tables, so their data is kept',
+    'missing: ' + missing.join(', '));
+}
+
+// ---- Section 10: fsb-server -- the legacy relay sink ----
+
+const sinkModule = require(path.join(ROOT, SERVER_DIR, 'src', 'ws', 'legacy-relay-sink.js'));
+const WebSocket = require(path.join(ROOT, 'showcase', 'server', 'node_modules', 'ws'));
+const RELAY_FRAME_CAP = 1024 * 1024 + 1024;
+
+{
+  // A frame over the cap makes ws close the socket. Old clients send the
+  // active tab's URL when the socket opens and reconnect at once after a
+  // close, so the cap stays at the old relay's 1 MiB.
+  check(/maxPayload:\s*MAX_PAYLOAD_BYTES\b/.test(sinkSource)
+    && /const MAX_PAYLOAD_BYTES = 1024 \* 1024 \+ 1024;/.test(sinkSource),
+    "the sink's WebSocket server keeps the old relay's 1 MiB frame cap (plus 1 KiB)");
+  check(/perMessageDeflate:\s*false/.test(sinkSource), 'the sink turns off per-message compression');
+  check(/socket\.on\('error',\s*noop\)/.test(sinkSource),
+    'the sink listens for errors on every raw upgrade socket');
+  check(/ws\.on\('error',\s*noop\)/.test(sinkSource),
+    'the sink listens for errors on every accepted socket');
+  // The idle reaper's terminate() is the only way the sink ends a socket.
+  check(!/\bws\.close\(/.test(sinkSource) && countSubstring(sinkSource, '.terminate()') === 1,
+    'the sink never closes a live socket; only the idle reaper terminates one');
+
+  check(sinkModule.MAX_PAYLOAD_BYTES === RELAY_FRAME_CAP, 'the sink exports the 1 MiB + 1 KiB frame cap');
+  const probe = sinkModule.attachLegacyRelaySink(http.createServer(), { log: { log() {} } });
+  try {
+    check(probe.wss.options.maxPayload === RELAY_FRAME_CAP && probe.wss.options.perMessageDeflate === false,
+      'the WebSocket server is built with that cap and without compression');
+  } finally {
+    probe.close();
+  }
+}
+
+function legacyKey() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function withTimeout(promise, ms, label) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + ' timed out after ' + ms + ' ms')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Opens a client socket. Resolves { ws, status: 101 } once open, or
+// { ws, status } when the server refuses the handshake.
+function openLegacySocket(url) {
+  return withTimeout(new Promise((resolve, reject) => {
+    const ws = new WebSocket(url);
+    const received = [];
+    ws.received = received;
+    ws.closeCode = null;
+    ws.on('error', () => {});
+    ws.on('message', (data, isBinary) => received.push({ text: data.toString('utf8'), isBinary }));
+    ws.on('close', (code) => { ws.closeCode = code; });
+    ws.once('open', () => resolve({ ws, status: 101 }));
+    ws.once('unexpected-response', (req, res) => {
+      res.resume();
+      req.destroy();
+      resolve({ ws, status: res.statusCode });
+    });
+    ws.once('error', reject);
+  }), 5000, 'WebSocket handshake');
+}
+
+function waitForMessage(ws, ms) {
+  if (ws.received.length > 0) return Promise.resolve(ws.received[0]);
+  return withTimeout(new Promise((resolve) => {
+    ws.once('message', (data, isBinary) => resolve({ text: data.toString('utf8'), isBinary }));
+  }), ms, 'pong');
+}
+
+function waitForClose(ws, ms) {
+  if (ws.readyState === WebSocket.CLOSED) return Promise.resolve(ws.closeCode);
+  return withTimeout(new Promise((resolve) => ws.once('close', (code) => resolve(code))), ms, 'close');
+}
+
+function httpRequest(port, method, urlPath, body) {
+  return withTimeout(new Promise((resolve, reject) => {
+    const headers = { Connection: 'close' };
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = Buffer.byteLength(body);
+    }
+    const req = http.request({ host: '127.0.0.1', port, method, path: urlPath, headers, agent: false }, (res) => {
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { text += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: text }));
+    });
+    req.on('error', reject);
+    if (body !== undefined) req.write(body);
+    req.end();
+  }), 5000, method + ' ' + urlPath);
+}
+
+// The hourly line, with the interval shortened: one aggregate line of counts
+// that names no key, address or payload.
+async function checkSinkReport() {
+  const lines = [];
+  const server = http.createServer((req, res) => { res.statusCode = 404; res.end(); });
+  const sink = sinkModule.attachLegacyRelaySink(server, {
+    log: { log: (line) => lines.push(String(line)) },
+    reportIntervalMs: 250,
+  });
+  const sockets = [];
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const { port } = server.address();
+    const key = legacyKey();
+    const accepted = await openLegacySocket(`ws://127.0.0.1:${port}/ws?key=${key}&role=extension`);
+    sockets.push(accepted.ws);
+    const refused = await openLegacySocket(`ws://127.0.0.1:${port}/ws?key=${key}&role=dashboard`);
+    sockets.push(refused.ws);
+
+    const lineRe = /^\[legacy-relay-sink\] (\d+) open sockets; in the last hour (\d+) upgrades accepted, (\d+) refused, (\d+) idle sockets closed$/;
+    const totals = () => lines.reduce((sum, line) => {
+      const m = line.match(lineRe);
+      if (m) { sum.accepted += Number(m[2]); sum.refused += Number(m[3]); }
+      return sum;
+    }, { accepted: 0, refused: 0 });
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline && (totals().accepted < 1 || totals().refused < 1)) await delay(50);
+
+    check(lines.length > 0 && lines.every((line) => lineRe.test(line)),
+      'the sink reports one aggregate line per interval', 'lines: ' + JSON.stringify(lines));
+    const sum = totals();
+    check(sum.accepted === 1 && sum.refused === 1,
+      'the report counts accepted and refused upgrades', JSON.stringify(sum));
+    const last = (lines[lines.length - 1] || '').match(lineRe);
+    check(last !== null && last[1] === '1', 'the report counts the open socket',
+      'last line: ' + lines[lines.length - 1]);
+    check(!lines.some((line) => line.includes(key) || line.includes('127.0.0.1')),
+      'the report names no key or address');
+  } finally {
+    for (const ws of sockets) ws.terminate();
+    sink.close();
+    await new Promise((resolve) => server.close(() => resolve()));
+  }
+}
+
+pending.push(withTimeout(checkSinkReport(), 10000, 'sink report check')
+  .catch((error) => fail('the sink report check ran to completion', error && error.stack)));
+
+// ---- Section 11: fsb-server -- a spawned server, as old installs see it ----
+
+function reservePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close((error) => (error ? reject(error) : resolve(port)));
+    });
+  });
+}
+
+function stopChild(child) {
+  return new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) return resolve();
+    const timer = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch (_) { /* already gone */ }
+      resolve();
+    }, 3000);
+    child.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    try { child.kill('SIGTERM'); } catch (_) { resolve(); }
+  });
+}
+
+// Starts showcase/server/server.js on a free port with a temporary database
+// and waits for its startup line. A port taken between the probe and the
+// child's listen gets a fresh port, up to three times.
+async function startShowcaseServer(tempDir) {
+  let lastOutput = '';
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const port = await reservePort();
+    const child = spawn(process.execPath, ['server.js'], {
+      cwd: path.join(ROOT, SERVER_DIR),
+      env: { ...process.env, PORT: String(port), DB_PATH: path.join(tempDir, 'sunset-' + attempt + '.db') },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const state = { output: '' };
+    child.stdout.on('data', (chunk) => { state.output += chunk; });
+    child.stderr.on('data', (chunk) => { state.output += chunk; });
+    const ready = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 10000);
+      const onData = () => {
+        if (!state.output.includes('[FSB Server] Running on http://localhost:')) return;
+        clearTimeout(timer);
+        resolve(true);
+      };
+      child.stdout.on('data', onData);
+      child.stderr.on('data', onData);
+      child.once('exit', () => { clearTimeout(timer); resolve(false); });
+      child.once('error', () => { clearTimeout(timer); resolve(false); });
+    });
+    if (ready) return { child, port, state };
+    lastOutput = state.output;
+    await stopChild(child);
+  }
+  throw new Error('showcase server did not start:\n' + lastOutput);
+}
+
+async function checkSpawnedServer() {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-dashboard-sunset-'));
+  const sockets = [];
+  let server = null;
+  try {
+    server = await startShowcaseServer(tempDir);
+    const { port } = server;
+    const homeBefore = await httpRequest(port, 'GET', '/');
+
+    // /dashboard goes to the matching locale home, path only.
+    for (const [from, to] of [
+      ['/dashboard', '/'],
+      ['/dashboard/', '/'],
+      ['/dashboard.html', '/'],
+      ['/dashboard?from=bookmark', '/'],
+      ['/de/dashboard', '/de'],
+      ['/zh-TW/dashboard', '/zh-TW'],
+    ]) {
+      const res = await httpRequest(port, 'GET', from);
+      check(res.status === 301 && res.headers.location === to, 'GET ' + from + ' is a 301 to ' + to,
+        'got ' + res.status + ' ' + res.headers.location);
+    }
+    const head = await httpRequest(port, 'HEAD', '/dashboard');
+    check(head.status === 301 && head.headers.location === '/', 'HEAD /dashboard is a 301 to /',
+      'got ' + head.status + ' ' + head.headers.location);
+    const similar = await httpRequest(port, 'GET', '/dashboards');
+    check(similar.status !== 301, 'GET /dashboards is not redirected home', 'got ' + similar.status);
+
+    // The hash-key and pairing endpoints answer 410 with JSON, which the old
+    // options page parses.
+    for (const [method, urlPath, body] of [
+      ['POST', '/api/auth/register', '{}'],
+      ['GET', '/api/pair/generate', undefined],
+    ]) {
+      const res = await httpRequest(port, method, urlPath, body);
+      let json = null;
+      try { json = JSON.parse(res.body); } catch (_) { json = null; }
+      check(res.status === 410 && /application\/json/.test(String(res.headers['content-type']))
+        && json !== null && json.error === 'live_dashboard_retired',
+        method + ' ' + urlPath + ' answers 410 with the retired-dashboard JSON',
+        'got ' + res.status + ' ' + res.body.slice(0, 200));
+    }
+
+    // The old relay socket opens, gets a text pong for its ping, gets nothing
+    // for its status frames, and stays open.
+    const key = legacyKey();
+    const relayUrl = `ws://127.0.0.1:${port}/ws?key=${key}&role=extension`;
+    const relay = await openLegacySocket(relayUrl);
+    sockets.push(relay.ws);
+    check(relay.status === 101, 'a v0.9.95 relay socket (role=extension, 64-hex key) opens',
+      'got ' + relay.status);
+
+    for (const [label, url] of [
+      ['role=dashboard', `ws://127.0.0.1:${port}/ws?key=${key}&role=dashboard`],
+      ['a malformed key', `ws://127.0.0.1:${port}/ws?key=not-a-key&role=extension`],
+    ]) {
+      const refused = await openLegacySocket(url);
+      sockets.push(refused.ws);
+      check(refused.status === 410, 'a relay socket with ' + label + ' is refused with 410',
+        'got ' + refused.status);
+    }
+
+    // Abuse on separate sockets: a binary frame, malformed JSON and a frame
+    // over the cap. Only the oversized one's own socket may close.
+    const abuse = {};
+    for (const name of ['binary', 'malformed', 'oversized']) {
+      const opened = await openLegacySocket(`ws://127.0.0.1:${port}/ws?key=${legacyKey()}&role=extension`);
+      sockets.push(opened.ws);
+      abuse[name] = opened;
+    }
+    const allOpened = Object.values(abuse).every((opened) => opened.status === 101);
+    check(allOpened, 'three more relay sockets open for the abuse frames');
+
+    if (relay.status === 101) {
+      relay.ws.send(JSON.stringify({
+        type: 'ext:snapshot',
+        payload: { url: 'https://example.com/?q=' + 'a'.repeat(4000), title: 'Example' },
+      }));
+      relay.ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+    }
+    if (allOpened) {
+      abuse.binary.ws.send(Buffer.from([0, 1, 2, 3, 4, 5, 6, 7]), { binary: true });
+      abuse.malformed.ws.send('{"type":"ping"');
+      abuse.oversized.ws.send('a'.repeat(Math.ceil(1.2 * 1024 * 1024)));
+    }
+
+    if (relay.status === 101) {
+      let pong = null;
+      try { pong = await waitForMessage(relay.ws, 3000); } catch (_) { pong = null; }
+      check(pong !== null && pong.isBinary === false && pong.text === '{"type":"pong"}',
+        'the relay socket gets the text {"type":"pong"} for its ping', 'got ' + JSON.stringify(pong));
+    }
+
+    await delay(1500);
+
+    if (relay.status === 101) {
+      check(relay.ws.readyState === WebSocket.OPEN, 'the relay socket is still open 1.5 s later',
+        'readyState ' + relay.ws.readyState + ', close code ' + relay.ws.closeCode);
+      check(relay.ws.received.length === 1, 'the status frame got no reply; only the ping did',
+        'received ' + JSON.stringify(relay.ws.received.map((m) => m.text.slice(0, 80))));
+    }
+    if (allOpened) {
+      for (const name of ['binary', 'malformed']) {
+        const { ws } = abuse[name];
+        check(ws.readyState === WebSocket.OPEN && ws.received.length === 0,
+          'the ' + name + ' frame is dropped without a reply and its socket stays open',
+          'readyState ' + ws.readyState + ', received ' + ws.received.length);
+      }
+      let closeCode = null;
+      try { closeCode = await waitForClose(abuse.oversized.ws, 3000); } catch (_) { closeCode = null; }
+      check(closeCode !== null, 'the frame over the cap closes only its own socket',
+        'still in readyState ' + abuse.oversized.ws.readyState);
+    }
+
+    const homeAfter = await httpRequest(port, 'GET', '/');
+    const staticRoot = fs.existsSync(path.join(ROOT, SERVER_DIR, 'public'))
+      ? path.join(ROOT, SERVER_DIR, 'public')
+      : path.join(ROOT, 'showcase', 'dist', 'showcase-angular', 'browser');
+    if (fs.existsSync(path.join(staticRoot, 'index.html'))) {
+      check(homeAfter.status === 200, 'after the abuse frames, GET / still answers 200',
+        'got ' + homeAfter.status);
+    } else {
+      check(homeAfter.status === homeBefore.status,
+        'after the abuse frames, GET / still answers as before (the site is not built)',
+        'before ' + homeBefore.status + ', after ' + homeAfter.status);
+    }
+    check(server.child.exitCode === null && server.child.signalCode === null,
+      'the server process survived the abuse frames');
+    check(!server.state.output.includes(key), 'the server log never names a relay key');
+  } finally {
+    for (const ws of sockets) {
+      try { ws.terminate(); } catch (_) { /* already closed */ }
+    }
+    if (server) await stopChild(server.child);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+pending.push(withTimeout(checkSpawnedServer(), 25000, 'spawned server checks')
+  .catch((error) => fail('the spawned server checks ran to completion', error && error.stack)));
 
 // ---- Result ----
 

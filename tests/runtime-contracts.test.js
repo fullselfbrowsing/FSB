@@ -28,7 +28,6 @@ const backgroundSource = readRepoFile('extension', 'background.js');
 const stateEmitterSource = readRepoFile('extension', 'ai', 'state-emitter.js');
 const popupSource = readRepoFile('extension', 'ui', 'popup.js');
 const sidepanelSource = readRepoFile('extension', 'ui', 'sidepanel.js');
-const dashboardSource = readRepoFile('showcase', 'js', 'dashboard.js');
 const adapterSource = readRepoFile('mcp', 'src', 'agent-providers', 'adapter.ts');
 const authoritySource = readRepoFile('mcp', 'src', 'agent-providers', 'effective-authority.ts');
 const runtimeFilesSource = readRepoFile('mcp', 'src', 'agent-providers', 'runtime-files.ts');
@@ -60,7 +59,6 @@ console.log('\n--- direct consumer boundary tests ---');
 assert(!popupSource.includes("case 'sessionStateEvent':"), 'popup no longer consumes sessionStateEvent directly');
 assert(popupSource.includes("case 'statusUpdate':") || popupSource.includes("case 'automationComplete':"), 'popup consumes statusUpdate / automationComplete channels');
 assert(sidepanelSource.includes("case 'sessionStateEvent':"), 'sidepanel still consumes sessionStateEvent');
-assert(!dashboardSource.includes('sessionStateEvent'), 'dashboard does not consume sessionStateEvent directly');
 
 console.log('\n--- state-emitter documentation tests ---');
 
