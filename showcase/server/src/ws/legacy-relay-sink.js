@@ -22,13 +22,19 @@
  * which those clients answer with their normal backoff of 1 s up to 30 s.
  *
  * /api/auth and /api/pair answer 410 Gone too, with a JSON body, because the
- * old options page calls resp.json() on whatever comes back.
+ * old options page calls resp.json() on whatever comes back. The one exception
+ * is POST /api/auth/register. An old install with no stored key calls it before
+ * it dials the relay, and retries every 30 s for as long as it gets an error.
+ * So register hands out a random, throwaway key in the old response shape. The
+ * key is not stored and unlocks nothing; it only lets that install open a quiet
+ * sink socket like every other old install.
  *
  * Once an hour the sink logs how many sockets are open and how many upgrades
  * it accepted and refused in that hour. When the open count nears zero, the
  * old installs have updated: delete this file and its mounts in server.js.
  */
 
+const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const { isValidHashKeyFormat } = require('../utils/hash');
@@ -163,9 +169,18 @@ function attachLegacyRelaySink(server, options = {}) {
   };
 }
 
-/** Every method and path under its mount answers 410 Gone with a JSON body. */
-function createRetiredDashboardRouter() {
+/**
+ * Every method and path under its mount answers 410 Gone with a JSON body.
+ * With `issueThrowawayKeys`, POST /register instead answers the way the old
+ * register endpoint did, with a fresh random key that is never stored.
+ */
+function createRetiredDashboardRouter(options = {}) {
   const router = express.Router();
+  if (options.issueThrowawayKeys) {
+    router.post('/register', (req, res) => {
+      res.json({ hashKey: crypto.randomBytes(32).toString('hex') });
+    });
+  }
   router.use((req, res) => {
     res.status(410).json(RETIRED_DASHBOARD_BODY);
   });

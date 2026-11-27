@@ -20602,11 +20602,16 @@ async function clearRetiredBackgroundAgentData() {
 const RETIRED_DASHBOARD_STORAGE_KEYS = ['serverHashKey', 'serverUrl', 'serverSyncEnabled', 'fsbActionIconRelaySeen'];
 
 async function clearRetiredDashboardData() {
+  // Separate steps, so a failed storage write still clears the alarm.
   try {
     await chrome.storage.local.remove(RETIRED_DASHBOARD_STORAGE_KEYS);
+  } catch (error) {
+    console.warn('[FSB BG] Retired dashboard storage cleanup failed:', error && error.message);
+  }
+  try {
     await chrome.alarms.clear('fsb-domstream-watchdog');
   } catch (error) {
-    console.warn('[FSB BG] Retired dashboard cleanup failed:', error && error.message);
+    console.warn('[FSB BG] Retired dashboard alarm cleanup failed:', error && error.message);
   }
 }
 

@@ -113,11 +113,11 @@ app.use((req, res, next) => {
 });
 
 // The Live Dashboard's hash-key and pairing endpoints, retired after v0.9.95.
-// Old installs still call them, so they answer 410 Gone with a JSON body
-// (see src/ws/legacy-relay-sink.js).
-const retiredDashboardRouter = createRetiredDashboardRouter();
-app.use('/api/auth', retiredDashboardRouter);
-app.use('/api/pair', retiredDashboardRouter);
+// Old installs still call them, so they answer 410 Gone with a JSON body,
+// except that register hands out a throwaway key so a keyless old install can
+// open a quiet relay socket instead of retrying (see src/ws/legacy-relay-sink.js).
+app.use('/api/auth', createRetiredDashboardRouter({ issueThrowawayKeys: true }));
+app.use('/api/pair', createRetiredDashboardRouter());
 
 // Phase 273 / INGEST-01..13 -- anonymous telemetry ingest (PUBLIC, no auth).
 // Mount order: AFTER trust-proxy line (top of file), AFTER existing routes

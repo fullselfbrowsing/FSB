@@ -92,7 +92,7 @@ The Express backend handles:
 - the hosted Jev decision gateway (`/api/jev`), off unless `JEV_ENABLED` is set and the upstream is configured
 - SQLite persistence for all of the above
 
-The Live Dashboard was retired after v0.9.95. Installs still on v0.9.95 or earlier keep opening its relay socket, so `server/src/ws/legacy-relay-sink.js` holds those sockets open, answers their pings, and discards everything else; `/api/auth` and `/api/pair` answer `410 Gone`, and `/dashboard` redirects to the home page. The sink logs an hourly count of open sockets and can be deleted once that count nears zero.
+The Live Dashboard was retired after v0.9.95. Installs still on v0.9.95 or earlier keep opening its relay socket, so `server/src/ws/legacy-relay-sink.js` holds those sockets open, answers their pings, and discards everything else; `/api/auth` and `/api/pair` answer `410 Gone` (except `POST /api/auth/register`, which hands keyless old installs a throwaway key that is never stored), and `/dashboard` redirects to the home page. The sink logs an hourly count of open sockets and can be deleted once that count nears zero.
 
 Local CI crawler smoke serves the built static output and runs the route checks against localhost:
 

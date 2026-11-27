@@ -21,7 +21,8 @@
  *   - fsb-server has no relay, pairing or hash-key code, and the legacy
  *     static dashboard files are gone. What is left for installs still on
  *     v0.9.95 is a quiet sink: /dashboard redirects home, the hash-key and
- *     pairing endpoints answer 410 Gone, and the old relay socket is held
+ *     pairing endpoints answer 410 Gone (register hands out a throwaway key
+ *     instead, so keyless installs stop retrying), and the old relay socket is held
  *     open and answered with a pong while everything else it sends is
  *     dropped.
  *
@@ -299,6 +300,8 @@ const cleanupSource = (cleanupStart !== -1 && cleanupEnd > cleanupStart)
     if (failingRun) pending.push(failingRun.done.then(() => {
       assert.strictEqual(failing.calls.warnings.length, 1);
       pass('cleanup swallows a storage failure and only warns');
+      assert.deepStrictEqual(failing.calls.cleared, ['fsb-domstream-watchdog']);
+      pass('cleanup still clears the watchdog alarm when storage fails');
     }).catch((error) => {
       fail('cleanup rejects when storage fails', error && error.message);
     }));
@@ -381,6 +384,7 @@ const optionsSource = read('extension/ui/options.js');
     vm.runInContext(fnSource + '\nthis.__normalize = normalizeSectionId;', sandbox);
     const normalize = sandbox.__normalize;
     check(normalize('sync') === 'help', 'an old #sync link opens Help');
+    check(normalize('retired-agents') === 'help', 'the #retired-agents link opens Help');
     check(normalize('providers') === 'api-config', 'the providers alias still opens api-config');
     check(normalize('help') === 'help' && normalize('dashboard') === 'dashboard',
       'other section ids pass through unchanged');
@@ -389,8 +393,16 @@ const optionsSource = read('extension/ui/options.js');
 
 {
   const src = read('extension/ui/onboarding.js');
-  check(src.includes("openInternalPage('ui/control_panel.html#help')"), 'onboarding opens the control panel at #help');
+  check(src.includes("openInternalPage('ui/control_panel.html#retired-agents')"),
+    'onboarding opens the control panel at the background-agents note');
   check(!src.includes('control_panel.html#sync'), 'onboarding no longer links to #sync');
+  const panel = read('extension/ui/control_panel.html');
+  const options = read('extension/ui/options.js');
+  check(panel.includes('<div class="sync-deprecation" id="retired-agents-note">'),
+    'the background-agents note carries the id that links scroll to');
+  check(/function revealRetiredAgentsNote\(rawSectionId\)[\s\S]*?getElementById\('retired-agents-note'\)[\s\S]*?scrollIntoView/.test(options)
+    && /switchSection\(hash\);\s*revealRetiredAgentsNote\(rawHash\);/.test(options),
+    'opening Help from #sync or #retired-agents scrolls the note into view');
 }
 
 // ---- Section 6: extension -- the toolbar icon no longer tracks the relay ----
@@ -901,10 +913,24 @@ async function checkSpawnedServer() {
     const similar = await httpRequest(port, 'GET', '/dashboards');
     check(similar.status !== 301, 'GET /dashboards is not redirected home', 'got ' + similar.status);
 
-    // The hash-key and pairing endpoints answer 410 with JSON, which the old
-    // options page parses.
+    // Register hands a keyless old install a throwaway key in the old response
+    // shape, a new one each time, so it opens a quiet sink socket instead of
+    // retrying every 30 s.
+    const keys = [];
+    for (let i = 0; i < 2; i += 1) {
+      const res = await httpRequest(port, 'POST', '/api/auth/register', '{}');
+      let json = null;
+      try { json = JSON.parse(res.body); } catch (_) { json = null; }
+      if (res.status === 200 && json && /^[a-f0-9]{64}$/.test(String(json.hashKey))) keys.push(json.hashKey);
+      else fail('POST /api/auth/register returns a 64-hex throwaway key', 'got ' + res.status + ' ' + res.body.slice(0, 200));
+    }
+    check(keys.length === 2 && keys[0] !== keys[1], 'POST /api/auth/register returns a fresh 64-hex throwaway key each time');
+
+    // Every other hash-key and pairing endpoint answers 410 with JSON, which the
+    // old options page parses.
     for (const [method, urlPath, body] of [
-      ['POST', '/api/auth/register', '{}'],
+      ['GET', '/api/auth/validate', undefined],
+      ['POST', '/api/pair/register', '{}'],
       ['GET', '/api/pair/generate', undefined],
     ]) {
       const res = await httpRequest(port, method, urlPath, body);
