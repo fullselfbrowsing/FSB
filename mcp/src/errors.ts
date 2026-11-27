@@ -55,6 +55,7 @@ const LAYER_LABELS = {
   pageNavigation: 'Page navigation',
   visualSession: 'Visual session contract',
   sessionLookup: 'Session lookup',
+  browserChoice: 'Browser choice',
 } as const;
 
 const CODE_ONLY_ERROR_KEYS = new Set([
@@ -82,6 +83,11 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'PAGE_UNRESPONSIVE',
   'ACTION_RESPONSE_TIMEOUT',
   'TAB_NOT_FOREGROUND',
+  // Several browsers on one hub: a call is tied to one browser and is never
+  // quietly sent to another.
+  'BROWSER_NOT_CONNECTED',
+  'AMBIGUOUS_TAB_BROWSER',
+  'BROWSER_CHOICE_UNAVAILABLE',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -152,6 +158,8 @@ function resolveErrorKey(
   }
 
   const lower = errorMsg.toLowerCase();
+  // The hub's own refusal of a named browser, when it arrives as a thrown error.
+  if (lower === 'browser_not_connected') return 'BROWSER_NOT_CONNECTED';
   if (lower.includes('version mismatch') || lower.includes('package.json') || lower.includes('server.json')) {
     return 'package_version_mismatch';
   }
@@ -220,6 +228,12 @@ function buildLayeredDetail(
     : [];
   const cap = typeof fsbResult?.cap === 'number' ? fsbResult.cap : undefined;
   const active = typeof fsbResult?.active === 'number' ? fsbResult.active : undefined;
+  const browserName = typeof fsbResult?.browser === 'string' ? fsbResult.browser.slice(0, 32) : '';
+  const stringList = (value: unknown): string[] => (Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').map((item) => item.slice(0, 32)).slice(0, 8)
+    : []);
+  const connectedBrowsers = stringList(fsbResult?.connectedBrowsers);
+  const browserCandidates = stringList(fsbResult?.candidates);
 
   switch (errorKey) {
     case 'package_version_mismatch':
@@ -291,6 +305,34 @@ function buildLayeredDetail(
         detected: LAYER_LABELS.pageNavigation,
         why: `Navigation to ${url || 'the requested URL'} failed.`,
         nextAction: 'Verify the destination URL or switch to a normal website tab, then retry.',
+      };
+    case 'BROWSER_NOT_CONNECTED': {
+      const refusal = typeof fsbResult?.refusalReason === 'string' ? fsbResult.refusalReason : '';
+      const others = connectedBrowsers.filter((name) => name !== browserName);
+      const where = browserName || 'the browser this call belongs to';
+      return {
+        detected: LAYER_LABELS.browserChoice,
+        why: refusal === 'extension_origin_pin_mismatch'
+          ? `FSB in ${where} was turned away: the bridge is paired to another browser. The call was not sent anywhere else.`
+          : `This call belongs to ${where}, which is not connected. It was not sent to another browser.`,
+        nextAction: refusal === 'extension_origin_pin_mismatch'
+          ? `Use ${others.join(' or ') || 'the paired browser'} (open_tab or list_tabs with browser set), or release the pairing with: npx -y fsb-mcp-server@latest pair --reset`
+          : others.length > 0
+            ? `Retry once ${where} is back, or move to a connected browser by calling open_tab or list_tabs with browser set to ${others.map((name) => `"${name}"`).join(' or ')}. list_browsers shows what each one has open.`
+            : `Open ${where}, check that the FSB extension is enabled there, then retry.`,
+      };
+    }
+    case 'AMBIGUOUS_TAB_BROWSER':
+      return {
+        detected: LAYER_LABELS.browserChoice,
+        why: `Tab ${requestedTabId ?? 'id'} exists in more than one connected browser${browserCandidates.length > 0 ? ` (${browserCandidates.join(', ')})` : ''}, so the call was not sent.`,
+        nextAction: 'Call list_tabs with browser set to the one you mean. That makes it your browser, and the same call then goes there.',
+      };
+    case 'BROWSER_CHOICE_UNAVAILABLE':
+      return {
+        detected: LAYER_LABELS.browserChoice,
+        why: `The FSB bridge on this machine is being run by an older fsb-mcp-server. It serves one Chromium browser and cannot reach ${browserName || 'the browser that was asked for'}.`,
+        nextAction: 'Restart your MCP clients on the current fsb-mcp-server (npx -y fsb-mcp-server@latest) so a current one runs the bridge, then retry.',
       };
     case 'NO_OWNED_TAB':
       return {

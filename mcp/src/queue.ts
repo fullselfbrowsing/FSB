@@ -55,6 +55,8 @@ export class TaskQueue {
     'list_agents',
     'get_agent_stats',
     'get_agent_history',
+    // Answered from the hub's own roster; it changes nothing in any browser.
+    'list_browsers',
   ]);
 
   /**

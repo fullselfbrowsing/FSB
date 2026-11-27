@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import { AgentScope } from '../agent-scope.js';
-import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
+import { sendAgentScopedBridgeMessage, sendBrowserMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 
 // Must exceed the extension-side 120_000ms payment confirmation gate.
@@ -39,7 +39,9 @@ export function registerVaultTools(
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
-      const result = await bridge.sendAndWait(
+      const result = await sendBrowserMessage(
+        bridge,
+        agentScope,
         { type: 'mcp:list-credentials', payload: {} },
         { timeout: 5_000 },
       );
@@ -89,7 +91,9 @@ export function registerVaultTools(
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
-      const result = await bridge.sendAndWait(
+      const result = await sendBrowserMessage(
+        bridge,
+        agentScope,
         { type: 'mcp:list-payments', payload: {} },
         { timeout: 5_000 },
       );

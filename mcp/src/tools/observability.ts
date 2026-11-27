@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import { AgentScope } from '../agent-scope.js';
+import { sendBrowserMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 
 /**
@@ -19,9 +20,9 @@ export function registerObservabilityTools(
   queue: TaskQueue,
   agentScope: AgentScope,
 ): void {
-  // Phase 238 D-06: scope discipline — observability is signature-parity only;
-  // no agent identity injection here per CONTEXT.md.
-  void agentScope;
+  // Phase 238 D-06: scope discipline — observability carries no agent
+  // identity. The scope is used only to send each call to the browser this
+  // session is in: sessions, logs and memory are kept per browser.
   server.tool(
     'list_sessions',
     'List all past FSB automation sessions with summary info (task, status, duration, action count, cost). Use to find session IDs for deeper inspection with get_session_detail. Related: get_session_detail (inspect a specific session), get_logs (get raw logs).',
@@ -31,7 +32,9 @@ export function registerObservabilityTools(
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       return queue.enqueue('list_sessions', async () => {
-        const result = await bridge.sendAndWait(
+        const result = await sendBrowserMessage(
+          bridge,
+          agentScope,
           { type: 'mcp:list-sessions', payload: { limit } },
           { timeout: 5_000 },
         );
@@ -52,7 +55,9 @@ export function registerObservabilityTools(
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       return queue.enqueue('get_session_detail', async () => {
-        const result = await bridge.sendAndWait(
+        const result = await sendBrowserMessage(
+          bridge,
+          agentScope,
           { type: 'mcp:get-session', payload: { sessionId, format } },
           { timeout: 10_000 },
         );
@@ -70,7 +75,9 @@ export function registerObservabilityTools(
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       return queue.enqueue('get_session_replay', async () => {
-        const result = await bridge.sendAndWait(
+        const result = await sendBrowserMessage(
+          bridge,
+          agentScope,
           { type: 'mcp:get-session-replay', payload: { sessionId } },
           { timeout: 20_000 },
         );
@@ -88,7 +95,9 @@ export function registerObservabilityTools(
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       return queue.enqueue('replay_session', async () => {
-        const result = await bridge.sendAndWait(
+        const result = await sendBrowserMessage(
+          bridge,
+          agentScope,
           { type: 'mcp:replay-session', payload: { sessionId } },
           { timeout: 20_000 },
         );
@@ -109,7 +118,9 @@ export function registerObservabilityTools(
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       return queue.enqueue('get_logs', async () => {
-        const result = await bridge.sendAndWait(
+        const result = await sendBrowserMessage(
+          bridge,
+          agentScope,
           { type: 'mcp:get-logs', payload: { sessionId, count } },
           { timeout: 5_000 },
         );
@@ -138,7 +149,9 @@ export function registerObservabilityTools(
         const options: Record<string, unknown> = {};
         if (topN) options.topN = topN;
 
-        const result = await bridge.sendAndWait(
+        const result = await sendBrowserMessage(
+          bridge,
+          agentScope,
           { type: 'mcp:search-memory', payload: { query, filters, options } },
           { timeout: 5_000 },
         );
@@ -156,7 +169,9 @@ export function registerObservabilityTools(
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       return queue.enqueue('get_memory_stats', async () => {
-        const result = await bridge.sendAndWait(
+        const result = await sendBrowserMessage(
+          bridge,
+          agentScope,
           { type: 'mcp:get-memory', payload: { statsOnly: true } },
           { timeout: 5_000 },
         );

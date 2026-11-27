@@ -1717,7 +1717,7 @@
     "message": "17개 범주에 걸쳐 있습니다"
   },
   "entry_feat_tools": {
-    "message": "MCP 도구 69개"
+    "message": "MCP 도구 70개"
   },
   "entry_feat_tools_sub": {
     "message": "코딩 에이전트에서"
@@ -1744,7 +1744,7 @@
     "message": "권장"
   },
   "entry_agent_desc": {
-    "message": "Claude Code, Cursor, VS Code, OpenClaw 등에서 FSB를 MCP 서버로 사용합니다. 도구 69개, API 키 없음, 브라우저 설정 없음."
+    "message": "Claude Code, Cursor, VS Code, OpenClaw 등에서 FSB를 MCP 서버로 사용합니다. 도구 70개, API 키 없음, 브라우저 설정 없음."
   },
   "entry_in_browser": {
     "message": "이 브라우저에서"
@@ -1792,7 +1792,7 @@
     "message": "FSB가 에이전트의 MCP 구성에 자신을 기록합니다."
   },
   "entry_mcp_2b": {
-    "message": "도구 69개"
+    "message": "도구 70개"
   },
   "entry_mcp_2c": {
     "message": ", 수동 JSON은 없습니다."
@@ -1908,7 +1908,7 @@
     "message": "도구"
   },
   "entry_sum_68": {
-    "message": "69개 사용 가능"
+    "message": "70개 사용 가능"
   },
   "entry_sum_access": {
     "message": "접근"

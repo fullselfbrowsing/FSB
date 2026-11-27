@@ -7,6 +7,7 @@ import {
 } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { request as nodeHttpRequest } from 'node:http';
+import { endpointStartingIn } from '../browser-routing.js';
 import { isAbsolute } from 'node:path';
 import { TextDecoder } from 'node:util';
 import { z } from 'zod';
@@ -314,6 +315,12 @@ export interface SpawnSupervisorCloseResult {
 
 export interface SpawnSupervisor {
   readonly handleExtRequest: ExtRequestHandler;
+  /**
+   * The browser whose extension started a running delegation, or null. The
+   * run's agent is sent back to that browser: the delegation is known only to
+   * the profile that asked for it.
+   */
+  browserForDelegation?(delegationId: string): string | null;
   recover(): Promise<AgentStartupRecoveryResult>;
   close(): Promise<SpawnSupervisorCloseResult>;
   journalEntryForChild(child: SupervisedChild): JournalEntry | null;
@@ -432,6 +439,7 @@ interface DelegationRun {
   holdTimer: unknown | null;
   executionPromise: Promise<void> | null;
   routeSignal: AbortSignal | null;
+  readonly browser: string | null;
   routeAbortListener: (() => void) | null;
   replayClosed: boolean;
   taskWriteStarted: boolean;
@@ -1185,6 +1193,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     });
   }
 
+  browserForDelegation(delegationId: string): string | null {
+    return this.activeRuns.get(delegationId)?.browser ?? null;
+  }
+
   private async start(
     requestId: string,
     task: string,
@@ -1238,6 +1250,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       holdTimer: null,
       executionPromise: null,
       routeSignal: context?.signal ?? null,
+      browser: typeof context?.browser === 'string' && context.browser ? context.browser : null,
       routeAbortListener: null,
       replayClosed: false,
       taskWriteStarted: false,
@@ -2540,7 +2553,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       stdout: child.stdout,
       task: run.task,
       cwd: run.grokRun.cwd,
-      endpoint: this.dependencies.endpoint,
+      // This provider's MCP entry carries no headers, so the run's id cannot
+      // reach the server with its session. The profile the run was started
+      // from rides on the endpoint instead.
+      endpoint: endpointStartingIn(this.dependencies.endpoint, run.browser),
       expectedCliVersion: run.detectionVersion ?? undefined,
       onEvent: (event) => this.acceptGrokEvent(run, event),
       recordSession: async (sessionId) => {

@@ -7,6 +7,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createRuntime } from './runtime.js';
 import { AgentScope } from './agent-scope.js';
 import { DELEGATION_ID_HEADER } from './agent-providers/runtime-files.js';
+import { START_BROWSER_PARAMETER } from './browser-routing.js';
 import type { WebSocketBridge } from './bridge.js';
 import type { TaskQueue } from './queue.js';
 import {
@@ -28,6 +29,8 @@ type HttpServerOptions = {
   port: number;
   bridge: WebSocketBridge;
   queue: TaskQueue;
+  // The browser a delegated run was started from. Its agent starts there.
+  browserForDelegation?: (delegationId: string) => string | null;
 };
 
 type RunningHttpServer = {
@@ -166,6 +169,15 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
           && DELEGATION_ID_PATTERN.test(rawDelegationId)
           ? new AgentScope({ environment: { FSB_DELEGATION_ID: rawDelegationId } })
           : undefined;
+        // One server answers many sessions here, so a session cannot be told
+        // where to start through the environment. A delegated run starts in
+        // the profile whose side panel started it: the supervisor knows which,
+        // by the run's id. A client that sends no such id may name its start
+        // browser in the endpoint URL (/mcp?browser=chrome-4187c196), which is
+        // how a provider whose MCP entry takes no headers is sent there.
+        const startBrowser = sessionAgentScope
+          ? options.browserForDelegation?.(rawDelegationId as string) ?? null
+          : url.searchParams.get(START_BROWSER_PARAMETER);
         const runtime = createRuntime({
           bridge: options.bridge,
           queue: options.queue,
@@ -187,6 +199,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
             sessions.delete(transport.sessionId);
           }
         };
+
+        if (startBrowser) runtime.agentScope.startIn(startBrowser);
 
         await runtime.server.connect(transport);
         await transport.handleRequest(req, res, parsedBody);

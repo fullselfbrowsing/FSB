@@ -69,7 +69,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     // tokens (FSB, OpenClaw, Claude, Codex, Cursor, MCP, Chrome) are preserved verbatim
     // by translators per showcase/angular/src/locale/DO-NOT-TRANSLATE.md.
     const t = $localize`:@@agents.meta.title:FSB for AI Agents | MCP Browser Automation`;
-    const d = $localize`:@@agents.meta.description:Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 69 MCP tools, one-line install, verified with doctor.`;
+    const d = $localize`:@@agents.meta.description:Give Grok Bot, Muse, Dots, OpenClaw, Hermes, Claude Code, Codex, or Cursor a real browser: the Chrome you are already signed into, 70 MCP tools, one-line install, verified with doctor.`;
     this.applyMeta(t, d, url);
     this.injectAgentsPageJsonLd();
 
@@ -294,9 +294,9 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
           applicationCategory: 'DeveloperApplication',
           operatingSystem: 'macOS, Linux, Windows (Node.js 18+)',
           url: `${HOST}/agents`,
-          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 69 MCP browser tools for the FSB MCP server.`,
+          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 70 MCP browser tools for the FSB MCP server.`,
           featureList: [
-            $localize`:@@agents.schema.software.feature.tools:69 MCP tools for browser action, observation, verification, and recovery`,
+            $localize`:@@agents.schema.software.feature.tools:70 MCP tools for browser action, observation, verification, and recovery`,
             $localize`:@@agents.schema.software.feature.manual:Manual mode by default; run_task autopilot only on explicit delegation`,
             $localize`:@@agents.schema.software.feature.vault:Vault tools fill credentials and payment methods without exposing raw secrets`,
             $localize`:@@agents.schema.software.feature.triggers:Trigger watcher tools for reactive page monitoring`,

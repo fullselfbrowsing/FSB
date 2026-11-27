@@ -157,7 +157,7 @@ for (const [english, key] of Object.entries(locale.exact)) {
 }
 
 check(
-  sha256('mcp/src/types.ts') === '6b5f312a5e9a9f3390c973a7f93ef7552db1c110aeeb116084c1f522e776770a',
+  sha256('mcp/src/types.ts') === '13c23acbf0c2cdffd908b322fbae7a613227a53fa971c9a2af07615f8161c8af',
   'mcp/src/types.ts is byte-stable'
 );
 check(

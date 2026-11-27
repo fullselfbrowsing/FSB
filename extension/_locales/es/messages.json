@@ -1717,7 +1717,7 @@
     "message": "En 17 categorías"
   },
   "entry_feat_tools": {
-    "message": "69 herramientas MCP"
+    "message": "70 herramientas MCP"
   },
   "entry_feat_tools_sub": {
     "message": "Desde tu agente de código"
@@ -1744,7 +1744,7 @@
     "message": "Recomendado"
   },
   "entry_agent_desc": {
-    "message": "Usa FSB como servidor MCP en Claude Code, Cursor, VS Code, OpenClaw y más. 69 herramientas, sin clave de API y sin configurar nada en el navegador."
+    "message": "Usa FSB como servidor MCP en Claude Code, Cursor, VS Code, OpenClaw y más. 70 herramientas, sin clave de API y sin configurar nada en el navegador."
   },
   "entry_in_browser": {
     "message": "En este navegador"
@@ -1792,7 +1792,7 @@
     "message": "FSB se escribe solo en la configuración MCP de tu agente."
   },
   "entry_mcp_2b": {
-    "message": "69 herramientas"
+    "message": "70 herramientas"
   },
   "entry_mcp_2c": {
     "message": ", sin JSON manual."
@@ -1908,7 +1908,7 @@
     "message": "Herramientas"
   },
   "entry_sum_68": {
-    "message": "69 disponibles"
+    "message": "70 disponibles"
   },
   "entry_sum_access": {
     "message": "Acceso"

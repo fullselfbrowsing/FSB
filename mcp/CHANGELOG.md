@@ -2,6 +2,47 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+## Unreleased
+
+Not published yet. The package version is still 0.11.5 and needs a bump before these ship.
+
+### Added
+
+- **Every browser and profile on one server.** The bridge hub keeps one browser per install (one extension in one profile) instead of one extension socket. Each Chrome profile that has the extension, other Chromium browsers running it and Safari are attached at once. Before, whichever profile connected first held the bridge and every other was refused.
+- **Browsers are named after their install.** Each is known by a key such as `chrome-4187c196`, taken from the install ID the extension has made once per profile since 0.9.92. The key is the same after a reconnect, a browser restart or a new hub. The installed extension needs no update.
+- **`list_browsers`.** A new read-only tool lists every attached browser: the `browser` value that names it, its kind, extension ID and version, windows, tabs, the tab in front there, whether it is paired, which one the session is in, and where a call that names none would go. It registers no agent and does not move the session. A browser that was turned away is listed with the reason. The tool count is now 70.
+- **An agent chooses its browser.** `open_tab`, `list_tabs` and `run_task` take an optional `browser` argument: a value from `list_browsers`, or a kind (`"chrome"` or `"safari"`). Every other tool follows the tab it names, or the browser the session used last, so naming a browser once is the switch. A kind means the browser of that kind the session is in, and otherwise the default among them. `FSB_BROWSER` in a client's MCP config sets where its sessions start, which keeps one client in one profile while another works elsewhere.
+- **One agent identity per browser.** A session registers separately in each browser it uses and keeps separate tab ownership there. A retry after `AGENT_NOT_REGISTERED` stays in the browser the call was sent to.
+- **Results say where they came from.** With more than one browser attached, every result carries `browser`, and `list_tabs` adds `browsers`. With one browser nothing changes.
+- **`BROWSER_NOT_CONNECTED`, `AMBIGUOUS_TAB_BROWSER` and `BROWSER_CHOICE_UNAVAILABLE`.** A call that belongs to one browser is refused when that browser is away. It is never sent to another.
+- **A delegated run starts in the profile that started it.** The reverse-channel handler is told which browser a request came from, and the run's agent session starts there. A hub that forwards the request to a relay sends the browser in a `relay:ext-route` frame first; `ext:request` itself is unchanged. A provider whose MCP entry carries no headers is given the browser in its endpoint URL.
+- **An HTTP session can name its start browser in the endpoint URL** (`/mcp?browser=chrome-4187c196`), since one HTTP server answers many sessions and cannot give each an environment.
+- **`status` and `doctor` list every attached browser**, one `Browser <name>:` line each, and any browser that was turned away, with the reason. `--browser <name>` chooses which one the detailed lines describe.
+- **Safari's `Origin` is accepted.** `safari-web-extension://` joins the bridge's origin allowlist, and Safari's extension ID (a bundle ID, not 32 letters) is accepted in its state frame.
+
+### Changed
+
+- An extension socket becomes a browser when its first state frame says which install it is, about a tenth of a second after it connects. A socket that has sent none after 4 seconds is attached as an older build, named after its extension ID (`chrome-legacy-badgafnf`).
+- Only a second socket from the same install contests a slot, and it wins only when paired, as before. Another profile is never displaced.
+- Every attached Chromium browser runs the same extension ID. A second ID is turned away while the first is attached, as it was when the hub held one extension, and is listed by `status`, `doctor` and `list_browsers` with the reason until it stops trying. One Safari install attaches at a time.
+- A browser's name is never given to another install while the server process lives.
+- A call that names no browser goes to a Chromium browser before Safari, whatever either reports. Among those, it goes to the one focused most recently once each reports focus, and until then to one with a window open before one without, then the one attached longest. Safari is used when a call names it, or when no Chromium browser is attached: a Safari Origin is random and its frames are self-reported, so another Safari extension that claims focus must not be handed these calls. A worker restart does not move the default.
+- One browser disconnecting fails only the calls it was holding. Before, every pending call was rejected. The rejection message is unchanged, so `sw_evicted` recovery still arms.
+- A reply is accepted only from the browser the request went to.
+- Each browser has its own liveness timer. Registering or reaping one no longer touches another's.
+- `stop_task` and `get_task_status` go to the browser running the session's task, and the `sw_evicted` snapshot is read from that browser. Trigger lookups go to the browser the trigger was armed in. Their reconnect waits end when that browser is back, not when any browser is.
+- Pairing closes any attached browser whose extension ID is not the paired one, so the result is the same whichever connected first. Other profiles of the paired extension stay.
+- The hub holds at most 16 browsers.
+
+### Compatibility and update
+
+- Whichever server binds port 7225 first is the hub. Until every MCP client on a machine runs this version, an older hub means one browser. A current client behind it gets `"choice": false` from `list_browsers`, which names that browser as a current hub would. A session that was working in that browser carries on; one tied to another profile is refused with `BROWSER_CHOICE_UNAVAILABLE` and is not moved.
+- A client from before this version that connects to a current hub names no browser. The hub gives it one on its first call and keeps it there, through a worker restart too. If that browser stays away for a minute, the client is told a browser is connected again and is given the one that is left.
+- Extensions older than 0.9.92 send no install ID. All profiles of such a build share one slot, as they did.
+- `relay:hello` is unchanged. `relay:welcome` and `relay:state` gain `browsers`, `refusedBrowsers` and `hubVersion`, which older clients ignore, and a hub may send `relay:ext-route`, which they also ignore.
+- The shared tool registry and its SHA-256 pin are unchanged. `list_browsers` and the `browser` argument live in the MCP registration layer and are not forwarded to the extension.
+- One extension ID is served at a time, paired or not, so a development build and the store build cannot be attached together. That was already so. Serving several IDs needs the native host to vouch for more than one, which it does not yet do. Safari attaches beside Chromium while nothing is paired, and cannot be paired yet, so delegated runs there are not available.
+
 <a id="v0.11.5"></a>
 
 ## 0.11.5 (2026-10-18)
