@@ -1,0 +1,178 @@
+/* Product palette: the extension's side panel, popup and control panel, and the
+   legacy showcase/dashboard.html. Light first; [data-theme="dark"] flips it.
+
+   Mirrors extension/shared/fsb-ui-core.css. On shipped pages these names sit on
+   :root, because every product page loads fsb-ui-core.css. Here they sit under
+   [data-surface="product"] so one specimen page can show the site and product
+   palettes side by side: several names (--primary, --bg-card, --radius-sm and
+   more) mean different things in each. data-surface exists only in this folder. */
+[data-surface="product"] {
+  --fsb-primary: #ff6b35;
+  --fsb-primary-hover: #e55a2b;
+  --fsb-primary-tint: #ff8c42;
+  --fsb-on-primary: #ffffff;
+  /* Brand-orange transparencies: four steps (decisions/0018). */
+  --fsb-primary-faint: rgba(255, 107, 53, 0.08);
+  --fsb-primary-soft: rgba(255, 107, 53, 0.12);
+  --fsb-primary-glow: rgba(255, 107, 53, 0.24);
+  --fsb-primary-glow-strong: rgba(255, 107, 53, 0.4);
+
+  /* One red, one green, one amber (decisions/0014); softer in dark mode (0015). */
+  --fsb-success: #10b981;
+  --fsb-warning: #d97706;
+  --fsb-danger: #dc2626;
+  --fsb-info: #0891b2;
+
+  /* The login prompt's amber text pair, kept by decision 0014. Not for new code. */
+  --fsb-amber-400: #fbbf24;
+  --fsb-amber-800: #92400e;
+
+  --fsb-gray-50: #faf8f6;
+  --fsb-gray-100: #f5f1ed;
+  --fsb-gray-150: #ede6df;
+  --fsb-gray-200: #e2d8cf;
+  --fsb-gray-300: #cdbfb2;
+  --fsb-gray-400: #a79383;
+  --fsb-gray-500: #7c6859;
+  --fsb-gray-600: #5f4f44;
+  --fsb-gray-700: #443832;
+  --fsb-gray-800: #2d2522;
+  --fsb-gray-900: #171312;
+
+  --fsb-surface-base: #fffdfb;
+  --fsb-surface-muted: #f8f4ef;
+  --fsb-surface-muted-2: #f1ebe4;
+  --fsb-surface-elevated: #ffffff;
+  --fsb-surface-ink: #201917;
+
+  --fsb-text-primary: #1f1a17;
+  --fsb-text-secondary: #6a584d;
+  --fsb-text-muted: #8d7a6e;
+  --fsb-text-inverse: #fffaf6;
+
+  --fsb-border-subtle: rgba(41, 29, 20, 0.10);
+  --fsb-border-strong: rgba(41, 29, 20, 0.16);
+  --fsb-border-accent: rgba(255, 107, 53, 0.24);
+
+  --fsb-shadow-xs: 0 1px 2px rgba(22, 15, 11, 0.05);
+  --fsb-shadow-sm: 0 8px 24px rgba(22, 15, 11, 0.06);
+  --fsb-shadow-md: 0 14px 32px rgba(22, 15, 11, 0.10);
+  --fsb-shadow-accent: 0 12px 30px rgba(255, 107, 53, 0.16);
+
+  --fsb-radius-sm: 8px;
+  --fsb-radius-md: 12px;
+  --fsb-radius-lg: 18px;
+  --fsb-radius-xl: 24px;
+  --fsb-radius-pill: 999px;
+
+  --fsb-space-1: 4px;
+  --fsb-space-2: 8px;
+  --fsb-space-3: 12px;
+  --fsb-space-4: 16px;
+  --fsb-space-5: 20px;
+  --fsb-space-6: 24px;
+  --fsb-space-8: 32px;
+  --fsb-space-12: 48px;
+
+  /* Stacking layers, lowest first (decisions/0013). */
+  --fsb-z-dropdown: 50;
+  --fsb-z-menu: 60;
+  --fsb-z-sticky: 100;
+  --fsb-z-drawer-scrim: 150;
+  --fsb-z-drawer: 200;
+  --fsb-z-overlay: 1000;
+  --fsb-z-toast: 1100;
+  --fsb-z-modal: 2000;
+  --fsb-z-top: 9999;
+
+  /* Technical text: the platform monospace stack (decisions/0012). */
+  --fsb-font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+
+  --fsb-focus-ring: 0 0 0 3px rgba(255, 107, 53, 0.14);
+
+  /* Compatibility aliases. Older product CSS reads these names; new product CSS
+     should read the --fsb-* names directly. */
+  --primary: var(--fsb-primary);
+  --primary-hover: var(--fsb-primary-hover);
+  --primary-gradient: linear-gradient(135deg, #ff6b35, #ff8c42);
+  --primary-glow: var(--fsb-primary-glow);
+
+  --primary-color: var(--fsb-primary);
+  --primary-color-dark: var(--fsb-primary-tint);
+  --primary-light: var(--fsb-primary-soft);
+
+  --success-color: var(--fsb-success);
+  --warning-color: var(--fsb-warning);
+  --error-color: var(--fsb-danger);
+  --info-color: var(--fsb-info);
+
+  --bg-primary: var(--fsb-surface-elevated);
+  --bg-secondary: var(--fsb-surface-base);
+  --bg-tertiary: var(--fsb-surface-muted-2);
+  --bg-accent: var(--fsb-primary-soft);
+  --bg-card: var(--fsb-surface-elevated);
+  --bg-elevated: var(--fsb-surface-muted);
+  --bg-body: var(--fsb-surface-base);
+  --bg-nav: rgba(255, 250, 246, 0.7);
+
+  --text-primary: var(--fsb-text-primary);
+  --text-secondary: var(--fsb-text-secondary);
+  --text-muted: var(--fsb-text-muted);
+  --text-inverse: var(--fsb-text-inverse);
+
+  --border-color: var(--fsb-border-subtle);
+  --border-hover: var(--fsb-border-strong);
+  --shadow-sm: var(--fsb-shadow-xs);
+  --shadow-md: var(--fsb-shadow-sm);
+  --shadow-lg: var(--fsb-shadow-md);
+  --shadow-xl: 0 20px 44px rgba(22, 15, 11, 0.14);
+  --shadow-glow: var(--fsb-shadow-accent);
+
+  --radius-sm: var(--fsb-radius-sm);
+  --radius-md: var(--fsb-radius-md);
+  --radius-lg: var(--fsb-radius-lg);
+  --radius-xl: var(--fsb-radius-xl);
+
+  --space-xs: var(--fsb-space-1);
+  --space-sm: var(--fsb-space-2);
+  --space-md: var(--fsb-space-4);
+  --space-lg: var(--fsb-space-6);
+  --space-xl: var(--fsb-space-8);
+  --space-2xl: var(--fsb-space-12);
+
+  --font-mono: var(--fsb-font-mono);
+}
+
+/* Product dark theme: near-black surfaces under the warm light text
+   (decisions/0011-product-dark-is-near-black.md). Mirrors the [data-theme="dark"]
+   block of fsb-ui-core.css. */
+[data-surface="product"][data-theme="dark"],
+[data-theme="dark"] [data-surface="product"] {
+  --fsb-surface-base: #050505;
+  --fsb-surface-muted: #121212;
+  --fsb-surface-muted-2: #141414;
+  --fsb-surface-elevated: #0d0d0d;
+  --fsb-surface-ink: #000000;
+
+  --fsb-text-primary: #f6efe9;
+  --fsb-text-secondary: #d2c1b4;
+  --fsb-text-muted: #a99283;
+  --fsb-text-inverse: #141110;
+
+  /* Softer status colours read better on near-black (decisions/0015). */
+  --fsb-success: #81c784;
+  --fsb-warning: #e6b844;
+  --fsb-danger: #e57373;
+  --fsb-info: #4dd0e1;
+
+  --fsb-border-subtle: rgba(255, 255, 255, 0.08);
+  --fsb-border-strong: rgba(255, 255, 255, 0.14);
+  --fsb-border-accent: rgba(255, 140, 66, 0.28);
+
+  --fsb-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --fsb-shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.30);
+  --fsb-shadow-md: 0 18px 40px rgba(0, 0, 0, 0.38);
+  --fsb-shadow-accent: 0 12px 30px rgba(255, 107, 53, 0.22);
+
+  --bg-nav: rgba(5, 5, 5, 0.72);
+}

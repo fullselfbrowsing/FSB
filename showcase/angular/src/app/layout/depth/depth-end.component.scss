@@ -39,7 +39,7 @@
 }
 
 .fsb-end-mark::before {
-  background: radial-gradient(closest-side, rgba(255, 107, 53, .14), transparent);
+  background: radial-gradient(closest-side, var(--primary-soft), transparent);
   content: '';
   height: 90%;
   left: 50%;
@@ -189,7 +189,7 @@
 }
 
 .version-tag {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.4em;
 }
 

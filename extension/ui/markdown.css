@@ -81,7 +81,7 @@
   color: #e83e8c;
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
   font-size: 0.9em;
 }
 
@@ -180,7 +180,7 @@
   background: #fafafa;
   color: #171717;
   border-bottom-left-radius: 6px;
-  border-left: 3px solid #ff6b35;
+  border-left: 3px solid var(--fsb-primary);
   padding: 14px 16px;
   font-size: 14px;
   line-height: 1.5;
@@ -219,7 +219,7 @@
 }
 
 [data-theme="dark"] .md-rendered a {
-  color: #60a5fa;
+  color: var(--fsb-info);
 }
 
 [data-theme="dark"] .md-rendered hr {
@@ -269,7 +269,7 @@
 [data-theme="dark"] .message.ai-completion {
   background: #262626;
   color: #e5e5e5;
-  border-left-color: #ff6b35;
+  border-left-color: var(--fsb-primary);
 }
 
 /* ============================================
@@ -286,13 +286,13 @@
 [data-theme="dark"] .message.ai {
   background: #292929;
   color: #d4d4d4;
-  border-left-color: #ff6b35;
+  border-left-color: var(--fsb-primary);
 }
 
 [data-theme="dark"] .message.error {
   background: #451a1a;
   color: #fca5a5;
-  border-left-color: #ef4444;
+  border-left-color: var(--fsb-danger);
 }
 
 [data-theme="dark"] .message.action {

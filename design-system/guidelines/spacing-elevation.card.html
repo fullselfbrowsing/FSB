@@ -1,0 +1,27 @@
+<!-- @dsCard group="Spacing" viewport="700x192" subtitle="Three soft shadows plus one orange glow" name="Elevation" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.t{padding:15px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card)}
+.bx{height:50px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:11px}
+.t b{display:block;font-size:.76rem;color:var(--text-primary)}
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="t"><div class="bx" style="box-shadow:var(--shadow-sm)"></div><b>sm</b><span class="var">--shadow-sm</span></div>
+<div class="t"><div class="bx" style="box-shadow:var(--shadow-md)"></div><b>md</b><span class="var">--shadow-md</span></div>
+<div class="t"><div class="bx" style="box-shadow:var(--shadow-lg)"></div><b>lg</b><span class="var">--shadow-lg</span></div>
+<div class="t"><div class="bx" style="box-shadow:var(--shadow-glow)"></div><b>glow</b><span class="var">--shadow-glow</span></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+/* Site spacing scale and layout constants. Mirrors showcase/angular/src/styles.scss.
+   The shipped 4px scale is --fsb-space-* in product-surface.css; the site
+   writes the same steps as literals today, so --space-* here is proposed. */
+:root {
+  --space-1: 4px; /* proposed */
+  --space-2: 8px; /* proposed */
+  --space-3: 12px; /* proposed */
+  --space-4: 16px; /* proposed */
+  --space-5: 20px; /* proposed */
+  --space-6: 24px; /* proposed */
+  --space-8: 32px; /* proposed */
+  --space-12: 48px; /* proposed */
+
+  --nav-height: 64px;
+  --max-width: 1200px;
+  --gutter: 24px; /* proposed */
+  --section-padding: 80px 0;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --nav-height: 56px;
+    --gutter: 16px; /* proposed */
+    --section-padding: 48px 0;
+  }
+}

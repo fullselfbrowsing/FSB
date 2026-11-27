@@ -1,0 +1,34 @@
+<!-- @dsCard group="Colors" viewport="700x300" subtitle="Near-black under data-theme=&quot;dark&quot;" name="Surfaces — product dark" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.sw{border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden;background:var(--bg-card)}
+.fill{height:56px}
+.m{padding:9px 11px;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:2px}
+.m b{font-size:.76rem;color:var(--text-primary);font-weight:600}
+.note{font-size:.7rem;color:var(--text-secondary);margin-top:4px}
+</style>
+</head>
+<body data-surface="product">
+<div class="grid">
+<div class="sw"><div class="fill" style="background:var(--fsb-surface-base)"></div><div class="m"><b>Base</b><span class="var">--fsb-surface-base</span><span class="lbl">#050505</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--fsb-surface-elevated)"></div><div class="m"><b>Elevated</b><span class="var">--fsb-surface-elevated</span><span class="lbl">#0d0d0d</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--fsb-surface-muted)"></div><div class="m"><b>Muted</b><span class="var">--fsb-surface-muted</span><span class="lbl">#121212</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--fsb-surface-muted-2)"></div><div class="m"><b>Muted 2</b><span class="var">--fsb-surface-muted-2</span><span class="lbl">#141414</span></div></div>
+</div>
+<div class="grid">
+<div class="sw"><div class="fill" style="background:var(--fsb-text-primary)"></div><div class="m"><b>Text</b><span class="var">--fsb-text-primary</span><span class="lbl">#f6efe9</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--fsb-text-secondary)"></div><div class="m"><b>Secondary</b><span class="var">--fsb-text-secondary</span><span class="lbl">#d2c1b4</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--fsb-text-muted)"></div><div class="m"><b>Muted text</b><span class="var">--fsb-text-muted</span><span class="lbl">#a99283</span></div></div>
+<div class="sw"><div class="fill" style="background:var(--fsb-surface-ink)"></div><div class="m"><b>Ink</b><span class="var">--fsb-surface-ink</span><span class="lbl">#000000</span></div></div>
+</div>
+<p class="note">Near-black surfaces under warm light text, on every product page (decision 0011).</p>
+</body>
+</html>

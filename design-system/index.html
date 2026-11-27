@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FSB design system: specimens</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+body { padding: 40px 32px 64px; }
+main { max-width: 760px; margin: 0 auto; }
+header { margin-bottom: 32px; }
+header p { max-width: 62ch; margin-top: 8px; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.05rem; margin: 40px 0 14px; color: var(--text-secondary); font-family: var(--font-mono); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+figure { margin: 0 0 22px; }
+figcaption { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+figcaption b { color: var(--text-primary); font-size: .9rem; }
+figcaption span, .hint { color: var(--text-muted); font-size: .8rem; }
+iframe { display: block; width: 100%; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); }
+ul.links { list-style: none; display: grid; gap: 8px; }
+ul.links a { color: var(--primary); }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>FSB design system</h1>
+  <p>Foundation specimens, rendered from <code>styles.css</code>. Open this file from disk or serve the repository root. The rules are in <a href="../DESIGN.md">DESIGN.md</a> and <a href="README.md">README.md</a>.</p>
+</header>
+
+<h2>Brand</h2>
+<figure><figcaption><b>The mark</b><span>Hairline F, heavy S, custom B</span></figcaption><iframe src="guidelines/brand-mark.card.html" height="165" title="The mark" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Construction</b><span>Three parts, one inherited color</span></figcaption><iframe src="guidelines/brand-construction.card.html" height="195" title="Construction" loading="lazy"></iframe></figure>
+<figure><figcaption><b>On surfaces</b><span>Inherits currentColor on both themes</span></figcaption><iframe src="guidelines/brand-on-surfaces.card.html" height="150" title="On surfaces" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Sizing and version tag</b><span>Nav 1.5rem, footer 1.32rem</span></figcaption><iframe src="guidelines/brand-sizing.card.html" height="140" title="Sizing and version tag" loading="lazy"></iframe></figure>
+<figure><figcaption><b>App icon</b><span>The mark knocked out on pure black</span></figcaption><iframe src="guidelines/brand-app-icon.card.html" height="150" title="App icon" loading="lazy"></iframe></figure>
+
+<h2>Color</h2>
+<figure><figcaption><b>Accent</b><span>One orange, four expressions</span></figcaption><iframe src="guidelines/color-accent.card.html" height="190" title="Accent" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Site surfaces, dark</b><span>Default theme, near-black ramp</span></figcaption><iframe src="guidelines/color-surfaces-dark.card.html" height="190" title="Site surfaces, dark" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Site surfaces, light</b><span>data-theme="light"</span></figcaption><iframe src="guidelines/color-surfaces-light.card.html" height="190" title="Site surfaces, light" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Text and borders</b><span>Theme-aware pairs</span></figcaption><iframe src="guidelines/color-text.card.html" height="210" title="Text and borders" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Product surfaces</b><span>Warm ramp for the extension pages</span></figcaption><iframe src="guidelines/color-product-surface.card.html" height="190" title="Product surfaces" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Product surfaces, dark</b><span>The core dark ramp</span></figcaption><iframe src="guidelines/color-product-dark.card.html" height="300" title="Product surfaces, dark" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Warm gray ramp</b><span>--fsb-gray-50 through 900</span></figcaption><iframe src="guidelines/color-product-gray.card.html" height="110" title="Warm gray ramp" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Overlay palette</b><span>What FSB draws on web pages</span></figcaption><iframe src="guidelines/color-overlay.card.html" height="300" title="Overlay palette" loading="lazy"></iframe></figure>
+
+<h2>Type</h2>
+<figure><figcaption><b>Families</b><span>System UI, Poppins, platform mono</span></figcaption><iframe src="guidelines/type-families.card.html" height="170" title="Families" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Scale</b><span>Fluid clamp headings, 1.7 body</span></figcaption><iframe src="guidelines/type-scale.card.html" height="310" title="Scale" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Mono and version tag</b><span>Platform mono at 0.4em tracking</span></figcaption><iframe src="guidelines/type-mono.card.html" height="148" title="Mono and version tag" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Gradient text</b><span>background-clip on the accent gradient</span></figcaption><iframe src="guidelines/type-gradient.card.html" height="145" title="Gradient text" loading="lazy"></iframe></figure>
+
+<h2>Spacing</h2>
+<figure><figcaption><b>Spacing rhythm</b><span>4px base, 8/12/16/24/32/48 in use</span></figcaption><iframe src="guidelines/spacing-rhythm.card.html" height="165" title="Spacing rhythm" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Layout constants</b><span>1200px container, 24px gutters</span></figcaption><iframe src="guidelines/spacing-layout.card.html" height="200" title="Layout constants" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Radius</b><span>8 / 12 / 16 / 24px plus pill</span></figcaption><iframe src="guidelines/spacing-radius.card.html" height="200" title="Radius" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Elevation</b><span>Three soft shadows plus one orange glow</span></figcaption><iframe src="guidelines/spacing-elevation.card.html" height="192" title="Elevation" loading="lazy"></iframe></figure>
+
+<h2>Motion</h2>
+<figure><figcaption><b>Transitions</b><span>150 / 250 / 400ms, all eased</span></figcaption><iframe src="guidelines/motion-transitions.card.html" height="170" title="Transitions" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Signature patterns</b><span>Card lift and the hero glow</span></figcaption><iframe src="guidelines/motion-signature.card.html" height="160" title="Signature patterns" loading="lazy"></iframe></figure>
+
+<h2>Iconography</h2>
+<figure><figcaption><b>Common icons</b><span>Font Awesome 6 solid, regular, brands</span></figcaption><iframe src="guidelines/icons-common.card.html" height="225" title="Common icons" loading="lazy"></iframe></figure>
+<figure><figcaption><b>Provider marks</b><span>The shipped SVG and PNG marks</span></figcaption><iframe src="guidelines/icons-providers.card.html" height="140" title="Provider marks" loading="lazy"></iframe></figure>
+
+<h2>Components</h2>
+<p class="hint">These cards need the design tool's component bundle, so they render inside the design tool rather than from disk. Each component's rules are in its <code>.prompt.md</code>, and <a href="components/README.md">components/README.md</a> maps each one to the code that ships.</p>
+<ul class="links">
+  <li><a href="components/brand/brand.card.html">Brand: FsbMark and VersionTag</a></li>
+  <li><a href="components/core/core.card.html">Core: buttons, badges, cards and stats</a></li>
+  <li><a href="components/forms/forms.card.html">Forms: field, input, select, textarea, toggle, checkbox, search</a></li>
+  <li><a href="components/navigation/navigation.card.html">Navigation: nav bar and footer</a></li>
+  <li><a href="components/feedback/feedback.card.html">Feedback: the copy confirmation toast</a></li>
+</ul>
+</main>
+</body>
+</html>

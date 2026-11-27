@@ -782,9 +782,14 @@ const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice
 // the block already silenced the delegation spinner and status dot, but the
 // automation loader kept animating for users who asked it not to. Rolled again
 // for the 1Password prompts (.vp rules) replacing the old login and card
-// prompt styles. No delegation or ownership rule changed.
+// prompt styles, and for the owner's colour decisions
+// (design-system/decisions/0014-0018): one red, green and amber; softer status
+// colours and the core's surfaces in dark mode; indigo folded into the brand
+// orange; four transparency steps. Every changed computed value was traced to
+// one of those decisions. Rolled again when monospace stacks moved to
+// --fsb-font-mono (decision 0012). No delegation or ownership rule changed.
 assert.equal(sha256(delegationCssSource),
-  'c77237ab05f61bc5d25f6d295e8825e8687d97aeb8790f5c337a6e8cf8c539f8',
+  'c33d3f3908ba6b820605a182f84ad686dae1e8a285b4a00f8b70f410fc297fd2',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

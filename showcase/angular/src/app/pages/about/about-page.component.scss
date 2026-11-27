@@ -165,8 +165,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px solid rgba(255, 107, 53, 0.2);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-glow);
   border-radius: var(--radius-sm);
   color: var(--primary);
   font-size: 1.1rem;
@@ -196,8 +196,8 @@
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px solid rgba(255, 107, 53, 0.25);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-glow);
   border-radius: 999px;
   color: var(--primary);
   font-size: 0.7rem;
@@ -339,7 +339,7 @@
 
 .kg-toggle-btn.active {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .kg-toggle-btn:not(.active):hover {
@@ -369,7 +369,7 @@
 :host ::ng-deep .knowledge-graph-tooltip {
   position: absolute;
   display: none;
-  background: var(--bg-elevated, #1a1a1a);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 9px 13px;
@@ -513,7 +513,7 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--text-secondary);
 }

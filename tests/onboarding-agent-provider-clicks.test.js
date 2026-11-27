@@ -169,10 +169,14 @@ function createHarness(initialStore, options) {
     'c2b75c8a5ca86333e4a73200136bb118a1d5f3845d88e59cd5a7296bddd5c3e3',
     'onboarding.html hash rolled: the stage label no longer mentions scrolling, which the wheel no longer does'
   );
+  // Rolled when onboarding's brand-orange transparencies moved to the four
+  // steps (design-system/decisions/0018); every changed computed value was
+  // traced to that decision. Rolled again when Space Mono was retired for
+  // --font-mono and its @font-face rules were removed (decision 0012).
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),
-    'c82125be8b8689ce82a339e3d0ab7207115cb4f0a9d0834de678a5ef072040ec',
-    'onboarding.css hash rolled: the wordmark B is 0.74em tall, level with the black S, as in the showcase fsb-wordmark.css'
+    'd94cdbececf1833174986796c88bcac58dd96dbb0ca13e3fa678ef88d4676cc8',
+    'onboarding.css hash rolled: the wordmark B is 0.74em tall, level with the black S, as in the showcase fsb-wordmark.css; monospace labels use the platform stack'
   );
 
   console.log('--- durable count, timestamps, and sibling preservation ---');

@@ -41,7 +41,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 20%, rgba(255, 107, 53, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 20%, var(--primary-soft) 0%, transparent 70%),
     radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255, 140, 66, 0.12) 0%, transparent 60%);
   pointer-events: none;
   animation: heroGlow 12s ease-in-out infinite;
@@ -102,12 +102,12 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: 14px;
-  box-shadow: var(--shadow-md), 0 0 30px rgba(255, 107, 53, 0.08);
+  box-shadow: var(--shadow-md), 0 0 30px var(--primary-faint);
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .install-bar:hover {
-  border-color: rgba(255, 107, 53, 0.35);
+  border-color: var(--primary-glow-strong);
   box-shadow: var(--shadow-md), 0 0 36px rgba(255, 107, 53, 0.16);
 }
 
@@ -177,7 +177,7 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.95rem;
   text-align: left;
   overflow: hidden;
@@ -206,8 +206,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px solid rgba(255, 107, 53, 0.25);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-glow);
   border-radius: 10px;
   color: var(--primary);
   font-size: 0.95rem;
@@ -215,14 +215,14 @@
 }
 
 .install-copy:hover {
-  background: rgba(255, 107, 53, 0.2);
-  border-color: rgba(255, 107, 53, 0.45);
+  background: var(--primary-glow);
+  border-color: var(--primary-glow-strong);
 }
 
 .install-copy.copied {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .install-fan {
@@ -286,7 +286,7 @@
 .install-fan-item:hover {
   border-color: rgba(255, 107, 53, 0.55);
   background: color-mix(in srgb, var(--bg-card) 88%, transparent);
-  box-shadow: var(--shadow-lg), 0 0 18px rgba(255, 107, 53, 0.18);
+  box-shadow: var(--shadow-lg), 0 0 18px var(--primary-soft);
   transform: translateX(var(--dx, 0)) rotate(var(--rot, 0deg)) scale(1.07);
   z-index: 2;
 }
@@ -318,7 +318,7 @@
 }
 
 .install-fan-flag {
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 500;
   color: var(--primary);
@@ -381,7 +381,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -432,11 +432,11 @@
 }
 
 .lb-row-fsb {
-  background: rgba(255, 107, 53, 0.07);
+  background: var(--primary-faint);
 }
 
 .lb-rank {
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-muted);
 }
@@ -482,7 +482,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--text-secondary);
@@ -531,7 +531,7 @@
   position: relative;
   height: 18px;
   margin-right: 64px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--text-muted);
 }
@@ -568,7 +568,7 @@
   align-items: center;
   gap: 6px 10px;
   margin-top: 6px;
-  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
@@ -695,8 +695,8 @@
   display: inline-block;
   font-size: 0.7rem;
   font-weight: 600;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  background: var(--danger-wash);
   padding: 3px 10px;
   border-radius: 10px;
   letter-spacing: 0.02em;
@@ -715,7 +715,7 @@
   text-align: center;
   max-width: 700px;
   margin: 0 auto 32px;
-  box-shadow: var(--shadow-glow), 0 0 40px rgba(255, 107, 53, 0.08);
+  box-shadow: var(--shadow-glow), 0 0 40px var(--primary-faint);
 }
 
 .fsb-highlight-header {
@@ -745,7 +745,7 @@
   display: inline-block;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-primary);
   background: var(--primary);
   padding: 4px 12px;
   border-radius: 10px;
@@ -818,14 +818,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: var(--bg-body);
   border-radius: var(--radius-sm);
   color: var(--primary);
   overflow: hidden;
-}
-
-:host-context([data-theme="light"]) .mcp-callout-icon {
-  background: #fff;
 }
 
 .mcp-callout-content h3 {
@@ -850,8 +846,8 @@
   gap: 9px;
   margin-bottom: 18px;
   padding: 6px 14px;
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px solid rgba(255, 107, 53, 0.28);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-glow);
   border-radius: 999px;
   color: var(--primary);
   font-size: 0.74rem;
@@ -916,7 +912,7 @@
 }
 
 .cap-logo:hover {
-  border-color: rgba(255, 107, 53, 0.4);
+  border-color: var(--primary-glow-strong);
 }
 
 .cap-logo-img {
@@ -1022,7 +1018,7 @@
 
 .eng-tab.on {
   background: var(--bg-elevated);
-  border-color: rgba(255, 107, 53, 0.45);
+  border-color: var(--primary-glow-strong);
   color: var(--text-primary);
   box-shadow: var(--shadow-glow);
 }
@@ -1054,7 +1050,7 @@
 }
 
 .eng-num {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -1068,7 +1064,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1078,8 +1074,8 @@
   padding: 1px 7px;
   background: var(--primary);
   border-radius: 10px;
-  color: #fff;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  color: var(--on-primary);
+  font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.06em;
 }
@@ -1211,7 +1207,7 @@
 }
 
 .eng-node-label {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1275,10 +1271,10 @@
   align-items: center;
   gap: 7px;
   padding: 5px 10px;
-  background: rgba(255, 107, 53, 0.08);
-  border: 1px solid rgba(255, 107, 53, 0.22);
+  background: var(--primary-faint);
+  border: 1px solid var(--primary-glow);
   border-radius: var(--radius-sm);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   color: var(--text-primary);
 }
@@ -1325,7 +1321,7 @@
 }
 
 .eng-chip small {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.64rem;
   color: var(--primary);
 }

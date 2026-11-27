@@ -1,0 +1,28 @@
+<!-- @dsCard group="Colors" viewport="700x210" subtitle="Theme-aware pairs" name="Text & borders" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.t{padding:15px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card)}
+.aa{font-size:1.5rem;font-weight:700;margin-bottom:9px;line-height:1}
+.bd{height:44px;border-radius:var(--radius-md);background:var(--bg-elevated);margin-bottom:9px}
+.t b{display:block;font-size:.74rem;color:var(--text-primary)}
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="t"><div class="aa" style="color:var(--text-primary)">Aa</div><b>Primary</b><span class="var">--text-primary</span></div>
+<div class="t"><div class="aa" style="color:var(--text-secondary)">Aa</div><b>Secondary</b><span class="var">--text-secondary</span></div>
+<div class="t"><div class="aa" style="color:var(--text-muted)">Aa</div><b>Muted</b><span class="var">--text-muted</span></div>
+<div class="t"><div class="bd" style="border:1px solid var(--border-hover)"></div><b>Border</b><span class="var">--border-color / -hover</span></div>
+</div>
+</body>
+</html>

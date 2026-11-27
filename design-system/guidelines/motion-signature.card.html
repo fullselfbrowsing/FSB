@@ -1,0 +1,30 @@
+<!-- @dsCard group="Motion" viewport="700x160" subtitle="Card lift and the hero glow" name="Signature patterns" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.lift{padding:22px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card);text-align:center;transition:transform var(--transition-base),border-color var(--transition-base),box-shadow var(--transition-base)}
+.lift:hover{transform:translateY(-4px);border-color:var(--border-hover);box-shadow:var(--shadow-md)}
+.lift i{color:var(--primary);font-size:1.2rem;display:block;margin-bottom:8px}
+.lift b{font-size:.85rem;color:var(--text-primary)}
+.glow{height:104px;border-radius:var(--radius-md);border:1px solid var(--border-color);position:relative;overflow:hidden;background:var(--bg-card);display:flex;align-items:center;justify-content:center}
+.glow::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 65% at 50% 18%,rgba(255,107,53,.28),transparent 70%);animation:breathe 12s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1) translate(0,0);opacity:1}33%{transform:scale(1.08) translate(2%,-3%);opacity:.85}66%{transform:scale(.95) translate(-2%,2%);opacity:.9}}
+.glow span{position:relative;font-size:.8rem;color:var(--text-secondary)}
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="lift"><i class="fa-solid fa-arrow-up"></i><b>Card lift</b><div class="lbl">translateY(-4px) + shadow on hover</div></div>
+<div class="glow"><span>Hero glow · 12s loop</span></div>
+</div>
+</body>
+</html>

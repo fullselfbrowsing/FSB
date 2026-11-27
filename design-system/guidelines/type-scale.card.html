@@ -1,0 +1,28 @@
+<!-- @dsCard group="Type" viewport="700x310" subtitle="Fluid clamp headings, 1.7 body" name="Scale" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.list{border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card);padding:4px 18px}
+.r{display:flex;align-items:baseline;justify-content:space-between;gap:20px;padding:13px 0;border-bottom:1px solid var(--border-color)}
+.r:last-child{border-bottom:none}
+.r h1,.r h2,.r h3,.r p{margin:0}
+.spec{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="list">
+<div class="r"><h1 style="font-size:2rem">Full Self-Browsing</h1><span class="spec">h1 · clamp(2rem, 5vw, 3.5rem) · 700</span></div>
+<div class="r"><h2 style="font-size:1.5rem">Built for the Modern Web</h2><span class="spec">h2 · clamp(1.5rem, 3.5vw, 2.5rem) · 700</span></div>
+<div class="r"><h3 style="font-size:1.125rem">Direct API Execution</h3><span class="spec">h3 · clamp(1.125rem, 2.5vw, 1.5rem) · 700</span></div>
+<div class="r"><p style="max-width:380px;font-size:.92rem">Body copy runs at 1rem with a 1.7 line-height in the secondary color.</p><span class="spec">p · 1rem · 1.7</span></div>
+</div>
+</body>
+</html>

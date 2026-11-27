@@ -9,6 +9,9 @@ on:
       - '*.md'
       - 'tests/**'
       - '.gitignore'
+      - 'design-system/**'
+      - '.claude/**'
+      - '.github/pull_request_template.md'
   workflow_dispatch:
 
 jobs:
