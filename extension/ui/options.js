@@ -5575,7 +5575,7 @@ function renderVaultAccess() {
     return `
     <div>
       <label class="onepassword-vault-option vx-opt${on ? ' on' : ''}">
-        <input type="checkbox" value="${escapeHtml(vault.id)}" ${on ? 'checked' : ''}>
+        <input type="checkbox" value="${fsbUiEscape(vault.id)}" ${on ? 'checked' : ''}>
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
         <span class="onepassword-vault-title">${escapeHtml(vault.title || vault.id)}</span>
         ${tag.text ? `<span class="vx-tag${tag.cls ? ' ' + tag.cls : ''}">${fsbUiHtml(tag.text)}</span>` : ''}
@@ -6078,7 +6078,7 @@ function renderCredentialCard(login, siteCounts) {
   if (sites.some((site) => site.protocol === 'http')) chips.push('<span class="vx-chip" translate="no">http</span>');
   const search = [login.title, login.username, scope].filter(Boolean).join(' ').toLowerCase();
   return `
-    <div class="credential-card" data-search="${escapeHtml(search)}">
+    <div class="credential-card" data-search="${fsbUiEscape(search)}">
       <div class="credential-card-icon">${escapeHtml(initial)}</div>
       <div class="credential-card-info">
         <div class="credential-card-domain">${escapeHtml(label)}</div>
@@ -6301,9 +6301,9 @@ function renderPaymentCard(pm) {
   const scope = (pm.cardholderName ? escapeHtml(pm.cardholderName) + ' · ' : '') + billing;
   const search = [pm.title, pm.cardholderName, brandLabel, pm.last4].filter(Boolean).join(' ').toLowerCase();
   return `
-    <div class="credential-card payment-card" data-payment-id="${escapeHtml(pm.id)}" data-search="${escapeHtml(search)}">
+    <div class="credential-card payment-card" data-payment-id="${fsbUiEscape(pm.id)}" data-search="${fsbUiEscape(search)}">
       <div class="credential-card-icon">
-        <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
+        <span class="payment-card-brand ${fsbUiEscape(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
       </div>
       <div class="credential-card-info">
         <div class="credential-card-domain">${name ? escapeHtml(name) : fsbUiHtml('Card')}</div>

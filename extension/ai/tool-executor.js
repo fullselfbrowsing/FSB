@@ -219,7 +219,7 @@ async function executeCdpTool(tool, params, tabId, cdpHandler) {
  * @param {Function|undefined} dataHandler - Optional callback for data tools
  * @returns {Promise<Object>} Structured result
  */
-async function executeBackgroundTool(tool, params, tabId, dataHandler) {
+async function executeBackgroundTool(tool, params, tabId, dataHandler, sessionId) {
   try {
     switch (tool.name) {
       case 'navigate': {
@@ -485,6 +485,17 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
         if (!pmId) {
           return makeResult({ success: false, error: 'fill_payment_method requires paymentMethodId parameter' });
         }
+        // The Vault page's "Enable Saved Payment Methods" switch, off unless
+        // the user turned it on, the way "Enable Auto-Login" gates sign-ins.
+        const stored = await chrome.storage.local.get('enableSavedPayments');
+        if (!stored || stored.enableSavedPayments !== true) {
+          return makeResult({
+            success: false,
+            hadEffect: false,
+            error: 'Saved payment methods are turned off. Ask the user to turn on Enable Saved Payment Methods on FSB\'s Vault page.',
+            result: { errorCode: 'payments_disabled' }
+          });
+        }
         const onePassword = (typeof globalThis !== 'undefined' && globalThis.fsbOnePassword) || null;
         if (!onePassword) {
           return makeResult({ success: false, error: '1Password support is not available' });
@@ -502,7 +513,7 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
           : fill.errorCode === 'merchant_changed' ? { outcome: 'page_changed' }
           : /^onepassword_(not_configured|no_vaults|bridge_offline|bridge_unpaired|server_outdated)$/.test(String(fill.errorCode || '')) ? { outcome: 'not_connected' }
           : null;
-        if (cardRow) chrome.runtime.sendMessage({ action: 'vaultResultRow', row: cardRow }).catch(() => {});
+        if (cardRow) chrome.runtime.sendMessage({ action: 'vaultResultRow', sessionId: sessionId || null, row: cardRow }).catch(() => {});
         if (fill.declined) {
           return makeResult({
             success: false,
@@ -772,7 +783,7 @@ async function executeTool(name, params, tabId, options = {}) {
       return executeCdpTool(tool, finalParams, tabId, options.cdpHandler);
 
     case 'background':
-      return executeBackgroundTool(tool, finalParams, tabId, options.dataHandler);
+      return executeBackgroundTool(tool, finalParams, tabId, options.dataHandler, options.sessionId);
 
     default:
       return makeResult({

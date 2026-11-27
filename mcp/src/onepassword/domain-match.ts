@@ -6,17 +6,20 @@
  * rules 1Password's own autofill applies:
  *   - Never              -> the website is ignored.
  *   - ExactDomain        -> hostname (and an explicit port) must be identical.
- *   - AnywhereOnWebsite  -> the host must sit on the same registrable domain.
+ *   - AnywhereOnWebsite  -> the host must sit on the same registrable domain,
+ *                           as the Public Suffix List draws it.
  * IP addresses and single-label hosts (localhost) always match exactly.
  * A website saved with https:// is never released to an http:// page, so a
  * login is not typed into a page without TLS. A website saved without a
  * scheme, or with http://, matches either.
  */
 
+import { getDomain } from 'tldts';
+
 // Suffixes under which unrelated parties each register their own name, so the
 // registrable domain is the suffix plus one more label (alpha.co.uk,
-// app.github.io). Anything not listed falls back to the last two labels.
-// Adding an entry only makes matching stricter, never looser.
+// app.github.io). The Public Suffix List covers every other suffix; this list
+// is checked as well, and adding an entry only makes matching stricter.
 const PUBLIC_SUFFIXES = new Set([
   // Multi-level country suffixes (the list the extension's own vault used).
   'co.uk', 'co.jp', 'co.kr', 'co.in', 'co.nz', 'co.za', 'co.il',
@@ -91,24 +94,45 @@ export function isIpHost(hostname: string): boolean {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
 }
 
-/**
- * Scheme to record for a host whose scheme is unknown (FSB's old vault kept
- * hostnames only). Routers, intranet names, and localhost are usually served
- * over http, so they get http:// and keep matching; public sites get https://
- * and are protected from plain-http pages.
- */
-export function defaultSchemeForHost(hostname: string): 'http:' | 'https:' {
-  return isIpHost(hostname) || !hostname.includes('.') ? 'http:' : 'https:';
+// Names that resolve only on a local network: mDNS (.local), home.arpa
+// (RFC 8375), ICANN's reserved .internal, and the suffixes routers and
+// intranets commonly use.
+const LOCAL_NETWORK_SUFFIXES = [
+  'local', 'localhost', 'localdomain', 'lan', 'home', 'home.arpa', 'internal', 'intranet', 'corp',
+];
+
+function isLocalNetworkHost(hostname: string): boolean {
+  return LOCAL_NETWORK_SUFFIXES.some((suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`));
 }
 
 /**
- * Approximate eTLD+1 ("accounts.google.com" -> "google.com",
- * "docs.app.github.io" -> "app.github.io"). A host that is itself a listed
+ * Scheme to record for a host whose scheme is unknown (FSB's old vault kept
+ * hostnames only). Routers, local-network names (nas.local, printer.lan,
+ * router.home.arpa), and localhost are usually served over http, so they get
+ * http:// and keep matching; public sites get https:// and are protected from
+ * plain-http pages.
+ */
+export function defaultSchemeForHost(hostname: string): 'http:' | 'https:' {
+  return isIpHost(hostname) || !hostname.includes('.') || isLocalNetworkHost(hostname) ? 'http:' : 'https:';
+}
+
+/**
+ * eTLD+1 ("accounts.google.com" -> "google.com", "www.maybank2u.com.my" ->
+ * "maybank2u.com.my", "docs.app.github.io" -> "app.github.io"), from the
+ * Public Suffix List, including its section for shared hosting such as
+ * duckdns.org, and from the list above. When both place the host, the longer
+ * domain wins, since it is the stricter one. A host that is itself a public
  * suffix ("github.io") is returned as is, so it matches none of the sites
  * under it.
  */
 export function registrableDomain(hostname: string): string {
   if (isIpHost(hostname)) return hostname;
+  const listed = listedRegistrableDomain(hostname);
+  const fromPsl = getDomain(hostname, { allowPrivateDomains: true, extractHostname: false }) ?? hostname;
+  return listed !== null && listed.length > fromPsl.length ? listed : fromPsl;
+}
+
+function listedRegistrableDomain(hostname: string): string | null {
   const labels = hostname.split('.');
   // Longest listed suffix first, so up.railway.app wins over a shorter entry.
   for (let start = 0; start < labels.length; start += 1) {
@@ -116,7 +140,7 @@ export function registrableDomain(hostname: string): string {
       return start === 0 ? hostname : labels.slice(start - 1).join('.');
     }
   }
-  return labels.length <= 2 ? hostname : labels.slice(-2).join('.');
+  return null;
 }
 
 export function websiteMatch(website: WebsiteLike, target: HostTarget): MatchStrength | null {

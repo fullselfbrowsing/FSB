@@ -467,6 +467,15 @@
     entry.resolve(result);
   }
 
+  // Back to waiting for the user after a step that changed nothing. If the
+  // time ran out meanwhile, the request ends now. Returns true when it ended.
+  function resumeWaiting(entry) {
+    entry.busy = false;
+    if (!entry.expired) return false;
+    settleAsk(entry, notProvided(entry.site, 'timeout'), { phase: 'cancelled' });
+    return true;
+  }
+
   api.askLoginInTab = async function (tabId, site, send, hooks, options) {
     var statusResult = await api.status({ pair: false });
     var status = statusResult && statusResult.ok ? statusResult.status : null;
@@ -487,11 +496,18 @@
         client: (options && typeof options.client === 'string') ? options.client : '',
         port: null,
         busy: false,
+        expired: false,
         settled: false,
         resolve: resolve,
         timer: null
       };
       entry.timer = setTimeout(function () {
+        // A submit or a 1Password retry already under way finishes and reports
+        // what it did; the time limit is only for a sheet nobody answered.
+        if (entry.busy) {
+          entry.expired = true;
+          return;
+        }
         settleAsk(entry, notProvided(site, 'timeout'), { phase: 'cancelled' });
       }, LOGIN_ASK_TIMEOUT_MS);
       pendingAsks[entry.requestId] = entry;
@@ -534,7 +550,11 @@
     var save = message.save === true && entry.canSave;
     entry.busy = true;
     pill(entry.hooks, { phase: 'signing_typed', client: entry.client });
-    if (!(await sameOrigin(entry.tabId, site.origin))) {
+    var stillOnSite = await sameOrigin(entry.tabId, site.origin);
+    // A newer ask on this tab replaced this one meanwhile: it was told nothing
+    // was filled, so nothing is.
+    if (entry.settled) return null;
+    if (!stillOnSite) {
       settleAsk(entry, toFillFailure(
         failure('page_changed', 'The page changed before the typed login was filled; nothing was filled'),
         'Page changed'
@@ -585,13 +605,14 @@
   async function retryFromOnePassword(entry) {
     entry.busy = true;
     var resolved = await api.resolveLogin(entry.site.url, { requireUnique: true });
+    if (entry.settled) return null;
     if (resolved && resolved.ok && resolved.login) {
       var out = await fillResolvedLogin(entry.tabId, entry.site, resolved.login, entry.send, entry.hooks);
       settleAsk(entry, out);
       return null;
     }
     if (resolved && resolved.errorCode === 'credential_not_found') {
-      entry.busy = false;
+      if (resumeWaiting(entry)) return null;
       return { type: 'still_missing' };
     }
     if (resolved && resolved.errorCode === 'multiple_credentials') {

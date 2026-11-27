@@ -563,6 +563,76 @@ async function run() {
 
   const background = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
 
+  console.log('\n--- autopilot fill_payment_method ---');
+  {
+    const executor = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ai', 'tool-executor.js'), 'utf8');
+    const makeResultSrc = executor.slice(executor.indexOf('function makeResult('), executor.indexOf('function buildAutopilotTriggerParams('));
+    const caseStart = executor.indexOf("      case 'fill_payment_method': {");
+    const caseEnd = executor.indexOf('      default: {', caseStart);
+    assert.ok(caseStart > 0 && caseEnd > caseStart, 'fill_payment_method case found in tool-executor.js');
+    const runCase = (stored, fillResult) => {
+      const fills = [];
+      const rows = [];
+      const context = {
+        chrome: {
+          storage: { local: { get: async (key) => (Object.prototype.hasOwnProperty.call(stored, key) ? { [key]: stored[key] } : {}) } },
+          tabs: { sendMessage: async () => ({}) },
+          runtime: { sendMessage: async (message) => { rows.push(JSON.parse(JSON.stringify(message))); } },
+        },
+        fsbOnePassword: {
+          async fillCardInTab(tabId, itemId) {
+            fills.push({ tabId, itemId });
+            return fillResult;
+          },
+        },
+      };
+      context.globalThis = context;
+      const run = vm.runInNewContext(
+        `${makeResultSrc}\n(async function (tool, params, tabId, dataHandler, sessionId) { switch (tool.name) {\n${executor.slice(caseStart, caseEnd)}\n} })`,
+        context,
+      );
+      return { fills, rows, run: (params, sessionId) => run({ name: 'fill_payment_method' }, params, 5, null, sessionId) };
+    };
+    const FILLED = { success: true, merchantDomain: 'shop.example', title: 'Visa', cardBrand: 'visa', last4: '4242', filled: ['cardNumber'] };
+    await check('card fills stay off until Enable Saved Payment Methods is on', async () => {
+      for (const stored of [{}, { enableSavedPayments: false }]) {
+        const env = runCase(stored, FILLED);
+        const result = await env.run({ paymentMethodId: 'v:card' }, 'session-a');
+        assert.equal(result.success, false);
+        assert.equal(result.hadEffect, false);
+        assert.equal(result.result.errorCode, 'payments_disabled');
+        assert.match(result.error, /Enable Saved Payment Methods/);
+        assert.equal(env.fills.length, 0, '1Password is never asked for the card');
+      }
+    });
+    await check('with the switch on the card is filled and its row names the session', async () => {
+      const env = runCase({ enableSavedPayments: true }, FILLED);
+      const result = await env.run({ paymentMethodId: 'v:card' }, 'session-a');
+      assert.equal(result.success, true);
+      assert.deepEqual(env.fills, [{ tabId: 5, itemId: 'v:card' }]);
+      assert.equal(env.rows.length, 1);
+      assert.equal(env.rows[0].action, 'vaultResultRow');
+      assert.equal(env.rows[0].sessionId, 'session-a', 'the side panel can tell which conversation it belongs to');
+      assert.equal(env.rows[0].row.outcome, 'card_filled');
+    });
+    await check('the agent loop passes its session to the tools it runs', () => {
+      const loop = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ai', 'agent-loop.js'), 'utf8');
+      assert.match(loop, /dataHandler: handleDataTool,\s*\/\/[^\n]*\n\s*sessionId: sessionId\s*\}\);/);
+      assert.ok(executor.includes('return executeBackgroundTool(tool, finalParams, tabId, options.dataHandler, options.sessionId);'));
+    });
+    await check('the side panel shows a vault row only in its own conversation, once', () => {
+      const panel = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ui', 'sidepanel.js'), 'utf8');
+      const rowCase = panel.slice(panel.indexOf("    case 'vaultResultRow':"), panel.indexOf("    case 'sessionStateEvent':"));
+      assert.ok(rowCase.includes('if (request.sessionId && request.sessionId === currentSessionId) addVaultRow(request.row);'));
+      // The worker reports a card prompt that timed out; the sheet's own
+      // countdown only closes the sheet, so the chat gets one row.
+      const sheet = panel.slice(panel.indexOf('function showPaymentFillConfirmation('), panel.indexOf('// Handle keyboard shortcuts'));
+      assert.ok(sheet.length > 0, 'payment sheet found');
+      assert.ok(!sheet.includes("addVaultRow({ outcome: 'card_timeout' })"), 'no second timeout row from the panel');
+      assert.ok(sheet.includes('if (left <= 0 && _vpPaymentSheet === state) closePaymentSheet();'));
+    });
+  }
+
   console.log('\n--- autopilot auto-login ---');
   {
     const hookStart = background.indexOf('// LOGIN DETECTION HOOK');
@@ -1050,6 +1120,8 @@ async function run() {
         window: { open: (url) => tabsOpened.push('window:' + url) },
         confirm: () => true,
         escapeHtml: (value) => String(value == null ? '' : value),
+        // The page's own escaper, which also escapes quotes for attributes.
+        fsbUiEscape: vm.runInNewContext(`(${between('function fsbUiEscape(', '\n}\n')}\n})`),
         fsbUiLine: (english) => english,
         fsbUiHtml: (english) => english,
         fsbUiSet: (node, english, subs) => {
@@ -1075,6 +1147,8 @@ async function run() {
           useAll: useAllOnePasswordVaults,
           saveLimit: saveOnePasswordVaults,
           setLimit: (ids) => { _vaultUi.allowEdited = true; _vaultUi.allow = new Set(ids); },
+          renderLogin: renderCredentialCard,
+          renderCard: renderPaymentCard,
         })`, context, { filename: 'options.js' });
       const settle = async () => {
         for (let i = 0; i < 400; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1481,6 +1555,30 @@ async function run() {
       await env.settle();
       assert.deepEqual(env.sent.filter((request) => request.action === 'onePasswordConfigure').pop(), { action: 'onePasswordConfigure', vaultScope: 'all' });
       assert.equal(env.page.ui.scope, 'all');
+    });
+
+    await check('a quote in a 1Password title cannot end the search attribute', () => {
+      const env = makePage({ answer: server({ config: DESKTOP }).answer });
+      const login = env.page.renderLogin({ id: 'v:1', vaultId: 'v-work', title: 'Work "SSO" portal onmouseover=x', username: 'alice@example.com', domains: ['sso.example.com'] }, {});
+      const card = env.page.renderCard({ id: 'v:"2', vaultId: 'v-work', title: 'Joint "house" card', cardBrand: 'visa" x="', last4: '4242' });
+      // Read the opening tag the way a browser does: name="value" pairs, in order.
+      const attributesOf = (markup) => {
+        let rest = markup.match(/<div class="credential-card[^>]*>/)[0].slice('<div'.length, -1);
+        const found = {};
+        for (let pair = rest.match(/^\s+([a-z-]+)="([^"]*)"/); pair; pair = rest.match(/^\s+([a-z-]+)="([^"]*)"/)) {
+          found[pair[1]] = pair[2];
+          rest = rest.slice(pair[0].length);
+        }
+        assert.equal(rest.trim(), '', 'nothing is left over after the quoted attributes');
+        return found;
+      };
+      const loginAttributes = attributesOf(login);
+      assert.deepEqual(Object.keys(loginAttributes), ['class', 'data-search']);
+      assert.ok(loginAttributes['data-search'].includes('alice@example.com'), 'search still finds the username');
+      const cardAttributes = attributesOf(card);
+      assert.deepEqual(Object.keys(cardAttributes), ['class', 'data-payment-id', 'data-search']);
+      assert.ok(cardAttributes['data-search'].includes('4242'), 'search still finds the last 4');
+      assert.ok(card.includes('class="payment-card-brand visa&quot; x=&quot;"'), 'the brand cannot add an attribute');
     });
 
     await check('the old vault and service-account copy are gone from the Vault page', () => {

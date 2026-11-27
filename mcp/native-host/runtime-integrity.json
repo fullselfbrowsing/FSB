@@ -2,7 +2,7 @@
   "schema": 1,
   "packageName": "fsb-mcp-server",
   "packageVersion": "0.95.0",
-  "lockSha256": "abcc47d9e4ed7a09b0190733d82fbeca6194bbe3754e8a465dc248c96a03356b",
+  "lockSha256": "2cdc038cc9203c0661d31c4abb13dcfe99dc7f4740532522558afae3a54835f8",
   "directDependencies": [
     {
       "name": "@1password/sdk",
@@ -19,6 +19,10 @@
     {
       "name": "strip-json-comments",
       "version": "5.0.3"
+    },
+    {
+      "name": "tldts",
+      "version": "7.6.2"
     },
     {
       "name": "ws",
@@ -38,6 +42,7 @@
     "@modelcontextprotocol/sdk",
     "smol-toml",
     "strip-json-comments",
+    "tldts",
     "ws",
     "yaml",
     "zod"
@@ -564,6 +569,18 @@
       "name": "strip-json-comments",
       "version": "5.0.3",
       "integrity": "sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw=="
+    },
+    {
+      "path": "node_modules/tldts",
+      "name": "tldts",
+      "version": "7.6.2",
+      "integrity": "sha512-IylRLICacWmPVf5tQIOvKkZzf2Vp8qJT3bAZox+3bWXj5P/pn45PC1a9l86loP7D/ywbSt/h/NnyIoR0fg4utA=="
+    },
+    {
+      "path": "node_modules/tldts-core",
+      "name": "tldts-core",
+      "version": "7.6.2",
+      "integrity": "sha512-/ZG+gignPzfgtpWNnbS7AKcU1ptt9jDqhIlr7vHOaw/Psz6HjXyB2CeFS3RrUGYwER/Q4F6IS8+9rZuYfRUz+Q=="
     },
     {
       "path": "node_modules/toidentifier",

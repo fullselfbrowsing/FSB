@@ -311,7 +311,7 @@ npx fsb-mcp-server onepassword                     # show the current setup
 
 Service accounts cannot read Personal vaults, so set `--save-vault` if you want "Save to 1Password". The Vault page does not set up service accounts, but it shows one set up this way as connected and offers Disconnect.
 
-Settings live in `~/.fsb/onepassword.json` (owner-only). A service-account token is stored there and never sent to the extension. `--desktop <account>` sets up the desktop app from the CLI, and `--reset` forgets everything. Logins are released only for a site one of their saved websites matches, following the item's 1Password autofill setting, and a website saved as `https://` is never matched by a plain-`http://` page. Cards fill only on `https` pages and only while the tab stays on the site it was on. Over MCP, FSB shows no card prompt of its own, so the agent asks the user before calling `use_payment_method`. In autopilot, FSB asks in the side panel.
+Settings live in `~/.fsb/onepassword.json` (owner-only). A service-account token is stored there and never sent to the extension. `--desktop <account>` sets up the desktop app from the CLI, and `--reset` forgets everything. Logins are released only for a site one of their saved websites matches, following the item's 1Password autofill setting, and a website saved as `https://` is never matched by a plain-`http://` page. Cards fill only on `https` pages and only while the tab stays on the site it was on. Over MCP, FSB shows no card prompt of its own, so the agent asks the user before calling `use_payment_method`. In autopilot, card fills need **Enable Saved Payment Methods** turned on in the Vault page, and FSB asks in the side panel before each one.
 
 ### Grok Build as the extension's AI provider
 

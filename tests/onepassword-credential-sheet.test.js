@@ -37,7 +37,9 @@ const NOT_FOUND = { ok: false, errorCode: 'credential_not_found', error: 'No 1Pa
 
 // saveVault is the broker's effectiveSaveVaultId; staleSaveVault is a stored
 // saveVaultId that 1Password no longer lists (effectiveSaveVaultId stays null).
-function makeEnv({ tabUrls = ['https://example.com/login'], saveVault = null, staleSaveVault = null, resolve = () => NOT_FOUND, timeoutMs = null, sheetShown = true } = {}) {
+// saveDelayMs holds the 1Password save open that long, like an approval prompt.
+// tabGates[n] is a promise the nth chrome.tabs.get call waits for.
+function makeEnv({ tabUrls = ['https://example.com/login'], saveVault = null, staleSaveVault = null, resolve = () => NOT_FOUND, timeoutMs = null, sheetShown = true, saveDelayMs = 0, tabGates = {} } = {}) {
   const requests = [];
   const pills = [];
   const fills = [];
@@ -51,8 +53,10 @@ function makeEnv({ tabUrls = ['https://example.com/login'], saveVault = null, st
     },
     tabs: {
       get: async (tabId) => {
+        const call = tabCall;
         const url = tabUrls[Math.min(tabCall, tabUrls.length - 1)];
         tabCall += 1;
+        if (tabGates[call]) await tabGates[call];
         return { id: tabId, url };
       },
     },
@@ -60,7 +64,10 @@ function makeEnv({ tabUrls = ['https://example.com/login'], saveVault = null, st
   const responses = {
     'onepassword.status': () => ({ ok: true, status: { configured: true, saveVaultId: saveVault || staleSaveVault, effectiveSaveVaultId: saveVault } }),
     'onepassword.resolve-login': (payload) => resolve(payload),
-    'onepassword.save-login': () => ({ ok: true, saved: { id: 'v1:new1', title: 'example.com' } }),
+    'onepassword.save-login': async () => {
+      if (saveDelayMs) await new Promise((r) => setTimeout(r, saveDelayMs));
+      return { ok: true, saved: { id: 'v1:new1', title: 'example.com' } };
+    },
   };
   const mcpBridgeClient = {
     isConnected: true,
@@ -311,6 +318,79 @@ async function run() {
     const result = await pending;
     assert.equal(result.errorCode, 'credential_not_provided');
     assert.equal(result.reason, 'timeout');
+  });
+  await check('a submit still saving when the time runs out reports the fill', async () => {
+    const env = makeEnv({ timeoutMs: 1200, saveVault: 'v1', saveDelayMs: 2000 });
+    const { pending, ask } = await startAsk(env);
+    const port = await readyPort(env, ask);
+    port.fromFrame({ type: 'submit', username: USER, password: SECRET, save: true });
+    const result = await pending;
+    assert.equal(result.success, true, 'the agent is told the page was filled');
+    assert.equal(result.by, 'you');
+    assert.equal(result.savedTo1Password, true);
+    assert.equal(env.fills.length, 1);
+    assert.equal(env.pills[env.pills.length - 1].phase, 'filled_saved');
+    assert.ok(!env.pills.some((p) => p.phase === 'cancelled'), 'no "nothing filled" state on the page');
+  });
+  await check('a 1Password retry still resolving when the time runs out fills and reports it', async () => {
+    let lookups = 0;
+    const env = makeEnv({
+      timeoutMs: 1200,
+      resolve: async () => {
+        lookups += 1;
+        if (lookups === 1) return NOT_FOUND;
+        await new Promise((r) => setTimeout(r, 2000));
+        return { ok: true, login: { id: 'v1:n', title: 'Example', username: USER, password: SECRET, oneTimeCode: '' } };
+      },
+    });
+    const { pending, ask } = await startAsk(env);
+    const port = await readyPort(env, ask);
+    port.fromFrame({ type: 'retry' });
+    const result = await pending;
+    assert.equal(result.success, true, 'the fill that happened is what the agent hears');
+    assert.equal(result.credentialId, 'v1:n');
+    assert.equal(env.fills.length, 1);
+    assert.equal(env.pills[env.pills.length - 1].phase, 'filled_1p');
+  });
+  await check('time that ran out during a still-missing retry ends the ask when the retry returns', async () => {
+    let lookups = 0;
+    const env = makeEnv({
+      timeoutMs: 1200,
+      resolve: async () => {
+        lookups += 1;
+        if (lookups > 1) await new Promise((r) => setTimeout(r, 2000));
+        return NOT_FOUND;
+      },
+    });
+    const { pending, ask } = await startAsk(env);
+    const port = await readyPort(env, ask);
+    port.fromFrame({ type: 'retry' });
+    const result = await pending;
+    assert.equal(result.errorCode, 'credential_not_provided');
+    assert.equal(result.reason, 'timeout');
+    assert.equal(env.fills.length, 0);
+    assert.ok(!port.posted.some((m) => m.type === 'still_missing'), 'the ended sheet is not offered another try');
+  });
+  await check('an ask replaced while its typed login is checked fills nothing', async () => {
+    // Call 0 is the first ask's tab read; call 1 is the submit's origin check.
+    let release;
+    const env = makeEnv({ tabGates: { 1: new Promise((r) => { release = r; }) } });
+    const first = await startAsk(env);
+    const port = await readyPort(env, first.ask);
+    port.fromFrame({ type: 'submit', username: USER, password: SECRET, save: false });
+    // The same tab asks again before the origin check comes back.
+    const second = env.api.fillLoginInTab(TAB, { requireUnique: true, askUser: true, client: 'Claude' }, env.send, env.hooks);
+    const firstResult = await first.pending;
+    assert.equal(firstResult.reason, 'replaced');
+    release();
+    await tick();
+    await tick();
+    assert.equal(env.fills.length, 0, 'the replaced request never types into the page');
+    for (let i = 0; i < 20 && !env.pills.filter((p) => p.phase === 'ask')[1]; i += 1) await tick();
+    const secondAsk = env.pills.filter((p) => p.phase === 'ask')[1];
+    const secondPort = await readyPort(env, secondAsk);
+    secondPort.fromFrame({ type: 'cancel' });
+    await second;
   });
   await check('a new ask on the same tab replaces the old one', async () => {
     const env = makeEnv();

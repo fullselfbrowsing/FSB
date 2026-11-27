@@ -2674,7 +2674,9 @@ async function runAgentIteration(sessionId, options) {
             cdpHandler: executeCDPToolDirect
               ? function(verb, params, tabId) { return executeCDPToolDirect({ tool: verb, params: params }, tabId); }
               : null,
-            dataHandler: handleDataTool
+            dataHandler: handleDataTool,
+            // Side-panel rows a tool posts (1Password outcomes) name their session.
+            sessionId: sessionId
           });
         } finally {
           if (spawnIntentToken && spawnProvenance

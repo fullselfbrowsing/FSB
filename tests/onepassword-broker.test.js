@@ -79,7 +79,9 @@ function makeSdk(items, options = {}) {
       if (options.authError) throw new Error(options.authError);
       // expireClient: n -- the nth client's session has expired, so every
       // read through it fails, the way one lapsed desktop session does.
-      const expired = options.expireClient === calls.createClient.length;
+      // expireEveryClient: every sign-in lapses, the way 1Password locking
+      // again right after the reconnect does.
+      const expired = options.expireEveryClient === true || options.expireClient === calls.createClient.length;
       const lapse = async () => {
         await new Promise((resolve) => setTimeout(resolve, 1));
         if (expired) throw new DesktopSessionExpiredError('session expired');
@@ -186,6 +188,25 @@ async function run() {
     assert.equal(match.websiteMatch({ url: 'alpha.co.uk' }, at('https://beta.co.uk')), null);
     assert.equal(match.websiteMatch({ url: 'shop.alpha.co.uk' }, at('https://login.alpha.co.uk')), 'site');
   });
+  await check('suffixes the hand list lacks come from the Public Suffix List', () => {
+    // Without the full list these all reduced to the suffix itself, so a
+    // login saved for one site was released on any other under it.
+    for (const [saved, other] of [
+      ['www.maybank2u.com.my', 'evil.com.my'],
+      ['shop.tokopedia.co.id', 'evil.co.id'],
+      ['www.vietcombank.com.vn', 'evil.com.vn'],
+      ['www.example.ne.jp', 'evil.ne.jp'],
+      ['www.gp.nhs.uk', 'evil.nhs.uk'],
+      // Dynamic DNS: every customer gets a subdomain (the list's private section).
+      ['nas.duckdns.org', 'evil.duckdns.org'],
+    ]) {
+      assert.equal(match.websiteMatch({ url: saved }, at(`https://${other}`)), null, `${saved} vs ${other}`);
+    }
+    assert.equal(match.registrableDomain('www.maybank2u.com.my'), 'maybank2u.com.my');
+    assert.equal(match.websiteMatch({ url: 'www.maybank2u.com.my' }, at('https://shop.maybank2u.com.my')), 'site',
+      'subdomains of the same site still match');
+    assert.equal(match.websiteMatch({ url: 'nas.duckdns.org' }, at('https://admin.nas.duckdns.org')), 'site');
+  });
   await check('shared hosting suffixes keep customers apart', () => {
     for (const suffix of ['github.io', 'vercel.app', 'netlify.app', 'pages.dev', 'up.railway.app']) {
       assert.equal(match.websiteMatch({ url: `app.${suffix}` }, at(`https://other.${suffix}`)), null, suffix);
@@ -221,6 +242,13 @@ async function run() {
     assert.equal(match.defaultSchemeForHost('example.com'), 'https:');
     assert.equal(match.defaultSchemeForHost('192.168.1.1'), 'http:');
     assert.equal(match.defaultSchemeForHost('localhost'), 'http:');
+    // Local-network names keep matching the plain-http pages they are served on.
+    for (const host of ['nas.local', 'printer.lan', 'router.home.arpa', 'wiki.corp', 'app.localhost', 'git.internal']) {
+      assert.equal(match.defaultSchemeForHost(host), 'http:', host);
+    }
+    for (const host of ['app.localhost.example.com', 'mylocal.com', 'dev.test']) {
+      assert.equal(match.defaultSchemeForHost(host), 'https:', host);
+    }
   });
   await check('non-web schemes are rejected', () => {
     assert.equal(at('chrome://settings'), null);
@@ -511,6 +539,14 @@ async function run() {
     const logins = await retrying.listLogins();
     assert.ok(logins.length > 0);
     assert.equal(expiring.calls.createClient.length, 2, 'client was rebuilt after expiry');
+  });
+  await check('a session that expires again after the reconnect asks the user to unlock', async () => {
+    const lapsing = makeSdk(items, { expireEveryClient: true });
+    const broker = new OnePasswordBroker({ loadSdk: async () => lapsing.sdk, configPath, env: {} });
+    const error = await rejects(broker.listLogins(), 'onepassword_auth_failed');
+    assert.equal(error.details.reason, 'locked', 'reported as locked, not as a failed request');
+    assert.equal(lapsing.calls.createClient.length, 2, 'one reconnect, then it stops');
+    assert.equal(broker.status().lastError.code, 'onepassword_auth_failed');
   });
   // The settings page lists vaults and logins at once on a cold server; with
   // the desktop app each extra sign-in is another approval prompt.

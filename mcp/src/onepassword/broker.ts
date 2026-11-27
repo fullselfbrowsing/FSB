@@ -869,9 +869,14 @@ export class OnePasswordBroker {
         return await fn(client, config, retire);
       } catch (error) {
         if (error instanceof BrokerError) throw error;
-        if (isSessionExpiry(error) && attempt === 0) {
+        if (isSessionExpiry(error)) {
           retire();
-          continue;
+          if (attempt === 0) continue;
+          // The fresh sign-in lapsed too, as when 1Password locks again while
+          // the retried call runs: the user has to unlock it, so say that.
+          const message = sanitizeSdkMessage(error);
+          this.noteError('onepassword_auth_failed', message);
+          throw new BrokerError('onepassword_auth_failed', `1Password session expired again: ${message}`, { reason: 'locked' });
         }
         if (isRateLimit(error)) {
           this.noteError('onepassword_rate_limited', 'Rate limited by 1Password');

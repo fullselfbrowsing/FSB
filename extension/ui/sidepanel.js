@@ -6084,7 +6084,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return;
 
     case 'vaultResultRow':
-      addVaultRow(request.row);
+      // Only the conversation the row belongs to shows it, as with loginDetected.
+      if (request.sessionId && request.sessionId === currentSessionId) addVaultRow(request.row);
       break;
 
     case 'sessionStateEvent': {
@@ -6441,10 +6442,9 @@ function showPaymentFillConfirmation(data) {
   state.timer = setInterval(() => {
     const left = Math.max(0, Math.ceil((VP_PAYMENT_LIMIT_MS - (Date.now() - started)) / 1000));
     if (clock) clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
-    if (left <= 0 && _vpPaymentSheet === state) {
-      closePaymentSheet();
-      addVaultRow({ outcome: 'card_timeout' });
-    }
+    // The worker's own 2-minute timer started first and already reported the
+    // timeout as a chat row, so the sheet only closes here.
+    if (left <= 0 && _vpPaymentSheet === state) closePaymentSheet();
   }, 1000);
   // Fill card takes clicks only after it has been on screen for a moment.
   state.arm = setTimeout(() => { if (fillBtn) fillBtn.disabled = false; }, 700);
