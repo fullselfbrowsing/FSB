@@ -2727,6 +2727,62 @@ async function removeHelperLocked(
   }
 }
 
+/**
+ * The extension a registration's own manifest names, or null. Doctor reads a
+ * manifest the same way.
+ */
+async function namedRegistrationExtensionId(
+  adapter: NativeHostInstallPlatformAdapter,
+): Promise<string | null> {
+  try {
+    const manifest = (await adapter.readRegistrationFacts())?.manifest;
+    // A bound on what is parsed; reading the registration again applies the
+    // exact size limit.
+    if (
+      manifest?.status !== 'file'
+      || typeof manifest.contents !== 'string'
+      || manifest.contents.length > 16 * 1024
+    ) {
+      return null;
+    }
+    const value: unknown = JSON.parse(manifest.contents);
+    const origins = value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>).allowed_origins
+      : null;
+    return Array.isArray(origins) && origins.length === 1 ? extensionIdFromOrigin(origins[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a registration left behind by a runtime that is gone is this
+ * package's own. Without the marker a registration can only be read against
+ * the Web Store ID: one for that ID reads as split, but one for any other
+ * extension reads as foreign until it is read against the extension its
+ * manifest names. A manifest for another program still fails that reading and
+ * stays foreign.
+ */
+async function hasOwnOrphanedRegistration(
+  surfaces: readonly BrowserSurface[],
+  markerFact: NativeHostFileFact,
+  readExtensionId: string,
+): Promise<boolean> {
+  if (surfaces.some((surface) => surface.reason.endsWith(':registration-split'))) return true;
+  for (const surface of surfaces) {
+    if (surface.reason !== 'foreign:registration-foreign') continue;
+    const named = await namedRegistrationExtensionId(surface.adapter);
+    if (!named || named === readExtensionId) continue;
+    try {
+      const reread = await readBrowserSurface(surface.adapter, markerFact, named);
+      if (reread.reason.endsWith(':registration-split')) return true;
+    } catch {
+      // A registration that cannot be read again proves nothing either way.
+    }
+  }
+  return false;
+}
+
 function uninstallAllResult(
   outcome: NativeHostUninstallAllResult['outcome'],
   fields: Readonly<{
@@ -2780,14 +2836,14 @@ export async function uninstallAllNativeHost(
       }
       if (runtime.state === 'absent') {
         // A registration of this package's own that lost its runtime never
-        // reads as exact, since the marker went with the runtime; it reads as
-        // a split registration. That is refused, as install and the
-        // per-browser uninstall refuse it, instead of being reported as
-        // nothing installed. A registration this package does not own is left
-        // alone and does not count. A client uninstall removes only a helper
-        // that install set up, and there is none, so it stays quiet.
-        const orphaned = surfaces.some((surface) => surface.reason.endsWith(':registration-split'));
-        return orphaned && !onlyAuto
+        // reads as exact, since the marker went with the runtime, whichever
+        // extension it was for (hasOwnOrphanedRegistration). That is refused,
+        // as install and the per-browser uninstall refuse it, instead of being
+        // reported as nothing installed. A registration this package does not
+        // own is left alone and does not count. A client uninstall removes
+        // only a helper that install set up, and there is none, so it stays
+        // quiet and reads nothing more.
+        return !onlyAuto && await hasOwnOrphanedRegistration(surfaces, runtime.markerFact, extensionId)
           ? uninstallAllResult('refused', { reason: 'split-state' })
           : uninstallAllResult('absent', { reason: 'absent' });
       }

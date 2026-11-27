@@ -806,19 +806,26 @@ function run() {
 
       // FSB's own Chrome registration whose runtime was deleted by hand is a
       // split state: uninstall refuses it, as install does, instead of saying
-      // nothing is installed.
-      const orphanInstall = runCli(['install', '--native-host'], fixture);
-      assertEqual(orphanInstall.status, 0, 'the orphaned registration fixture installs first');
-      fs.rmSync(stableRoot, { recursive: true, force: true });
-      const orphanUninstall = runCli(['uninstall', '--native-host'], fixture);
-      assertEqual(orphanUninstall.status, 1, 'uninstall refuses a registration whose runtime is gone');
-      assertIncludes(
-        `${orphanUninstall.stdout}${orphanUninstall.stderr}`,
-        'not changed: split-state',
-        'uninstall reports the orphaned registration as a split state',
-      );
-      assert(fs.existsSync(manifestPath), 'the refused uninstall leaves the orphaned registration in place');
-      fs.rmSync(manifestPath, { force: true });
+      // nothing is installed. That holds for an unpacked build's ID too,
+      // although without the runtime the registration is first read against
+      // the Web Store ID.
+      for (const [label, orphanExtensionId] of [
+        ['the Web Store ID', EXTENSION_ID],
+        ['an unpacked build ID', DEVELOPMENT_EXTENSION_ID],
+      ]) {
+        const orphanInstall = runCli(['install', '--native-host', '--extension-id', orphanExtensionId], fixture);
+        assertEqual(orphanInstall.status, 0, `the orphaned registration fixture for ${label} installs first`);
+        fs.rmSync(stableRoot, { recursive: true, force: true });
+        const orphanUninstall = runCli(['uninstall', '--native-host'], fixture);
+        assertEqual(orphanUninstall.status, 1, `uninstall refuses a registration for ${label} whose runtime is gone`);
+        assertIncludes(
+          `${orphanUninstall.stdout}${orphanUninstall.stderr}`,
+          'not changed: split-state',
+          `uninstall reports the orphaned registration for ${label} as a split state`,
+        );
+        assert(fs.existsSync(manifestPath), `the refused uninstall leaves the orphaned registration for ${label} in place`);
+        fs.rmSync(manifestPath, { force: true });
+      }
 
       const duplicateId = runCli([
         'install',

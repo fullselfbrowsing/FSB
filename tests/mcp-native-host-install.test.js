@@ -5182,6 +5182,32 @@ async function runEnsureTransaction() {
     deepEqual(harness.registeredBrowsers(), ['edge'], `${platformName} the registration this package does not own is left in place`);
     equal(ensureMutations(harness.trace).length, 0, `${platformName} the foreign registration causes zero mutation`);
   }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // With the marker gone, a registration is read against the Web Store ID,
+    // so FSB's own registration for an unpacked build first reads as foreign.
+    const harness = fakeEnsureHarness(modules, platformName, {});
+    harness.register('chrome', DEVELOPMENT_EXTENSION_ID);
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', `${platformName} uninstall-all refuses FSB's own registration for another extension whose runtime is gone`);
+    equal(result.reason, 'split-state', `${platformName} that leftover registration is a split state too`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the refused uninstall-all leaves that registration`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the refused uninstall-all for another extension changes nothing`);
+    const client = await installer.uninstallAllNativeHost({ onlyProvenance: 'auto' }, harness.dependencies);
+    equal(client.outcome, 'absent', `${platformName} a client uninstall stays quiet about that registration`);
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // Naming another extension does not make another program's manifest FSB's.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      foreignManifests: [['edge', manifestText(
+        platformName === 'win32' ? 'C:\\Program Files\\Other\\launcher.exe' : '/opt/other/launcher',
+        DEVELOPMENT_EXTENSION_ID,
+      )]],
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'absent', `${platformName} a manifest for another program that names an extension is not counted`);
+    deepEqual(harness.registeredBrowsers(), ['edge'], `${platformName} that manifest is left in place`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} that manifest causes zero mutation`);
+  }
   {
     const harness = fakeEnsureHarness(modules, 'linux', {
       installed: { version: '0.9.0' },
