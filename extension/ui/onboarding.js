@@ -468,7 +468,7 @@
           <div class="ob-feat-row">
             <div class="ob-feat" data-di="0.5"><i class="fa-solid fa-bolt"></i><b>${escapeHtml(ob('entry_feat_api', 'Direct API'))}</b><span>${escapeHtml(ob('entry_feat_api_sub', 'Talks to apps, not just clicks'))}</span></div>
             <div class="ob-feat" data-di="0.58"><i class="fa-solid fa-compass"></i><b>${escapeHtml(ob('entry_feat_guides', '130+ guides'))}</b><span>${escapeHtml(ob('entry_feat_guides_sub', 'Across 17 categories'))}</span></div>
-            <div class="ob-feat" data-di="0.66"><i class="fa-solid fa-plug"></i><b>${escapeHtml(ob('entry_feat_tools', '69 MCP tools'))}</b><span>${escapeHtml(ob('entry_feat_tools_sub', 'From your agent'))}</span></div>
+            <div class="ob-feat" data-di="0.66"><i class="fa-solid fa-plug"></i><b>${escapeHtml(ob('entry_feat_tools', '70 MCP tools'))}</b><span>${escapeHtml(ob('entry_feat_tools_sub', 'From your agent'))}</span></div>
           </div>
           <div class="ob-nav ob-nav-center" data-di="0.8"><button class="ob-btn ob-btn-primary ob-btn-wide" id="obGetStarted" type="button" data-door="primary">${escapeHtml(ob('entry_get_started', 'Get started'))} <i class="fa-solid fa-arrow-right"></i></button></div>
           <button class="ob-skip ob-skip-center" id="obWelcomeSkip" type="button" data-di="0.9">${escapeHtml(ob('entry_skip_setup', 'Skip setup for now'))}</button>
@@ -536,7 +536,7 @@
           </div>
           <div class="ob-mcp-steps">
             <div class="ob-mcp-step" data-di="0.5"><span class="n">1</span><span>${escapeHtml(ob('entry_mcp_1a', 'Run the command in your terminal.'))} <b>${escapeHtml(ob('entry_mcp_1b', 'Hover copy'))}</b> ${escapeHtml(ob('entry_mcp_1c', 'to pick a specific client.'))}</span></div>
-            <div class="ob-mcp-step" data-di="0.57"><span class="n">2</span><span>${escapeHtml(ob('entry_mcp_2a', "FSB writes itself into your agent's MCP config."))} <b>${escapeHtml(ob('entry_mcp_2b', '69 tools'))}</b>${escapeHtml(ob('entry_mcp_2c', ', zero manual JSON.'))}</span></div>
+            <div class="ob-mcp-step" data-di="0.57"><span class="n">2</span><span>${escapeHtml(ob('entry_mcp_2a', "FSB writes itself into your agent's MCP config."))} <b>${escapeHtml(ob('entry_mcp_2b', '70 tools'))}</b>${escapeHtml(ob('entry_mcp_2c', ', zero manual JSON.'))}</span></div>
             <div class="ob-mcp-step" data-di="0.64"><span class="n">3</span><span>${escapeHtml(ob('entry_mcp_3', "Ask your agent to browse. It drives FSB's DOM engine for you."))}</span></div>
           </div>
           <a class="ob-claw" href="${AGENTS_PAGE_URL}" target="_blank" rel="noopener" data-di="0.72">
@@ -1358,7 +1358,7 @@
       return [
         { k: ob('entry_sum_setup', 'Setup'), v: ob('entry_sum_mcp', 'MCP server') },
         { k: ob('entry_sum_command', 'Command'), v: 'fsb-mcp-server', mono: true },
-        { k: ob('entry_sum_tools', 'Tools'), v: ob('entry_sum_68', '69 available') },
+        { k: ob('entry_sum_tools', 'Tools'), v: ob('entry_sum_68', '70 available') },
         { k: ob('entry_sum_access', 'Access'), v: ob('entry_sum_granted', 'Granted on install'), ok: true },
         { k: ob('entry_sum_version', 'Version'), v: `v${VERSION}`, mono: true }
       ];

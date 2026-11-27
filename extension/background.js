@@ -19657,6 +19657,24 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
     return { success: false, error: 'No tab ID available' };
   }
 
+  // Native input, typing and capture act on web pages only. A click in an
+  // extension page, such as FSB's own Control Panel, would change settings
+  // around the MCP settings tool's rules; read routes refuse these pages too.
+  if (typeof chrome !== 'undefined' && chrome.tabs && typeof chrome.tabs.get === 'function') {
+    const targetTab = await chrome.tabs.get(tabId).catch(() => null);
+    const shown = targetTab ? [targetTab.url, targetTab.pendingUrl] : [];
+    const extensionPage = shown.find((url) => typeof url === 'string' && /^chrome-extension:\/\//i.test(url));
+    if (extensionPage) {
+      return {
+        success: false,
+        errorCode: 'restricted_active_tab',
+        error: 'Extension pages cannot be automated. Change FSB settings with the settings tool.',
+        currentUrl: extensionPage,
+        pageType: 'Chrome extension page'
+      };
+    }
+  }
+
   // Attach only after the caller owns the per-tab lease. Internal warm
   // attachments may be released, but external debugger owners are preserved.
   async function attachDebugger() {

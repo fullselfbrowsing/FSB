@@ -1651,7 +1651,7 @@
     "message": "17 カテゴリにわたります"
   },
   "entry_feat_tools": {
-    "message": "69 個の MCP ツール"
+    "message": "70 個の MCP ツール"
   },
   "entry_feat_tools_sub": {
     "message": "エージェントから"
@@ -1726,7 +1726,7 @@
     "message": "FSB はエージェントの MCP 設定へ自分を書き込みます。"
   },
   "entry_mcp_2b": {
-    "message": "ツール 69 個"
+    "message": "ツール 70 個"
   },
   "entry_mcp_2c": {
     "message": "、手動の JSON は不要です。"
@@ -1848,7 +1848,7 @@
     "message": "ツール"
   },
   "entry_sum_68": {
-    "message": "69 個が利用可能"
+    "message": "70 個が利用可能"
   },
   "entry_sum_access": {
     "message": "アクセス"
@@ -5416,5 +5416,11 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "このブラウザーではログアウトしました。ローカルサーバーにはまだ 1Password のサインインが残っています。FSB は次に可能になったときにそれを削除します。"
+  },
+  "panel_36fc19ad69": {
+    "message": "匿名の使用状況データは送信していません。クリックして再び有効にします。"
+  },
+  "panel_01003693b8": {
+    "message": "このパネルの外でプロバイダーが変更されました。モデルを更新すると、ほかのモデルも一覧に表示されます。"
   }
 }

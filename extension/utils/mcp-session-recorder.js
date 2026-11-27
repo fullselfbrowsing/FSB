@@ -121,7 +121,8 @@
     get_session_detail: 1, get_session_replay: 1,
     get_logs: 1, get_memory_stats: 1,
     'mcp:get-session': 1, 'mcp:get-session-replay': 1,
-    'mcp:get-logs': 1, 'mcp:get-memory': 1, 'mcp:get-diagnostics': 1
+    'mcp:get-logs': 1, 'mcp:get-memory': 1, 'mcp:get-diagnostics': 1,
+    'mcp:get-settings': 1, 'mcp:set-setting': 1
   });
   var JOURNAL_ACTION_RESULT_FIELDS = Object.freeze([
     'success', 'status', 'error', 'errorCode', 'code', 'message',

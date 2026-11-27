@@ -46,6 +46,7 @@ Use this package when you want your AI client to drive the browser directly whil
 - Uninstalling FSB from its last client removes a helper that `install` set up, unless the extension has run a delegated agent through it. After `uninstall --all` or `uninstall --native-host`, the helper stays off until the next `install`.
 - One helper can serve several browsers, and `uninstall --native-host --browser <name>` removes only that browser's registration.
 - The hub answers the extension's 1Password requests, so logins and cards come from the user's 1Password, and `fsb-mcp-server onepassword` configures the connection from a terminal. See [1Password for logins and cards](#1password-for-logins-and-cards).
+- A new `settings` tool reads and changes the FSB Control Panel's settings in one call each, with API keys and endpoints read-only and five safety switches that move one way only. See [Settings](#settings-1).
 - **Compatibility:** `fsb-mcp-server` 0.95.0 requires FSB extension 0.9.99 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.5
@@ -53,7 +54,7 @@ Use this package when you want your AI client to drive the browser directly whil
 - `install --cline` writes `~/.cline/data/settings/cline_mcp_settings.json`, the settings file Cline's VS Code extension, JetBrains plugin, and CLI share. Earlier versions wrote a VS Code extension-storage file that current Cline ignores after its one-time import, so rerun the install if FSB never appeared in Cline.
 - Cline entries set `timeout: 1800` (seconds) so long `run_task` calls are not cut off by Cline's fixed 60-second request timeout.
 - Reinstalling keeps the `timeout`, `disabled`, and `autoApprove` settings Cline stores on the `fsb` entry.
-- `start_visual_session`, `end_visual_session`, and `back` are no longer registered, so the server lists 69 tools. Use `go_back` in place of `back`.
+- `start_visual_session`, `end_visual_session`, and `back` are no longer registered. Use `go_back` in place of `back`.
 - When `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, or `CLINE_DIR` points at a directory that does not exist yet, `install --cline` reports it instead of editing the legacy settings file. Reinstalling no longer rewrites a Cline or Continue config whose keys only changed order.
 - `install --antigravity` replaces `install --windsurf` and writes `~/.gemini/config/mcp_config.json`, falling back to `~/.gemini/antigravity/mcp_config.json` on older Antigravity releases. An empty config file is treated as an empty config.
 - Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
@@ -591,7 +592,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ## Tools
 
-`fsb-mcp-server` registers 69 tools.
+`fsb-mcp-server` registers 70 tools.
 
 ### Autopilot (3)
 
@@ -692,6 +693,14 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 | `use_payment_method` | Fill a checkout form with a 1Password card on an `https` page. FSB shows no prompt of its own, so ask the user first. |
 
 These tools read the user's 1Password once it is connected, usually with **Log in to 1Password** on the extension's Vault page (see [1Password](#1password-for-logins-and-cards)). Responses expose metadata only. Passwords, one-time codes, full card numbers, and CVV values go from 1Password to this server to the extension to the page, and are never returned to the MCP client.
+
+### Settings (1)
+
+| Tool | Purpose |
+|------|---------|
+| `settings` | Read or change the FSB Control Panel settings. No arguments lists every setting; `key` shows one with its type and allowed values; `key` and `value` change it. |
+
+Writes use the same storage keys and rules as the Control Panel, so autopilot, `run_task` and an open Control Panel see the new value at once. API keys are shown only as set or empty, endpoints only as their origin, and neither can be changed over MCP. Five safety switches move only one way: auto sign-in and saved payments can be turned off but not on, session recording can be turned on but not off, the session retention can only be raised, and telemetry can only be opted out of. Delegated autopilot runs can read settings but not change them. Every change is written to the FSB logs with the client that made it.
 
 ### Tool Count Contract
 

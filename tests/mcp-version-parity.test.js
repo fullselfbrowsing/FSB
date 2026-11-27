@@ -368,11 +368,14 @@ async function run() {
   const claimedCounts = (text) => Array.from(withoutMarkup(text).matchAll(TOOL_COUNT_CLAIM),
     (match) => Number(match[1] ?? match[2]));
   const statesToolCount = new RegExp(`(?<![\\d.])${toolCount}(?![\\d.])`, 'u');
+  // The llms "Release notes" bullet summarises each release with the count it
+  // shipped (0.9.95 had 69 tools), so it is history, like releaseNotes.* units.
+  const withoutReleaseHistory = (text) => text.replace(/^- \[Release notes\]\([^)\n]*\):[^\n]*$/gmu, '');
   // Scanned for stale claims only; neither states the count today.
   const sourcesWithoutClaims = new Set(['showcase about metadata', 'showcase support page']);
   for (const [name, content] of liveToolCountSources) {
     if (!name.startsWith('showcase locale ')) {
-      const counts = claimedCounts(content);
+      const counts = claimedCounts(withoutReleaseHistory(content));
       assert(counts.length > 0 || sourcesWithoutClaims.has(name),
         `${name} still states a tool count the check can read`);
       assert(counts.every((count) => count === toolCount),
@@ -445,6 +448,8 @@ async function run() {
     'mcp:get-session-replay',
     'mcp:replay-session',
     'system:client-inventory',
+    'mcp:get-settings',
+    'mcp:set-setting',
   ];
   const historicalMessageTypes = messageTypes.filter(
     (type) => !mergedAdditiveMessageTypes.includes(type),
@@ -456,7 +461,7 @@ async function run() {
   assert(
     JSON.stringify(messageTypes.filter((type) => mergedAdditiveMessageTypes.includes(type)))
       === JSON.stringify(mergedAdditiveMessageTypes),
-    'the merged branch retains the reviewed task-status, replay, and client-inventory additive MCPMessageType values',
+    'the merged branch retains the reviewed task-status, replay, client-inventory and Phase 66.1 settings additive MCPMessageType values, in order',
   );
   assert(
     /type: 'mcp:result' \| 'mcp:progress' \| 'mcp:error';/.test(typesSource),

@@ -155,8 +155,10 @@ for (const [english, key] of Object.entries(locale.exact)) {
   check(englishCatalog[key] && englishCatalog[key].message === english, 'exact chrome key ' + key + ' matches the English catalog');
 }
 
+// Re-pinned for the settings tool's two additive message types
+// (mcp:get-settings, mcp:set-setting); the file now equals the Jev copy.
 check(
-  sha256('mcp/src/types.ts') === '6b5f312a5e9a9f3390c973a7f93ef7552db1c110aeeb116084c1f522e776770a',
+  sha256('mcp/src/types.ts') === '7d8f9776a1c7ea8b32c72f24058a4697453714faa6646a45efbdea53c3e0fc98',
   'mcp/src/types.ts is byte-stable'
 );
 check(

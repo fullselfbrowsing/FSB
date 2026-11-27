@@ -6,7 +6,7 @@ All notable changes to `fsb-mcp-server` are documented in this file. Each entry 
 
 ## 0.95.0 (2026-11-27)
 
-Minor release in which `install` sets up FSB's local helper, the server keeps it current, uninstalling the last client removes it, the local agent service becomes the extension's hub, and the hub answers the extension's 1Password requests, released alongside FSB extension 0.9.99. The jump from 0.11.5 is a numbering choice only: versions still compare part by part, so every 0.11.x helper counts as older and is refreshed.
+Minor release in which `install` sets up FSB's local helper, the server keeps it current, uninstalling the last client removes it, the local agent service becomes the extension's hub, the hub answers the extension's 1Password requests, and a new `settings` tool reads and changes the extension's settings, released alongside FSB extension 0.9.99. The jump from 0.11.5 is a numbering choice only: versions still compare part by part, so every 0.11.x helper counts as older and is refreshed.
 
 ### Added
 
@@ -18,8 +18,11 @@ Minor release in which `install` sets up FSB's local helper, the server keeps it
 - **One helper can serve several browsers.** A current helper can gain a registration for another browser with the same extension ID. `uninstall --native-host --browser <name>` removes only that browser's registration, and the helper's files go with its last registration.
 - **1Password for logins and cards.** The hub answers the extension's `onepassword.*` requests with the 1Password JavaScript SDK, `@1password/sdk` 0.5.0, a new pinned and bundled production dependency. These requests never reach a relay, and the passwords, one-time codes, card numbers and CVVs in their answers go back on the extension socket only, never to an MCP client. `fill_credential`, `use_payment_method`, their list tools and autopilot's auto-login read the user's 1Password through it.
 - **`fsb-mcp-server onepassword`** configures the connection from a terminal: `--desktop <account>`, `--service-account`, `--vaults`, `--allow <ids>`, `--all-vaults`, `--save-vault <id>` and `--reset`. Settings live in `~/.fsb/onepassword.json` with owner-only permissions; tokens are never accepted from the extension.
+- **`settings`, one tool for the extension's settings.** No arguments returns every setting as one compact JSON line; `key` returns one with its type, whether it is writable and its range or allowed values; `key` and `value` change it (`value` is a string, and JSON booleans and numbers are accepted). The extension owns the list, so a new setting needs no change here. Failures are typed `SETTING_*` codes with a hint: an unknown key, a read-only key (API keys and endpoints, and the unsafe direction of five one-way safety switches), an invalid value with what is allowed, a provider that is not ready, a write from a delegated autopilot run, or an extension that predates the tool (`SETTING_UNSUPPORTED`). A write sends its value only after the extension reports the key writable, so a refused API key never leaves this process. The tool skips the task queue and is not in the extension's autopilot tool list.
 
 ### Changed
+
+- The server registers 70 tools with `settings`.
 
 - **`uninstall` removes a helper nothing needs.** After removing the client entries, `uninstall --<client>` also removes the helper when it was set up by `install`, no other FSB client config can be found, and the browser extension has never run a delegated agent through it, as recorded in the local agent service's delegation log under `~/.fsb/agent-runtime`. A connection test or sign-in does not count. Otherwise the helper stays, and the command says why and how to remove it anyway. A client config that cannot be read counts as still using FSB, and clients that only print setup instructions are listed as unchecked. `uninstall --all` removes the helper when it was set up by `install` and the extension has not run a delegated agent through it.
 - `uninstall --native-host` and `uninstall --all` record that you removed the helper, so the automatic refresh stays off until the next `install`.
