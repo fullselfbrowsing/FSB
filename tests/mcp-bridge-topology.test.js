@@ -3128,7 +3128,20 @@ async function runPromotedRelayStartsWithNoRoster(WebSocketBridge) {
       sockets.push(chrome.socket, safari.socket);
       await waitFor(() => browserKeys(relay) === BOTH_KEYS, 'the relay holds the hub\'s roster');
 
+      // A request the old hub is holding fails when it goes away. What the
+      // relay reports at that moment is what a call queued behind it is routed
+      // with, before any new hub answers.
+      const held = relay.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: CHROME_KEY });
+      await waitFor(() => chrome.requests().length === 1, 'the hub hands a request to chrome');
+      const atLoss = held.then(
+        () => null,
+        () => ({ roster: relay.browserRoster, connected: relay.isConnected }),
+      );
+
       hub.disconnect();
+      const gap = await atLoss;
+      assertEqual(gap && gap.roster, null, 'when the hub goes away, the relay has no roster while it fails the requests it held');
+      assertEqual(gap && gap.connected, false, 'and is not connected: a call queued then is refused, not taken for one through an older hub');
       await waitFor(() => relay.currentMode === 'hub', 'the relay is promoted', 2000);
       assertEqual(browserKeys(relay), '', 'a promoted relay does not inherit the old hub\'s roster');
       assertEqual(relay.isConnected, false, 'and is not connected until a browser reaches it');

@@ -742,6 +742,50 @@ async function main() {
     oldBridge.topology = { extensionConnected: false, extensionAttachment: null };
     checkEqual(JSON.parse(textOf(await createSession(oldBridge).call('list_browsers'))).browsers.length, 0, 'an older hub with no browser lists none');
 
+    // The hub this process relays through goes away. Until the next hub
+    // answers, the relay has no roster and nothing is connected. A call queued
+    // behind one the old hub was holding runs in that gap: it passed its
+    // connection check before the drop, and is routed after it.
+    const handover = createBridge({ roster: roster() });
+    const queuedSession = createSession(handover);
+    await queuedSession.call('open_tab', action({ url: 'https://example.com', browser: HOME }));
+    let loseHub = null;
+    handover.responders.push((message) => {
+      if (message.type !== 'mcp:execute-action' || loseHub) return undefined;
+      return new Promise((_resolve, reject) => { loseHub = () => reject(new Error('Lost connection to hub')); });
+    });
+    const inFlight = queuedSession.call('open_tab', action({ url: 'https://example.com/held' }));
+    const queuedBehind = queuedSession.call('open_tab', action({ url: 'https://example.com/queued' }));
+    for (let tick = 0; !loseHub && tick < 200; tick += 1) await new Promise((resolve) => setImmediate(resolve));
+    check(loseHub !== null, 'the first call is held by the hub when it goes away');
+    // What the relay's close handler leaves: no roster, not connected, and the
+    // last attachment the old hub described, which was its default profile.
+    handover.roster = null;
+    handover.topology = {
+      extensionConnected: false,
+      extensionAttachment: {
+        extensionId: 'abcdefghijklmnopabcdefghijklmnop',
+        extensionVersion: '0.9.95',
+        installInstanceId: '4187c196-3c4b-4778-b904-a7ad83023d2e',
+        normalWindowCount: 1,
+        connectedAt: null,
+      },
+    };
+    Object.defineProperty(handover, 'isConnected', { configurable: true, get() { return false; } });
+    const sentAtDrop = handover.calls.length;
+    const madeInTheGap = textOf(await queuedSession.call('open_tab', action({ url: 'https://example.com/now' })));
+    if (loseHub) loseHub();
+    await inFlight;
+    const queuedText = textOf(await queuedBehind);
+    check(!/older fsb-mcp-server/.test(queuedText), 'a call queued when the hub goes away is not told an older server runs the bridge');
+    checkEqual(queuedText, madeInTheGap, 'it is told what any call made then is told: the extension is not connected');
+    checkEqual(handover.calls.length, sentAtDrop, 'and nothing is sent while there is no hub');
+    checkEqual(queuedSession.agentScope.browserSession().current, HOME, 'the session stays tied to its profile');
+    handover.roster = roster();
+    Object.defineProperty(handover, 'isConnected', { configurable: true, get() { return true; } });
+    await queuedSession.call('read_page', {});
+    checkEqual(handover.last().browser, HOME, 'and goes back there once the next hub answers');
+
     // A worker restart: for a moment nothing is attached, then another profile
     // attaches first.
     const gap = createBridge({ roster: roster() });

@@ -60,6 +60,15 @@ export function routeBrowserCall(
   const session = agentScope.browserSession();
   const tabId = typeof call.tabId === 'number' && Number.isFinite(call.tabId) ? call.tabId : null;
   const roster = rosterOf(bridge);
+  // No roster can also mean no hub at all. A relay drops its roster the moment
+  // its hub goes away and has none until the next hub answers. That is not an
+  // older hub and must not be reported as one. A call that gets here then (one
+  // queued before the drop) is refused as not connected, as it would have been
+  // a moment later, and sends nothing: the session stays tied to its browser
+  // and goes back there once the next hub answers.
+  if (roster === null && bridge.isConnected === false) {
+    return { ok: false, failure: { success: false, error: 'extension_not_connected' } };
+  }
   const route = resolveBrowser({
     roster,
     named: call.browser,
