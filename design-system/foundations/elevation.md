@@ -36,7 +36,7 @@ Stacking layers, lowest first ([0013](../decisions/0013-name-values-before-chang
 | `sticky` | 100 | dashboard header, author footer, overflow dropdown | `nav` | 1000 | nav, stats back button |
 | `drawer-scrim` | 150 | sidebar overlay | | | |
 | `drawer` | 200 | dashboard sidebar | | | |
-| `overlay` | 1000 | save bar, graph tooltips, payment confirm | | | |
+| `overlay` | 1000 | save bar, graph tooltips | | | |
 | `toast` | 1100 | status toast | | | |
 | `modal` | 2000 | credential modal | | | |
 | `top` | 9999 | pairing QR overlay | | | |

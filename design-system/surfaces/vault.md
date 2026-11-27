@@ -1,12 +1,12 @@
 # 1Password vault
 
-Status: pending, lands with PR #172
+Status: current. 1Password replaced FSB's own vault in PR #172, merged into PR #173 (extension 0.9.99).
 
 ## What it is
 
-With PR #172, FSB stops keeping passwords and cards of its own. Logins and credit cards stay in the user's 1Password, and FSB reads one item at fill time through the FSB local server. Everything on this page is built on the PR #172 branch (`…/onepassword-vault-replacement`) and lands with that PR; none of it exists on main. Main still has separate Passwords and Payments sections (`#passwords`, `#payments` in [`control_panel.html`](../../extension/ui/control_panel.html)) over FSB's own PIN-locked vault in [`secure-config.js`](../../extension/config/secure-config.js).
+FSB keeps no passwords or cards of its own. Logins and credit cards stay in the user's 1Password, and FSB reads one item at fill time through the FSB local server. PR #172 built this and was merged into PR #173. It replaced the control panel's separate Passwords and Payments sections and FSB's own PIN-locked vault in [`secure-config.js`](../../extension/config/secure-config.js), which now only decrypts once to move old items into 1Password.
 
-| Surface | Where on the PR branch | Palette | Shown |
+| Surface | Where | Palette | Shown |
 |---|---|---|---|
 | Vault page | `#vault` in `extension/ui/control_panel.html`; `.vx-*` in `options.css`; `VAULT_VIEWS` in `options.js` | product | in the control panel |
 | Side panel prompts | `showLoginPrompt`, the card check sheet and `vaultRowSpec` in `extension/ui/sidepanel.js`; `.vp` in `sidepanel.css` | product | autopilot only |
@@ -15,7 +15,7 @@ With PR #172, FSB stops keeping passwords and cards of its own. Logins and credi
 
 ### How secrets move
 
-These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-in-extension-frame.md) records the input rule. File names below are on the PR branch.
+These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-in-extension-frame.md) records the input rule.
 
 1. **One path, one machine.** 1Password (the desktop app, or a service account set up in a terminal) to the FSB local server `fsb-mcp-server` on loopback, over the paired bridge, to the extension's service worker, to one page field. Nothing is asked before pairing (`ensurePaired` in `extension/utils/onepassword-client.js`).
 2. **The agent gets metadata.** Ids, titles, usernames, saved sites, card brand and last 4; `list_payment_methods` also returns the cardholder name and expiry (`mcp/src/tools/vault.ts`). Never a password, a one-time code, a card number, a security code or the service-account token. Only the CLI writes that token, to `~/.fsb/onepassword.json` with owner-only permissions, and it never crosses the bridge (`mcp/src/onepassword/config.ts`).
@@ -49,8 +49,8 @@ These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-i
 - **Credential sheet.** On the pill's black: fields white at 6%, a focused field's border orange at 60%, the primary `.os-btn.go` `#ff7a1a`, focus outlines `#ffb45c`, warnings and an http site in `#fbbf24`.
 - **Vault page.** The product palette through the `options.css` aliases (`--primary-color`, `--bg-secondary`, `--border-color`, `--text-*`), which come from [`product-surface.css`](../tokens/product-surface.css). The status pill is the panel's `.sync-status-pill`, `data-state` `connected`, `connecting` or `disconnected`.
 - **Side panel.** `.vp` declares its own palette. Light: `--orange: #ff6b35`, `--ok: #0b7a54`, `--warn: #9a5a00`, `--err: #c23a3a`. Dark: `#34d399`, `#f5a524`, `#f87171`, and `--vault: #e4e4e7`.
-- **No tokens yet.** [`overlay.css`](../tokens/overlay.css) mirrors only `visual-feedback.js`; the pill and the sheet need `--fsb-ov-*` names when they merge.
-- **Type.** The system stack, with Space Mono for the agent name, timer and chips, and a wordmark of Poppins F and S with a drawn B at 0.68em. `@font-face` inside a shadow root is ignored, so the pill fetches the font files and registers `fsb-vault-mono` and `fsb-vault-poppins` on the document from their bytes, which works under any page `font-src` policy (`loadFonts`). Under [0012](../decisions/0012-platform-mono-for-technical-text.md), `fsb-vault-mono` should become the platform stack before the PR merges.
+- **No tokens yet.** [`overlay.css`](../tokens/overlay.css) mirrors only `visual-feedback.js`; the pill and the sheet have no `--fsb-ov-*` names yet.
+- **Type.** The system stack, with the platform monospace stack of [0012](../decisions/0012-platform-mono-for-technical-text.md) for the agent name, timer and chips, and a wordmark of Poppins F and S with a drawn B at 0.68em. `@font-face` inside a shadow root is ignored, so the pill fetches the two Poppins files and registers `fsb-vault-poppins` on the document from their bytes, which works under any page `font-src` policy (`loadFonts`). The monospace text needs no web font. The side panel's `.vp` sets `--vp-mono` to `--fsb-font-mono`, and the Vault page's flow labels use `--fsb-font-mono` directly.
 
 ## Anatomy
 
@@ -113,8 +113,8 @@ These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-i
 ## Copy and i18n
 
 - **Helper.** The pill's lines go through `ov()` with the `entry_vault_*` keys: 42 of them, in all eight catalogs. The sheet uses `data-i18n` and `data-i18n-attr`.
-- **Gates.** On the branch, [`verify-extension-copy.mjs`](../../scripts/verify-extension-copy.mjs) adds `vault-pill.js`, `credential-sheet.html` and `credential-sheet.js` to `SCOPE`. `verify-extension-i18n.mjs` adds `1Password` to `PROTECTED`, so the name stays English in every locale.
-- **Identifiers.** Font families registered from a content script are kebab-case (`fsb-vault-mono`), so the gate does not read them as copy.
+- **Gates.** [`verify-extension-copy.mjs`](../../scripts/verify-extension-copy.mjs) has `vault-pill.js`, `credential-sheet.html` and `credential-sheet.js` in `SCOPE`. `verify-extension-i18n.mjs` has `1Password` in `PROTECTED`, so the name stays English in every locale.
+- **Identifiers.** Font families registered from a content script are kebab-case (`fsb-vault-poppins`), so the gate does not read them as copy.
 - **Names.** `$CLIENT$` is the MCP client's label from the tab's visual session (`_visualClientLabel` in `mcp-bridge-client.js`); with none, the copy says "your agent". The site row is `translate="no"`.
 - **Voice.** One short line, then a middle dot and the reason: "Not filled · page isn't https". Say what did not happen: "nothing filled", "not saved". Paying stays with the person: "Card filled · review and pay".
 
@@ -123,13 +123,13 @@ These rules outlast any layout. [Decision 0009](../decisions/0009-secret-input-i
 - **The pill is announced.** `role="status"` with `aria-live="polite"`, or `role="dialog"` while asking; named "FSB"; not `aria-hidden`, unlike the [in-page overlays](overlays.md).
 - **The sheet.** Enter in the username moves to the password, and Enter there signs in. The save switch is a button with `aria-pressed`. The eye button is named "Show password" or "Hide password". Buttons, the eye, the switch and the links show a 2px `#ffb45c` focus outline; a focused field gets an orange border.
 - **Covered or distracted.** Sign in stays off unless the sheet is fully visible (`IntersectionObserver` with `trackVisibility` and a 100ms delay), and typing pauses when the page takes focus (the window `blur` listener).
-- **A real prompt is provable.** While the sheet asks, the toolbar icon shows its `ask` state, an orange inset ring and key dot (`drawAskBadge` in `extension/utils/action-icon.js`), which no page can draw. It outranks every other icon motion (`RANK` `ask: 5`). The PR adds it to the icon file as it was before PR #173 rewrote it; see Known issues.
+- **A real prompt is provable.** While the sheet asks, the toolbar icon shows its `ask` state, an orange inset ring and key dot (`drawAskBadge` in `extension/utils/action-icon.js`), which no page can draw. It outranks every other icon motion (`RANK` `ask: 5`), and its ring follows the rounded tile (`tilePath`) like every other state.
 - **Not colour alone.** Every tone also changes the text.
 - **Side panel.** The card sheet is `role="dialog"` with `aria-modal="true"`, and Fill card ignores clicks for its first 700ms.
 
 ## Tests that pin it
 
-Main has none of these. Main's [`secure-config-credential-vault.test.js`](../../tests/secure-config-credential-vault.test.js) and [`vault-list-state.test.js`](../../tests/vault-list-state.test.js) pin the old vault; the PR rewrites both. On the branch:
+These pin it:
 
 - `tests/onepassword-credential-sheet.test.js`: the sheet port is refused for a wrong nonce, the top frame, another tab, another extension page or another extension; a second frame cannot take a bound request; fills are origin-pinned and results carry no value; saving happens only with a save vault; cancel, a closed frame, the timeout, a replacement ask and "still missing" each end cleanly.
 - `tests/onepassword-client.test.js`: only the origin is sent, fills land only on it, results carry no secret, cards need a trusted approval for the same merchant, autopilot never guesses between logins, the old vault moves in batches.
@@ -141,25 +141,20 @@ Main has none of these. Main's [`secure-config-credential-vault.test.js`](../../
 
 ## Known issues
 
-On the PR branch, not on main:
-
 1. **The tone colour is never drawn.** Each tone sets `--c1`, but nothing reads it; only the ring shows the state.
 2. **Reduced motion still moves.** The track keeps sweeping, slowed to 2.4s, and the approval key keeps breathing.
 3. **The pill blocks clicks.** `.op` takes pointer events in every mode, so even a status line covers the page's top-right corner. The status pill is click-through except its Stop button (`.pl-stop`).
 4. **A fourth orange.** The sheet's primary button is `#ff7a1a`, in neither the product nor the overlay family.
 5. **The side panel's typed login uses `sendMessage`.** Its autopilot form sends the values with `chrome.runtime.sendMessage` (`loginFormSubmitted`), which every extension context receives. The port rule covers only the on-page sheet.
-6. **The copy says less than the tool returns.** "What agents see" and `skills/fsb/references/vault-boundary.md` list titles, usernames, sites and last 4; `list_payment_methods` also returns the cardholder name and expiry.
+6. **The Vault page says less than the tool returns.** Its "What agents see" card lists titles, usernames, sites and last four digits; `list_payment_methods` also returns the cardholder name and expiry. `skills/fsb/references/vault-boundary.md` already says so.
 7. **Names and labels.** The frame's title is "FSB". The sheet's fields have only an `aria-label` and a placeholder, no visible label.
-8. **Page-local palettes.** `.vp` and the `.vx-tag` literals (`#047857`, `#b45309`) fork the product tokens; the style-literal ratchet counts them.
+8. **Page-local palettes.** `.vp` and the `.vx-tag` literals (`#047857`, `#b45309`) fork the product tokens, and the credential sheet's colours are all literals; the style-literal ratchet counts them. They predate decisions [0014](../decisions/0014-product-status-colours-one-per-role.md)–[0018](../decisions/0018-brand-orange-transparencies-four-steps.md): `.vp` keeps its own red, green and amber (`#c23a3a`, `#0b7a54`, `#9a5a00`; dark `#f87171`, `#34d399`, `#f5a524`) and orange `#ff6b35` at 12%. Folding them in is a visible change with contrast trade-offs, so it waits for the owner's call.
 9. **Weight.** `fsb-vault-poppins` registers the Poppins 100 file as weight 200.
 10. **Covering check.** Where `isVisible` is not supported, the check falls back to plain intersection.
-11. **The `ask` state is built on the old icon.** The branch forks from main before PR #173 (merge base `f6c4c9441`), and PR #173 rewrote [`action-icon.js`](../../extension/utils/action-icon.js). The rewrite cuts the frames to the artwork's rounded corners and draws the ring along them (`tilePath`). An explicit Light theme puts every form on a white tile (`TILES`). `getMotion` hands each tab's form to the status pill from its `watch:`, `capability:` and `session:` claims only. The PR's `drawAskBadge` strokes a square ring (`ctx.rect`) in a file with no tiles and no corner cut. A three-way merge of the branch tip onto PR #173 conflicts in `action-icon.js` and `messaging.js`.
 
 ## Sources
 
-- PR #172, read with `git show`: `extension/content/vault-pill.js`; `extension/ui/credential-sheet.html`, `.css` and `.js`; `extension/utils/onepassword-client.js`; `extension/content/actions.js` (`fillOriginRefusal`); `extension/content/messaging.js` (`vaultPill`); `extension/ws/mcp-bridge-client.js` (`_vaultPillHooks`); `extension/ui/control_panel.html` (`#vault`), `options.css` and `options.js`; `extension/ui/sidepanel.js` and `sidepanel.css`; `extension/utils/action-icon.js` (`ask`); `mcp/src/onepassword/domain-match.ts`, `broker.ts` and `config.ts`; `mcp/src/tools/vault.ts`; `skills/fsb/references/vault-boundary.md`.
-- Read at the local branch tip `c3c162888`, ten commits ahead of the PR head `497072c67`. The all-vaults default and the one-button Vault page come from those commits.
-- Main, for comparison: [`control_panel.html`](../../extension/ui/control_panel.html) `#passwords` and `#payments`, [`secure-config.js`](../../extension/config/secure-config.js), [`vault.ts`](../../mcp/src/tools/vault.ts).
-- PR #173, the code PR #172 lands on: [`action-icon.js`](../../extension/utils/action-icon.js) (`TILES`, `tilePath`, `RANK`, `getMotion`) and [`visual-feedback.js`](../../extension/content/visual-feedback.js) (`#fsb-progress-host`, `.pl-stop`).
+- The code: [`vault-pill.js`](../../extension/content/vault-pill.js); [`credential-sheet.html`](../../extension/ui/credential-sheet.html), [`.css`](../../extension/ui/credential-sheet.css) and [`.js`](../../extension/ui/credential-sheet.js); [`onepassword-client.js`](../../extension/utils/onepassword-client.js); [`actions.js`](../../extension/content/actions.js) (`fillOriginRefusal`); [`messaging.js`](../../extension/content/messaging.js) (`vaultPill`); [`mcp-bridge-client.js`](../../extension/ws/mcp-bridge-client.js) (`_vaultPillHooks`); [`control_panel.html`](../../extension/ui/control_panel.html) (`#vault`), [`options.css`](../../extension/ui/options.css) and [`options.js`](../../extension/ui/options.js); [`sidepanel.js`](../../extension/ui/sidepanel.js) and [`sidepanel.css`](../../extension/ui/sidepanel.css); [`action-icon.js`](../../extension/utils/action-icon.js) (`ask`, `TILES`, `tilePath`, `RANK`, `getMotion`); [`domain-match.ts`](../../mcp/src/onepassword/domain-match.ts), [`broker.ts`](../../mcp/src/onepassword/broker.ts) and [`config.ts`](../../mcp/src/onepassword/config.ts); [`vault.ts`](../../mcp/src/tools/vault.ts); [`vault-boundary.md`](../../skills/fsb/references/vault-boundary.md).
+- First read on the PR #172 branch at `c3c162888`. The merged head is `ddc3d28ab` (merge `117472425` into PR #173). After the merge, the type, the `ask` ring and every known issue but the second were checked against the merged code.
 - The "FSB · 1Password vault" design canvas ([sources.md](../sources.md)): Main, VaultStates, SidePanel, Overlay, OverlayStates, CredInput, CredWhere and Security. The Notes board reviews the PR and is not a source of rules. The canvas's mock data is personal and is not copied here.
 - Related: [In-page overlays](overlays.md), decisions [0003](../decisions/0003-overlay-accent-ff8c00.md), [0006](../decisions/0006-overlays-in-shadow-dom-top-layer.md) and [0009](../decisions/0009-secret-input-in-extension-frame.md).

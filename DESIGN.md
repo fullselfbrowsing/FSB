@@ -252,7 +252,7 @@ FSB has no component library. The design tool's prototyping kit lives in `design
 - [control panel](design-system/surfaces/control-panel.md)
 - [onboarding](design-system/surfaces/onboarding.md)
 - [overlays](design-system/surfaces/overlays.md)
-- [1Password vault](design-system/surfaces/vault.md), pending
+- [1Password vault](design-system/surfaces/vault.md)
 
 ## Overlays
 
@@ -302,16 +302,17 @@ These are open, or decided and not yet applied. Each has a home in a foundation 
 3. **The status pill draws its own wordmark.** Its outlined B is a 0.68em B, short of the 0.74em every other copy uses, and its F is Poppins 200. `fsb-wordmark-parity.test.js` does not read it.
 4. **Control panel timings differ.** options.css uses 150/200/300ms ease-in-out under the site's token names.
 5. **Status gaps:**
-   - The control panel's `.status-toast` carries errors, and the side panel's checkboxes use `#f97316`.
+   - The control panel's `.status-toast` carries errors.
    - Green, amber and the Beta badge's white label fail AA as small text on white (2.5:1, 3.2:1 and 3.0:1). Text in these roles needs a darker shade.
    - Orange text on a light surface fails AA: `#ff6b35` is 2.84:1 on white and 2.47:1 on its soft wash (the transcribing mic, the recon button and the AI memory badge). A darker text orange is an open decision.
    - The control panel's "Stop all" button is white on the softer dark red (2.99:1); its `#b91c1c` hover needs the white.
-   - Tonal alert shades (`#991b1b` on `#fee2e2` and similar) and the payment prompt's blue ramp are still literals ([0014](design-system/decisions/0014-product-status-colours-one-per-role.md), [0016](design-system/decisions/0016-indigo-folds-into-brand-orange.md)).
+   - Tonal alert shades (`#991b1b` on `#fee2e2` and similar) are still literals ([0014](design-system/decisions/0014-product-status-colours-one-per-role.md), [0016](design-system/decisions/0016-indigo-folds-into-brand-orange.md)).
 6. **No type-size or motion tokens ship yet.** Stacking layers have tokens now (`--fsb-z-*`, `--z-*`; [decision 0013](design-system/decisions/0013-name-values-before-changing-them.md)). The site still re-declares three `--fsb-*` names with its own values; `--fsb-primary-soft` now reads the site's `--primary-soft`.
 7. **Raw values remain.**
    - `design-system/style-literals.baseline.json` records them per file, and the counts may only fall. HTML inline styles are not counted yet.
    - The conflicts named in [0013](design-system/decisions/0013-name-values-before-changing-them.md) are settled ([0014](design-system/decisions/0014-product-status-colours-one-per-role.md) to [0018](design-system/decisions/0018-brand-orange-transparencies-four-steps.md)), except shadows, which need a scale first. Shadows and focus rings keep literal alphas.
-8. **Overlay gaps against these rules:**
+8. **The 1Password surfaces predate the colour decisions.** The side panel's `.vp` prompts, the Vault page's `.vx-*` tags and the credential sheet keep their own red, green, amber and orange (for example `.vp` `--err: #c23a3a`, `--ok: #0b7a54`, `--warn: #9a5a00`) instead of [0014](design-system/decisions/0014-product-status-colours-one-per-role.md)–[0018](design-system/decisions/0018-brand-orange-transparencies-four-steps.md). Folding them in is a visible change with contrast trade-offs, so it waits for a decision. See `@design-system/surfaces/vault.md#known-issues`.
+9. **Overlay gaps against these rules:**
     - The viewport glow's bead keeps travelling under `prefers-reduced-motion`, and the crawl card and the element highlight ignore it.
     - The status pill overshoots as it pops in and grows, and scales new text in, against the motion rules.
 

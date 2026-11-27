@@ -21,7 +21,7 @@ Chosen option 1. It matches every overlay in production and the overlay design b
 ## Consequences
 
 - Overlay colours are listed in [../tokens/overlay.css](../tokens/overlay.css). Each token names the selector and property it comes from, and the drift check holds them equal.
-- New overlay UI, such as the status pill and the vault pill in PR #172, uses this family, not `#ff6b35`.
+- New overlay UI, such as the status pill and the 1Password vault pill, uses this family, not `#ff6b35`.
 - The crawl card is blue (`#38bdf8`). Calling an app's capability is violet (`#8b5cf6`, `#a78bfa`). A blocked site is amber (`#f5a524`), and done is green (`#34d399`).
 
 ## Evidence

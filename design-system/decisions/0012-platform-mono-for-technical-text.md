@@ -47,7 +47,7 @@ This is the stack the control panel already ships. Kept from 0004:
   - every message ID is unchanged;
   - `sync-xliff-targets.mjs` keeps every translation, with no unit marked for review.
 - **The ratchet tracks the migration.** `scripts/check-style-literals.mjs` already counts literal `font-family` stacks, so each step lowers the baseline.
-- **The pills.** The status pill sets its labels in the platform stack and loads no font. The vault pill in PR #172 still registers Space Mono on the document (`fsb-vault-mono`) and should switch the same way; shadow roots ignore `@font-face`, so no web font is needed.
+- **The pills.** The status pill and the 1Password vault pill set their labels in the platform stack and load no monospace font; shadow roots ignore `@font-face`, so none is needed. The vault pill still registers its two Poppins wordmark faces. The side panel's 1Password prompts (`--vp-mono`) and the Vault page's flow labels read `--fsb-font-mono`.
 - **Poppins on the showcase.** Since PR #173 the wordmark's F and S are one-glyph `data:` faces in `fsb-wordmark.css`, which `font-src 'self' data:` admits. Space Mono needs no hosting there.
 
 ## Evidence

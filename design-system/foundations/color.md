@@ -56,7 +56,7 @@ Accent and status tokens ([0013](../decisions/0013-name-values-before-changing-t
 | Orange transparencies | `--primary-faint` 8%, `--primary-soft` 12%, `--primary-glow` 24%, `--primary-glow-strong` 40% | `--fsb-primary-faint`, `-soft`, `-glow`, `-glow-strong` at the same steps |
 | Status | `--danger` `#ef4444`, `--danger-wash`, `--success` `#22c55e`, `--warning` `#eab308` | `--fsb-success` `#10b981` / `#81c784`, `--fsb-warning` `#d97706` / `#e6b844`, `--fsb-danger` `#dc2626` / `#e57373`, `--fsb-info` `#0891b2` / `#4dd0e1` |
 
-`--fsb-amber-400` and `--fsb-amber-800` remain only as the login prompt's amber text pair. **MUST NOT** use them in new code.
+`--fsb-amber-400` and `--fsb-amber-800` remain for the control panel's AI memory badge and site-graph form pills. **MUST NOT** use them in new code.
 
 ## Specimens
 
@@ -69,9 +69,9 @@ Accent and status tokens ([0013](../decisions/0013-name-values-before-changing-t
 - **The danger red differs between palettes:** `#ef4444` on the site; `#dc2626` on product pages, or `#e57373` in their dark mode. The site's status colours were not part of [0014](../decisions/0014-product-status-colours-one-per-role.md).
 - **Small status text.** Green and amber fail AA as small text on white (2.5:1 and 3.2:1); text in these roles needs a darker shade.
 - **Orange text on light surfaces.** `#ff6b35` is 2.84:1 on white and 2.47:1 on its soft wash, so small orange text on a light product page fails AA (the transcribing mic, the recon button, the AI memory badge). A darker text orange is an open decision.
-- **Tonal shades stay literal:** alert text on tints (`#991b1b` on `#fee2e2`), the payment prompt's blue ramp, and the Visa, Amex and Discover labels (fixed card colours).
+- **Tonal shades stay literal:** alert text on tints (`#991b1b` on `#fee2e2`) and the Visa, Amex and Discover labels (fixed card colours).
 - **Off-palette colours:**
-  - the side panel's checkboxes use `accent-color: #f97316`, which is not the brand orange;
+  - the 1Password surfaces declare their own palettes (`.vp` in the side panel, the credential sheet's literals; [vault.md](../surfaces/vault.md) known issue 8);
   - `markdown.css` (message rendering) uses no tokens at all.
 - **Research pages keep their own palettes.** phantom-stream sets `--primary` to blue inside `.ps-page`; prometheus has its own `--text`.
 - Raw colours outside token blocks are counted by `scripts/check-style-literals.mjs`, and that count may only fall.

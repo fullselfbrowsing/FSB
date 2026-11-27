@@ -14,7 +14,7 @@ Start with [DESIGN.md](../DESIGN.md) at the repository root: the short contract,
 | Control panel | Settings and dashboard (`control_panel.html` with `options.css`) | Product | [surfaces/control-panel.md](surfaces/control-panel.md) |
 | Onboarding | First-run setup inside the extension | Site (its own copy) | [surfaces/onboarding.md](surfaces/onboarding.md) |
 | In-page overlays | What FSB draws on web pages: glows, the status pill, replay, crawl card, inspector | Overlay: `#ff8c00` family | [surfaces/overlays.md](surfaces/overlays.md) |
-| 1Password vault | Vault settings, prompts and the on-page sheet (pending, PR #172) | Product and overlay | [surfaces/vault.md](surfaces/vault.md) |
+| 1Password vault | Vault settings, prompts and the on-page sheet | Product and overlay | [surfaces/vault.md](surfaces/vault.md) |
 
 One brand orange, `#ff6b35`, runs through the site and the extension pages. The overlays use `#ff8c00`. See [decisions/0002](decisions/0002-three-palettes-one-brand-orange.md) and [decisions/0003](decisions/0003-overlay-accent-ff8c00.md).
 

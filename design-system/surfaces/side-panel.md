@@ -47,7 +47,7 @@ The side panel uses the product palette ([0002](../decisions/0002-three-palettes
 | Runner | `#automationRunner` | `.pixel-loader`: three 3×5 `.pixel-letter` grids (F, S, B) beside `#automationTimer` |
 | Composer | `.chat-input-area .input-wrapper` | contenteditable `#chatInput.chat-input` (`role="textbox"`, `aria-multiline`), then 36px `#stopBtn`, `#micBtn`, `#sendBtn` |
 | Footer | `.author-footer` | `#footerVersion`, which no script fills |
-| Payment confirm | `#paymentFillConfirmOverlay` | scrim and `.payment-fill-confirm-card` with `#pfcAllow` and `#pfcDeny` |
+| 1Password card check | built by sidepanel.js | `.vp.sp-dim` scrim and `.vp.sp-sheet`; see [vault.md](vault.md) |
 
 `addMessage()` in sidepanel.js gives each bubble the class `message <type> new`:
 
@@ -61,7 +61,7 @@ The side panel uses the product palette ([0002](../decisions/0002-three-palettes
 | `.message.status-message` | `addStatusMessage()` creates it only as a hidden `.status-anchor`; progress shows in the header and the runner | `--status-bg` (never painted) |
 | `.message.ai` | no side panel code path renders it; `renderPersistedMessage()` maps restored messages to the classes above | `--ai-*` |
 
-Inline cards in the list: `.message.login-prompt`, `.message.payment-prompt`, `.replay-preview-card`, `.replay-decision-card`, `.action-summary-group` and `.recon-suggestion`.
+Inline cards in the list: the 1Password prompts (`.vp.sp-card`, `.vp.sp-row`; see [vault.md](vault.md)), `.replay-preview-card`, `.replay-decision-card`, `.action-summary-group` and `.recon-suggestion`.
 
 ## States
 
@@ -154,24 +154,21 @@ The design checks also hold this surface. [`check-style-literals.mjs`](../../scr
 - **markdown.css uses no tokens.** Its `[data-theme="dark"] .message.system`, `.message.ai`, `.message.error` and `.message.action` rules load after sidepanel.css with equal specificity. In dark mode they replace the page's tones with literals: `.message.system` becomes `#303030`, `.message.error` `#451a1a` and `.message.action` `#1a2e1a`. Its links are blue (`#1a73e8`) and its inline code pink (`#e83e8c`).
 - **44px only for delegated controls.** The header and composer buttons stay under 44px, and a test pins the composer at 36px.
 - **Off-brand colours.**
-  - `.login-prompt-save-label input[type="checkbox"]` sets `accent-color: #f97316`, not `#ff6b35`.
-  - `--accent-color` is never declared, so `.payment-fill-confirm-btn.allow` and the confirm icon fall back to purple `#7c5cff`.
   - `--text-tertiary` is undeclared and falls back to `#666`.
-  - The login and payment prompts bring their own tonal ramps: amber (`#fff7ed`, `#fb923c`, and the `--fsb-amber-400` / `--fsb-amber-800` text pair) and blue (`#eff6ff`, `#1d4ed8`, `#2563eb`). Their light-blue accents now read `--fsb-info` ([0016](../decisions/0016-indigo-folds-into-brand-orange.md)).
+  - The 1Password prompts bring their own palette in `.vp` (see [vault.md](vault.md), known issue 8).
   - The recon button uses the brand orange, not indigo ([0016](../decisions/0016-indigo-folds-into-brand-orange.md)). Card-network labels (Amex, Discover) are fixed literals.
 - **Dead selectors.** `body[data-ui-state="running"]`, `body[data-ui-state="error"]` and `body[data-sidepanel-view="history"]` style states that no script sets. `.message.ai`, the visible `.message.status-message` and `.message.completed` have no caller in sidepanel.js, so the `--ai-*` and `--status-bg` tokens paint nothing.
 - **Restricted-page notice.** `showChromepageError()` appends to `#messages`, which does not exist (the list is `#chatMessages`). The notice throws instead of rendering, and its styles are inline.
 - **Accessibility gaps.**
   - `#chatInput` has no accessible name and an empty `data-placeholder`.
   - `#chatMessages` is not a live region.
-  - `#paymentFillConfirmOverlay` has no dialog role and does not move focus.
   - The composer and header `:focus` outlines also show on mouse click.
 - **Translucent content.** `.message` carries `backdrop-filter: blur(10px)` and a resting shadow, against [elevation.md](../foundations/elevation.md).
 - **Motion.** `.message.new` overshoots, against the no-bounce rule. The recording pulse and the hover lifts ignore reduced motion.
 
 ## Sources
 
-- [`sidepanel.html`](../../extension/ui/sidepanel.html): `.sidepanel-header`, `#historyView`, `#delegationRun`, `#automationRunner`, `#chatInput`, `#paymentFillConfirmOverlay`
+- [`sidepanel.html`](../../extension/ui/sidepanel.html): `.sidepanel-header`, `#historyView`, `#delegationRun`, `#automationRunner`, `#chatInput`
 - [`sidepanel.css`](../../extension/ui/sidepanel.css): `:root`, `[data-theme="dark"]`, `.message.*`, `.delegation-*`, `.pixel-letter`, the `prefers-reduced-motion` block
 - [`sidepanel.js`](../../extension/ui/sidepanel.js): `applyTheme`, `mirrorThemePreference`, `_setHeaderStatus`, `setRunningState`, `applyInputLockout`, `_delegationToneForSnapshot`, `addMessage`, `spLine`, `showChromepageError`
 - [`fsb-ui-core.css`](../../extension/shared/fsb-ui-core.css): `:root`, `[data-theme="dark"]`, `:is(.chat-header, .sidepanel-header)`

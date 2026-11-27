@@ -4,15 +4,15 @@ Status: shipped on main
 
 ## What it is
 
-The control panel is the extension's options page: provider setup, settings, the password and payment vaults, memory, logs, help and a usage dashboard.
+The control panel is the extension's options page: provider setup, settings, the 1Password vault, memory, logs, help and a usage dashboard.
 
 - **Entry.** [`manifest.json`](../../extension/manifest.json) `options_page` points at [`control_panel.html`](../../extension/ui/control_panel.html).
   - The settings buttons in the [side panel](side-panel.md) and [popup](popup.md) call `chrome.runtime.openOptionsPage()`.
   - [`sidepanel.js`](../../extension/ui/sidepanel.js) `openControlPanelSection()` opens one section by hash.
   - [`options.js`](../../extension/ui/options.js) `initializeSections()` reads `location.hash`, and `switchSection()` writes it back.
 - **Files.** The stylesheet is [`options.css`](../../extension/ui/options.css); there is no control_panel.css. Behaviour is in options.js, plus helpers such as [`providers-panel.js`](../../extension/ui/providers-panel.js).
-- **Sections,** in rail order: `#dashboard`, `#api-config`, `#sync`, `#passwords`, `#payments`, `#advanced`, `#memory`, `#logs` and `#help`.
-  - Sync, Passwords and Payments carry a `.feature-badge.beta`.
+- **Sections,** in rail order: `#dashboard`, `#api-config`, `#sync`, `#vault`, `#advanced`, `#memory`, `#logs` and `#help`.
+  - Sync and Vault carry a `.feature-badge.beta`. Old `#passwords` and `#payments` links land on `#vault`.
   - Entering `#advanced` also shows `#consent-audit` (`switchSection`).
 
 ## Palette and tokens

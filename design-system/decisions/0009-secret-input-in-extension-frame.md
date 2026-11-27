@@ -1,9 +1,9 @@
 # 0009. Secret input on a web page goes in an extension frame, never in the page or a shadow root
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-24
 
-Proposed: built on the `onepassword-vault-replacement` branch (pull request #172), not yet on main. When it merges, set this record to Accepted.
+Accepted: the credential sheet shipped with pull request #172, merged into pull request #173 (branch `while-we-were-here`).
 
 ## Context and problem statement
 
@@ -29,5 +29,5 @@ Chosen option 1. In a Chromium test, every key typed into an input inside a clos
 
 ## Evidence
 
-- Pull request #172 (branch `onepassword-vault-replacement`): `extension/ui/credential-sheet.html`, `extension/content/vault-pill.js`
+- [extension/ui/credential-sheet.html](../../extension/ui/credential-sheet.html), [extension/content/vault-pill.js](../../extension/content/vault-pill.js) (pull request #172)
 - The "FSB · 1Password vault" design canvas, boards CredWhere and Security (see [../sources.md](../sources.md))

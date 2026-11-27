@@ -32,6 +32,6 @@ Chosen option 1, by the owner.
 
 ## Evidence
 
-- [extension/ui/sidepanel.css](../../extension/ui/sidepanel.css) `.recon-btn`, `.message.payment-prompt`, `.history-cost`
+- [extension/ui/sidepanel.css](../../extension/ui/sidepanel.css) `.recon-btn`, `.history-cost`
 - [extension/ui/options.css](../../extension/ui/options.css) `.research-pagination`, `.memory-badge.ai-enhanced`, `.recon-ai-note`
 - [extension/ui/markdown.css](../../extension/ui/markdown.css) `[data-theme="dark"] .md-rendered a`
