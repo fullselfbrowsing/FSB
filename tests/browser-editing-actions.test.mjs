@@ -43,8 +43,10 @@ async function evaluate(ws, expression) {
 async function openFixture(name) {
   const profile = mkdtempSync(join(tmpdir(), 'fsb-browser-actions-'));
   const fixture = new URL(`./fixtures/${name}`, import.meta.url).href;
+  // The mock keychain keeps macOS from showing a "Keychain Not Found" dialog
+  // when the suite runs with HOME pointed at a temporary folder.
   const child = spawn(chrome, [
-    '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+    '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--use-mock-keychain',
     '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', `--user-data-dir=${profile}`, fixture
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let launchError, launchStderr = '';
