@@ -29,7 +29,6 @@ const stateEmitterSource = readRepoFile('extension', 'ai', 'state-emitter.js');
 const popupSource = readRepoFile('extension', 'ui', 'popup.js');
 const sidepanelSource = readRepoFile('extension', 'ui', 'sidepanel.js');
 const dashboardSource = readRepoFile('showcase', 'js', 'dashboard.js');
-const wsClientSource = readRepoFile('extension', 'ws', 'ws-client.js');
 const adapterSource = readRepoFile('mcp', 'src', 'agent-providers', 'adapter.ts');
 const authoritySource = readRepoFile('mcp', 'src', 'agent-providers', 'effective-authority.ts');
 const runtimeFilesSource = readRepoFile('mcp', 'src', 'agent-providers', 'runtime-files.ts');
@@ -62,7 +61,6 @@ assert(!popupSource.includes("case 'sessionStateEvent':"), 'popup no longer cons
 assert(popupSource.includes("case 'statusUpdate':") || popupSource.includes("case 'automationComplete':"), 'popup consumes statusUpdate / automationComplete channels');
 assert(sidepanelSource.includes("case 'sessionStateEvent':"), 'sidepanel still consumes sessionStateEvent');
 assert(!dashboardSource.includes('sessionStateEvent'), 'dashboard does not consume sessionStateEvent directly');
-assert(!wsClientSource.includes('sessionStateEvent'), 'ws client does not consume or relay sessionStateEvent directly');
 
 console.log('\n--- state-emitter documentation tests ---');
 

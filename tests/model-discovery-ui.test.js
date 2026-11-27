@@ -6,8 +6,8 @@
  * Two layers:
  *   1. Static-analysis assertions on control_panel.html / options.css /
  *      options.js — confirms the markup, styles, and required call sites
- *      exist (matches the project's prevailing test pattern,
- *      cf. tests/dashboard-metrics-render.test.js).
+ *      exist (matches the project's prevailing static-analysis test
+ *      pattern).
  *   2. Behavioral assertions on the discovery helper module exposed by
  *      options.js as globalThis.FSBDiscoveryUI — covers the truth table
  *      states, debounce, fresh-only hosted discovery, refresh, and

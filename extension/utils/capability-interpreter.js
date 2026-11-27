@@ -17,10 +17,10 @@
    * Module shell: the dual-export IIFE mirror of extension/utils/value-extractor.js
    * (the PURE, browser-API-free variant). Like value-extractor.js this module
    * OMITS any lazy browser-API resolver -- it touches no browser API and reaches
-   * the vendored globals only through typeof-guarded accessors (the
-   * ws-client.js getFSBLZStringCodec pattern), so it loads cleanly under the Node
-   * test harness where the cfworker IIFE is pre-loaded via vm. The service worker
-   * reads the global FsbCapabilityInterpreter after importScripts.
+   * the vendored globals only through typeof-guarded accessors, so it loads
+   * cleanly under the Node test harness where the cfworker IIFE is pre-loaded
+   * via vm. The service worker reads the global FsbCapabilityInterpreter after
+   * importScripts.
    *
    * Locked decisions implemented here (26-CONTEXT.md):
    *   - D-04 endpoint templating is a hand-rolled {var} replacer; url-template is

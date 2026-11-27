@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API-Konfiguration"
   },
-  "panel_8d261a372f": {
-    "message": "Synchronisierung"
-  },
   "panel_703390318b": {
     "message": "Betaversion"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "Verwerfen"
-  },
-  "panel_49e49bb440": {
-    "message": "Erzeugen"
   },
   "panel_0e91610117": {
     "message": "Aktualisieren"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "Vollständige Richtlinie lesen →"
   },
-  "panel_04dfac3671": {
-    "message": "Getrennt"
-  },
-  "panel_acf2db1614": {
-    "message": "Serversynchronisierung"
-  },
-  "panel_609bbbdf07": {
-    "message": "Hash-Schlüssel"
-  },
-  "panel_534803768c": {
-    "message": "Dashboard koppeln"
-  },
-  "panel_9a177de63c": {
-    "message": "Zum Koppeln scannen"
-  },
-  "panel_43e3ece73f": {
-    "message": "verbleibend"
-  },
   "panel_c9b3c38247": {
     "message": "Summe"
   },
@@ -984,15 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "Spracheingabe auszuschalten hindert FSB daran, das Mikrofon zu nutzen, widerruft aber nicht die von Chrome gespeicherte Berechtigung."
-  },
-  "panel_76e917ee87": {
-    "message": "Kopple diese Erweiterung mit dem FSB-Dashboard für Fernsteuerung und Ergebnisspeicherung"
-  },
-  "panel_c11de3bb2e": {
-    "message": "Mit dem FSB-Server verbinden, um Ergebnisse zu speichern und das Dashboard zu öffnen"
-  },
-  "panel_097b5fa7f6": {
-    "message": "Erzeuge einen Schlüssel und kopple dann das Dashboard, um diesen Browser mit dem FSB-Server zu verbinden."
   },
   "panel_75d0625c55": {
     "message": "Hintergrundagenten haben das Gebäude verlassen"
@@ -1555,8 +1522,8 @@
   "panel_d2286811e6": {
     "message": "MCP-Clients wie Claude Code und Cursor verbinden und dann mit dem Befehl doctor prüfen"
   },
-  "panel_f3cb441c27": {
-    "message": "Lies, wie FSB Daten, Speicher und optionale Serversynchronisierung behandelt"
+  "panel_71b36c0b35": {
+    "message": "Lies, wie FSB Daten und Speicher behandelt"
   },
   "panel_476481e410": {
     "message": "Fehler melden, Funktionen anfragen und den Entwicklungsfortschritt verfolgen"
@@ -1636,20 +1603,8 @@
   "panel_22965568d2": {
     "message": "Verbunden"
   },
-  "panel_ee172faa9c": {
-    "message": "Ungültiger Schlüssel"
-  },
   "panel_031a8f0f65": {
     "message": "Fehlgeschlagen"
-  },
-  "panel_424a2551d3": {
-    "message": "Abgelaufen"
-  },
-  "panel_c7730178f4": {
-    "message": "Neuen Code erzeugen"
-  },
-  "panel_ac116124f7": {
-    "message": "Kopplungscode konnte nicht erzeugt werden. Versuche es erneut."
   },
   "panel_d03fd96d28": {
     "message": "Geladenes Modell wählen..."
@@ -3080,66 +3035,6 @@
   "copy_84e9814ece": {
     "message": "Forschungsergebnisse konnten nicht gelöscht werden"
   },
-  "copy_491c2ddc8e": {
-    "message": "Bitte gib zuerst eine Server-URL ein"
-  },
-  "copy_9526d57756": {
-    "message": "Hash-Schlüssel erzeugt und gespeichert"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "Hash-Schlüssel konnte nicht erzeugt werden"
-  },
-  "copy_52b3b70484": {
-    "message": "Verbindung zum Server nicht möglich: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "Kein Hash-Schlüssel zum Kopieren"
-  },
-  "copy_f0b64c63d8": {
-    "message": "Hash-Schlüssel kopiert"
-  },
-  "copy_0cf23c4489": {
-    "message": "Kopieren fehlgeschlagen"
-  },
-  "copy_8cab3b4552": {
-    "message": "Bitte gib Server-URL und Hash-Schlüssel ein"
-  },
-  "copy_271b7b0f3b": {
-    "message": "Serververbindung erfolgreich"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "Hash-Schlüssel ist ungültig"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "Verbindung zum Server nicht möglich"
-  },
-  "copy_0ea446a05f": {
-    "message": "Server hat keinen Hash-Schlüssel zurückgegeben"
-  },
-  "copy_e5697f10b5": {
-    "message": "Fehlerhafte Kopplungsantwort"
-  },
-  "copy_30fa7c27e5": {
-    "message": "Kopplungscode konnte nicht erzeugt werden: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "Hash-Schlüssel konnte nicht registriert werden: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "Diesen Speicher löschen?"
   },
@@ -3188,9 +3083,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "Fernsteuerung aktiv"
   },
   "copy_23a711ebd2": {
     "message": "Keine Modelle entsprechen der Suche"
@@ -3314,12 +3206,6 @@
   },
   "copy_f38984cf15": {
     "message": "Anonyme Nutzungsdaten werden gesendet. Klicken, um zu stoppen."
-  },
-  "copy_81649d0543": {
-    "message": "Dein Server-Hash-Schlüssel"
-  },
-  "copy_e4cdf160f5": {
-    "message": "Hash-Schlüssel kopieren"
   },
   "copy_8c16fe2070": {
     "message": "Wenn aktiviert, werden neue Speicher automatisch von der KI auf tiefere Erkenntnisse analysiert"

@@ -8,7 +8,7 @@
  * Covers:
  *   ICON-01: every state still tracks its own canonical source (drift guard)
  *   ICON-02: the icon reads no phase at all -- it diverges from the overlay
- *   ICON-03: resting frame is full strength until a relay has actually connected
+ *   ICON-03: the resting frame is always the full-strength glyph
  *   ICON-04: watchdog alarm is armed only while a loop is owed
  *   ICON-05: the four forms -- orbit / sweep / ring / breathe -- and their geometry
  *   ICON-06: the breathe loops for as long as a watch is armed
@@ -69,7 +69,6 @@ const ACTIVITY_TTL_MS = 60000;
 const BREATHE_MIN_ALPHA = 0.45;
 const BREATHE_GLOW_RATIO = 0.15625;
 const BREATHE_GLOW_ALPHA = 0.95;
-const RELAY_SEEN_KEY = 'fsbActionIconRelaySeen';
 const INTENT_KEY = 'fsbActionIconIntent';
 const ANIMATIONS_KEY = 'animatedActionHighlights';
 
@@ -511,50 +510,46 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     'the on-page overlay still maps phases -- only the icon opted out');
 
   // -------------------------------------------------------------------------
-  console.log('\nICON-03: resting frame is full strength until a relay connects');
+  console.log('\nICON-03: the resting frame is the full-strength glyph');
   // -------------------------------------------------------------------------
 
   {
     const w = makeWorker();
     await w.api.init({ hasLiveSession: () => false });
 
-    // Static cache renders in order: idle:on, idle:off, watching:on, watching:off,
-    // ring:kickoff, each at 16 then 32. Idle sequence numbers remain unchanged.
-    const IDLE_ON_32 = 2;
-    const IDLE_OFF_32 = 4;
+    // Static cache renders in order: idle, watching, ring:kickoff, each at 16
+    // then 32.
+    const IDLE_32 = 2;
 
     assertEq(w.emits.length, 1, 'init emits exactly one resting frame');
-    assertEq(w.emits[0].imageData[32].seq, IDLE_ON_32, 'fresh install rests on the UNDIMMED idle frame');
+    assertEq(w.emits[0].imageData[32].seq, IDLE_32, 'fresh install rests on the UNDIMMED idle frame');
     assert(w.emits[0].imageData[16] && w.emits[0].imageData[32], 'every emit carries both 16 and 32');
 
     const g32 = w.groups(32);
-    assertEq(g32.length, 5, 'four resting frames and one Ring kickoff render at 32');
-    assertEq(g32[0][0].alpha, 1, 'idle:on drawn at full alpha');
-    assertEq(g32[0][0].filter, 'none', 'idle:on drawn unfiltered');
-    assertEq(g32[1][0].alpha, 0.5, 'idle:off drawn at half alpha');
-    assert(/grayscale/.test(g32[1][0].filter), 'idle:off drawn desaturated');
-
-    // The regression: a relay that never connects must not dim anything.
-    w.api.setConnected(false);
-    assertEq(w.emits.length, 1, 'a failed/never-connected relay causes no repaint');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_ON_32,
-      'icon stays UNDIMMED when the relay has never connected');
-
-    // Once a relay has connected, losing it is a real signal and does dim.
-    w.api.setConnected(true);
-    assertEq(w.emits.length, 1, 'connecting does not repaint (appearance unchanged)');
-    assertEq(w.localStore[RELAY_SEEN_KEY], true, 'first connect records the relay install-wide');
-
-    w.api.setConnected(false);
-    assertEq(w.emits.length, 2, 'losing a relay that HAD connected repaints');
-    assertEq(w.emits[1].imageData[32].seq, IDLE_OFF_32, 'dropped relay dims the icon');
+    assertEq(g32.length, 3, 'two resting frames and one Ring kickoff render at 32');
+    assertEq(g32[0][0].alpha, 1, 'idle drawn at full alpha');
+    assertEq(g32[0][0].filter, 'none', 'idle drawn unfiltered');
+    assert(g32.every((g) => opsOf(g, 'drawImage').every((d) => !/grayscale/.test(d.filter))),
+      'no static frame is desaturated');
+    assertEq(typeof w.api.setConnected, 'undefined',
+      'the icon API has no connection switch that could dim it');
   }
 
   {
-    // A dashboard user restarting the browser: relay known, not yet reconnected.
-    const w = makeWorker({ local: { [RELAY_SEEN_KEY]: true } });
+    // An install upgraded from a build that dimmed the icon while its server
+    // relay was down. Neither leftover -- the install-wide flag in local storage
+    // or the connected field in the stored intent -- may dim the new icon.
+    const w = makeWorker({
+      local: { fsbActionIconRelaySeen: true },
+      session: { [INTENT_KEY]: { animating: false, claims: {}, resolved: null, connected: false, updatedAt: 1 } }
+    });
     await w.api.init({ hasLiveSession: () => false });
-    assertEq(w.emits[0].imageData[32].seq, 4, 'known relay + not connected dims from the first frame');
+    assertEq(w.emits.length, 1, 'legacy relay state still emits exactly one resting frame');
+    assertEq(w.emits[0].imageData[32].seq, 2, 'legacy relay state rests on the undimmed idle frame');
+    assert(!Object.prototype.hasOwnProperty.call(w.sessionStore[INTENT_KEY] || {}, 'connected'),
+      'the rewritten intent drops the legacy connected field');
+    assertEq(w.localStore.fsbActionIconRelaySeen, true,
+      'the icon does not rewrite the legacy flag');
   }
 
   // -------------------------------------------------------------------------
@@ -951,8 +946,8 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     const w = makeWorker();
     await w.api.init({ hasLiveSession: () => false });
 
-    // Static cache order is unchanged: seq 2 is idle:on@32.
-    const IDLE_ON_32 = 2;
+    // Static cache order is unchanged: seq 2 is idle@32.
+    const IDLE_32 = 2;
 
     w.api.setWatching(true);
     await flush();
@@ -979,7 +974,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     await flush();
     assertEq(w.timerCount(), 0, 'disarming stops the loop');
     assert(w.alarmLog.cleared.includes(WATCHDOG), 'and clears the watchdog');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_ON_32,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_32,
       'disarming drops straight to the idle frame');
   }
 
@@ -1037,8 +1032,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   {
     // Worker died mid-animation, session is still live -> restart the loop.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } },
-      local: { [RELAY_SEEN_KEY]: true }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => true });
     await new Promise((r) => setImmediate(r));
@@ -1050,7 +1044,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   {
     // Worker died mid-animation, but the session is gone -> snap to static.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => false });
     await flush();
@@ -1065,7 +1059,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   {
     // A stored SESSION claim with no live session behind it is dropped.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'session:1': 'orbit' }, resolved: 'orbit', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'session:1': 'orbit' }, resolved: 'orbit', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => false });
     await flush();
@@ -1079,7 +1073,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // older generation accidentally wrote Ring into session storage, recovery
     // must not resurrect it without a matching promise that can end it.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'capability:1': 'ring' }, resolved: 'ring', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'capability:1': 'ring' }, resolved: 'ring', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => true });
     await flush();
@@ -1109,7 +1103,6 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     await ctx.fsbActionIcon.init({});
     ctx.fsbActionIcon.noteActivity(1, 'orbit');
     ctx.fsbActionIcon.setWatching(true);
-    ctx.fsbActionIcon.setConnected(true);
     await ctx.fsbActionIcon.repair();
     assert(true, 'a worker without OffscreenCanvas degrades silently instead of throwing');
     assertEq(w.errors.filter((e) => /setIcon failed/.test(e)).length, 0, 'no spurious emit failures');
@@ -1236,7 +1229,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // A live arm during boot coexists with a stored claim rather than being
     // clobbered by the restore.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     const booting = w.api.init({ hasLiveSession: () => true });
     w.api.setWatching(true, 9);
@@ -1251,7 +1244,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // A disarm during boot is also authoritative even though the claim has not
     // been restored into memory yet.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     const booting = w.api.init({ hasLiveSession: () => true });
     w.api.setWatching(false, 5);
@@ -1335,10 +1328,10 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     w.api.noteActivity(1, 'orbit');
     await flush();
 
-    // Static cache is seqs 1-10; the acting frames follow, frame f at 32 = 12+2f.
+    // Static cache is seqs 1-6; the acting frames follow, frame f at 32 = 8+2f.
     const first = w.emits[staticEmits];
     assert(!!first, 'the loop emitted a frame');
-    assertEq(first && first.imageData[32].seq, 12,
+    assertEq(first && first.imageData[32].seq, 8,
       'the first frame shown is frame 0, not a frame partway into the cycle');
   }
 
@@ -1672,7 +1665,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(resolvedNow(), 'ring', 'beginCapability claims Ring');
     assertEq(w.emits.length, emitsBefore + 1,
       'beginCapability paints the cached kickoff frame synchronously');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 10,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 6,
       'the immediate frame is the cached Ring kickoff');
     await flush();
     assertEq(w.timerCount(), 1, 'Ring repeats while the capability remains unsettled');
@@ -1810,7 +1803,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     w.resolveNextIcon();
     await flush();
     assertEq(w.emits.length, before + 2, 'completion drains exactly one latest frame');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 18,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 14,
       'the drained frame matches the current wall-clock phase, not the oldest queued phase');
     w.resolveNextIcon();
     await flush();

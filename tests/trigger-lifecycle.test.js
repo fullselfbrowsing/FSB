@@ -1002,7 +1002,7 @@ function caseU() {
   const bgPath = path.resolve(__dirname, '..', 'extension', 'background.js');
   const src = fs.readFileSync(bgPath, 'utf8');
   const valueBlockStart = src.indexOf("case 'triggerValueChanged':");
-  const valueBlockEnd = src.indexOf("case 'domStreamSnapshot':", valueBlockStart);
+  const valueBlockEnd = src.indexOf("case 'lattice-test-connection':", valueBlockStart);
   const valueBlock = valueBlockStart >= 0 && valueBlockEnd > valueBlockStart
     ? src.slice(valueBlockStart, valueBlockEnd)
     : '';

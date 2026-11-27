@@ -1220,11 +1220,6 @@
           }, 200);
         }, 3000);
       }
-
-      // Auto-broadcast overlay state to dashboard if streaming
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        window.FSB.domStream.broadcastOverlayState();
-      }
     }
 
     /**
@@ -3009,11 +3004,6 @@
 
       // Start position tracking
       this._startTracking();
-
-      // Broadcast glow position to dashboard DOM stream
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        window.FSB.domStream.broadcastOverlayState();
-      }
     }
 
     showPulse(element) {
@@ -3098,20 +3088,6 @@
       };
     }
 
-    getStreamState() {
-      if (!this.currentGeometry) return null;
-
-      return {
-        x: this.currentGeometry.x,
-        y: this.currentGeometry.y,
-        w: this.currentGeometry.w,
-        h: this.currentGeometry.h,
-        state: 'active',
-        mode: this.currentGeometry.mode || 'box',
-        fragments: this.currentGeometry.fragments || null
-      };
-    }
-
     _startTracking() {
       // Phase 229-01 (OVERLAY-02): attach invalidation listeners ONCE per lifecycle.
       // Cached rect is reused on every rAF tick until resize/scroll/show() fires.
@@ -3159,13 +3135,6 @@
     }
 
     hide() {
-      // Broadcast glow removal to dashboard DOM stream before clearing
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        this.currentGeometry = null;
-        this.targetElement = null;
-        window.FSB.domStream.broadcastOverlayState();
-      }
-
       this._stopTracking();
 
       this._setActiveState(false);
@@ -3190,13 +3159,6 @@
     }
 
     destroy() {
-      // Broadcast glow removal to dashboard DOM stream
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        this.currentGeometry = null;
-        this.targetElement = null;
-        window.FSB.domStream.broadcastOverlayState();
-      }
-
       this._stopTracking();
       if (this.host) {
         demoteFromTopLayer(this.host);

@@ -1,13 +1,14 @@
 /**
  * Background-agents retirement: control panel and chat UI checks.
  *
- *   - The Sync tab keeps its note about the retired agents, with both
- *     links (target=_blank rel=noopener noreferrer) and a footer naming
- *     v0.9.45rc1 and April 2026.
+ *   - The control panel keeps its note about the retired agents (now in
+ *     the Help section), with both links (target=_blank rel=noopener
+ *     noreferrer) and a footer naming v0.9.45rc1 and April 2026.
  *   - The commented-out agent UI (agent forms, /agent slash commands) and
  *     the old "Your previous agents" notice are gone; nothing in the UI
  *     reads bgAgents any more.
- *   - Server Sync and pairing wiring stays live.
+ *   - The Server Sync and pairing controls left with the Live Dashboard;
+ *     none of their buttons is wired any more.
  *
  * Plain Node + assert + fs. No browser, no chrome stubs.
  */
@@ -116,26 +117,22 @@ const emojiTargets = [
   }
 }
 
-// ---- Section 4: D-15 -- Server Sync + pairing wiring at ui/options.js:4189-4205 stays LIVE ----
+// ---- Section 4: the Server Sync and pairing controls are gone ----
 
 {
-  const src = read('extension/ui/options.js');
-  const lines = src.split('\n');
-  const liveIds = ['btnPairDashboard', 'btnGenerateHashKey', 'btnCopyHashKey', 'btnTestConnection', 'btnCancelPairing'];
+  const js = read('extension/ui/options.js');
+  const html = read('extension/ui/control_panel.html');
+  // btnTestConnection is left out: the id is generic enough for a future feature to reuse.
+  const retiredIds = ['btnPairDashboard', 'btnGenerateHashKey', 'btnCopyHashKey', 'btnCancelPairing'];
 
-  let violations = [];
-  for (const id of liveIds) {
-    const liveHits = lines.filter(line =>
-      line.indexOf("getElementById('" + id + "')") !== -1 &&
-      !/^\s*\/\//.test(line)
-    );
-    if (liveHits.length === 0) {
-      violations.push(id + ' -- no LIVE getElementById call found (Phase 213 relocation requires this preserved)');
-    }
+  let leftovers = [];
+  for (const id of retiredIds) {
+    if (js.includes("getElementById('" + id + "')")) leftovers.push('options.js looks up ' + id);
+    if (html.includes('id="' + id + '"')) leftovers.push('control_panel.html renders ' + id);
   }
 
-  if (violations.length === 0) pass('D-15 Server Sync + pairing wiring preserved LIVE for Phase 213 relocation');
-  else fail('D-15 Server Sync + pairing wiring broken', violations.join('; '));
+  if (leftovers.length === 0) pass('Server Sync and pairing controls are removed from the control panel');
+  else fail('Server Sync and pairing controls still present', leftovers.join('; '));
 }
 
 // ---- Section 5: the old agent-names notice is gone ----

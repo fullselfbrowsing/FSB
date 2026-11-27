@@ -372,16 +372,12 @@ function armMcpBridge(reason) {
 
 armMcpBridge('service-worker-evaluated');
 
-// Dashboard relay WebSocket client (auto-connects to full-selfbrowsing.com)
-try { importScripts('lib/lz-string.min.js'); } catch (e) { console.error('[FSB] Failed to load lz-string.min.js:', e.message); }
-try { importScripts('ws/phantom-stream-protocol.js'); } catch (e) { console.error('[FSB] Failed to load phantom-stream-protocol.js:', e.message); }
 // Phase 211-03 diagnostic logging: load the ring buffer BEFORE redactForLog so
 // that rateLimitedWarn sees globalThis.fsbDiagnostics on first call. The drift
 // pre-throttle then loads after both dependencies and before runtime consumers.
 try { importScripts('utils/diagnostics-ring-buffer.js'); } catch (e) { console.error('[FSB] Failed to load diagnostics-ring-buffer.js:', e.message); }
 try { importScripts('utils/redactForLog.js'); } catch (e) { console.error('[FSB] Failed to load redactForLog.js:', e.message); }
 try { importScripts('utils/agent-protocol-drift-diagnostics.js'); } catch (e) { console.error('[FSB] Failed to load agent-protocol-drift-diagnostics.js:', e.message); }
-try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Failed to load ws-client.js:', e.message); }
 
 // Phase 26 Plan 01 (v0.9.99 CAP-01/CAP-05): Native Capability Catalog Wall-1
 // data spine. The three vendored libraries load FIRST so their classic-script
@@ -393,8 +389,8 @@ try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Faile
 // per CAP-05 but not wired until Phase 28 (search). cfworker-json-schema is the
 // eval-free IIFE-bundled JSON Schema validator (a top-level import/export is a
 // SyntaxError under importScripts in a classic service worker, so it MUST be
-// IIFE-bundled, not vendored raw). Each wrapped in try/catch mirroring the
-// lz-string precedent above; D-05 keeps these edits additive (manifest and
+// IIFE-bundled, not vendored raw). Each wrapped in try/catch like the
+// diagnostics loads above; these edits stay additive (manifest and
 // permissions unchanged; background.js is byte-frozen as an esbuild input).
 try { importScripts('lib/jmespath.min.js'); } catch (e) { console.error('[FSB] Failed to load jmespath.min.js:', e.message); }
 try { importScripts('lib/minisearch.min.js'); } catch (e) { console.error('[FSB] Failed to load minisearch.min.js:', e.message); }
@@ -848,8 +844,6 @@ const CONTENT_SCRIPT_FILES = [
   'content/badge-combine.js',
   'utils/ui-locale.js',
   'content/visual-feedback.js',
-  'content/phantom-stream-capture.js',
-  'content/dom-stream.js',
   'content/trigger-observe.js',
   'content/accessibility.js',
   'utils/google-sheets-ui.js',
@@ -4056,104 +4050,6 @@ function formatETA(ms) {
 }
 
 /**
- * Broadcast task progress to connected dashboard clients via WebSocket.
- * Called per iteration and after terminal outcomes for dashboard-originated tasks.
- * Only sends ext:task-progress for running sessions -- terminal state forwarding
- * (ext:task-complete) is handled separately in Plan 02.
- *
- * @param {Object} session - Active automation session object
- */
-function broadcastDashboardProgress(session) {
-  // Guard: WebSocket must exist and be connected
-  if (typeof fsbWebSocket === 'undefined' || !fsbWebSocket || !fsbWebSocket.connected) {
-    return;
-  }
-  // Guard: Only broadcast for dashboard-originated tasks
-  if (!session._isDashboardTask) {
-    return;
-  }
-  var progress = calculateProgress(session);
-  var isTerminal = session.status === 'completed' || session.status === 'failed' ||
-    session.status === 'stopped' || session.status === 'no_progress' ||
-    session.status === 'max_iterations' || session.status === 'timeout' ||
-    session.status === 'error';
-  // Do NOT send ext:task-complete here -- that is handled by Plan 02
-  // via automationComplete interception. This function ONLY sends
-  // ext:task-progress for running sessions.
-  if (isTerminal) {
-    return;
-  }
-  fsbWebSocket.send('ext:task-progress', {
-    progress: progress.progressPercent,
-    phase: session.lastTurnResult ? 'acting' : 'thinking',
-    eta: progress.estimatedTimeRemaining || null,
-    elapsed: Date.now() - (session.startTime || Date.now()),
-    action: session._lastActionSummary || session.lastAiReasoning || 'Working...',
-    iteration: session.iterationCount || 0,
-    maxIterations: session.maxIterations || 100,
-    taskRunId: session._dashboardTaskRunId || '',
-    task: session.task || '',
-    taskSource: 'live',
-    updatedAt: Date.now()
-  });
-}
-
-/**
- * Returns a recovery snapshot of the current or recently-completed dashboard task.
- * Called by ws-client.js _sendStateSnapshot (line 327) and _handleStopTask (line 768)
- * via typeof guard. Priority: running task first, then recently completed (60s TTL).
- *
- * @returns {Object|null} Recovery snapshot or null if no dashboard task state available
- */
-function _getDashboardTaskRecoverySnapshot() {
-  // 1. Check for a running dashboard task first
-  if (typeof activeSessions !== 'undefined') {
-    var running = null;
-    activeSessions.forEach(function(s) {
-      if (s._isDashboardTask && s.status === 'running') running = s;
-    });
-    if (running) {
-      var progress = calculateProgress(running);
-      return {
-        taskRunId: running._dashboardTaskRunId || '',
-        taskStatus: 'running',
-        task: running.task || '',
-        progress: progress.progressPercent,
-        phase: running.lastTurnResult ? 'acting' : 'thinking',
-        eta: progress.estimatedTimeRemaining || null,
-        elapsed: Date.now() - (running.startTime || Date.now()),
-        action: running._lastActionSummary || 'Working...',
-        lastAction: running._lastActionSummary || '',
-        summary: '',
-        error: '',
-        stopped: false,
-        tabId: typeof running.tabId === 'number' ? running.tabId : null,
-        taskSource: 'snapshot',
-        updatedAt: Date.now()
-      };
-    }
-  }
-
-  // 2. Check for a recently completed dashboard task (retained for 60 seconds)
-  if (_lastDashboardTaskResult && _lastDashboardTaskResultTime) {
-    var age = Date.now() - _lastDashboardTaskResultTime;
-    if (age < 60000) {
-      // Return the stored completion payload with taskSource overridden to 'snapshot'
-      return Object.assign({}, _lastDashboardTaskResult, {
-        taskSource: 'snapshot',
-        updatedAt: _lastDashboardTaskResultTime
-      });
-    } else {
-      // Expired -- clear it
-      _lastDashboardTaskResult = null;
-      _lastDashboardTaskResultTime = 0;
-    }
-  }
-
-  return null;
-}
-
-/**
  * Summarize a task description into a short label using the AI provider.
  * Non-blocking -- returns null on failure. Skips tasks already short enough.
  * @param {string} taskText - Original task description
@@ -4867,37 +4763,6 @@ const {
 } = (typeof MCPVisualSessionUtils !== 'undefined') ? MCPVisualSessionUtils : {};
 const mcpVisualSessionFinalizationTimers = new Map();
 const MCP_VISUAL_SESSION_STORAGE_KEY = 'fsbMcpVisualSessions';
-
-// Last dashboard task completion result (retained for recovery snapshot)
-var _lastDashboardTaskResult = null;
-var _lastDashboardTaskResultTime = 0;
-
-// Phase 211-02 STREAM-02: SW-side cache of the last-known staleFlushCount
-// from the active streaming content script. Read by ws/ws-client.js
-// _emitStreamState at the ext:stream-state send call (line ~912).
-// Module-scope (not per-tab) is acceptable: only one streaming tab at a time.
-var _lastDomStreamStaleFlushCount = 0;
-
-// ============================================================================
-// Phase 213 - Sync tab runtime cache (SYNC-02)
-// Mirrors ext:remote-control-state for replay-on-attach via the
-// 'getRemoteControlState' runtime action. Updated by the
-// 'remoteControlStateChanged' push handler below. SW-lifetime only;
-// null on cold start. Per CONTEXT D-18, disconnected is the safe default.
-// Renamed from _lastRemoteControlState to _bgRemoteControlStateCache to
-// avoid colliding with the same-named identifier in ws/ws-client.js:124.
-// In Chrome service workers, importScripts loads files into the SAME global
-// scope -- two top-level declarations of the same name throw
-// "Identifier '_lastRemoteControlState' has already been declared" and break
-// background.js startup. ws-client.js's cache (Phase 209 snapshot recovery)
-// remains untouched at its original name.
-let _bgRemoteControlStateCache = null;
-
-function normalizeDashboardServerUrlForSync(value) {
-  const fallback = 'https://full-selfbrowsing.com';
-  const url = (typeof value === 'string' && value.trim()) ? value.trim() : fallback;
-  return url.replace(/\/+$/, '');
-}
 
 // Store for AI integration instances per session (for multi-turn conversations)
 // This allows conversation history to persist across iterations within a session
@@ -12383,54 +12248,6 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       break;
     }
 
-    case 'getRemoteControlState': {
-      // Phase 213 D-16: replay-on-attach for Sync tab pill.
-      // Returns the last cached ext:remote-control-state payload or a
-      // disconnected-shaped default if no broadcast has happened yet this
-      // SW lifetime. Sync tab JS uses this to populate the pill before the
-      // first push arrives.
-      const state = (_bgRemoteControlStateCache && typeof _bgRemoteControlStateCache === 'object')
-        ? _bgRemoteControlStateCache
-        : { enabled: false, attached: false, tabId: null, reason: 'unknown', ownership: 'none' };
-      sendResponse({ success: true, state: state });
-      break;
-    }
-
-    case 'remoteControlStateChanged': {
-      // Phase 213 D-17 cache update path. ws/ws-client.js
-      // _broadcastRemoteControlState fires this push after every WS emit.
-      // background.js listens to its own broadcast so the cache survives
-      // when the Sync tab is closed.
-      if (request.state && typeof request.state === 'object') {
-        _bgRemoteControlStateCache = request.state;
-      }
-      sendResponse({ success: true });
-      break;
-    }
-
-    case 'reconnectDashboardWebSocket': {
-      try {
-        if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && typeof fsbWebSocket.connect === 'function') {
-          fsbWebSocket.connect();
-          sendResponse({ success: true });
-        } else {
-          sendResponse({ success: false, error: 'dashboard relay unavailable' });
-        }
-      } catch (error) {
-        sendResponse({ success: false, error: error && error.message ? error.message : 'reconnect failed' });
-      }
-      break;
-    }
-
-    case 'getDashboardWebSocketStatus': {
-      // Replay-on-attach for the Sync tab pill's Connected input: reports the
-      // dashboard relay's live socket state. Mirrors getRemoteControlState;
-      // ws/ws-client.js pushes 'dashboardWsStatusChanged' on open/close.
-      const wsConnected = !!(typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected === true);
-      sendResponse({ success: true, connected: wsConnected });
-      break;
-    }
-
     case 'testAPI':
       handleTestAPI(request, sender, sendResponse);
       return true; // Will respond asynchronously
@@ -13126,61 +12943,11 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       handleCDPMouseWheel(request, sender, sendResponse);
       return true; // Will respond asynchronously
 
-    case 'automationComplete': {
-      // Forward task completion to dashboard via WebSocket (per D-03, D-04)
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        var completedSessionId = request.sessionId;
-        var completedSession = activeSessions.get(completedSessionId);
-        if (completedSession && completedSession._isDashboardTask) {
-          var outcomeStr = request.outcome || 'success';
-          var taskStatus = outcomeStr === 'error' ? 'failed' : outcomeStr;
-          var completionSuccess = outcomeStr === 'success';
-          var actionCount = Array.isArray(completedSession.actionHistory) ? completedSession.actionHistory.length : 0;
-          var elapsedMs = Date.now() - (completedSession.startTime || Date.now());
-
-          (async function() {
-            var tabInfo = null;
-            try {
-              if (typeof completedSession.tabId === 'number') {
-                tabInfo = await chrome.tabs.get(completedSession.tabId);
-              }
-            } catch (_e) { /* tab may be closed */ }
-
-            var taskCompletePayload = {
-              success: completionSuccess,
-              summary: request.result || '',
-              elapsed: elapsedMs,
-              taskRunId: completedSession._dashboardTaskRunId || '',
-              task: completedSession.task || request.task || '',
-              taskStatus: taskStatus,
-              progress: completionSuccess ? 100 : (calculateProgress(completedSession).progressPercent || 0),
-              phase: 'complete',
-              action: '',
-              lastAction: completedSession._lastActionSummary || '',
-              actionCount: actionCount,
-              totalCost: completedSession.totalCost || (completedSession.agentState ? completedSession.agentState.totalCost : 0) || 0,
-              finalUrl: tabInfo ? tabInfo.url : (completedSession.lastUrl || ''),
-              pageTitle: tabInfo ? tabInfo.title : '',
-              taskSource: 'live',
-              updatedAt: Date.now(),
-              stopped: !!request.stopped,
-              error: request.error || null,
-              blocker: request.blocker || null,
-              nextStep: request.nextStep || null
-            };
-            fsbWebSocket.send('ext:task-complete', taskCompletePayload);
-
-            _lastDashboardTaskResult = taskCompletePayload;
-            _lastDashboardTaskResultTime = Date.now();
-          })();
-        }
-      }
+    case 'automationComplete':
+      // fsbBroadcastAutomationLifecycle already delivers completion to the UI
+      // pages and the MCP bridge, so there is nothing to do here. The label
+      // stays so this message never falls through to the unknown-action reply.
       break;
-    }
-
-    // ==========================================
-    // DOM Stream forwarding (content -> dashboard via WebSocket)
-    // ==========================================
 
     case 'triggerValueChanged':
     case 'triggerValueReport':
@@ -13193,119 +12960,6 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
         }
       })();
       return true;
-
-    case 'domStreamSnapshot':
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-snapshot', request.snapshot || {});
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'domStreamMutations':
-      // Phase 211-02 STREAM-02: cache the last-known staleFlushCount from
-      // the content script so ws/ws-client.js _emitStreamState can include
-      // it in the ext:stream-state payload. Additive only -- the
-      // ext:dom-mutations payload shape MUST NOT change (D-14).
-      if (typeof request.staleFlushCount === 'number') {
-        _lastDomStreamStaleFlushCount = request.staleFlushCount;
-      }
-      // Phase 211-02 STREAM-01: ensure the dom-stream watchdog alarm is armed
-      // whenever streaming activity is observed. chrome.alarms.create is
-      // idempotent (recreating the same name replaces the schedule), so it is
-      // safe to call on every dispatch. Pattern mirrors ws/mcp-bridge-client.js:218.
-      try {
-        var alarmsApi = (typeof chrome !== 'undefined') ? chrome.alarms : null;
-        if (alarmsApi && typeof alarmsApi.create === 'function') {
-          var armResult = alarmsApi.create('fsb-domstream-watchdog', { periodInMinutes: 1 });
-          if (armResult && typeof armResult.catch === 'function') {
-            armResult.catch(function() { /* best-effort; in-memory watchdog still runs in content script */ });
-          }
-        }
-      } catch (e) { /* best-effort */ }
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-mutations', {
-          mutations: request.mutations || [],
-          streamSessionId: request.streamSessionId || '',
-          snapshotId: request.snapshotId || 0
-        });
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'domStreamScroll':
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-scroll', {
-          scrollX: request.scrollX || 0,
-          scrollY: request.scrollY || 0,
-          streamSessionId: request.streamSessionId || '',
-          snapshotId: request.snapshotId || 0
-        });
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'domStreamOverlay':
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-overlay', {
-          glow: request.glow || null,
-          progress: request.progress || null,
-          streamSessionId: request.streamSessionId || '',
-          snapshotId: request.snapshotId || 0
-        });
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'domStreamDialog':
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-dialog', {
-          dialog: request.dialog || {}
-        });
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'domStreamMedia':
-      // Phase 33 (MEDIA): relay live <video>/<audio> playback state to the
-      // dashboard viewer. The MediaSyncPayload is forwarded as the ws payload
-      // so the viewer receives it verbatim (additive STREAM.* type; the relay
-      // and ws-client are generic by type, so no other hop changes).
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-media', request.media || {});
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'domStreamMediaHint':
-      // Phase 33 (MEDIA): relay an adaptive-manifest discovery hint (dormant
-      // until chrome.webRequest discovery is opt-in enabled).
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-media-hint', request.hint || {});
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'domStreamReady':
-      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
-        fsbWebSocket.send('ext:dom-ready', { tabId: sender.tab ? sender.tab.id : null });
-      }
-      // Phase 276 STREAM-DEFENSIVE-04 (hypothesis #4 pending-intent re-arm):
-      // when the content-script's dom-stream module finishes loading and pings
-      // ready, re-arm any dash:dom-stream-start payload that was parked in
-      // ws-client.js _pendingStreamStart because pingDomStream had not yet
-      // responded within the 5s probe budget. The function is a no-op if no
-      // intent is parked. Defensive only -- the readiness ping should normally
-      // succeed on the first poll, but this covers the edge case where a slow
-      // CWS-flagged page extends past 5s before the dom-stream module loads.
-      try {
-        if (typeof _onDomStreamReady === 'function') {
-          _onDomStreamReady(sender.tab ? sender.tab.id : null);
-        }
-      } catch (e) {
-        console.warn('[FSB DOM] _onDomStreamReady re-arm failed (non-blocking):', e && e.message);
-      }
-      sendResponse({ success: true });
-      break;
 
     case 'lattice-test-connection': {
       // UAT-08 prep: SW-bounce for options.js Test Connection.
@@ -13695,7 +13349,6 @@ async function handleStartAutomation(request, sender, sendResponse) {
           activeSessions,
           persistSession,
           sendSessionStatus,
-          broadcastDashboardProgress: typeof broadcastDashboardProgress === 'function' ? broadcastDashboardProgress : function() {},
           endSessionOverlays,
           cleanupSession,
           startKeepAlive,
@@ -13878,12 +13531,6 @@ async function handleStartAutomation(request, sender, sendResponse) {
     };
 
     activeSessions.set(sessionId, sessionData);
-
-    // Tag dashboard-originated sessions for progress broadcasting and correlation
-    if (source === 'dashboard') {
-      sessionData._isDashboardTask = true;
-      sessionData._dashboardTaskRunId = 'run_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
-    }
 
     // Multi-site orchestration: detect multi-company career task
     if (typeof extractCompaniesFromTask === 'function') {
@@ -14102,7 +13749,6 @@ async function handleStartAutomation(request, sender, sendResponse) {
       activeSessions,
       persistSession,
       sendSessionStatus,
-      broadcastDashboardProgress: typeof broadcastDashboardProgress === 'function' ? broadcastDashboardProgress : function() {},
       endSessionOverlays,
       cleanupSession,
       startKeepAlive,
@@ -16465,9 +16111,6 @@ async function startAutomationLoop(sessionId) {
     taskSummary: session.taskSummary || null
   });
 
-  // Broadcast progress to dashboard for dashboard-originated tasks
-  broadcastDashboardProgress(session);
-
   // Fallback: clean up overlays on previous tab if a tab switch occurred
   if (session.previousTabId && session.previousTabId !== session.tabId) {
     sendSessionStatus(session.previousTabId, { phase: 'ended', reason: 'tab_switch' });
@@ -18501,9 +18144,6 @@ async function startAutomationLoop(sessionId) {
       // Dynamic delay based on stuck counter - optimized for speed
       // FSB TIMING: Log iteration end
       automationLogger.logTiming(sessionId, 'LOOP', 'iteration_end', Date.now() - iterationStart, { iteration: session.iterationCount });
-
-      // Post-iteration progress broadcast to dashboard (after actions executed)
-      broadcastDashboardProgress(session);
 
       const delay = session.stuckCounter > 0 ?
         Math.min(1000 * Math.pow(1.5, session.stuckCounter), 10000) : // Exponential backoff up to 10s
@@ -20788,7 +20428,7 @@ try {
   }
 } catch (_e) { /* icon is presentation-only */ }
 
-// --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
+// --- chrome.alarms.onAlarm Listener (MCP recorder, visual sessions, triggers, telemetry, icon, MCP reconnect) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   // MCP replay recorder idle + retention alarms. The recorder owns the
   // fsbMcpSession: namespace so open sessions survive service-worker
@@ -20907,41 +20547,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     armMcpBridge('alarm:' + MCP_RECONNECT_ALARM);
     return;
   }
-
-  // Phase 211-02 STREAM-01: dom-stream watchdog (safety net).
-  // Survives SW idle eviction (chrome.alarms.create at periodInMinutes: 1).
-  // The content-script self-watchdog is the trip wire; this alarm exists
-  // so a wedged content script does not strand the stream silently.
-  // Phase 212 owns the agent branch below; this branch slots BEFORE it.
-  if (alarm.name === 'fsb-domstream-watchdog') {
-    console.log('[FSB DOM] watchdog alarm fired (SW safety net)');
-    // Phase 276 STREAM-DEFENSIVE-05 (watchdog auto-resnapshot): if streaming
-    // is supposed to be active but the alarm is firing (i.e. the SW just woke
-    // and nothing has flushed mutations recently), request a fresh snapshot
-    // from the dashboard via the ext:request-snapshot signal. The dashboard
-    // routes this through its requestPreviewResync path which re-issues
-    // dash:dom-stream-start. Best-effort -- no-op if the WS is offline or
-    // _streamingActive is false/undefined.
-    try {
-      var streamingActive = (typeof _streamingActive !== 'undefined') && !!_streamingActive;
-      if (streamingActive
-          && typeof fsbWebSocket !== 'undefined'
-          && fsbWebSocket
-          && fsbWebSocket.connected
-          && typeof fsbWebSocket.send === 'function') {
-        var streamTypes = (globalThis.FSBPhantomStreamProtocol && globalThis.FSBPhantomStreamProtocol.STREAM)
-          ? globalThis.FSBPhantomStreamProtocol.STREAM
-          : {};
-        fsbWebSocket.send(streamTypes.REQUEST_SNAPSHOT || 'ext:request-snapshot', {
-          reason: 'sw-watchdog-tick',
-          ts: Date.now()
-        });
-      }
-    } catch (e) {
-      console.warn('[FSB DOM] watchdog auto-resnapshot failed (non-blocking):', e && e.message);
-    }
-    return;
-  }
 });
 
 // Phase 6 Plan 06-02 (FINT-07): SW-side startup wiring for the offscreen
@@ -20987,6 +20592,21 @@ async function clearRetiredBackgroundAgentData() {
       .map((alarm) => chrome.alarms.clear(alarm.name)));
   } catch (error) {
     console.warn('[FSB BG] Retired background agent cleanup failed:', error && error.message);
+  }
+}
+
+// v0.9.95 was the last version with the Live Dashboard, its relay and remote
+// control. Every extension update deletes what they left behind: the relay
+// server address, the paired hash key, the sync toggle, the toolbar icon's
+// relay-seen flag, and the periodic live-preview watchdog alarm.
+const RETIRED_DASHBOARD_STORAGE_KEYS = ['serverHashKey', 'serverUrl', 'serverSyncEnabled', 'fsbActionIconRelaySeen'];
+
+async function clearRetiredDashboardData() {
+  try {
+    await chrome.storage.local.remove(RETIRED_DASHBOARD_STORAGE_KEYS);
+    await chrome.alarms.clear('fsb-domstream-watchdog');
+  } catch (error) {
+    console.warn('[FSB BG] Retired dashboard cleanup failed:', error && error.message);
   }
 }
 
@@ -21061,13 +20681,11 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
   if (details && details.reason === 'update') {
     await clearRetiredBackgroundAgentData();
+    await clearRetiredDashboardData();
   }
 
   // Connect to local MCP bridge (auto-reconnects if server not running yet)
   armMcpBridge('runtime.onInstalled');
-
-  // Connect to dashboard relay (auto-reconnects with backoff)
-  fsbWebSocket.connect();
 });
 
 // Initialize analytics and restore sessions on startup
@@ -21102,9 +20720,6 @@ chrome.runtime.onStartup.addListener(async () => {
 
   // Connect to local MCP bridge (auto-reconnects if server not running yet)
   armMcpBridge('runtime.onStartup');
-
-  // Connect to dashboard relay (auto-reconnects with backoff)
-  fsbWebSocket.connect();
 });
 
 // Listen for debug mode changes so toggling takes effect immediately
@@ -21121,43 +20736,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       && typeof FsbTriggerManager !== 'undefined'
       && typeof FsbTriggerManager.setCap === 'function') {
     FsbTriggerManager.setCap(changes.fsbTriggerCap.newValue);
-  }
-
-  // React to dashboard sync toggle -- connect/disconnect relay WebSocket immediately
-  if (namespace === 'local' && changes.serverSyncEnabled) {
-    if (changes.serverSyncEnabled.newValue) {
-      fsbWebSocket.connect();
-    } else {
-      fsbWebSocket.disconnect();
-    }
-  }
-
-  // React to Sync tab server/key changes. Pairing tokens are generated for a
-  // specific hash key; if the relay remains connected to an older key, the
-  // dashboard joins one room while the extension stays in another.
-  if (namespace === 'local' && (changes.serverHashKey || changes.serverUrl)) {
-    const nextKey = changes.serverHashKey
-      ? changes.serverHashKey.newValue
-      : (typeof fsbWebSocket !== 'undefined' && fsbWebSocket ? fsbWebSocket.serverHashKey : null);
-    const nextUrl = changes.serverUrl
-      ? normalizeDashboardServerUrlForSync(changes.serverUrl.newValue)
-      : (typeof fsbWebSocket !== 'undefined' && fsbWebSocket ? normalizeDashboardServerUrlForSync(fsbWebSocket.serverUrl) : null);
-    const currentKey = (typeof fsbWebSocket !== 'undefined' && fsbWebSocket) ? fsbWebSocket.serverHashKey : null;
-    const currentUrl = (typeof fsbWebSocket !== 'undefined' && fsbWebSocket) ? normalizeDashboardServerUrlForSync(fsbWebSocket.serverUrl) : null;
-    const keyChanged = !!nextKey && nextKey !== currentKey;
-    const urlChanged = !!nextUrl && nextUrl !== currentUrl;
-    if (keyChanged || urlChanged) {
-      chrome.storage.local.get(['serverSyncEnabled']).then(({ serverSyncEnabled }) => {
-        if (serverSyncEnabled === false) return;
-        if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && typeof fsbWebSocket.connect === 'function') {
-          fsbWebSocket.connect();
-        }
-      }).catch(() => {
-        if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && typeof fsbWebSocket.connect === 'function') {
-          fsbWebSocket.connect();
-        }
-      });
-    }
   }
 
   // PERF: Update cached DOM settings in active sessions when changed
@@ -21178,8 +20756,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // =====================================================================
 // Phase 211-03 LOG-04: exportDiagnostics handler (back-end only).
-// Phase 213's Sync tab will wire a button to call this. Phase 211 ships
-// the contract; no UI in this milestone (D-08).
+// No extension UI calls it yet.
 //
 // Request:  { action: 'exportDiagnostics', clear?: boolean }
 // Response: { ok: true, entries: [...], clearedAt: <ts>|null }

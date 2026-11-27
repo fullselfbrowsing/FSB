@@ -4,9 +4,6 @@
  * Connects to the local MCP server's WebSocket bridge on ws://localhost:7225.
  * Routes incoming MCP tool requests to the extension's existing action handlers
  * and sends results back. Auto-reconnects with exponential backoff.
- *
- * This runs alongside the existing dashboard relay (ws-client.js) -- both
- * connections are independent and always-on.
  */
 
 const MCP_BRIDGE_URL = 'ws://localhost:7225';

@@ -9,11 +9,13 @@ const ROOT = path.resolve(__dirname, '..');
 const PHASE_DIR = '.planning/milestones/v0.9.91-phases/61-delegation-ux-sw-eviction-persistence';
 const UAT_PATH = `${PHASE_DIR}/61-HUMAN-UAT.md`;
 const VALIDATION_PATH = `${PHASE_DIR}/61-VALIDATION.md`;
-const PRE_PHASE61_ROOT_TEST_HASH = '1f02d3f54f3136054ccb26f10dbff97e1c30ed7118cae72e0f0dfc758577f683';
+// Both prior-chain digests were re-pinned when the Live Dashboard tests were
+// retired and their commands left the root chain.
+const PRE_PHASE61_ROOT_TEST_HASH = 'b78541f5871ec4456dd5389919a833f2539e5d1c84eab7b782cf7c4f662648c8';
 const PHASE62_DIR = '.planning/milestones/v0.9.91-phases/62-ci-drift-smoke-gate-doctor-extensions';
 const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
 const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
-const PRE_PHASE62_ROOT_TEST_HASH = '8069c2f916171cd373a073d52c5874aa29bad9a0710c7104efde6ce21ee9e282';
+const PRE_PHASE62_ROOT_TEST_HASH = '47efaeca6a9657496b9eb9270b1494da6b4b00d661801ee54e797a8c23d6c254';
 const PHASE63_DIR = '.planning/milestones/v0.9.91-phases/63-native-messaging-host';
 const PHASE63_UAT_PATH = `${PHASE63_DIR}/63-HUMAN-UAT.md`;
 const PHASE63_VALIDATION_PATH = `${PHASE63_DIR}/63-VALIDATION.md`;
@@ -154,7 +156,6 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node --test tests/google-sheets-session.test.js tests/google-sheets-content-actions.test.js tests/gsheets-handler.test.js tests/google-sheets-wiring.test.js tests/spreadsheet-record-redaction.test.js',
   'node tests/sidepanel-automation-runner.test.js',
   'node tests/server-client-ip-geo.test.js',
-  'node tests/ws-client-relay-reconnect.test.js',
   'node --test tests/network-capture-debugger-lifecycle.test.js',
   'node tests/extension-ui-locale.test.js',
   'node scripts/verify-extension-i18n.mjs',
@@ -172,6 +173,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/jev-gateway-log-hygiene.test.js',
   'node tests/jev-calibration-profile.test.js',
   'node tests/server-jev-gateway-boot.test.js',
+  'node tests/dashboard-sunset.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([

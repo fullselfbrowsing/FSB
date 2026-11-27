@@ -574,7 +574,7 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 15 Plan 15-03: 159 mentions (+2 new lines for utils/value-extractor.js +
   // utils/trigger-manager.js -- the fire-condition engine; load order
   // value-extractor -> trigger-store -> trigger-manager -> trigger-lifecycle).
-  // Phase 24 Plan 24-01: 160 mentions (+1 new line for ws/phantom-stream-protocol.js).
+  // Phase 24 Plan 24-01: 160 mentions (+1 new line for the live-preview stream protocol bundle).
   // Phase 26 (v0.9.99 capability foundation): 167 mentions (+7 -- 3 vendored libs
   // lib/{jmespath,minisearch,cfworker-json-schema}.min.js + 3 capability modules
   // utils/capability-{recipe-schema,auth-strategies,interpreter}.js + 1 load-order comment).
@@ -633,13 +633,16 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (side-panel active tab handed to the delegated agent) adds one -> 333.
   // The retained debugger session manager adds one shared load -> 334.
   // Deleting the four commented-out background-agent loads drops it to 330.
+  // Retiring the Live Dashboard removes the three relay loads (lz-string, the
+  // stream protocol bundle and the relay client) plus one comment that named
+  // the relay -> 326.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 330, 'background.js importScripts count includes the retained debugger session manager');
+  passAssertEqual(importScriptsCount, 326, 'background.js importScripts count includes the retained debugger session manager');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
   // (value-extractor + trigger-manager) -> 156; Phase 24 adds 1
-  // (phantom-stream-protocol) -> 157. Phase 26 adds 6 (3 vendored libs + 3 capability
+  // (the live-preview stream protocol bundle) -> 157. Phase 26 adds 6 (3 vendored libs + 3 capability
   // modules) -> 163; Phase 27 Plan 27-02 adds 1 (utils/capability-fetch.js) -> 164.
   // Phase 28 Plan 28-01 adds 2 (catalog/recipe-index.generated.js + utils/capability-search.js) -> 166.
   // Phase 29 adds 5 (utils/capability-catalog.js + utils/capability-router.js + 3 catalog/handlers
@@ -682,8 +685,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // shared model discovery add two more call sites -> 328. The delegation tab
   // seed is call site 329. The debugger session manager is call site 330.
   // Deleting the four commented-out background-agent loads drops it to 326.
+  // Retiring the Live Dashboard removes the three relay loads -> 323.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 326, 'background.js importScripts() call sites include the retained debugger session manager');
+  passAssertEqual(importScriptsCallSites, 323, 'background.js importScripts() call sites include the retained debugger session manager');
   passAssertEqual((bgSource.match(/importScripts\(['"]utils\/debugger-sessions\.js['"]\)/g) || []).length, 1,
     'debugger session manager is loaded exactly once');
   const lineLease = bgLines.findIndex(line => /importScripts\(['"]utils\/cdp-lease\.js['"]\)/.test(line));

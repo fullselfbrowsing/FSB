@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API 設定"
   },
-  "panel_8d261a372f": {
-    "message": "同期"
-  },
   "panel_703390318b": {
     "message": "ベータ"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "破棄"
-  },
-  "panel_49e49bb440": {
-    "message": "生成"
   },
   "panel_0e91610117": {
     "message": "更新"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "ポリシー全文を読む →"
   },
-  "panel_04dfac3671": {
-    "message": "未接続"
-  },
-  "panel_acf2db1614": {
-    "message": "サーバー同期"
-  },
-  "panel_609bbbdf07": {
-    "message": "ハッシュ鍵"
-  },
-  "panel_534803768c": {
-    "message": "ダッシュボードをペアリング"
-  },
-  "panel_9a177de63c": {
-    "message": "スキャンしてペアリング"
-  },
-  "panel_43e3ece73f": {
-    "message": "残り"
-  },
   "panel_c9b3c38247": {
     "message": "合計"
   },
@@ -984,15 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "音声入力を切ると FSB はマイクを使いませんが、Chrome が保存した許可は取り消されません。"
-  },
-  "panel_76e917ee87": {
-    "message": "リモート操作と結果の保存のため、この拡張機能を FSB ダッシュボードとペアリングします"
-  },
-  "panel_c11de3bb2e": {
-    "message": "結果の保存とダッシュボード利用のため FSB サーバーに接続します"
-  },
-  "panel_097b5fa7f6": {
-    "message": "鍵を生成し、ダッシュボードをペアリングしてこのブラウザを FSB サーバーに結びます。"
   },
   "panel_75d0625c55": {
     "message": "バックグラウンドのエージェントは退場しました"
@@ -1555,8 +1522,8 @@
   "panel_d2286811e6": {
     "message": "Claude Code や Cursor などの MCP クライアントを接続し、doctor コマンドで確認します"
   },
-  "panel_f3cb441c27": {
-    "message": "FSB がデータ、保存、任意のサーバー同期をどう扱うかを読みます"
+  "panel_71b36c0b35": {
+    "message": "FSB がデータと保存をどう扱うかを読みます"
   },
   "panel_476481e410": {
     "message": "不具合の報告、機能の要望、開発の進捗確認ができます"
@@ -1636,20 +1603,8 @@
   "panel_22965568d2": {
     "message": "接続済み"
   },
-  "panel_ee172faa9c": {
-    "message": "無効な鍵"
-  },
   "panel_031a8f0f65": {
     "message": "失敗"
-  },
-  "panel_424a2551d3": {
-    "message": "期限切れ"
-  },
-  "panel_c7730178f4": {
-    "message": "新しいコードを生成"
-  },
-  "panel_ac116124f7": {
-    "message": "ペアリングコードを生成できませんでした。もう一度試してください。"
   },
   "panel_d03fd96d28": {
     "message": "読み込み済みのモデルを選ぶ..."
@@ -3080,66 +3035,6 @@
   "copy_84e9814ece": {
     "message": "調査結果を消去できませんでした"
   },
-  "copy_491c2ddc8e": {
-    "message": "先にサーバー URL を入力してください"
-  },
-  "copy_9526d57756": {
-    "message": "ハッシュキーを生成して保存しました"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "ハッシュキーを生成できませんでした"
-  },
-  "copy_52b3b70484": {
-    "message": "サーバーに接続できません: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "コピーするハッシュキーがありません"
-  },
-  "copy_f0b64c63d8": {
-    "message": "ハッシュキーをコピーしました"
-  },
-  "copy_0cf23c4489": {
-    "message": "コピーに失敗しました"
-  },
-  "copy_8cab3b4552": {
-    "message": "サーバー URL とハッシュキーを入力してください"
-  },
-  "copy_271b7b0f3b": {
-    "message": "サーバーに接続しました"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "ハッシュキーが無効です"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "サーバーに接続できません"
-  },
-  "copy_0ea446a05f": {
-    "message": "サーバーはハッシュキーを返しませんでした"
-  },
-  "copy_e5697f10b5": {
-    "message": "ペアリング応答の形式が正しくありません"
-  },
-  "copy_30fa7c27e5": {
-    "message": "ペアリングコードを生成できませんでした: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "ハッシュキーを登録できませんでした: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "このメモリを削除しますか？"
   },
@@ -3188,9 +3083,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "リモート制御が有効です"
   },
   "copy_23a711ebd2": {
     "message": "検索に一致するモデルがありません"
@@ -3314,12 +3206,6 @@
   },
   "copy_f38984cf15": {
     "message": "匿名の使用状況データを送信しています。クリックして停止します。"
-  },
-  "copy_81649d0543": {
-    "message": "サーバーのハッシュキー"
-  },
-  "copy_e4cdf160f5": {
-    "message": "ハッシュキーをコピー"
   },
   "copy_8c16fe2070": {
     "message": "有効にすると、新しいメモリが AI によって自動分析され、より深い洞察が得られます"

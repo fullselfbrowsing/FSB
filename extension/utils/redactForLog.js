@@ -7,11 +7,9 @@
 // globalThis.fsbDiagnostics so load order is forgiving.
 //
 // Layered prefixes (D-11):
-//   DLG  -- dialog relay (content/dom-stream.js dialog open/close)
-//   DOM  -- content stream (mutation/scroll/overlay/snapshot/ready dispatch)
+//   DOM  -- content-script DOM and navigation events
 //   BG   -- background runtime
 //   WS   -- websocket transport
-//   SYNC -- Sync tab UI (reserved for Phase 213)
 //
 // Redaction rule (D-12 / PITFALLS.md P11):
 //   Default behavior is "log shape, not content".

@@ -538,7 +538,6 @@ test('content action exposes only the fixed Sheets UI operations and protects va
   const actions = ACTIONS_SOURCE;
   const messaging = fs.readFileSync(path.join(ROOT, 'extension/content/messaging.js'), 'utf8');
   const background = fs.readFileSync(path.join(ROOT, 'extension/background.js'), 'utf8');
-  const wsClient = fs.readFileSync(path.join(ROOT, 'extension/ws/ws-client.js'), 'utf8');
   const legacySheetsActions = actions.slice(
     actions.indexOf('fillsheet: async'),
     actions.indexOf('dragdrop: async')
@@ -560,5 +559,4 @@ test('content action exposes only the fixed Sheets UI operations and protects va
   assert.match(messaging, /'fillsheet'[\s\S]*'readsheet'[\s\S]*'sheetsSession'/);
   assert.match(messaging, /longTimeoutTools = \[[^\]]*'sheetsSession'/);
   assert.match(background, /'utils\/google-sheets-ui\.js'[\s\S]*'content\/actions\.js'/);
-  assert.match(wsClient, /'utils\/google-sheets-ui\.js'[\s\S]*'content\/actions\.js'/);
 });

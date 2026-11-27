@@ -140,11 +140,10 @@ check(!source.includes('document.cookie'), 'resolver does not read document.cook
 // Nothing in the service worker translates, so it does not load the module.
 // Content scripts do, right before the overlay that uses it.
 const background = fs.readFileSync(path.join(root, 'extension/background.js'), 'utf8');
-const wsClient = fs.readFileSync(path.join(root, 'extension/ws/ws-client.js'), 'utf8');
 check(!background.includes("importScripts('utils/ui-locale.js')"), 'the service worker does not load ui-locale.js');
 const contentScriptOrder = /'utils\/ui-locale\.js',\s*'content\/visual-feedback\.js'/;
-check(contentScriptOrder.test(background) && contentScriptOrder.test(wsClient),
-  'both content-script lists inject ui-locale.js right before visual-feedback.js');
+check(contentScriptOrder.test(background),
+  'the content-script list injects ui-locale.js right before visual-feedback.js');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'extension/manifest.json'), 'utf8'));
 check(manifest.default_locale === 'en', 'manifest default_locale is en');
@@ -1910,8 +1909,6 @@ function sidepanelMessageContext(api) {
     ['options', "'Error saving payment method: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
     ['options', "'Failed to start explorer: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
     ['options', "'Failed to load more session events: $ERROR$', { error: { english: error.message } }", 1],
-    ['options', "'Could not generate pairing code: $ERROR$', { error: { english: error.message } }", 2],
-    ['options', "'Could not register hash key: $ERROR$', { error: { english: error.message } }", 1],
     ['sidepanel', "var providerSubs = { name: provider ? provider.label : { english: 'Selected provider' } };", 1],
     ['sidepanel', "headingSubs = { name: snapshot.provider ? snapshot.provider.label : { english: 'Selected provider' } };", 1],
     ['sidepanel', "reason: startDetail ? { english: startDetail.reason } : '',", 1],

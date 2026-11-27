@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API 設定"
   },
-  "panel_8d261a372f": {
-    "message": "同步"
-  },
   "panel_703390318b": {
     "message": "測試版"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "捨棄"
-  },
-  "panel_49e49bb440": {
-    "message": "產生"
   },
   "panel_0e91610117": {
     "message": "重新整理"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "閱讀完整政策 →"
   },
-  "panel_04dfac3671": {
-    "message": "未連線"
-  },
-  "panel_acf2db1614": {
-    "message": "伺服器同步"
-  },
-  "panel_609bbbdf07": {
-    "message": "雜湊金鑰"
-  },
-  "panel_534803768c": {
-    "message": "配對儀表板"
-  },
-  "panel_9a177de63c": {
-    "message": "掃描配對"
-  },
-  "panel_43e3ece73f": {
-    "message": "剩餘"
-  },
   "panel_c9b3c38247": {
     "message": "合計"
   },
@@ -984,15 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "關閉語音輸入後，FSB 不再使用麥克風，但不會撤銷 Chrome 已儲存的權限。"
-  },
-  "panel_76e917ee87": {
-    "message": "將此擴充功能與 FSB 儀表板配對，以便遠端控制和儲存結果"
-  },
-  "panel_c11de3bb2e": {
-    "message": "連線 FSB 伺服器以儲存結果並使用儀表板"
-  },
-  "panel_097b5fa7f6": {
-    "message": "產生金鑰，然後配對儀表板，將此瀏覽器連到 FSB 伺服器。"
   },
   "panel_75d0625c55": {
     "message": "背景代理已經離開"
@@ -1555,8 +1522,8 @@
   "panel_d2286811e6": {
     "message": "連接 Claude Code 和 Cursor 等 MCP 用戶端，然後用 doctor 命令驗證"
   },
-  "panel_f3cb441c27": {
-    "message": "閱讀 FSB 如何處理資料、儲存和選用的伺服器同步"
+  "panel_71b36c0b35": {
+    "message": "閱讀 FSB 如何處理資料和儲存"
   },
   "panel_476481e410": {
     "message": "回報缺陷、要求功能並追蹤開發進度"
@@ -1636,20 +1603,8 @@
   "panel_22965568d2": {
     "message": "已連線"
   },
-  "panel_ee172faa9c": {
-    "message": "無效金鑰"
-  },
   "panel_031a8f0f65": {
     "message": "失敗"
-  },
-  "panel_424a2551d3": {
-    "message": "已過期"
-  },
-  "panel_c7730178f4": {
-    "message": "產生新代碼"
-  },
-  "panel_ac116124f7": {
-    "message": "無法產生配對碼。請再試一次。"
   },
   "panel_d03fd96d28": {
     "message": "選擇已載入的模型..."
@@ -3080,66 +3035,6 @@
   "copy_84e9814ece": {
     "message": "無法清除研究結果"
   },
-  "copy_491c2ddc8e": {
-    "message": "請先輸入伺服器 URL"
-  },
-  "copy_9526d57756": {
-    "message": "已產生並儲存雜湊金鑰"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "無法產生雜湊金鑰"
-  },
-  "copy_52b3b70484": {
-    "message": "無法連接伺服器：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "沒有可複製的雜湊金鑰"
-  },
-  "copy_f0b64c63d8": {
-    "message": "已複製雜湊金鑰"
-  },
-  "copy_0cf23c4489": {
-    "message": "複製失敗"
-  },
-  "copy_8cab3b4552": {
-    "message": "請輸入伺服器 URL 和雜湊金鑰"
-  },
-  "copy_271b7b0f3b": {
-    "message": "伺服器連線成功"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "雜湊金鑰無效"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "無法連接伺服器"
-  },
-  "copy_0ea446a05f": {
-    "message": "伺服器未傳回雜湊金鑰"
-  },
-  "copy_e5697f10b5": {
-    "message": "配對回應格式錯誤"
-  },
-  "copy_30fa7c27e5": {
-    "message": "無法產生配對碼：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "無法註冊雜湊金鑰：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "刪除此記憶？"
   },
@@ -3188,9 +3083,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "遠端控制已啟用"
   },
   "copy_23a711ebd2": {
     "message": "沒有模型符合搜尋"
@@ -3314,12 +3206,6 @@
   },
   "copy_f38984cf15": {
     "message": "正在傳送匿名使用資料。點選以停止。"
-  },
-  "copy_81649d0543": {
-    "message": "你的伺服器雜湊金鑰"
-  },
-  "copy_e4cdf160f5": {
-    "message": "複製雜湊金鑰"
   },
   "copy_8c16fe2070": {
     "message": "啟用後，新記憶會由 AI 自動分析以獲得更深入的見解"

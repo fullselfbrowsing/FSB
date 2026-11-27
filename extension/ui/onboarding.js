@@ -332,7 +332,7 @@
     bind('#obUseByok', 'click', () => { state.path = 'byok'; state.screen = 'provider'; render(); });
     bind('#obOpenClaw', 'click', (event) => {
       event.preventDefault();
-      openInternalPage('ui/control_panel.html#sync');
+      openInternalPage('ui/control_panel.html#help');
     });
   }
 
