@@ -47,6 +47,7 @@ Use this package when you want your AI client to drive the browser directly whil
 - The long-lived local agent service owns hub port 7225. A stdio server joins it as a relay, or hands the port over once nothing is in flight.
 - Uninstalling FSB from its last client removes a helper that `install` set up, unless the extension has run a delegated agent through it. After `uninstall --all` or `uninstall --native-host`, the helper stays off until the next `install`.
 - One helper can serve several browsers, and `uninstall --native-host --browser <name>` removes only that browser's registration.
+- The hub answers the extension's 1Password requests, so logins and cards come from the user's 1Password, and `fsb-mcp-server onepassword` configures the connection from a terminal. See [1Password for logins and cards](#1password-for-logins-and-cards).
 - **Compatibility:** `fsb-mcp-server` 0.95.0 requires FSB extension 0.9.99 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.5
