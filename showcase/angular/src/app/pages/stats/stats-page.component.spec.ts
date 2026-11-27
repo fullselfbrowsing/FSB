@@ -317,6 +317,31 @@ describe('StatsPageComponent visualization lifecycle', () => {
     expect(fixture.componentInstance.hasPlottableRegions).toBeFalse();
   });
 
+  it('gives every Popular client an opaque colour of its own and names the 7-day window', async () => {
+    const fixture = await createFixture('fsb-popular-mcp');
+    chartLoader.resolve({ default: FakeChart });
+    await settle(fixture);
+
+    const labels = [
+      'Claude', 'Codex', 'Grok', 'Cursor', 'Grok Bot',
+      'OpenCode', 'OpenClaw', 'Hermes', 'Antigravity', 'Gemini',
+    ];
+    fsb.headline$.next(readyState(fsbHeadline({
+      popular_mcp_clients: labels.map((label, index) => ({ label, uniq: labels.length - index })),
+    })));
+    await settle(fixture);
+
+    const config = chartInstances[chartInstances.length - 1].config;
+    const colours: string[] = config.data.datasets[0].backgroundColor;
+    expect(config.type).toBe('doughnut');
+    expect(config.data.labels).toEqual(labels);
+    expect(colours).toHaveSize(labels.length);
+    expect(new Set(colours).size).toBe(labels.length);
+    // Translucent theme tokens (primary-soft, border) made slices invisible.
+    expect(colours.filter((colour) => /^rgba\(/.test(colour))).toEqual([]);
+    expect(fixture.componentInstance.tabMetrics[0]).toEqual({ label: 'clients (7d)', value: '10' });
+  });
+
   it('does not mount a chart when the loader resolves after destruction', async () => {
     const fixture = await createFixture();
     github.stars$.next(starState());

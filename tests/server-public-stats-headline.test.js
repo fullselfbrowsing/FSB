@@ -108,8 +108,8 @@ function getJson(path_, extraHeaders = {}) {
   queries.upsertRollupDailyRow(UUID_A, YESTERDAY, 30, 20, 1, 1);
 
   // --- Seed telemetry_global_aggregates: 2 rows (today + yesterday). ---
-  // popular_mcp_json has a >=k=5 label "Claude" plus an Other bucket (housekeeper
-  // would have written this already). We seed it directly here.
+  // A stale daily client list. The headline must ignore it and count clients
+  // from the last 7 days of raw events instead (see the checks below).
   const popularMcpToday = JSON.stringify([
     { label: 'Claude', uniq: 6 },
     { label: 'Other (N=12)', uniq: 12 },
@@ -218,8 +218,10 @@ function getJson(path_, extraHeaders = {}) {
       Array.isArray(body.popular_mcp_clients) && body.popular_mcp_clients.every(
         (x) => typeof x.label === 'string' && Number.isInteger(x.uniq)),
       `got ${JSON.stringify(body.popular_mcp_clients)}`);
-    check('popular_mcp_clients includes Claude with uniq=6',
-      body.popular_mcp_clients.some((x) => x.label === 'Claude' && x.uniq === 6),
+    check('popular_mcp_clients counts the 3 posted Claude installs, not the daily row',
+      body.popular_mcp_clients.length === 1
+        && body.popular_mcp_clients[0].label === 'Claude'
+        && body.popular_mcp_clients[0].uniq === 3,
       `got ${JSON.stringify(body.popular_mcp_clients)}`);
     check('popular_agents is array of {label,uniq}',
       Array.isArray(body.popular_agents) && body.popular_agents.every(
@@ -273,6 +275,61 @@ function getJson(path_, extraHeaders = {}) {
   const exact24h = queries.getPublicHeadlineRows(TOKENS_NOW).tokens_24h;
   check('tokens_24h includes exact endpoints only (10 + 20 = 30)', exact24h === 30,
     `got ${exact24h}`);
+
+  // The client list is a rolling 7 days of raw events. A client seen
+  // yesterday but not today still shows, and 'unknown' never does: it marks
+  // heartbeats and calls recorded before the extension knew the client, from
+  // installs that also report their real client.
+  const POPULAR_NOW = Date.UTC(2030, 1, 1, 12, 0, 0);
+  const D7 = 7 * 24 * 60 * 60 * 1000;
+  const FUTURE_TOLERANCE = 5 * 60 * 1000;
+  const popularRows = [
+    // [install, ts_minute, client, tokens_in]
+    ['bbbbbbbb-0000-4000-8000-000000000001', POPULAR_NOW - D7, 'Claude', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000002', POPULAR_NOW - H24, 'Claude', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000003', POPULAR_NOW - H24, 'Grok', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000004', POPULAR_NOW - 6 * H24, 'Grok Bot', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000005', POPULAR_NOW + FUTURE_TOLERANCE, 'Cursor', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000006', POPULAR_NOW - D7 - 1, 'Codex', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000007', POPULAR_NOW + FUTURE_TOLERANCE + 1, 'Hermes', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000001', POPULAR_NOW - 60 * 1000, 'unknown', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000008', POPULAR_NOW - 60 * 1000, 'unknown', 100],
+    ['bbbbbbbb-0000-4000-8000-000000000009', POPULAR_NOW - 60 * 1000, 'unknown', 0],
+  ];
+  popularRows.forEach(([installUuid, tsMinute, client, tokensIn], index) => {
+    queries.insertTelemetryEvent.run(
+      `cccccccc-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      installUuid, tsMinute, client, 'm', tokensIn, 0, 0,
+      'periodic', 'popular-hash', tsMinute
+    );
+  });
+  const popular = buildHeadlineJson(queries, POPULAR_NOW).popular_mcp_clients;
+  const popularByLabel = Object.fromEntries(popular.map((x) => [x.label, x.uniq]));
+  check('7-day client list keeps yesterday and 6-days-ago clients (Grok, Grok Bot)',
+    popularByLabel.Grok === 1 && popularByLabel['Grok Bot'] === 1,
+    `got ${JSON.stringify(popular)}`);
+  check('7-day client list includes the exact lower bound and the +5 min ingest tolerance',
+    popularByLabel.Claude === 2 && popularByLabel.Cursor === 1,
+    `got ${JSON.stringify(popular)}`);
+  check('7-day client list drops events older than 7 days and beyond the future tolerance',
+    !('Codex' in popularByLabel) && !('Hermes' in popularByLabel),
+    `got ${JSON.stringify(popular)}`);
+  check('client list never publishes unknown, with or without tokens',
+    !('unknown' in popularByLabel) && popular.length === 4,
+    `got ${JSON.stringify(popular)}`);
+  check('client list is sorted by installs, largest first',
+    popular[0].label === 'Claude' && popular[0].uniq === 2,
+    `got ${JSON.stringify(popular)}`);
+
+  // The query must be served by the partial index of labelled rows; most of
+  // the table is 'unknown' heartbeats it never needs to read.
+  const popularPlan = db.prepare(`EXPLAIN QUERY PLAN ${queries.selectPopularMcpForDayRange.source}`)
+    .all(POPULAR_NOW - D7, POPULAR_NOW)
+    .map((row) => row.detail)
+    .join(' | ');
+  check('client list query uses idx_telemetry_events_labeled_ts',
+    popularPlan.includes('idx_telemetry_events_labeled_ts'),
+    `plan=${popularPlan}`);
 
   activeTracker._resetForTest();
   const ACTIVE_BOUNDARY_NOW = Date.UTC(2030, 0, 2, 12, 0, 0);

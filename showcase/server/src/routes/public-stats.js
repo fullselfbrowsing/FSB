@@ -24,9 +24,10 @@
  *   - Reads telemetry_rollups_daily + telemetry_global_aggregates via
  *     queries.getPublicHeadlineRows() + queries.getPublicSeriesRows().
  *   - Reads in-memory liveness via active-tracker.countActiveUsers / getActiveAgentSum.
- *   - popular_mcp_json / popular_agent_json arrive pre-filtered by Phase 273
- *     housekeeper (k>=5 floor; below-k collapsed to "Other (N=<sum>)" -- per
- *     D-07 + WR-01).
+ *   - popular_mcp_clients counts installs per named client over the last
+ *     7 days of telemetry_events and passes through the housekeeper's
+ *     applyMcpKFloor, so it obeys the same anonymity floor as the daily row.
+ *   - popular_agent_json arrives pre-filtered by the housekeeper.
  */
 
 'use strict';
@@ -34,7 +35,12 @@
 const express = require('express');
 const crypto = require('crypto');
 const activeTracker = require('../telemetry/active-tracker');
-const { applyRegionKFloor, REGION_K_FLOOR } = require('../telemetry/housekeeper');
+const {
+  applyMcpKFloor,
+  applyRegionKFloor,
+  K_ANONYMITY_FLOOR,
+  REGION_K_FLOOR,
+} = require('../telemetry/housekeeper');
 const { placeCentroid } = require('../utils/ip-geo');
 
 // 30-second in-process memo TTL.
@@ -125,10 +131,12 @@ function buildHeadlineJson(queries, nowMs = Date.now()) {
     activeSnapshotMs,
   );
 
-  // popular_mcp_json rows look like {mcp_client, uniq}; rename to {label, uniq}
-  // for the public-facing FSBTelemetryHeadline contract. popular_agent_json
-  // follows the same shape (housekeeper writes {agent, uniq} -> rename agent).
-  const popularMcpRaw = safeParseArray(rows.latest_global.popular_mcp_json);
+  // Client popularity covers the last 7 days of raw events rather than the
+  // latest daily row, which only holds the current UTC day. Rows look like
+  // {mcp_client, uniq}; rename to {label, uniq} for the public
+  // FSBTelemetryHeadline contract. popular_agent_json follows the same shape
+  // (housekeeper writes {agent, uniq} -> rename agent).
+  const popularMcpRaw = applyMcpKFloor(rows.popular_mcp_7d, K_ANONYMITY_FLOOR);
   const popularAgentRaw = safeParseArray(rows.latest_global.popular_agent_json);
   // Region breakdown. Stored as {region, uniq}, already k>=5-floored by the
   // housekeeper (city -> subdivision -> country -> 'Other'); mapped to the

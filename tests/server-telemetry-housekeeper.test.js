@@ -25,6 +25,7 @@ const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 
 const {
   runHousekeeperTick,
   floorToUtcDayMs,
+  applyMcpKFloor,
   K_ANONYMITY_FLOOR,
   ROLLUP_RETENTION_DAYS,
 } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'housekeeper'));
@@ -297,6 +298,64 @@ check('daily source cap attributes each install only to its latest observed sour
   roamingGlobal && roamingGlobal.agents_active_sum === 64 && roamingGlobal.trusted_active_installs === 2,
   `got ${JSON.stringify(roamingGlobal)}`);
 roamingDb.close();
+
+// 'unknown' is never a client in the daily list, even when it carries tokens:
+// the extension records MCP calls as 'unknown' until it learns the client,
+// and those installs report their real client as well.
+const unknownDb = new Database(':memory:');
+initializeDatabase(unknownDb);
+const unknownQueries = new Queries(unknownDb);
+const labelledInstall = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
+const unlabelledInstall = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
+const heartbeatInstall = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3';
+[
+  ['ffffffff-ffff-4fff-8fff-000000000001', labelledInstall, 'Grok', 100, 200],
+  ['ffffffff-ffff-4fff-8fff-000000000002', labelledInstall, 'unknown', 100, 200],
+  ['ffffffff-ffff-4fff-8fff-000000000003', unlabelledInstall, 'unknown', 300, 600],
+  ['ffffffff-ffff-4fff-8fff-000000000004', heartbeatInstall, 'unknown', 0, 0],
+].forEach(([eventId, installUuid, client, tokensIn, tokensOut], index) => {
+  unknownQueries.insertTelemetryEventWithRegionV2.run(
+    eventId, installUuid, tsToday + index * 60000, client, 'm', tokensIn, tokensOut, 0, 2,
+    'periodic', 'unknown-source', NOW, 'unknown'
+  );
+});
+runHousekeeperTick(unknownDb, unknownQueries, NOW);
+const unknownGlobal = unknownDb.prepare(
+  'SELECT unique_installs, popular_mcp_json FROM telemetry_global_aggregates WHERE day_utc = ?'
+).get(TODAY);
+const unknownPopular = unknownGlobal ? JSON.parse(unknownGlobal.popular_mcp_json) : null;
+check('daily client list drops unknown with and without tokens but still counts every install',
+  unknownGlobal && unknownGlobal.unique_installs === 3
+    && Array.isArray(unknownPopular)
+    && unknownPopular.length === 1
+    && unknownPopular[0].mcp_client === 'Grok'
+    && unknownPopular[0].uniq === 1,
+  `got ${JSON.stringify(unknownGlobal)}`);
+unknownDb.close();
+
+// The floor is 1 today, so the 'Other' bucketing never fires in the ticks
+// above. Exercise it directly so raising the floor keeps working.
+const bucketed = applyMcpKFloor([
+  { mcp_client: 'Claude', uniq: 3 },
+  { mcp_client: 'Grok', uniq: 1 },
+  { mcp_client: 'Hermes', uniq: 1 },
+], 2);
+check('applyMcpKFloor pools installs of below-floor labels into Other',
+  JSON.stringify(bucketed) === JSON.stringify([
+    { mcp_client: 'Claude', uniq: 3 },
+    { mcp_client: 'Other', uniq: 2 },
+  ]),
+  `got ${JSON.stringify(bucketed)}`);
+const suppressed = applyMcpKFloor([
+  { mcp_client: 'Claude', uniq: 3 },
+  { mcp_client: 'Grok', uniq: 1 },
+], 2);
+check('applyMcpKFloor drops Other when its own total is under the floor',
+  JSON.stringify(suppressed) === JSON.stringify([{ mcp_client: 'Claude', uniq: 3 }]),
+  `got ${JSON.stringify(suppressed)}`);
+check('applyMcpKFloor treats a missing list as empty',
+  Array.isArray(applyMcpKFloor(undefined, 1)) && applyMcpKFloor(undefined, 1).length === 0,
+  'expected []');
 
 // Upgrade an actual pre-v2 telemetry schema. Existing active values default to
 // version zero, so the migration cannot accidentally bless leaked history.

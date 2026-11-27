@@ -267,6 +267,10 @@ function initializeDatabase(db) {
     CREATE INDEX IF NOT EXISTS idx_telemetry_events_iphash_recv ON telemetry_events(ip_hash, received_at);
     CREATE INDEX IF NOT EXISTS idx_telemetry_events_ts ON telemetry_events(ts_minute);
     CREATE INDEX IF NOT EXISTS idx_telemetry_events_received_at ON telemetry_events(received_at);
+    -- Only rows with a named MCP client, a small fraction of the table (most
+    -- rows are 'unknown' heartbeats), so the 7-day public client list stays cheap.
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_labeled_ts
+      ON telemetry_events(ts_minute, mcp_client, install_uuid) WHERE mcp_client <> 'unknown';
 
     -- telemetry_rollups_daily: per-UUID per-day aggregates; 365-day retention; powers Phase 274.
     -- region / geo_kind are the install's latest coarse location for that UTC day

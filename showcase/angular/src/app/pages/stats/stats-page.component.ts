@@ -362,7 +362,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
         const list = headline?.popular_mcp_clients ?? [];
         const top = list[0];
         return [
-          { label: $localize`:@@stats.metric.trackedClients:tracked clients`, value: this.fmtNum(list.length) },
+          { label: $localize`:@@stats.metric.trackedClients:clients (7d)`, value: this.fmtNum(list.length) },
           { label: top ? $localize`:@@stats.metric.topNamed:top: ${this.displayLabel(top.label)}:entityLabel:` : $localize`:@@stats.metric.topClient:top client`, value: top ? this.fmtNum(top.uniq) : '0' },
         ];
       }
@@ -1050,10 +1050,10 @@ export class StatsPageComponent implements OnInit, OnDestroy {
               {
                 label: $localize`:@@SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND:Popular MCP clients`,
                 data: list.map((x) => x.uniq),
-                backgroundColor: [
-                  tokens.primary, tokens.primarySoft, tokens.muted,
-                  tokens.border, tokens.text, '#a78bfa', '#34d399',
-                ],
+                // One opaque colour per client; see doughnutColor at the end of the file.
+                backgroundColor: list.map((_, index) =>
+                  doughnutColor(tokens, index),
+                ),
               },
             ],
           },
@@ -1105,3 +1105,15 @@ function readChartTokens(): ChartTokens {
 const CHART_LIBRARY_ERROR = $localize`:@@stats.error.chartLibrary:Could not load chart library.`;
 const CHART_RENDER_ERROR = $localize`:@@stats.error.chartRender:Could not render the selected chart.`;
 const PRELOCALIZED_ERRORS: ReadonlySet<string> = new Set([CHART_LIBRARY_ERROR, CHART_RENDER_ERROR]);
+
+/* The client doughnut can hold every allowlisted MCP client, so each slice gets
+   an opaque colour of its own. The theme's primary leads; the fixed hues read on
+   both the dark and light themes, and the palette repeats only past its end. */
+const DOUGHNUT_HUES: readonly string[] = [
+  '#a78bfa', '#34d399', '#60a5fa', '#fbbf24', '#f472b6', '#22d3ee', '#a3e635', '#f87171',
+];
+
+function doughnutColor(tokens: ChartTokens, index: number): string {
+  const palette = [tokens.primary, ...DOUGHNUT_HUES, tokens.muted];
+  return palette[index % palette.length];
+}
