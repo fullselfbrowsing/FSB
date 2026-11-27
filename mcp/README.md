@@ -36,8 +36,6 @@ It also supports trigger watchers, visible client-owned visual sessions, capabil
 
 Use this package when you want your AI client to drive the browser directly while still using FSB's DOM analysis, selector handling, visual overlay, action verification, session logging, memory, and vault boundaries.
 
-> **PhantomStream (engineering milestone 0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
-
 ### What's New In v0.11.5
 
 - `install --cline` writes `~/.cline/data/settings/cline_mcp_settings.json`, the settings file Cline's VS Code extension, JetBrains plugin, and CLI share. Earlier versions wrote a VS Code extension-storage file that current Cline ignores after its one-time import, so rerun the install if FSB never appeared in Cline.

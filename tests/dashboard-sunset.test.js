@@ -652,6 +652,14 @@ function setEntries(source, name) {
     .filter((table) => !schemaSource.includes('CREATE TABLE IF NOT EXISTS ' + table + ' ('));
   check(missing.length === 0, 'schema.js still creates the dashboard-era tables, so their data is kept',
     'missing: ' + missing.join(', '));
+
+  // Nothing in FSB uses the PhantomStream package any more; the library lives on its own.
+  const rootPackage = JSON.parse(read('package.json'));
+  const rootLock = JSON.parse(read('package-lock.json'));
+  const PHANTOM_PACKAGE = '@full-self-browsing/phantom-stream';
+  check(!(rootPackage.dependencies || {})[PHANTOM_PACKAGE] && !(rootPackage.devDependencies || {})[PHANTOM_PACKAGE]
+    && !rootLock.packages['node_modules/' + PHANTOM_PACKAGE],
+    'the root package no longer depends on ' + PHANTOM_PACKAGE);
 }
 
 // ---- Section 10: fsb-server -- the legacy relay sink ----

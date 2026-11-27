@@ -95,7 +95,6 @@
   ],
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
-    "@full-self-browsing/phantom-stream": "0.2.1",
     "axios": "^1.6.0",
     "jmespath": "^0.16.0",
     "lattice": "npm:@full-self-browsing/lattice@1.4.0",

@@ -1,10 +1,24 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.95`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase site) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.95`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
 The independently published `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ## [Unreleased]
+
+### Removed
+
+- **The Live Dashboard is retired.** The showcase `/dashboard` page is gone, along with pairing a browser to it (hash key and QR code), the live DOM preview, remote control from the web, and starting tasks from the dashboard. v0.9.95 is the last version that has them. `/dashboard`, `/dashboard/`, `/dashboard.html` and their localized forms now redirect permanently to the matching home page, and the support FAQ's remote-control answer is gone.
+- **The extension no longer keeps a connection to full-selfbrowsing.com.** It no longer registers a hash key, opens the `wss://…/ws` relay at install and startup, streams pages, or accepts remote input. The control panel's Sync tab is gone, and the toolbar icon no longer dims when that relay is unreachable; its animations are unchanged. The relay's 20-second keepalive also kept the service worker awake on every install, so the worker now goes idle like any other MV3 worker when no session, MCP bridge, or trigger needs it.
+- **An update cleans up what older versions left behind.** On update the extension deletes `serverHashKey`, `serverUrl`, `serverSyncEnabled` and `fsbActionIconRelaySeen` from storage and clears the `fsb-domstream-watchdog` alarm, the same way v0.9.95 cleaned up after background agents.
+- **The FSB dependency on `@full-self-browsing/phantom-stream` is gone.** PhantomStream continues as a standalone open-source library, and its showcase page stays.
+
+### Changed
+
+- **fsb-server keeps old installs quiet instead of refusing them.** Installs still on v0.9.95 or earlier keep dialing the relay and would dim their toolbar icon if it disappeared. `/ws` now holds their sockets open: it answers their keepalive ping and discards everything else without reading or storing it. Every other upgrade gets `410 Gone`, as do `/api/auth/*` and `/api/pair/*`. The sink logs one aggregate count an hour and goes away once that count nears zero. The pairing and hash-key tables keep their existing rows; nothing new is written to them.
+- **The background-agents note moved to Help.** It used to sit in the Sync tab. Onboarding's "Set it up for your Claw" link and old `#sync` links now open Help.
+- **The privacy policy dates the retirement.** The Remote Dashboard and PhantomStream disclosure now applies to v0.9.95 and earlier, the page is dated November 27, 2026, and the September 29, 2026 policy is archived in every site language.
+- The showcase CSP no longer allows scripts from unpkg.com, the camera permission policy is off, and CORS no longer exposes `X-FSB-Hash-Key`; only the dashboard used them.
 
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
