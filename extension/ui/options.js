@@ -1816,18 +1816,7 @@ function initFsbSelects() {
 }
 
 function normalizeSectionId(sectionId) {
-  // The Sync section is gone. Old #sync links, and the #retired-agents link
-  // from onboarding, open Help, which ends with the background-agents note.
-  if (sectionId === 'sync' || sectionId === 'retired-agents') return 'help';
   return sectionId === 'providers' ? 'api-config' : sectionId;
-}
-
-// The note sits below every Help card, so a link meant for it scrolls it into view.
-function revealRetiredAgentsNote(rawSectionId) {
-  if (rawSectionId !== 'sync' && rawSectionId !== 'retired-agents') return;
-  const note = document.getElementById('retired-agents-note');
-  if (!note) return;
-  requestAnimationFrame(() => note.scrollIntoView({ block: 'start' }));
 }
 
 function switchSection(sectionId) {
@@ -1861,11 +1850,9 @@ function switchSection(sectionId) {
 
 function initializeSections() {
   // Check URL hash for initial section
-  const rawHash = window.location.hash.slice(1);
-  const hash = normalizeSectionId(rawHash);
+  const hash = normalizeSectionId(window.location.hash.slice(1));
   if (hash && document.getElementById(hash)) {
     switchSection(hash);
-    revealRetiredAgentsNote(rawHash);
   }
 }
 

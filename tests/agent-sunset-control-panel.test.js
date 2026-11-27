@@ -1,9 +1,9 @@
 /**
  * Background-agents retirement: control panel and chat UI checks.
  *
- *   - The control panel keeps its note about the retired agents (now in
- *     the Help section), with both links (target=_blank rel=noopener
- *     noreferrer) and a footer naming v0.9.45rc1 and April 2026.
+ *   - The note about the retired agents is gone too: no "Background agents
+ *     have left the building" block, OpenClaw / Claude Routines links or
+ *     "Retired in v0.9.45rc1" footer is left in the control panel.
  *   - The commented-out agent UI (agent forms, /agent slash commands) and
  *     the old "Your previous agents" notice are gone; nothing in the UI
  *     reads bgAgents any more.
@@ -54,22 +54,22 @@ function fail(label, detail) {
   if (detail) console.log('       ' + detail);
 }
 
-// ---- Section 1: AGENTS-01 deprecation notice present in control_panel.html ----
+// ---- Section 1: the retired-agents note is gone from control_panel.html ----
 
 {
   const src = read('extension/ui/control_panel.html');
-  const tryOpenClaw = countSubstring(src, 'Try OpenClaw') === 1;
-  const tryRoutines = countSubstring(src, 'Try Claude Routines') === 1;
-  const noNoopener = (src.match(/rel="noopener noreferrer"/g) || []).length;
+  const leftovers = [
+    'Background agents have left the building',
+    'Try OpenClaw',
+    'Try Claude Routines',
+    'Retired in v0.9.45rc1',
+    'sync-deprecation',
+  ].filter(text => src.includes(text));
   const footerTexts = extractDeprecationFooterTexts(src);
-  const footer = footerTexts.filter(text => (
-    text.includes('Retired in v0.9.45rc1') &&
-    text.includes('April 2026')
-  )).length === 1;
-  if (tryOpenClaw && tryRoutines && noNoopener >= 2 && footer) {
-    pass('AGENTS-01 deprecation notice present (CTAs + semantic footer; rel=noopener noreferrer count=' + noNoopener + ')');
+  if (leftovers.length === 0 && footerTexts.length === 0) {
+    pass('AGENTS-01 the retired-agents note and its footer are removed from the control panel');
   } else {
-    fail('AGENTS-01 deprecation notice incomplete', 'tryOpenClaw=' + tryOpenClaw + ' tryRoutines=' + tryRoutines + ' noopener=' + noNoopener + ' footer=' + footer + ' footerTexts=' + JSON.stringify(footerTexts));
+    fail('AGENTS-01 retired-agents note still present', 'found: ' + JSON.stringify(leftovers) + ' footers=' + JSON.stringify(footerTexts));
   }
 }
 

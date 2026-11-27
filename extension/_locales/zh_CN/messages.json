@@ -961,27 +961,6 @@
   "panel_509f0b9d50": {
     "message": "关闭语音输入后，FSB 不再使用麦克风，但不会撤销 Chrome 已保存的权限。"
   },
-  "panel_75d0625c55": {
-    "message": "后台代理已经离开"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB 专注于一次到位的精确浏览器执行。定时和重复任务更适合专为此设计的工具："
-  },
-  "panel_5a694f4532": {
-    "message": "用于开源代理循环，以及"
-  },
-  "panel_6e34781c2f": {
-    "message": "用于托管的长时间自动化。选择适合你工作方式的那个。"
-  },
-  "panel_e76c360683": {
-    "message": "试用 OpenClaw"
-  },
-  "panel_1a58d9154d": {
-    "message": "试用 Claude Routines"
-  },
-  "panel_582ba53e9e": {
-    "message": "已在 v0.9.45rc1 停用 · 2026 年 4 月"
-  },
   "panel_9f83a0b7bf": {
     "message": "从过往自动化会话中学到的长期记忆"
   },
@@ -1759,7 +1738,7 @@
     "message": "为你的 Claw 进行设置"
   },
   "entry_claw_desc": {
-    "message": "在控制面板中引导安装 OpenClaw"
+    "message": "full-selfbrowsing.com 上的 OpenClaw 设置指南"
   },
   "entry_prefer_key": {
     "message": "更想用自己的密钥？"

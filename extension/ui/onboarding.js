@@ -319,9 +319,9 @@
           <div class="ob-mcp-step"><span class="n">2</span><span>${escapeHtml(ob('entry_mcp_2a', "FSB writes itself into your agent's MCP config."))} <b>${escapeHtml(ob('entry_mcp_2b', '69 tools'))}</b>${escapeHtml(ob('entry_mcp_2c', ', zero manual JSON.'))}</span></div>
           <div class="ob-mcp-step"><span class="n">3</span><span>${escapeHtml(ob('entry_mcp_3', "Ask your agent to browse. It drives FSB's DOM engine for you."))}</span></div>
         </div>
-        <a class="ob-claw" href="#" id="obOpenClaw">
+        <a class="ob-claw" href="https://full-selfbrowsing.com/agents#skill" target="_blank" rel="noopener" id="obOpenClaw">
           <span class="ob-claw-ic"><span class="install-glyph" role="img" aria-label="OpenClaw" style="${maskStyle('openclaw.svg')}"></span></span>
-          <span class="ob-claw-body"><span class="ob-claw-name">${escapeHtml(ob('entry_claw_name', 'Set it up for your Claw'))}</span><span class="ob-claw-desc">${escapeHtml(ob('entry_claw_desc', 'Guided OpenClaw install in the control panel'))}</span></span>
+          <span class="ob-claw-body"><span class="ob-claw-name">${escapeHtml(ob('entry_claw_name', 'Set it up for your Claw'))}</span><span class="ob-claw-desc">${escapeHtml(ob('entry_claw_desc', 'OpenClaw setup guide on full-selfbrowsing.com'))}</span></span>
           <i class="fa-solid fa-arrow-up-right-from-square ob-claw-go"></i>
         </a>
         ${navHtml({ skipLabel: ob('entry_prefer_key', 'Prefer your own key?'), skipId: 'obUseByok', skipArrow: true })}
@@ -330,10 +330,6 @@
     bindMcpInteractions();
     bindNav();
     bind('#obUseByok', 'click', () => { state.path = 'byok'; state.screen = 'provider'; render(); });
-    bind('#obOpenClaw', 'click', (event) => {
-      event.preventDefault();
-      openInternalPage('ui/control_panel.html#retired-agents');
-    });
   }
 
   function renderProvider() {

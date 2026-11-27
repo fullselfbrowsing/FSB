@@ -961,27 +961,6 @@
   "panel_509f0b9d50": {
     "message": "音声入力を切ると FSB はマイクを使いませんが、Chrome が保存した許可は取り消されません。"
   },
-  "panel_75d0625c55": {
-    "message": "バックグラウンドのエージェントは退場しました"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB は一度きりの正確なブラウザ実行に集中します。予定された繰り返し作業には、そのための道具の方が向いています:"
-  },
-  "panel_5a694f4532": {
-    "message": "オープンソースのエージェントループには、そして"
-  },
-  "panel_6e34781c2f": {
-    "message": "管理された長時間の自動化には。働き方に合う方を選んでください。"
-  },
-  "panel_e76c360683": {
-    "message": "OpenClaw を試す"
-  },
-  "panel_1a58d9154d": {
-    "message": "Claude Routines を試す"
-  },
-  "panel_582ba53e9e": {
-    "message": "v0.9.45rc1 で退役 · 2026年4月"
-  },
   "panel_9f83a0b7bf": {
     "message": "過去の自動化セッションから学んだ長期メモリ"
   },
@@ -1759,7 +1738,7 @@
     "message": "Claw 向けに設定"
   },
   "entry_claw_desc": {
-    "message": "コントロールパネルでの OpenClaw ガイド付きインストール"
+    "message": "full-selfbrowsing.com の OpenClaw セットアップガイド"
   },
   "entry_prefer_key": {
     "message": "自分の鍵を使いますか？"

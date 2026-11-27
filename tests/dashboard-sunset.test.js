@@ -10,8 +10,9 @@
  *     service worker loads or references them.
  *   - On extension update, background.js deletes the relay settings, the
  *     toolbar icon's relay-seen flag and the live-preview watchdog alarm.
- *   - The control panel has no Sync tab. The background-agents note now sits
- *     in Help, and old #sync links land there.
+ *   - The control panel has no Sync tab, and the background-agents note that
+ *     lived in it is gone too. Onboarding's OpenClaw card links to the setup
+ *     guide on the website instead of a control-panel section.
  *   - The toolbar icon no longer dims for a missing relay.
  *   - The absence guards from the earlier Sync consolidation checks still
  *     hold.
@@ -334,25 +335,18 @@ const optionsSource = read('extension/ui/options.js');
 }
 
 {
-  const help = (controlPanel.match(/<section[^>]*id="help"[\s\S]*?<\/section>/) || [''])[0];
-  const headline = 'Background agents have left the building';
-  check(countSubstring(controlPanel, headline) === 1, 'the background-agents note appears exactly once');
-  check(help.includes(headline), 'the background-agents note sits inside section#help');
-  check(help.indexOf('class="help-grid"') !== -1 && help.indexOf('class="help-grid"') < help.indexOf(headline),
-    'the note follows the Help cards');
-  check(/href="https:\/\/github\.com\/openclaw\/openclaw"[^>]*rel="noopener noreferrer"/.test(help)
-      && /href="https:\/\/www\.anthropic\.com\/claude\/routines"[^>]*rel="noopener noreferrer"/.test(help),
-    'both note links stay in Help with rel="noopener noreferrer"');
-  check(/Retired in v0\.9\.45rc1/.test(help) && /April 2026/.test(help),
-    'the note footer still names v0.9.45rc1 and April 2026');
+  const leftovers = ['Background agents have left the building', 'Try OpenClaw', 'Try Claude Routines',
+    'Retired in v0.9.45rc1', 'sync-deprecation', 'retired-agents-note']
+    .filter((text) => controlPanel.includes(text));
+  check(leftovers.length === 0, 'control_panel.html no longer carries the background-agents note',
+    'found: ' + leftovers.join(', '));
 }
 
 {
   const css = read('extension/ui/options.css');
-  check(/\.sync-deprecation\s*\{/.test(css), 'options.css still styles the background-agents note');
-  const leftovers = ['.pairing-qr', '.sync-key-row', '.sync-section-header', 'pairingPulse']
+  const leftovers = ['.pairing-qr', '.sync-key-row', '.sync-section-header', 'pairingPulse', '.sync-deprecation']
     .filter((token) => css.includes(token));
-  check(leftovers.length === 0, 'options.css has no pairing or Sync row styles', 'found: ' + leftovers.join(', '));
+  check(leftovers.length === 0, 'options.css has no pairing, Sync row or retired-note styles', 'found: ' + leftovers.join(', '));
 }
 
 {
@@ -383,9 +377,8 @@ const optionsSource = read('extension/ui/options.js');
     vm.createContext(sandbox);
     vm.runInContext(fnSource + '\nthis.__normalize = normalizeSectionId;', sandbox);
     const normalize = sandbox.__normalize;
-    check(normalize('sync') === 'help', 'an old #sync link opens Help');
-    check(normalize('retired-agents') === 'help', 'the #retired-agents link opens Help');
     check(normalize('providers') === 'api-config', 'the providers alias still opens api-config');
+    check(normalize('sync') === 'sync', 'no section alias is left for the retired Sync tab');
     check(normalize('help') === 'help' && normalize('dashboard') === 'dashboard',
       'other section ids pass through unchanged');
   }
@@ -393,16 +386,26 @@ const optionsSource = read('extension/ui/options.js');
 
 {
   const src = read('extension/ui/onboarding.js');
-  check(src.includes("openInternalPage('ui/control_panel.html#retired-agents')"),
-    'onboarding opens the control panel at the background-agents note');
-  check(!src.includes('control_panel.html#sync'), 'onboarding no longer links to #sync');
-  const panel = read('extension/ui/control_panel.html');
+  check(/<a class="ob-claw" href="https:\/\/full-selfbrowsing\.com\/agents#skill" target="_blank" rel="noopener" id="obOpenClaw">/.test(src),
+    'the onboarding OpenClaw card links to the setup guide on the website');
+  check(!src.includes('control_panel.html#sync') && !src.includes('control_panel.html#retired-agents')
+      && !src.includes("bind('#obOpenClaw'"),
+    'the onboarding OpenClaw card no longer opens a control-panel section');
   const options = read('extension/ui/options.js');
-  check(panel.includes('<div class="sync-deprecation" id="retired-agents-note">'),
-    'the background-agents note carries the id that links scroll to');
-  check(/function revealRetiredAgentsNote\(rawSectionId\)[\s\S]*?getElementById\('retired-agents-note'\)[\s\S]*?scrollIntoView/.test(options)
-    && /switchSection\(hash\);\s*revealRetiredAgentsNote\(rawHash\);/.test(options),
-    'opening Help from #sync or #retired-agents scrolls the note into view');
+  check(!options.includes('revealRetiredAgentsNote') && !options.includes('retired-agents'),
+    'options.js has no scroll helper for the removed note');
+  const catalogs = ['de', 'en', 'es', 'ja', 'ko', 'ru', 'zh_CN', 'zh_TW'];
+  const noteKeys = ['panel_75d0625c55', 'panel_d17d0cfd98', 'panel_5a694f4532', 'panel_6e34781c2f',
+    'panel_e76c360683', 'panel_1a58d9154d', 'panel_582ba53e9e'];
+  const stale = [];
+  for (const loc of catalogs) {
+    const messages = JSON.parse(read('extension/_locales/' + loc + '/messages.json'));
+    for (const key of noteKeys) if (messages[key]) stale.push(loc + ':' + key);
+    if (/control/i.test(messages.entry_claw_desc.message) && loc === 'en') stale.push('en:entry_claw_desc');
+  }
+  const exact = read('extension/utils/panel-exact.js');
+  for (const key of noteKeys) if (exact.includes('"' + key + '"')) stale.push('panel-exact:' + key);
+  check(stale.length === 0, 'the note strings are gone from every catalog and the exact map', 'found: ' + stale.join(', '));
 }
 
 // ---- Section 6: extension -- the toolbar icon no longer tracks the relay ----

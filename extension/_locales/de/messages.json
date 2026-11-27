@@ -961,27 +961,6 @@
   "panel_509f0b9d50": {
     "message": "Spracheingabe auszuschalten hindert FSB daran, das Mikrofon zu nutzen, widerruft aber nicht die von Chrome gespeicherte Berechtigung."
   },
-  "panel_75d0625c55": {
-    "message": "Hintergrundagenten haben das Gebäude verlassen"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB bleibt bei präziser Browserausführung in einem Versuch. Geplante und wiederkehrende Aufgaben passen besser zu Werkzeugen, die dafür gebaut sind:"
-  },
-  "panel_5a694f4532": {
-    "message": "für eine quelloffene Agentenschleife, und"
-  },
-  "panel_6e34781c2f": {
-    "message": "für verwaltete, lang laufende Automatisierungen. Wähle, was zu deiner Arbeitsweise passt."
-  },
-  "panel_e76c360683": {
-    "message": "OpenClaw ausprobieren"
-  },
-  "panel_1a58d9154d": {
-    "message": "Claude Routines ausprobieren"
-  },
-  "panel_582ba53e9e": {
-    "message": "Eingestellt in v0.9.45rc1 · April 2026"
-  },
   "panel_9f83a0b7bf": {
     "message": "Langzeitgedächtnis aus früheren Automatisierungssitzungen"
   },
@@ -1759,7 +1738,7 @@
     "message": "Für deinen Claw einrichten"
   },
   "entry_claw_desc": {
-    "message": "Geführte OpenClaw-Installation im Kontrollzentrum"
+    "message": "OpenClaw-Einrichtungsanleitung auf full-selfbrowsing.com"
   },
   "entry_prefer_key": {
     "message": "Lieber einen eigenen Schlüssel?"

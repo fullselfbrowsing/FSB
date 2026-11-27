@@ -5835,67 +5835,6 @@ textarea.form-input {
   }
 }
 
-.sync-deprecation {
-  margin-top: var(--space-xl);
-  padding-top: var(--space-xl);
-  border-top: 1px solid var(--border-color);
-}
-
-.sync-deprecation-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 10px;
-}
-
-.sync-deprecation-head i {
-  color: var(--text-muted);
-  font-size: 0.95rem;
-}
-
-.sync-deprecation-body {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  line-height: 1.65;
-  max-width: 760px;
-  margin-bottom: 16px;
-}
-
-.sync-deprecation-links {
-  display: flex;
-  gap: 28px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
-.sync-deprecation-links a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--primary-color);
-  font-weight: 600;
-  font-size: 0.9rem;
-  text-decoration: none;
-  transition: opacity var(--transition-fast);
-}
-
-.sync-deprecation-links a:hover {
-  opacity: 0.8;
-}
-
-.sync-deprecation-links a i {
-  font-size: 0.72rem;
-}
-
-.sync-deprecation-foot {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
 /* Count pill, used by the Pending Requests card header */
 .sync-status-pill {
   display: inline-flex;
