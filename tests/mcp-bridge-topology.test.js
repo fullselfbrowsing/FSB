@@ -1850,6 +1850,68 @@ async function runReplacedSocketReleasesRelayRoutes(WebSocketBridge, auth) {
   });
 }
 
+// The hub's own call sent to an extension socket that a successor replaces
+// can never be answered once that socket closes. It is rejected then, as on
+// any extension disconnect, instead of holding isIdle() false until its own
+// timeout (10 minutes for run_task).
+async function runReplacedSocketRejectsLocalCalls(WebSocketBridge, auth) {
+  await withTempHome('bridge-replaced-local-calls', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 25_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://replaced-local-extension', authPath);
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'replaced-local-hub',
+      handshakeTimeoutMs: 25,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    try {
+      await hub.connect();
+      const options = {
+        origin: 'chrome-extension://replaced-local-extension',
+        pairingCode: auth.formatPairingCode(state),
+      };
+      const first = await createBrowserSocket(port, options);
+      resources.sockets.push(first);
+      const messages = collectSocketMessages(first);
+      await waitFor(() => hub.extensionClient !== null, 'the hub registers the first extension socket', 1000, 10);
+      const replaced = hub.extensionClient;
+
+      const started = Date.now();
+      const localCall = hub.sendAndWait({ type: 'mcp:idle-probe', payload: { from: 'hub' } }, { timeout: 5000 });
+      const settled = localCall.then(
+        () => { throw new Error('the local call cannot be answered by a socket that closed'); },
+        (error) => error,
+      );
+      await waitFor(() => messages.length === 1, 'the local call reaches the first socket', 1000, 10);
+      assert(!hub.isIdle(), 'the hub is busy with its own call');
+
+      const firstClosed = waitForSocketClose(first, 1000);
+      const successor = await createBrowserSocket(port, options);
+      resources.sockets.push(successor);
+      await waitFor(
+        () => hub.extensionClient !== null && hub.extensionClient !== replaced,
+        'the successor replaces the first socket',
+        1000,
+        10,
+      );
+      await firstClosed;
+      const error = await settled;
+      assert(Date.now() - started < 4000, 'the call is rejected when the socket closes, not at its timeout');
+      assertEqual(error.message, 'Extension disconnected', 'the rejection keeps the literal the sw_evicted recovery checks');
+      assertEqual(error.bridgeDisconnectReason, 'extension_replaced', 'the cause says the socket was replaced');
+      assert(hub.isIdle(), 'nothing stranded keeps the hub busy');
+      assertEqual(hub.pendingRequests.size, 0, 'no pending call outlives the socket it was sent through');
+      assertEqual(hub.messageOrigin.size, 0, 'no routing entry outlives the socket it was sent through');
+      assertEqual(successor.readyState, WebSocket.OPEN, 'the successor socket stays open');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 // Node keeps a server listening after an accept failure such as EMFILE, so an
 // 'error' event on a listening hub is not an outage and must not become one.
 async function runHubSurvivesAcceptError(WebSocketBridge) {
@@ -3656,6 +3718,7 @@ async function run() {
   await runCase('quiet legacy extension is never reaped', () => runQuietLegacyExtensionIsKept(WebSocketBridge));
   await runCase('a replaced socket ping cannot arm its successor', () => runReplacedSocketPingIsIgnored(WebSocketBridge, auth));
   await runCase('a replaced socket takes its relay routes with it', () => runReplacedSocketReleasesRelayRoutes(WebSocketBridge, auth));
+  await runCase('a replaced socket rejects the hub\'s own calls', () => runReplacedSocketRejectsLocalCalls(WebSocketBridge, auth));
   await runCase('hub keeps serving through an accept error', () => runHubSurvivesAcceptError(WebSocketBridge));
   await runCase('hub that loses its listener tears down and re-binds', () => runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule));
   await runCase('stdio server exits when the host closes stdin', () => runStdinShutdownHelper());

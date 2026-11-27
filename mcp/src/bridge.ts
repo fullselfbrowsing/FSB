@@ -248,9 +248,10 @@ export class WebSocketBridge {
   private relayCapabilities = new Map<string, Set<BridgeCapability>>();
   private activeExtRequests = new Map<string, ActiveExtRequest>();
   private messageOrigin = new Map<string, string>(); // msgId -> instanceId | "local"
-  // Relay messages still unanswered when their extension socket was replaced,
-  // msgId -> relay instanceId, dropped once that socket closes.
-  private relayRoutesOnReplacedSocket = new WeakMap<WsWebSocket, Map<string, string>>();
+  // Messages still unanswered when their extension socket was replaced: relay
+  // ones (msgId -> relay instanceId) and this process's own (msgId), settled
+  // once that socket closes.
+  private routesOnReplacedSocket = new WeakMap<WsWebSocket, { relayRoutes: Map<string, string>; localIds: Set<string> }>();
   private handshakeTimers = new Map<WsWebSocket, ReturnType<typeof setTimeout>>();
   private acceptedSocketMetadata = new WeakMap<WsWebSocket, AcceptedSocketMetadata>();
   private extensionLivenessTimer: ReturnType<typeof setInterval> | null = null;
@@ -1028,14 +1029,18 @@ export class WebSocketBridge {
         origin: this.acceptedSocketMetadata.get(this.extensionClient)?.browserOrigin ?? null,
       });
       this._abortRoutesForOrigin(this.extensionClient);
-      // Every relay message waiting here went to the socket being replaced,
-      // since relay messages only ever go to the current one. They stay routed
-      // while it closes, so a late answer still reaches its relay.
+      // Every message waiting here went to the socket being replaced, since
+      // messages only ever go to the current one. They stay routed while it
+      // closes, so a late answer still reaches its relay or local caller.
       const relayRoutes = new Map<string, string>();
+      const localIds = new Set<string>();
       for (const [msgId, origin] of this.messageOrigin) {
-        if (origin !== 'local') relayRoutes.set(msgId, origin);
+        if (origin === 'local') localIds.add(msgId);
+        else relayRoutes.set(msgId, origin);
       }
-      if (relayRoutes.size > 0) this.relayRoutesOnReplacedSocket.set(this.extensionClient, relayRoutes);
+      if (relayRoutes.size > 0 || localIds.size > 0) {
+        this.routesOnReplacedSocket.set(this.extensionClient, { relayRoutes, localIds });
+      }
       this.extensionClient.close();
     }
 
@@ -1058,7 +1063,7 @@ export class WebSocketBridge {
 
     ws.on('close', (code: number) => {
       if (this.extensionClient !== ws) {
-        this._dropRelayRoutesOnReplacedSocket(ws);
+        this._dropRoutesOnReplacedSocket(ws);
         return;
       }
       this._stopExtensionLiveness();
@@ -1616,16 +1621,30 @@ export class WebSocketBridge {
 
   /**
    * A replaced extension socket has closed, so nothing it was sent can be
-   * answered any more. Relays find out when their calls time out; an entry
-   * left here would keep isIdle() false for good, blocking step-down,
-   * uninstall and hub handover.
+   * answered any more. Relays find out when their calls time out; this
+   * process's own calls are rejected now, as on any extension disconnect, so
+   * a run_task does not wait out its 10 minutes. An entry left here would
+   * keep isIdle() false, blocking step-down, uninstall and hub handover.
    */
-  private _dropRelayRoutesOnReplacedSocket(ws: WsWebSocket): void {
-    const relayRoutes = this.relayRoutesOnReplacedSocket.get(ws);
-    if (!relayRoutes) return;
-    this.relayRoutesOnReplacedSocket.delete(ws);
-    for (const [msgId, relayId] of relayRoutes) {
+  private _dropRoutesOnReplacedSocket(ws: WsWebSocket): void {
+    const routes = this.routesOnReplacedSocket.get(ws);
+    if (!routes) return;
+    this.routesOnReplacedSocket.delete(ws);
+    for (const [msgId, relayId] of routes.relayRoutes) {
       if (this.messageOrigin.get(msgId) === relayId) this.messageOrigin.delete(msgId);
+    }
+    for (const msgId of routes.localIds) {
+      if (this.messageOrigin.get(msgId) === 'local') this.messageOrigin.delete(msgId);
+      const pending = this.pendingRequests.get(msgId);
+      if (!pending) continue;
+      clearTimeout(pending.timeout);
+      this.pendingRequests.delete(msgId);
+      this.progressListeners.delete(msgId);
+      // Literal, so the sw_evicted recovery still arms; the cause rides on
+      // the property, as in the close handler for the current socket.
+      const error = new Error('Extension disconnected') as BridgeDisconnectError;
+      error.bridgeDisconnectReason = 'extension_replaced';
+      pending.reject(error);
     }
   }
 
