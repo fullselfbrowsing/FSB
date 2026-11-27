@@ -268,6 +268,8 @@ npx -y fsb-mcp-server@latest uninstall --native-host --browser edge
 
 Extension IDs are browser-installation-specific. Omitted `--extension-id` uses the published Chrome Web Store ID, `badgafnfchcihdfnjneklogedcdkmjfk`. For Edge, Brave, Chromium, or an unpacked build, copy the 32-character lowercase ID shown on that browser's extensions page and pass it with `--extension-id`.
 
+A helper serves one extension ID. When `install` set it up for an ID that no browser profile has, such as the Web Store ID while only an unpacked build is installed, `install --native-host --extension-id <extension-id>` replaces it with one for that ID. A helper you installed with `install --native-host`, one an installed extension still uses, and one newer than the running package are refused instead; remove it with `uninstall --native-host` first.
+
 `--browser` selects one browser's user-scoped native-messaging registration. One helper can be registered in several browsers with the same extension ID. `uninstall --native-host --browser <name>` removes only that browser's registration, and the helper's files go with its last registration. To add a browser where you have since installed FSB, run `install` again.
 
 ### Grok Build as the extension's AI provider

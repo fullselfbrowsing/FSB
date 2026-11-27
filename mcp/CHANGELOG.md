@@ -22,6 +22,7 @@ Not published yet. The package version is still 0.11.5 and needs a bump before t
 - The helper records whether it came from `install` (`auto`) or `install --native-host` (`explicit`) in `provenance.json`, next to its install receipt. The receipt itself keeps the exact format earlier versions read, so an earlier package version can still repair or remove the helper. A helper installed by an earlier version has no record and counts as explicit, so uninstalling a client never removes a helper you installed yourself.
 - An installed helper older than the running package is now refreshed instead of being refused as a version mismatch. A helper whose files fail their integrity check is refreshed only when its marker and receipt agree and only the launcher differs. Helpers FSB does not own, and split or invalid installs, are still never changed; `doctor` reports them.
 - An `install --native-host` for a second browser adds that browser's registration instead of being refused as a cross-target request.
+- An `install --native-host` for another extension ID replaces a helper that `install` set up on its own when no browser profile has the extension that helper serves, for example one registered for the Web Store ID while only an unpacked build is installed. A helper installed with `install --native-host`, one an installed extension still uses, and one newer than the running package are still refused as owned by another extension.
 
 ### Compatibility and update
 

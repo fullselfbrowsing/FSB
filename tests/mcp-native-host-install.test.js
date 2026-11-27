@@ -3907,6 +3907,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     detectBrowsers: async (extensionId) => {
       trace.push(`detect:${extensionId}`);
       if (options.detectThrows) throw new Error('sensitive:detect');
+      if (typeof options.detected === 'function') return options.detected(extensionId);
       return options.detected ?? ['chrome'];
     },
     pinnedNodePresent: async () => options.nodePresent !== false,
@@ -4996,6 +4997,81 @@ async function runEnsureTransaction() {
     equal(harness.publishCount(), 0, `${platformName} the second browser shares the runtime`);
     const repeat = await installer.installNativeHostBrowser({ browser: 'edge' }, harness.dependencies);
     equal(repeat.status, 'already-installed', `${platformName} the added browser is idempotent`);
+  }
+  const DEVELOPMENT_ORIGIN = `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`;
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // install set the helper up for the Web Store ID while only an unpacked
+    // build is present; that build's repair command names its own ID.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      detected: () => [],
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'installed', `${platformName} an explicit install replaces an automatic helper no installed extension uses`);
+    equal(result.origin, DEVELOPMENT_ORIGIN, `${platformName} the replacement serves the extension the install names`);
+    equal(harness.stable().marker.origin, DEVELOPMENT_ORIGIN, `${platformName} the replacement runtime is bound to that extension`);
+    equal(harness.stable().provenance, 'explicit', `${platformName} the replacement records that it was installed by name`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the old helper's registrations go with it`);
+    check(harness.trace.includes(`detect:${EXTENSION_ID}`), `${platformName} the replacement first looks for the extension the old helper served`);
+    traceOrder(harness.trace, [
+      'wake:hold',
+      'stop:write:uninstall',
+      /^(?:file:delete:|registry:delete:)/u,
+      'runtime:remove',
+      'publish:stable',
+    ], `${platformName} the old helper is removed under the wake lock before the new one is published`);
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome'],
+      detected: (extensionId) => (extensionId === EXTENSION_ID ? ['chrome'] : []),
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'an automatic helper an installed extension still uses is not replaced');
+    equal(result.reason, 'ownership-mismatch', 'the helper in use is reported as owned by another extension');
+    equal(ensureMutations(harness.trace).length, 0, 'the helper in use is left untouched');
+    equal(harness.stable().marker.origin, ORIGIN, 'the helper in use keeps its extension');
+  }
+  for (const [label, options] of [
+    ['a helper installed by name', { installed: { provenance: 'explicit' }, detected: () => [] }],
+    ['an older unmarked helper', { installed: {}, detected: () => [] }],
+    ['a newer automatic helper', { installed: { provenance: 'auto', version: '99.0.0' }, detected: () => [] }],
+    ['an automatic helper whose extension cannot be looked for', { installed: { provenance: 'auto' }, detectThrows: true }],
+  ]) {
+    const harness = fakeEnsureHarness(modules, 'linux', { registered: ['chrome'], ...options });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.reason, 'ownership-mismatch', `${label} is not replaced for another extension`);
+    equal(ensureMutations(harness.trace).length, 0, `${label} is left untouched`);
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0', provenance: 'auto' },
+      registered: ['chrome'],
+      detected: () => [],
+      daemonOnline: true,
+      children: true,
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'a busy service refuses the replacement');
+    equal(result.reason, 'daemon-busy', 'the busy service is reported');
+    deepEqual(harness.registeredBrowsers(), ['chrome'], 'a refused replacement keeps every registration');
+    equal(harness.stable().marker.origin, ORIGIN, 'a refused replacement keeps the old helper');
+    equal(harness.publishCount(), 0, 'a refused replacement publishes nothing');
+    equal(harness.stopRequest(), null, 'the refused replacement withdraws its stop request');
   }
   for (const platformName of ['darwin', 'linux', 'win32']) {
     const harness = fakeEnsureHarness(modules, platformName, {});

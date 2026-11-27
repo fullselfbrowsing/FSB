@@ -2253,10 +2253,50 @@ function browserInstallResult(
 }
 
 /**
+ * Whether an explicit install for another extension may replace the installed
+ * helper. A helper serves one extension. One that `install` set up on its own
+ * can be bound to the Web Store ID while only an unpacked build is present,
+ * and the extension's repair command names its own ID, so refusing would
+ * leave no way forward short of uninstalling first. It is replaced only when
+ * no browser profile holds the extension it serves, so a build that still
+ * uses it keeps it. A helper set up with `install --native-host`, one newer
+ * than this package, and a browser registration this package does not own
+ * are refused as before.
+ */
+async function replaceableAutoHelper(
+  dependencies: NativeHostEnsureDependencies,
+  helper: Readonly<{
+    provenance: NativeHostProvenance;
+    runtime: Readonly<NativeHostRuntimeOwnedInspection>;
+    receipt: Readonly<NativeHostRuntimeReceipt>;
+    target: BrowserSurface;
+    servedExtensionId: string;
+  }>,
+): Promise<boolean> {
+  if (
+    helper.provenance !== 'explicit'
+    || runtimeProvenance(helper.runtime) !== 'auto'
+    || helper.target.state === 'other'
+  ) {
+    return false;
+  }
+  const order = compareNativeHostVersions(helper.receipt.packageVersion, dependencies.packageVersion);
+  if (order === null || order > 0) return false;
+  try {
+    const holders = [...await dependencies.detectBrowsers(helper.servedExtensionId)];
+    return !holders.some((browser) => isNativeHostBrowser(browser));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The explicit single-browser install. With no other browser registered it is
  * the original install transaction. With another browser already registered
  * to the same current runtime it adds this browser's registration instead of
- * refusing; any other registration it does not own still refuses.
+ * refusing; any other registration it does not own still refuses. A helper
+ * `install` set up for an extension no browser profile holds is replaced by
+ * one for the extension this install names (replaceableAutoHelper).
  */
 export async function installNativeHostBrowser(
   requestValue: NativeHostInstallRequest,
@@ -2321,9 +2361,7 @@ export async function installNativeHostBrowser(
           runtime.marker?.packageVersion ?? null,
         );
       }
-      // An exact runtime with no registration at all (an uninstall that could
-      // not remove its files) is registered again below rather than refused.
-      if (runtime.state !== 'exact' && !others.some((surface) => surface.state === 'exact')) {
+      const publishFresh = async (): Promise<NativeHostInstallResult> => {
         const publisher = await createPublisher(dependencies, {
           extensionId,
           installToken: lease.token,
@@ -2345,6 +2383,12 @@ export async function installNativeHostBrowser(
           await promoteProvenance(dependencies);
         }
         return result;
+      };
+      // An exact runtime with no registration at all (an uninstall that could
+      // not remove its files) is registered again below rather than refused.
+      // Awaited here, so the lease is released only after the publish settles.
+      if (runtime.state !== 'exact' && !others.some((surface) => surface.state === 'exact')) {
+        return await publishFresh();
       }
       if (runtime.state !== 'exact') {
         return browserInstallResult(
@@ -2357,6 +2401,36 @@ export async function installNativeHostBrowser(
         );
       }
       const receipt = exactRuntimeReceipt(runtime, ensurePair(dependencies, browser));
+      if (
+        receipt
+        && markerExtensionId
+        && receipt.origin !== expectedOrigin
+        && await replaceableAutoHelper(dependencies, {
+          provenance,
+          runtime,
+          receipt,
+          target: surfaceFor(surfaces, browser),
+          servedExtensionId: markerExtensionId,
+        })
+      ) {
+        const removal = await removeHelperLocked(dependencies, lease, {
+          markerFact: runtime.markerFact,
+          receipt,
+          surfaces,
+          extensionId: markerExtensionId,
+        });
+        if (!removal.ok) {
+          return browserInstallResult(
+            dependencies,
+            browser,
+            'refused',
+            removal.reason,
+            expectedOrigin,
+            receipt.packageVersion,
+          );
+        }
+        return await publishFresh();
+      }
       if (!receipt || receipt.origin !== expectedOrigin) {
         return browserInstallResult(
           dependencies,
@@ -2547,6 +2621,82 @@ export async function uninstallNativeHostBrowser(
   });
 }
 
+type HelperRemoval = Readonly<
+  | { ok: true; removedBrowsers: NativeHostBrowser[] }
+  | { ok: false; reason: string; removedBrowsers: NativeHostBrowser[] }
+>;
+
+/**
+ * Removes every exact registration and then the runtime, under the caller's
+ * lease, after asking the daemon to stop. The wake lock keeps browsers from
+ * starting the helper until its files are gone. A runtime that cannot be
+ * removed gets its registrations back; a removal that stops earlier reports
+ * the browsers it already removed.
+ */
+async function removeHelperLocked(
+  dependencies: NativeHostEnsureDependencies,
+  lease: NativeHostLockLease,
+  helper: Readonly<{
+    markerFact: NativeHostFileFact;
+    receipt: Readonly<NativeHostRuntimeReceipt>;
+    surfaces: readonly BrowserSurface[];
+    extensionId: string;
+  }>,
+): Promise<HelperRemoval> {
+  const removedBrowsers: NativeHostBrowser[] = [];
+  const fail = (reason: string): HelperRemoval => Object.freeze({
+    ok: false,
+    reason,
+    removedBrowsers: [...removedBrowsers],
+  });
+  const held = await takeWakeLock(dependencies, lease.token);
+  if (!held.ok) return fail(held.reason);
+  const wake = held.hold;
+  const stopped = await stopStableRootDaemon(dependencies, lease.token, 'uninstall');
+  try {
+    if (!stopped.ok) return fail(stopped.reason);
+    for (const browser of browsersIn(helper.surfaces, 'exact')) {
+      if (!await stillHeld(lease)) return fail('lock-lost');
+      const removed = await removeRegistrationLocked(
+        dependencies,
+        browser,
+        helper.markerFact,
+        helper.extensionId,
+      );
+      if (!removed.ok) return fail(removed.reason);
+      removedBrowsers.push(browser);
+    }
+    let unchanged = false;
+    try {
+      unchanged = await dependencies.runtime.recheckExactRuntime(helper.receipt);
+    } catch {
+      unchanged = false;
+    }
+    if (!unchanged) return fail('boundary-changed');
+    await stopRefreshingWakeLock(wake);
+    if (!await stillHeld(lease)) return fail('lock-lost');
+    try {
+      await dependencies.runtime.removeExactRuntime(helper.receipt);
+    } catch {
+      const restored = await restoreRegistrations(
+        dependencies,
+        lease,
+        removedBrowsers,
+        helper.extensionId,
+      );
+      return Object.freeze({
+        ok: false,
+        reason: 'runtime-remove-failed',
+        removedBrowsers: removedBrowsers.filter((browser) => !restored.includes(browser)),
+      });
+    }
+    return Object.freeze({ ok: true, removedBrowsers: [...removedBrowsers] });
+  } finally {
+    await releaseWakeLock(wake);
+    await removeStopRequest(dependencies, lease.token);
+  }
+}
+
 function uninstallAllResult(
   outcome: NativeHostUninstallAllResult['outcome'],
   fields: Readonly<{
@@ -2624,71 +2774,19 @@ export async function uninstallAllNativeHost(
       if (onlyAuto && provenance !== 'auto') {
         return uninstallAllResult('kept', { reason: 'explicit-provenance', provenance });
       }
-      const held = await takeWakeLock(dependencies, lease.token);
-      if (!held.ok) return uninstallAllResult('refused', { reason: held.reason, provenance });
-      const wake = held.hold;
-      const stopped = await stopStableRootDaemon(dependencies, lease.token, 'uninstall');
-      const removedBrowsers: NativeHostBrowser[] = [];
-      try {
-        if (!stopped.ok) {
-          return uninstallAllResult('refused', { reason: stopped.reason, provenance });
-        }
-        for (const browser of browsersIn(surfaces, 'exact')) {
-          if (!await stillHeld(lease)) {
-            return uninstallAllResult('refused', { reason: 'lock-lost', removedBrowsers, provenance });
-          }
-          const removed = await removeRegistrationLocked(
-            dependencies,
-            browser,
-            runtime.markerFact,
-            installedExtensionId,
-          );
-          if (!removed.ok) {
-            return uninstallAllResult('refused', {
-              reason: removed.reason,
-              removedBrowsers,
-              provenance,
-            });
-          }
-          removedBrowsers.push(browser);
-        }
-        let unchanged = false;
-        try {
-          unchanged = await dependencies.runtime.recheckExactRuntime(receipt);
-        } catch {
-          unchanged = false;
-        }
-        if (!unchanged) {
-          return uninstallAllResult('refused', {
-            reason: 'boundary-changed',
-            removedBrowsers,
-            provenance,
-          });
-        }
-        await stopRefreshingWakeLock(wake);
-        if (!await stillHeld(lease)) {
-          return uninstallAllResult('refused', { reason: 'lock-lost', removedBrowsers, provenance });
-        }
-        try {
-          await dependencies.runtime.removeExactRuntime(receipt);
-        } catch {
-          const restored = await restoreRegistrations(
-            dependencies,
-            lease,
-            removedBrowsers,
-            installedExtensionId,
-          );
-          return uninstallAllResult('refused', {
-            reason: 'runtime-remove-failed',
-            removedBrowsers: removedBrowsers.filter((browser) => !restored.includes(browser)),
-            provenance,
-          });
-        }
-        return uninstallAllResult('removed', { removedBrowsers, provenance });
-      } finally {
-        await releaseWakeLock(wake);
-        await removeStopRequest(dependencies, lease.token);
-      }
+      const removal = await removeHelperLocked(dependencies, lease, {
+        markerFact: runtime.markerFact,
+        receipt,
+        surfaces,
+        extensionId: installedExtensionId,
+      });
+      return removal.ok
+        ? uninstallAllResult('removed', { removedBrowsers: removal.removedBrowsers, provenance })
+        : uninstallAllResult('refused', {
+          reason: removal.reason,
+          removedBrowsers: removal.removedBrowsers,
+          provenance,
+        });
     } finally {
       await releaseLease(lease);
     }
