@@ -2302,7 +2302,9 @@ async function replaceableAutoHelper(
  * refusing; any other registration it does not own still refuses. A helper
  * `install` set up for the Web Store ID while no browser profile holds the
  * store build is replaced by one for the extension this install names
- * (replaceableAutoHelper).
+ * (replaceableAutoHelper). The new publisher is made before the old helper is
+ * removed, and a replacement that stops after removing anything reports
+ * `replacement-incomplete` instead of a refusal that changed nothing.
  */
 export async function installNativeHostBrowser(
   requestValue: NativeHostInstallRequest,
@@ -2367,14 +2369,17 @@ export async function installNativeHostBrowser(
           runtime.marker?.packageVersion ?? null,
         );
       }
-      const publishFresh = async (): Promise<NativeHostInstallResult> => {
-        const publisher = await createPublisher(dependencies, {
-          extensionId,
-          installToken: lease.token,
-          provenance,
-          destination: 'stable',
-          windowsManifest: null,
-        });
+      const newPublisher = () => createPublisher(dependencies, {
+        extensionId,
+        installToken: lease.token,
+        provenance,
+        destination: 'stable',
+        windowsManifest: null,
+      });
+      const publishFresh = async (
+        prepared: NativeHostInstallRuntimeAdapter | null = null,
+      ): Promise<NativeHostInstallResult> => {
+        const publisher = prepared ?? await newPublisher();
         if (!publisher) {
           return browserInstallResult(dependencies, browser, 'refused', 'unavailable', expectedOrigin, null);
         }
@@ -2419,23 +2424,42 @@ export async function installNativeHostBrowser(
           servedExtensionId: markerExtensionId,
         })
       ) {
+        // The publisher is made first, so one that cannot be made (no usable
+        // npm, for one) refuses before anything is removed.
+        const publisher = await newPublisher();
+        if (!publisher) {
+          return browserInstallResult(dependencies, browser, 'refused', 'unavailable', expectedOrigin, receipt.packageVersion);
+        }
         const removal = await removeHelperLocked(dependencies, lease, {
           markerFact: runtime.markerFact,
           receipt,
           surfaces,
           extensionId: markerExtensionId,
         });
+        // Once anything is removed, a refusal would read as nothing changed.
+        // replacement-incomplete says the old helper is partly or wholly gone;
+        // running the same install again finishes the replacement.
         if (!removal.ok) {
           return browserInstallResult(
             dependencies,
             browser,
             'refused',
-            removal.reason,
+            removal.removedBrowsers.length > 0 ? 'replacement-incomplete' : removal.reason,
             expectedOrigin,
             receipt.packageVersion,
           );
         }
-        return await publishFresh();
+        const replaced = await publishFresh(publisher);
+        return replaced.status === 'refused'
+          ? browserInstallResult(
+            dependencies,
+            browser,
+            'refused',
+            'replacement-incomplete',
+            expectedOrigin,
+            receipt.packageVersion,
+          )
+          : replaced;
       }
       if (!receipt || receipt.origin !== expectedOrigin) {
         return browserInstallResult(

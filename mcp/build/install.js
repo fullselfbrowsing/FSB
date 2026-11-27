@@ -284,6 +284,16 @@ function printNativeInstallResult(result, updatedFrom = null) {
     }
     const location = boundedNativeLocation(receipt.location);
     const origin = exactNativeOrigin(receipt.origin);
+    // A replacement can stop after the old helper is partly or wholly removed;
+    // saying nothing changed would hide that it no longer serves its browsers.
+    if (receipt.status === 'refused' && receipt.reason === 'replacement-incomplete') {
+        console.error('Native messaging host was only partly replaced: the old helper was removed in whole'
+            + ' or in part, and the new one is not installed.');
+        console.error(`Expected location: ${location}`);
+        console.error('Run the same install command again, or npx -y fsb-mcp-server@latest doctor for repair details.');
+        process.exitCode = 1;
+        return;
+    }
     if (receipt.status === 'refused') {
         printNativeHostRefusal(receipt.reason, receipt.location);
         return;

@@ -3102,6 +3102,29 @@ async function runCliOutput() {
     'already-installed native result remains factual',
   );
 
+  // A replacement that stopped after removing the old helper, or part of it,
+  // says so instead of claiming nothing changed.
+  const partlyReplaced = await captureCliAction(() => cli.runInstall(
+    { 'native-host': true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+    operationsWith({
+      status: 'refused',
+      reason: 'replacement-incomplete',
+      location,
+      origin: `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(partlyReplaced.exitCode, 1, 'an incomplete replacement exits nonzero');
+  equal(partlyReplaced.stdout, '', 'an incomplete replacement prints nothing optimistic');
+  equal(
+    partlyReplaced.stderr,
+    'Native messaging host was only partly replaced: the old helper was removed in whole or in part,'
+      + ' and the new one is not installed.\n'
+      + `Expected location: ${location}\n`
+      + 'Run the same install command again, or npx -y fsb-mcp-server@latest doctor for repair details.\n',
+    'an incomplete replacement says the old helper is gone and how to finish',
+  );
+
   const removed = await captureCliAction(() => cli.runUninstall(
     { 'native-host': true, browser: 'chrome' },
     operationsWith(null, {
@@ -3913,6 +3936,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     pinnedNodePresent: async () => options.nodePresent !== false,
     createPublisher: async (publisherOptions) => {
       trace.push(`publisher:${publisherOptions.destination}`);
+      if (options.publisherThrows) throw new Error('sensitive:publisher');
       const layout = modules.runtimeLayout.resolveNativeHostRuntimeLayout({
         ...input,
         extensionId: publisherOptions.extensionId,
@@ -5088,6 +5112,55 @@ async function runEnsureTransaction() {
     equal(harness.stable().marker.origin, ORIGIN, 'a refused replacement keeps the old helper');
     equal(harness.publishCount(), 0, 'a refused replacement publishes nothing');
     equal(harness.stopRequest(), null, 'the refused replacement withdraws its stop request');
+  }
+  const replaceFor = async (platformName, options) => {
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      detected: () => [],
+      ...options,
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    return { harness, result };
+  };
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      // The publisher is made before anything is removed.
+      const { harness, result } = await replaceFor(platformName, { publisherThrows: true });
+      equal(result.reason, 'unavailable', `${platformName} a replacement whose publisher cannot be made is refused`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} a replacement without a publisher changes nothing`);
+      deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} a replacement without a publisher keeps every registration`);
+      equal(harness.stable().marker.origin, ORIGIN, `${platformName} a replacement without a publisher keeps the old helper`);
+      check(!harness.trace.includes('wake:hold'), `${platformName} a replacement without a publisher never stops the old helper`);
+    }
+    {
+      const { harness, result } = await replaceFor(platformName, {
+        loseLock: (trace) => trace.some((entry) => /^(?:file:delete:|registry:delete:)/u.test(entry)),
+      });
+      equal(result.status, 'refused', `${platformName} a replacement that loses its lock mid-removal is refused`);
+      equal(result.reason, 'replacement-incomplete', `${platformName} a replacement that removed a registration says so`);
+      equal(harness.registeredBrowsers().length, 1, `${platformName} the registration removed before the lock was lost stays removed`);
+      equal(harness.publishCount(), 0, `${platformName} a replacement that lost its lock publishes nothing`);
+    }
+    {
+      const { harness, result } = await replaceFor(platformName, {
+        publishResult: { status: 'refused', reason: 'pack-failed', receipt: null },
+      });
+      equal(result.status, 'refused', `${platformName} a replacement whose publish fails is refused`);
+      equal(result.reason, 'replacement-incomplete', `${platformName} a publish failure after the removal says the old helper is gone`);
+      equal(harness.stable(), null, `${platformName} the removed helper is not reported as kept`);
+      deepEqual(harness.registeredBrowsers(), [], `${platformName} the old helper's registrations went with it`);
+    }
+    {
+      const { harness, result } = await replaceFor(platformName, { failRuntimeRemove: true });
+      equal(result.reason, 'runtime-remove-failed', `${platformName} a replacement whose registrations all came back reports the removal failure`);
+      deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} the failed runtime removal restores every registration`);
+      equal(harness.stable().marker.origin, ORIGIN, `${platformName} the failed runtime removal keeps the old helper`);
+      equal(harness.publishCount(), 0, `${platformName} the failed runtime removal publishes nothing`);
+    }
   }
   for (const platformName of ['darwin', 'linux', 'win32']) {
     const harness = fakeEnsureHarness(modules, platformName, {});
