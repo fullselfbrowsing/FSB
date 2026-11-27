@@ -8,7 +8,7 @@
         "status": "success",
         "result": "Ticked Alpha on the checklist."
       },
-      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"success\",\n  \"result\": \"Ticked Alpha on the checklist.\"\n}",
+      "wireText": "{\"success\":true,\"sessionId\":\"sess_p70_wire\",\"status\":\"success\",\"result\":\"Ticked Alpha on the checklist.\"}",
       "storeWrites": [
         {
           "taskId": "sess_p70_wire",
@@ -51,7 +51,7 @@
         "status": "success",
         "result": "Ticked Alpha on the checklist."
       },
-      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"success\",\n  \"result\": \"Ticked Alpha on the checklist.\"\n}",
+      "wireText": "{\"success\":true,\"sessionId\":\"sess_p70_wire\",\"status\":\"success\",\"result\":\"Ticked Alpha on the checklist.\"}",
       "storeWrites": [
         {
           "taskId": "sess_p70_wire",
@@ -94,7 +94,7 @@
         "status": "error",
         "error": "API call failed: provider returned 500"
       },
-      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"error\",\n  \"error\": \"API call failed: provider returned 500\"\n}",
+      "wireText": "{\"success\":true,\"sessionId\":\"sess_p70_wire\",\"status\":\"error\",\"error\":\"API call failed: provider returned 500\"}",
       "storeWrites": [
         {
           "taskId": "sess_p70_wire",
@@ -137,7 +137,7 @@
         "status": "stopped",
         "result": {}
       },
-      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"status\": \"stopped\",\n  \"result\": {}\n}",
+      "wireText": "{\"success\":true,\"sessionId\":\"sess_p70_wire\",\"status\":\"stopped\",\"result\":{}}",
       "storeWrites": [
         {
           "taskId": "sess_p70_wire",
@@ -192,7 +192,7 @@
         },
         "hint": "lifecycle event missing -- audit cleanup paths"
       },
-      "wireText": "{\n  \"success\": true,\n  \"sessionId\": \"sess_p70_wire\",\n  \"partial_outcome\": \"timeout\",\n  \"partial_state\": {\n    \"task_id\": \"sess_p70_wire\",\n    \"status\": \"in_progress\",\n    \"started_at\": 1760000000000,\n    \"last_heartbeat_at\": 1760000570000,\n    \"originating_mcp_call_id\": \"mcp_p70_wire\",\n    \"target_tab_id\": null,\n    \"current_step\": 0,\n    \"ai_cycle_count\": 0,\n    \"last_dom_hash\": null\n  },\n  \"hint\": \"lifecycle event missing -- audit cleanup paths\"\n}",
+      "wireText": "{\"success\":true,\"sessionId\":\"sess_p70_wire\",\"partial_outcome\":\"timeout\",\"partial_state\":{\"task_id\":\"sess_p70_wire\",\"status\":\"in_progress\",\"started_at\":1760000000000,\"last_heartbeat_at\":1760000570000,\"originating_mcp_call_id\":\"mcp_p70_wire\",\"target_tab_id\":null,\"current_step\":0,\"ai_cycle_count\":0,\"last_dom_hash\":null},\"hint\":\"lifecycle event missing -- audit cleanup paths\"}",
       "storeWrites": [
         {
           "taskId": "sess_p70_wire",

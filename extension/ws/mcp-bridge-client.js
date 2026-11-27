@@ -63,6 +63,9 @@ const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close
 // In-process-only call timing stamp (D-04). JSON and structuredClone drop
 // Symbol keys, so the stamp never reaches a response or storage.
 const MCP_BRIDGE_CALL_TIMING = Symbol.for('fsb.mcp.call-timing');
+// Marks an action payload that arrived as a live mcp:execute-action call.
+// Replays call _handleExecuteAction without it.
+const MCP_BRIDGE_LIVE_ACTION = Symbol.for('fsb.mcp.live-action');
 // Toolbar icon classes keyed by message type. Read-only tools never reach
 // mcp:execute-action -- they have their own routes and carry no tool name, so
 // the route itself is what identifies them as reading.
@@ -1322,12 +1325,82 @@ class MCPBridgeClient {
     this._send({ id, type: 'mcp:result', payload });
   }
 
+  // An MCP action call. When the page changed in a way the host cannot
+  // predict, runActionWithPageView (mcp-tool-dispatcher.js) adds a compact
+  // view of the page to the result: after _handleExecuteAction has handed the
+  // result to the session recorder, before the wire copy is taken. Replays
+  // call _handleExecuteAction directly and never wait for a view. The payload
+  // is marked as a live call, which answering an action with the navigation
+  // it started requires.
+  async _handleExecuteActionWithView(payload) {
+    if (payload && typeof payload === 'object') {
+      try {
+        Object.defineProperty(payload, MCP_BRIDGE_LIVE_ACTION, { value: true, enumerable: false, configurable: true });
+      } catch (_error) { /* an unmarked call keeps the unknown outcome */ }
+    }
+    const execute = () => this._handleExecuteAction(payload);
+    if (typeof runActionWithPageView !== 'function') return execute();
+    const params = (payload && payload.params && typeof payload.params === 'object') ? payload.params : {};
+    const namedTab = Number.isFinite(params.tab_id) ? params.tab_id : (Number.isFinite(params.tabId) ? params.tabId : null);
+    return runActionWithPageView({
+      toolName: payload && payload.tool,
+      tabId: namedTab,
+      params,
+      execute,
+      // Content-script results carry no tab id; the view reads the tab the
+      // action ran in, resolved the way read tools resolve it.
+      resolveTabId: async () => {
+        if (typeof globalThis.resolveAgentTabOrError !== 'function') return null;
+        const resolved = await globalThis.resolveAgentTabOrError(payload && payload.agentId, params, this);
+        return resolved && resolved.success !== false && Number.isFinite(resolved.tabId) ? resolved.tabId : null;
+      }
+    });
+  }
+
+  // A change_report that records nothing goes to the MCP server as
+  // {changed:false}, so the host reads less but can still tell "nothing
+  // changed" from "not observed" (no report at all: reports switched off, or
+  // the observation could not start). pageStable, the content script's signal
+  // to the change-report wait, is left out. The session recorder has already
+  // stored the full result, and the result object itself is left untouched.
+  _actionResultForWire(result) {
+    if (!result || typeof result !== 'object') return result;
+    const hasOwn = (key) => Object.prototype.hasOwnProperty.call(result, key);
+    const emptyReport = hasOwn('change_report')
+      && typeof isEmptyChangeReport === 'function' && isEmptyChangeReport(result.change_report);
+    const dropStable = hasOwn('pageStable');
+    if (!emptyReport && !dropStable) return result;
+    const wireResult = { ...result };
+    if (emptyReport) wireResult.change_report = { changed: false };
+    if (dropStable) delete wireResult.pageStable;
+    return wireResult;
+  }
+
   _sendError(id, error) {
     this._send({ id, type: 'mcp:error', payload: { success: false, error } });
   }
 
   _sendProgress(id, progressData) {
     this._send({ id, type: 'mcp:progress', payload: progressData });
+  }
+
+  /**
+   * Sends one content-script action of an MCP call. On a live call, an action
+   * whose connection closed because the page navigated is answered with that
+   * navigation instead of an unknown outcome (runActionAcrossNavigation in
+   * mcp-tool-dispatcher.js holds every condition). Replays keep the unknown
+   * outcome. `delivery` is the object _sendToContentScript reports on.
+   */
+  _sendAcrossNavigation(payload, tabId, send, delivery) {
+    if (!payload || payload[MCP_BRIDGE_LIVE_ACTION] !== true || typeof runActionAcrossNavigation !== 'function') {
+      return send();
+    }
+    return runActionAcrossNavigation({
+      toolName: payload.tool,
+      tabId,
+      execute: send,
+      connectionClosed: () => delivery.connectionClosed === true
+    });
   }
 
   async _handleMessage(raw) {
@@ -1489,7 +1562,7 @@ class MCPBridgeClient {
       }
 
       case 'mcp:execute-action':
-        return this._handleExecuteAction(payload);
+        return this._actionResultForWire(await this._handleExecuteActionWithView(payload));
 
       case 'mcp:start-automation':
         return this._handleStartAutomation(payload, id);
@@ -1609,9 +1682,11 @@ class MCPBridgeClient {
   /**
    * Send message to content script using background.js's sendMessageWithRetry.
    * This ensures content scripts are injected before sending, handling the
-   * MV3 content script lifecycle properly.
+   * MV3 content script lifecycle properly. A caller that passes `delivery`
+   * finds connectionClosed set on it when the message was sent and its
+   * connection closed before an answer came.
    */
-  async _sendToContentScript(tabId, message) {
+  async _sendToContentScript(tabId, message, delivery) {
     const deliveryDeadline = Date.now() + 12000;
     if (message.action === 'executeAction') message._fsbDeadlineAt = deliveryDeadline;
     const isAction = message.action === 'executeAction';
@@ -1645,6 +1720,12 @@ class MCPBridgeClient {
     };
     const onDeliveryState = (state) => {
       if (settled) return;
+      // The connection closed after the message was sent. The result stays
+      // the unknown outcome; what the closing means is the caller's to judge.
+      if (state === 'closed') {
+        if (delivery) delivery.connectionClosed = true;
+        return;
+      }
       dispatched = state === 'dispatching';
       // An undelivered attempt may retry only within the original delivery
       // window. A sheet that was dispatched gets its own execution budget.
@@ -1721,9 +1802,17 @@ class MCPBridgeClient {
     if (resolved.success === false) {
       return resolved;
     }
+    // The content script builds the snapshot from request.options. Each
+    // element costs about half a kilobyte, so every request is capped at 200,
+    // the DOM snapshot resource's request for 2000 included.
+    // prioritizeViewport passes through when given; the content default is true.
+    const requested = Number(payload.maxElements);
+    const maxElements = Number.isFinite(requested) && requested >= 1 ? Math.min(Math.floor(requested), 200) : 50;
+    const options = { maxElements };
+    if (typeof payload.prioritizeViewport === 'boolean') options.prioritizeViewport = payload.prioritizeViewport;
     const response = await this._sendToContentScript(resolved.tabId, {
       action: 'getDOM',
-      maxElements: payload.maxElements || 50,
+      options,
     });
     return response;
   }
@@ -1738,9 +1827,10 @@ class MCPBridgeClient {
     if (resolved.success === false) {
       return resolved;
     }
+    // The content script reads its flags from request.params.
     const response = await this._sendToContentScript(resolved.tabId, {
       action: 'readPage',
-      full: payload.full || false,
+      params: { full: payload.full || false },
     });
     return response;
   }
@@ -1769,6 +1859,13 @@ class MCPBridgeClient {
    * (resolveAgentTabOrError) passes AND AFTER a concrete tabId is known,
    * BEFORE the underlying action executes. See .planning/v0.9.62-CONTRACT.md
    * Field Bundle section and .planning/phases/256-.../256-CONTEXT.md ordering.
+   *
+   * Callers start the tick and dispatch the action without waiting for it:
+   * the tick only drives the overlay, and on a tab without a content script
+   * it would otherwise hold every action for its full 750 ms cap. The overlay
+   * may therefore light up just after the action starts. The returned
+   * promise never rejects; _clearVisualSessionIfFinal waits for it so a
+   * final clear always lands after the tick.
    *
    * Sidecar field SHAPE (per Phase 256 Plan 02):
    *   payload.visualSession = { visualReason, client, isFinal }
@@ -1882,7 +1979,7 @@ class MCPBridgeClient {
    * COMPLETE-02 (immediate clear post-change_report), COMPLETE-03
    * (idempotent on no active session -- delegated to clearVisualSession).
    */
-  async _clearVisualSessionIfFinal(tabId, agentId, payload) {
+  async _clearVisualSessionIfFinal(tabId, agentId, payload, pendingTick) {
     if (typeof MCPVisualSessionLifecycleUtils === 'undefined') return;
     if (typeof MCPVisualSessionLifecycleUtils.clearVisualSession !== 'function') return;
     const sidecar = payload && payload.visualSession;
@@ -1890,6 +1987,8 @@ class MCPBridgeClient {
     if (sidecar.isFinal !== true) return;
     if (!Number.isFinite(tabId) || tabId <= 0) return;
     if (typeof agentId !== 'string' || !agentId) return;
+    // A tick still in flight would re-create the session after this clear.
+    if (pendingTick) await pendingTick;
     try {
       await Promise.race([MCPVisualSessionLifecycleUtils.clearVisualSession(tabId, { reason: 'is_final' }),
         new Promise((resolve) => setTimeout(resolve, 750))]);
@@ -2122,12 +2221,12 @@ class MCPBridgeClient {
         if (resolvedTabId !== null) {
           const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
           this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
-          await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
+          const visualTick = this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload).catch(() => {});
           // Phase 257 -- explicit completion. When the caller marks this
           // bootstrap call as the final action of the task, clear the visual
           // session immediately rather than waiting for the 60s sliding-window
           // timer. Gated by sidecar.isFinal === true inside the helper.
-          await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload);
+          await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload, visualTick);
         }
       }
       return dispatched;
@@ -2151,8 +2250,8 @@ class MCPBridgeClient {
           if (resolvedTabId !== null) {
             const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
             this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
-            await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
-            await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload);
+            const visualTick = this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload).catch(() => {});
+            await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload, visualTick);
           }
         }
         return dispatched;
@@ -2173,8 +2272,9 @@ class MCPBridgeClient {
     // Runs AFTER resolveAgentTabOrError approves the tab + agent pairing
     // (v0.9.60 ownership gate) and BEFORE the underlying executeFn fires.
     // TIMEOUT-05 ownership-gating-wins: this line is unreachable when
-    // resolved.success === false above.
-    await this._recordVisualSessionTickIfPresent(tabId, agentId, payload);
+    // resolved.success === false above. The action does not wait for the
+    // tick; only a final clear does.
+    const visualTick = this._recordVisualSessionTickIfPresent(tabId, agentId, payload).catch(() => {});
 
     const routeParams = {
       ...params,
@@ -2205,13 +2305,19 @@ class MCPBridgeClient {
         }
         return executeCDPToolDirect({ tool: toolDef._cdpVerb, params }, tabId);
       }
-      // Default: send to content script (content-routed or unknown tools)
-      return this._sendToContentScript(tabId, {
+      // Default: send to content script (content-routed or unknown tools).
+      // The send may be answered by the navigation it started
+      // (_sendAcrossNavigation).
+      const delivery = { connectionClosed: false };
+      const send = () => this._sendToContentScript(tabId, {
         action: 'executeAction',
         tool: payload.tool,
         params,
         source: 'mcp-manual',
-      });
+      }, delivery);
+      return typeof this._sendAcrossNavigation === 'function'
+        ? this._sendAcrossNavigation(payload, tabId, send, delivery)
+        : send();
     };
     const executeFn = async () => {
       const provenance = (typeof globalThis !== 'undefined')
@@ -2261,7 +2367,7 @@ class MCPBridgeClient {
     // change_report resolves (wrapWithChangeReport awaits the report before
     // returning) so the user sees the action's effect land first, then the
     // overlay vanishes. Gated by sidecar.isFinal === true inside the helper.
-    await this._clearVisualSessionIfFinal(tabId, agentId, payload);
+    await this._clearVisualSessionIfFinal(tabId, agentId, payload, visualTick);
 
     return actionResult;
   }
@@ -2336,17 +2442,16 @@ class MCPBridgeClient {
       throw new Error('execute_js requires a "code" parameter (string)');
     }
 
+    // A returned Promise is awaited for at most this long.
+    const promiseTimeoutMs = 10000;
+
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
-        func: (userCode) => {
-          try {
-            // Use Function constructor to execute in page context
-            // This allows return values and multi-statement code
-            const fn = new Function(userCode);
-            const result = fn();
-            // Serialize result for message passing
+        func: (userCode, settleTimeoutMs) => {
+          // Serialize result for message passing
+          const serialize = (result) => {
             if (result === undefined) return { value: 'undefined' };
             if (result === null) return { value: 'null' };
             if (typeof result === 'object') {
@@ -2354,11 +2459,49 @@ class MCPBridgeClient {
               catch { return { value: String(result) }; }
             }
             return { value: String(result) };
+          };
+          // An async function always hands back a native Promise, even when
+          // the page has replaced window.Promise, so executeScript waits for
+          // it. A rejection takes the same shape as a thrown exception.
+          const settle = async (thenable) => {
+            let timer;
+            const timedOut = {};
+            try {
+              const value = await new Promise((resolve, reject) => {
+                timer = setTimeout(() => resolve(timedOut), settleTimeoutMs);
+                thenable.then(resolve, reject);
+              });
+              if (value === timedOut) {
+                return {
+                  error: `The Promise returned by the script did not settle within ${settleTimeoutMs / 1000} s. It may still be running in the page.`,
+                  timedOut: true,
+                };
+              }
+              return serialize(value);
+            } catch (rejection) {
+              return { error: (rejection && rejection.message) || String(rejection) };
+            } finally {
+              clearTimeout(timer);
+            }
+          };
+          try {
+            // Use Function constructor to execute in page context
+            // This allows return values and multi-statement code
+            const fn = new Function(userCode);
+            const result = fn();
+            let isThenable = false;
+            try {
+              isThenable = result !== null
+                && (typeof result === 'object' || typeof result === 'function')
+                && typeof result.then === 'function';
+            } catch { isThenable = false; }
+            if (isThenable) return settle(result);
+            return serialize(result);
           } catch (execError) {
             return { error: execError.message || String(execError) };
           }
         },
-        args: [code],
+        args: [code, promiseTimeoutMs],
       });
 
       // chrome.scripting.executeScript returns an array of InjectionResult
@@ -2368,6 +2511,16 @@ class MCPBridgeClient {
       }
 
       const resultValue = injectionResult.result;
+      if (resultValue && resultValue.timedOut) {
+        // The script ran, but its work had not finished when the wait ended.
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          errorCode: 'ACTION_RESPONSE_TIMEOUT',
+          error: resultValue.error,
+        };
+      }
       if (resultValue && resultValue.error) {
         return { success: false, error: resultValue.error };
       }

@@ -219,7 +219,7 @@ for (const name of PATH_NAMES) {
     assert.deepEqual(Object.keys(parsed).filter((key) => !hasOwn(offParsed, key)), ['fast_mode'],
       'the key-set difference is exactly fast_mode');
     const { fast_mode: _block, ...rest } = parsed;
-    assert.equal(JSON.stringify(rest, null, 2), GOLDEN.paths[name].wireText,
+    assert.equal(JSON.stringify(rest), GOLDEN.paths[name].wireText,
       'without fast_mode the text re-serializes to the golden, byte for byte');
   });
 }

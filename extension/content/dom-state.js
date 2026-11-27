@@ -626,44 +626,110 @@
   /**
    * RefMap - Maps compact refs (e1, e2, ...) to DOM elements for AI communication
    * Uses WeakRef to prevent memory leaks when DOM elements are garbage-collected.
-   * Each generateCompactSnapshot() call resets and rebuilds the map.
+   *
+   * A ref names one element for the life of the document. An element keeps its
+   * ref across snapshots, and an element seen for the first time gets a number
+   * never issued before in this document, so a ref from an earlier snapshot
+   * resolves to its original element or to nothing, never to another element.
+   * reset() starts a new snapshot generation: `map` then holds only the
+   * elements registered since, so the snapshot code that scans it costs what
+   * one snapshot costs, while `live` keeps every registered element still on
+   * the page for resolve() and getInfo(). reset() drops entries whose element
+   * is gone and never renumbers. The counter starts again only in a new
+   * document, which loads a new content script and a new RefMap. Each RefMap
+   * numbers inside its own random blocks of 999 numbers, so a ref copied from
+   * another page, or from before the content script was re-injected, is almost
+   * never a number this document issues and fails as unknown instead of naming
+   * an element. A document that uses up a block draws another unused block
+   * rather than counting on into a range another document may own.
    */
   class RefMap {
+    static BLOCK_SIZE = 1000;
+    static BLOCK_COUNT = 900;
+
     constructor() {
-      this.map = new Map();    // ref -> { element: WeakRef, selector, role, name }
-      this.counter = 0;
+      this.map = new Map();    // ref -> { element: WeakRef, selector, role, name }, this generation
+      this.live = new Map();   // ref -> the same entry, every generation, until its element is gone
+      this.refsByElement = new WeakMap();    // element -> ref
+      // Refs of this document are e<base+1> ... e<base+999>, where the base is
+      // a random multiple of 1000 between 1000 and 900000. Once a block is
+      // used up, the next ref opens a new block, drawn the same way from the
+      // blocks this document has not used.
+      this.blocks = [];   // block numbers (base / 1000) in the order used
+      this.base = this._openBlock();
+      this.counter = this.base;   // highest ref number issued in this document
       this.generationId = 0;
       this.generationUrl = '';
     }
 
     reset() {
+      for (const [ref, entry] of this.live) {
+        const el = entry.element.deref();
+        if (!el || !el.isConnected) this.live.delete(ref);
+      }
       this.map.clear();
-      this.counter = 0;
       this.generationId++;
     }
 
     register(element, selector, role, name) {
-      this.counter++;
-      const ref = `e${this.counter}`;
-      this.map.set(ref, {
+      let ref = this.refsByElement.get(element);
+      if (!ref) {
+        if (this.counter % RefMap.BLOCK_SIZE === RefMap.BLOCK_SIZE - 1) {
+          this.counter = this._openBlock();
+        }
+        this.counter++;
+        ref = `e${this.counter}`;
+        this.refsByElement.set(element, ref);
+      }
+      const entry = {
         element: new WeakRef(element),
         selector,
         role: role || 'generic',
         name: name || ''
-      });
+      };
+      this.map.set(ref, entry);
+      this.live.set(ref, entry);
       return ref;
     }
 
+    // True when this document issued the ref, whether or not its element remains.
+    issued(ref) {
+      if (typeof ref !== 'string' || !/^e[1-9]\d*$/.test(ref)) return false;
+      const n = Number(ref.slice(1));
+      if (n % RefMap.BLOCK_SIZE === 0) return false;
+      const index = this.blocks.indexOf(Math.floor(n / RefMap.BLOCK_SIZE));
+      if (index === -1) return false;
+      return index < this.blocks.length - 1 || n <= this.counter;
+    }
+
+    // Picks a random block this document has not used and returns its base.
+    // Once all of them are used, blocks continue above the highest one.
+    _openBlock() {
+      let block;
+      if (this.blocks.length < RefMap.BLOCK_COUNT) {
+        const used = new Set(this.blocks);
+        do {
+          block = 1 + Math.floor(Math.random() * RefMap.BLOCK_COUNT);
+        } while (used.has(block));
+      } else {
+        block = Math.max(...this.blocks) + 1;
+      }
+      this.blocks.push(block);
+      return block * RefMap.BLOCK_SIZE;
+    }
+
+    // null: never issued in this document. stale: issued, but its element was
+    // removed from the page. Neither case offers another element.
     resolve(ref) {
-      const entry = this.map.get(ref);
-      if (!entry) return null;
+      const entry = this.live.get(ref);
+      if (!entry) return this.issued(ref) ? { element: null, selector: null, stale: true } : null;
       const el = entry.element.deref();
       if (!el || !el.isConnected) return { element: null, selector: entry.selector, stale: true };
       return { element: el, selector: entry.selector, stale: false };
     }
 
     getInfo(ref) {
-      const entry = this.map.get(ref);
+      const entry = this.live.get(ref);
       return entry ? { role: entry.role, name: entry.name, selector: entry.selector } : null;
     }
 

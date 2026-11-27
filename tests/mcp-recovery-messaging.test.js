@@ -197,6 +197,69 @@ async function run() {
         assert(!text.includes('then retry.'), 'hung mutation never recommends an immediate retry');
       },
     },
+    {
+      label: 'element_not_found',
+      input: { success: false, error: 'Element not found: #checkout-button' },
+      checks(text) {
+        assert(text.startsWith('Detected: Element lookup\n'), 'element not found names the element lookup layer');
+        assert(!text.includes('Page navigation'), 'element not found is not reported as page navigation');
+        assert(text.includes('#checkout-button'), 'element not found keeps the selector in Why');
+        assert(text.includes('get_page_snapshot') && text.includes('different selector'),
+          'element not found suggests a fresh snapshot or a different selector');
+      },
+    },
+    {
+      label: 'element_not_found_code',
+      input: { success: false, errorCode: 'element_not_found' },
+      checks(text) {
+        assert(text.startsWith('Detected: Element lookup\n'), 'a bare element_not_found code names the element lookup layer');
+        assert(text.includes('matched no element'), 'a bare element_not_found code explains the miss');
+      },
+    },
+    {
+      label: 'stale_ref',
+      input: {
+        success: false,
+        refStale: true,
+        error: 'Element ref "e5" (button "Save") is stale. The page has changed. Use elements from the current snapshot.',
+      },
+      checks(text) {
+        assert(text.startsWith('Detected: Element lookup\n'), 'a stale ref names the element lookup layer');
+        assert(text.includes('fresh get_page_snapshot') && text.includes('ref from it'), 'a stale ref asks for a fresh get_page_snapshot ref, the snapshot that issues refs');
+        assert(!text.includes('Page navigation'), 'a stale ref is not reported as page navigation');
+      },
+    },
+    {
+      label: 'unknown_ref',
+      input: { success: false, error: 'Unknown ref "e99". Use refs from the latest page snapshot.' },
+      checks(text) {
+        assert(text.startsWith('Detected: Element lookup\n'), 'an unknown ref names the element lookup layer');
+      },
+    },
+    {
+      label: 'invalid_selector',
+      input: { success: false, error: "Failed to execute 'querySelector' on 'Document': 'a[' is not a valid selector." },
+      checks(text) {
+        assert(text.startsWith('Detected: Element lookup\n'), 'an unparsable selector names the element lookup layer');
+        assert(text.includes('selector syntax'), 'an unparsable selector asks for a fixed selector');
+      },
+    },
+    {
+      label: 'tab_not_found_keeps_generic_text',
+      input: { success: false, error: 'Tab 12 not found' },
+      checks(text) {
+        assert(!text.includes('Element lookup'), 'a missing tab is not reported as an element lookup');
+        assert(text.startsWith('Detected: Page navigation\nWhy: Tab 12 not found\n'), 'a missing tab keeps its previous text');
+      },
+    },
+    {
+      label: 'uncertain_element_failure_keeps_unknown_outcome',
+      input: { success: false, outcome: 'unknown', mayHaveExecuted: true, error: 'Element not found' },
+      checks(text) {
+        assert(text.startsWith('Detected: Action outcome unknown\n'), 'an uncertain action keeps the unknown-outcome text');
+        assert(!text.includes('Element lookup'), 'an uncertain action is not relabelled');
+      },
+    },
   ];
 
   for (const fixture of fixtures) {

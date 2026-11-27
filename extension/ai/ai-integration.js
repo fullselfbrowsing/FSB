@@ -1293,7 +1293,10 @@ ${domState.scrollInfo?.hasMoreBelow ? 'More content below -- scroll down to see 
       }
 
       // MEM-03: Track working selectors (promote after 2+ uses with success AND hadEffect)
-      if (this.hardFacts && lastAction.result.success === true && lastAction.result.hadEffect === true && lastAction.result.selectorUsed) {
+      // A snapshot ref (e12) names an element of one page only, so it is never
+      // remembered as a working selector.
+      if (this.hardFacts && lastAction.result.success === true && lastAction.result.hadEffect === true && lastAction.result.selectorUsed
+          && !/^\s*e\d+\s*$/i.test(String(lastAction.result.selectorUsed))) {
         const sel = lastAction.result.selectorUsed;
         if (!this._selectorUsageCount) this._selectorUsageCount = {};
         this._selectorUsageCount[sel] = (this._selectorUsageCount[sel] || 0) + 1;

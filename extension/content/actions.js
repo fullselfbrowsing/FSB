@@ -123,7 +123,7 @@ async function ensureCoordinatesVisible(docX, docY, width, height) {
     window.scrollTo({
       left: Math.max(0, docX - window.innerWidth / 2 + width / 2),
       top: Math.max(0, docY - window.innerHeight / 2 + height / 2),
-      behavior: 'smooth'
+      behavior: typeof FSB.scrollBehavior === 'function' ? FSB.scrollBehavior() : 'smooth'
     });
 
     // Wait for scroll animation to complete
@@ -1550,6 +1550,205 @@ function checkBinaryState(element, intent) {
   return { shouldAct: true, reason: 'no_aria_state' };
 }
 
+/**
+ * Ticks a checkbox or radio whose native input is hidden by clicking the
+ * visible label that draws it, as a person would, then reads the input's
+ * checked state back. One click event is dispatched, so the input toggles once.
+ * @param {HTMLInputElement} input - The hidden checkbox or radio
+ * @param {Element} label - Its visible label
+ * @param {boolean} [wanted] - The checked state the caller wants; omitted when any change will do
+ * @param {Function} [onDispatch] - Called just before the click is dispatched
+ * @returns {Promise<Object>} { dispatched, confirmed, error, scrolled?, stable?, preState?, postState?, verification? }
+ *   confirmed is true only when the input's checked state changed, and to the wanted state when one was given.
+ */
+async function tickThroughLabel(input, label, wanted, onDispatch) {
+  const enabled = FSB.checkElementEnabled(input);
+  if (!enabled.passed) {
+    return { dispatched: false, confirmed: false, error: `Element not ready: ${enabled.reason}` };
+  }
+  const readiness = await FSB.smartEnsureReady(label, 'click');
+  if (!readiness.ready) {
+    return { dispatched: false, confirmed: false, error: `Element not ready: its label is not ready (${readiness.failureReason})` };
+  }
+  if (!input.isConnected || !label.isConnected) {
+    return { dispatched: false, confirmed: false, error: 'Element no longer in DOM' };
+  }
+
+  const preState = captureActionState(input, 'toggleCheckbox');
+  const rect = label.getBoundingClientRect();
+  const labelEventInit = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window,
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    button: 0,
+    buttons: 1
+  };
+  if (typeof onDispatch === 'function') onDispatch();
+  label.dispatchEvent(new MouseEvent('mousedown', labelEventInit));
+  label.dispatchEvent(new MouseEvent('mouseup', labelEventInit));
+  label.dispatchEvent(new MouseEvent('click', labelEventInit));
+
+  const stability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+  const postState = captureActionState(input, 'toggleCheckbox');
+  const verification = verifyActionEffect(preState, postState, 'toggleCheckbox');
+  const confirmed = verification.verified && (wanted === undefined || input.checked === wanted);
+  return {
+    dispatched: true,
+    confirmed,
+    error: confirmed ? null : `Clicked its label, but the ${input.type} is ${verification.verified ? 'now' : 'still'} ${input.checked ? 'checked' : 'unchecked'}`,
+    scrolled: readiness.scrolled,
+    stable: !!(stability && stability.stable === true),
+    preState,
+    postState,
+    verification
+  };
+}
+
+// ============================================================================
+// SELECT OPTION RESOLUTION
+// A caller names an option by its value, its visible text or its position.
+// The option is found before the select is touched, so a request that names
+// no single option changes nothing, and its reply lists what the select offers.
+// ============================================================================
+
+// Most options a refusal lists by name; the rest are only counted.
+const SELECT_OPTION_LIST_LIMIT = 12;
+// Longest option text or value quoted in a refusal.
+const SELECT_OPTION_QUOTE_LIMIT = 80;
+
+/**
+ * Reduces option text to the form it is compared in: every run of whitespace
+ * (non-breaking spaces included) becomes one space and the ends are trimmed.
+ * @param {*} value - Text to normalize
+ * @returns {string} Normalized text
+ */
+function normalizeOptionText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Describes each option of a select by position, value, text and label.
+ * `shown` is the text a reply quotes: the option's text, or its label
+ * attribute when the option has no text of its own.
+ * @param {HTMLSelectElement} select - The select to read
+ * @returns {Array<Object>} One entry per option, in document order
+ */
+function describeSelectOptions(select) {
+  return Array.from(select.options || [], (option, index) => {
+    const text = normalizeOptionText(option.text);
+    const label = normalizeOptionText(option.label);
+    return { option, index, value: String(option.value ?? ''), text, label, shown: text || label };
+  });
+}
+
+/**
+ * Quotes options for a refusal, capped in count and in length.
+ * @param {Array<Object>} entries - Entries from describeSelectOptions
+ * @param {boolean} [withValues=false] - Also quote each option's value
+ * @returns {string} For example: "Red", "Green", and 3 more
+ */
+function quoteSelectOptions(entries, withValues = false) {
+  const clip = (value) => (value.length > SELECT_OPTION_QUOTE_LIMIT ? `${value.slice(0, SELECT_OPTION_QUOTE_LIMIT)}...` : value);
+  const quoted = entries.slice(0, SELECT_OPTION_LIST_LIMIT)
+    .map(entry => (withValues ? `"${clip(entry.shown)}" (value "${clip(entry.value)}")` : `"${clip(entry.shown)}"`));
+  const more = entries.length - quoted.length;
+  if (more > 0) quoted.push(`and ${more} more`);
+  return quoted.join(', ');
+}
+
+/**
+ * Finds the option a select_option request names, without changing the select.
+ *
+ * A value is tried as an option value, then as the option's visible text,
+ * then as text or label with letter case ignored. That last, loosest step
+ * counts only when exactly one option matches. A text request skips the value
+ * step, and an index must be the position of an existing option.
+ *
+ * @param {HTMLSelectElement} select - The select to search
+ * @param {Object} params - Tool parameters; value, index or text names the option
+ * @returns {Object} { choice, requestedBy, matchedBy } when one option is named,
+ *   otherwise { errorCode, error } with nothing chosen
+ */
+function resolveSelectOption(select, params) {
+  const entries = describeSelectOptions(select);
+  const offered = entries.length > 0
+    ? `Available options (${entries.length}): ${quoteSelectOptions(entries)}.`
+    : 'This select has no options.';
+  const refusal = (errorCode, error) => ({ errorCode, error });
+
+  const requestedBy = ['value', 'index', 'text'].find(key => params[key] !== undefined && params[key] !== null);
+  if (!requestedBy) {
+    return refusal('OPTION_NOT_FOUND', `No option was named, so nothing was changed. Pass an option's value or visible text as value. ${offered}`);
+  }
+
+  if (requestedBy === 'index') {
+    const raw = params.index;
+    const position = typeof raw === 'string' && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : raw;
+    if (!Number.isInteger(position) || position < 0 || position >= entries.length) {
+      const range = entries.length > 0 ? ` (positions 0 to ${entries.length - 1})` : '';
+      return refusal('OPTION_NOT_FOUND',
+        `Option index ${String(raw)} does not exist: this select has ${entries.length} option${entries.length === 1 ? '' : 's'}${range}. Nothing was changed. ${offered}`);
+    }
+    return { choice: entries[position], requestedBy, matchedBy: 'index' };
+  }
+
+  const requested = String(params[requestedBy]);
+  const wanted = normalizeOptionText(requested);
+
+  if (requestedBy === 'value') {
+    const byValue = entries.find(entry => entry.value === requested);
+    if (byValue) return { choice: byValue, requestedBy, matchedBy: 'value' };
+  }
+
+  const byText = entries.find(entry => entry.text === wanted);
+  if (byText) return { choice: byText, requestedBy, matchedBy: 'text' };
+
+  const folded = wanted.toLowerCase();
+  const loose = folded
+    ? entries.filter(entry => entry.text.toLowerCase() === folded || entry.label.toLowerCase() === folded)
+    : [];
+  if (loose.length === 1) return { choice: loose[0], requestedBy, matchedBy: 'text-ignoring-case' };
+  if (loose.length > 1) {
+    return refusal('OPTION_AMBIGUOUS',
+      `"${requested}" matches ${loose.length} options when letter case is ignored: ${quoteSelectOptions(loose, true)}. Nothing was changed. Retry with the exact text or the value of the option you want.`);
+  }
+  return refusal('OPTION_NOT_FOUND', `No option matches "${requested}". Nothing was changed. ${offered} Retry with one of these texts.`);
+}
+
+/**
+ * Lists the positions of the selected options, to tell whether a selection
+ * changed.
+ * @param {HTMLSelectElement} select - The select to read
+ * @returns {string} Comma-separated positions
+ */
+function readSelectedPositions(select) {
+  return Array.from(select.options || [], (option, index) => (option.selected ? index : -1))
+    .filter(index => index >= 0).join(',');
+}
+
+/**
+ * Tells whether a select currently holds the chosen option. A single select
+ * holds it when selectedIndex points at an option with the chosen value and
+ * text; a multiple select holds it when such an option is among those
+ * selected. Comparing value and text keeps the answer right when the page
+ * rebuilt its option elements in the meantime.
+ * @param {HTMLSelectElement} select - The select to read
+ * @param {Object} choice - Entry returned by resolveSelectOption
+ * @returns {boolean} True when the chosen option is selected
+ */
+function selectHoldsOption(select, choice) {
+  const options = select.options || [];
+  const selected = select.multiple
+    ? Array.from(options).filter(option => option.selected)
+    : [options[select.selectedIndex]];
+  return selected.some(option => option
+    && String(option.value ?? '') === choice.value
+    && normalizeOptionText(option.text) === choice.text);
+}
+
 // ============================================================================
 // STABILITY PROFILES -- observation-based waits replacing hardcoded setTimeout
 // Each profile tunes maxWait, stableTime, and networkQuietTime for its use case.
@@ -2265,12 +2464,18 @@ const tools = {
   scrollToElement: async (params) => {
     const selector = params.selector;
     if (!selector) return { success: false, error: 'No selector provided' };
-    const element = document.querySelector(selector);
+    const element = FSB.querySelectorWithShadow(selector);
     if (!element) return { success: false, error: `Element not found: ${selector}` };
+    // A checkbox or radio drawn by its label may have no box of its own; the
+    // label's box is the one to bring into view.
+    const box = FSB.visibleLabelOfHiddenToggle?.(element) || element;
     const position = params.position || 'center';
-    element.scrollIntoView({ behavior: 'smooth', block: position === 'center' ? 'center' : 'start' });
+    box.scrollIntoView({
+      behavior: typeof FSB.scrollBehavior === 'function' ? FSB.scrollBehavior() : 'smooth',
+      block: position === 'center' ? 'center' : 'start'
+    });
     await waitForStability('scroll');
-    const rect = element.getBoundingClientRect();
+    const rect = box.getBoundingClientRect();
     const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight;
     return { success: true, scrollY: window.scrollY, elementInViewport: inViewport };
   },
@@ -2297,75 +2502,25 @@ const tools = {
     let element = null;
     let selectorUsed = null;
 
-    // TEXT-BASED TARGETING (D-03, D-04, D-05)
-    // When params.text is provided, find element by visible text content.
-    // This handles dynamic apps (LinkedIn/Ember, Facebook/React) where IDs
-    // regenerate and CSS classes are shared across list items.
+    // TEXT-BASED TARGETING
+    // A text target goes through the same name binder as selector text=:
+    // exactly one element, addressed by its ref from here on, or a refusal
+    // that lists candidate refs with nothing clicked. executeAction binds the
+    // text before this tool runs; this covers direct calls.
     if (params.text && typeof params.text === 'string') {
-      const searchText = params.text.toLowerCase();
-      const candidates = [];
-
-      // Use TreeWalker for efficient traversal of all elements
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_ELEMENT,
-        {
-          acceptNode: (node) => {
-            // Skip invisible containers early
-            const style = window.getComputedStyle(node);
-            if (style.display === 'none' || style.visibility === 'hidden') {
-              return NodeFilter.FILTER_REJECT; // Skip node and its children
-            }
-            // Check if this element's own text content matches
-            // Use innerText (rendered text only) for accuracy
-            const nodeText = (node.innerText || node.textContent || '').toLowerCase();
-            if (nodeText.includes(searchText)) {
-              return NodeFilter.FILTER_ACCEPT;
-            }
-            return NodeFilter.FILTER_SKIP; // Skip node but check children
-          }
-        }
-      );
-
-      let node;
-      while ((node = walker.nextNode())) {
-        candidates.push(node);
+      let verdict = null;
+      try {
+        verdict = typeof FSB.bindTargetByName === 'function' ? FSB.bindTargetByName(params.text, 'click') : null;
+      } catch (_bindError) {
+        verdict = null;
       }
-
-      // Find the most specific match: prefer the deepest (most nested) element
-      // whose text matches, as it is closest to the actual text content.
-      // Filter for visibility: non-zero dimensions.
-      let textMatchElement = null;
-      for (let i = candidates.length - 1; i >= 0; i--) {
-        const el = candidates[i];
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          textMatchElement = el;
-          break;
-        }
-      }
-
-      // D-05: If no "deepest visible" found, fall back to first visible match
-      if (!textMatchElement) {
-        for (const el of candidates) {
-          const rect = el.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            textMatchElement = el;
-            break;
-          }
-        }
-      }
-
-      if (textMatchElement) {
-        // Found element by text -- skip the selector cascade and proceed
-        // directly to the readiness/click logic below.
-        element = textMatchElement;
-        selectorUsed = `[text-match: "${params.text}"]`;
-        // Cache element for potential re-use
-        const textSelector = `[text-match-${Date.now()}]`;
-        FSB.elementCache?.set(textSelector, element);
+      if (verdict && verdict.ok === true) {
+        element = verdict.element;
+        selectorUsed = verdict.ref;
       } else {
-        // No visible element matches the text
+        const error = verdict && verdict.error
+          ? verdict.error
+          : `text="${params.text}" could not be bound to one element, so nothing was executed.`;
         actionRecorder.record(null, 'click', params, {
           selectorTried: `text:"${params.text}"`,
           selectorUsed: null,
@@ -2374,15 +2529,17 @@ const tools = {
           coordinatesUsed: null,
           coordinateSource: null,
           success: false,
-          error: `No visible element found containing text "${params.text}"`,
+          error,
           duration: Date.now() - startTime
         });
         return {
           success: false,
-          error: `No visible element found containing text "${params.text}". ${candidates.length} hidden/zero-dimension elements matched. Try scrolling the page or using a CSS selector instead.`,
+          errorCode: (verdict && verdict.errorCode) || 'BIND_NOT_FOUND',
+          error,
           tool: 'click',
-          textSearched: params.text,
-          hiddenMatches: candidates.length
+          outcome: 'failed',
+          mayHaveExecuted: false,
+          textSearched: params.text
         };
       }
     }
@@ -2454,6 +2611,70 @@ const tools = {
     // checks to hang or return false positives. DOM toolbar elements (Name Box, formula bar)
     // are always interactive despite what readiness checks report.
     const isCanvasEditor = FSB.isCanvasBasedEditor && FSB.isCanvasBasedEditor();
+
+    // A styled checkbox or radio hides the native input and draws the control
+    // with its label. The label is clicked in the input's place, and the click
+    // succeeds only when the input's checked state changed. Canvas editors keep
+    // their own path, which runs no readiness checks.
+    const toggleLabel = isCanvasEditor ? null : FSB.visibleLabelOfHiddenToggle?.(element);
+    if (toggleLabel) {
+      let labelSettlesEarly = false;
+      try { labelSettlesEarly = typeof FSB.classifyJevRisk === 'function' && FSB.classifyJevRisk(element, {}) === null; } catch (_e) { labelSettlesEarly = false; }
+      const ticked = await tickThroughLabel(element, toggleLabel, undefined, () => { clickDispatched = true; });
+      const labelPageStable = labelSettlesEarly && ticked.stable === true;
+      actionRecorder.record(null, 'click', params, {
+        selectorTried,
+        selectorUsed,
+        elementFound: true,
+        elementDetails: captureElementDetails(toggleLabel),
+        success: ticked.confirmed,
+        error: ticked.error,
+        hadEffect: ticked.dispatched ? ticked.confirmed : null,
+        effectDetails: ticked.verification ? ticked.verification.changes : null,
+        duration: Date.now() - startTime
+      });
+      if (!ticked.dispatched) {
+        return buildFailureReport('click', params.selector, element, ticked.error);
+      }
+      if (!ticked.confirmed) {
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          clicked: params.selector,
+          hadEffect: false,
+          pageStable: labelPageStable,
+          viaLabel: true,
+          error: `${ticked.error}. Inspect the page before retrying.`,
+          verification: ticked.verification
+        };
+      }
+      return {
+        success: true,
+        clicked: params.selector,
+        hadEffect: true,
+        checked: element.checked,
+        viaLabel: true,
+        scrolled: ticked.scrolled,
+        pageStable: labelPageStable,
+        verification: {
+          localChanges: ticked.verification.localChanges,
+          confidence: ticked.verification.confidence,
+          whatChanged: ticked.verification.whatChanged,
+          preState: ticked.preState,
+          postState: ticked.postState,
+          verified: ticked.verification.verified,
+          changes: ticked.verification.changes,
+          reason: ticked.verification.reason
+        },
+        elementInfo: {
+          tag: element.tagName,
+          text: toggleLabel.textContent?.trim().substring(0, 50),
+          wasScrolledIntoView: ticked.scrolled
+        }
+      };
+    }
+
     let readiness = { ready: true, scrolled: false };
     if (!isCanvasEditor) {
       // SPEED-05: Use smart readiness check with fast-path for ready elements
@@ -2469,18 +2690,26 @@ const tools = {
             if (!element.isConnected) {
               return buildFailureReport('click', selectorUsed, null, 'Element no longer in DOM');
             }
-            if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
-                FSB.querySelectorWithShadow(selectorUsed) !== element) {
+            if (selectorUsed && FSB.querySelectorWithShadow(selectorUsed) !== element) {
               return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
             }
+            // The service worker may skip its own settle wait only for a control the
+            // code-only risk classifier finds nothing against. Anything that can
+            // submit, send, pay, delete or confirm keeps the full wait, so an effect
+            // that arrives late still reaches its change report.
+            let settlesEarly = false;
+            try { settlesEarly = typeof FSB.classifyJevRisk === 'function' && FSB.classifyJevRisk(element, {}) === null; } catch (_e) { settlesEarly = false; }
             clickDispatched = true;
             element.click();
-            await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+            const fallbackStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
             return {
               success: true,
               clicked: params.selector,
               hadEffect: true,
               scrolled: false,
+              // True only when the stability wait after the click saw the page
+              // settle; the service worker then skips its own settle wait.
+              pageStable: settlesEarly && !!(fallbackStability && fallbackStability.stable === true),
               method: 'programmatic_click_obscured_fallback',
               verification: { verified: false, reason: 'obscured_fallback_no_verification' },
               elementInfo: { tag: element.tagName, text: (element.innerText || '').substring(0, 50), wasScrolledIntoView: false },
@@ -2523,12 +2752,8 @@ const tools = {
       if (!element.isConnected) {
         return buildFailureReport('click', params.selector, null, 'Element no longer in DOM');
       }
-      if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
-          FSB.querySelectorWithShadow(selectorUsed) !== element) {
+      if (selectorUsed && FSB.querySelectorWithShadow(selectorUsed) !== element) {
         return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
-      }
-      if (params.text && !(element.innerText || element.textContent || '').toLowerCase().includes(params.text.toLowerCase())) {
-        return buildFailureReport('click', params.text, null, 'Text target changed before click');
       }
 
       // FIX: Handle target="_blank" links that would open in a new tab
@@ -2585,13 +2810,22 @@ const tools = {
       // Dispatch full mouse event sequence for proper JS handler triggering.
       // The synthetic click is the only activation: a second one would flip
       // toggles back and submit forms twice.
+      // The service worker may skip its own settle wait only for a control the
+      // code-only risk classifier finds nothing against. Anything that can
+      // submit, send, pay, delete or confirm keeps the full wait, so an effect
+      // that arrives late still reaches its change report.
+      let settlesEarly = false;
+      try { settlesEarly = typeof FSB.classifyJevRisk === 'function' && FSB.classifyJevRisk(element, {}) === null; } catch (_e) { settlesEarly = false; }
       clickDispatched = true;
       element.dispatchEvent(new MouseEvent('mousedown', mouseEventInit));
       element.dispatchEvent(new MouseEvent('mouseup', mouseEventInit));
       element.dispatchEvent(new MouseEvent('click', mouseEventInit));
 
       // VERIFY-04: Wait for page stability (REPLACE fixed 300ms with dynamic stability detection)
-      await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      const clickStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      // True only when that wait saw the page settle; the service worker then
+      // skips its own settle wait before taking the change report.
+      const pageStable = settlesEarly && !!(clickStability && clickStability.stable === true);
 
       // VERIFY-04: Capture post-state and verify using SHARED utilities
       const postState = captureActionState(element, 'click');
@@ -2659,6 +2893,7 @@ const tools = {
           mayHaveExecuted: true,
           clicked: params.selector,
           hadEffect: false,
+          pageStable,
           error: 'Click was dispatched but its effect could not be confirmed. Inspect the page before retrying.',
           verification
         };
@@ -2687,6 +2922,7 @@ const tools = {
         clicked: params.selector,
         hadEffect: true,
         scrolled: wasScrolled,
+        pageStable,
         verification: {
           localChanges: verification.localChanges,
           confidence: verification.confidence,
@@ -3494,7 +3730,11 @@ const tools = {
       }
 
       // Wait for page stability before capturing post-state
-      await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      const typeStability = await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+      // True only when that wait saw the page settle and no Enter was pressed
+      // (Enter can submit a form); the service worker then skips its own
+      // settle wait before taking the change report.
+      const pageStable = !!(typeStability && typeStability.stable === true) && !params.pressEnter;
 
       // Capture post-state for verification
       const postState = captureActionState(element, 'type');
@@ -3528,6 +3768,7 @@ const tools = {
         selectorIndex: selectorIndex,
         usedFallback: selectorIndex > 0,
         hadEffect: true,
+        pageStable,
         verification: {
           verified: verification.verified,
           reason: verification.reason,
@@ -4946,12 +5187,17 @@ const tools = {
     return { success: true, hovering: params.selector, scrolled: readiness.scrolled };
   },
 
-  // Select dropdown option with verification
+  // Select an option of a native select by value, visible text or position
   selectOption: async (params) => {
     const startTime = Date.now();
     const selectors = params.selectors || [params.selector];
     let lastAttemptError = null;
-    let lastVerification = null;
+    const record = (outcome) => actionRecorder.record(null, 'selectOption', params, { selectorTried: selectors[0], ...outcome, duration: Date.now() - startTime });
+    // Ends the call with a failure about the select that was found.
+    const fail = (selector, element, details) => {
+      record({ selectorUsed: selector, elementFound: true, elementDetails: captureElementDetails(element), success: false, error: details.error });
+      return { success: false, action: 'selectOption', selector, ...details };
+    };
 
     for (let selectorIndex = 0; selectorIndex < selectors.length; selectorIndex++) {
       const currentSelector = selectors[selectorIndex];
@@ -4959,30 +5205,77 @@ const tools = {
         let element = FSB.querySelectorWithShadow(currentSelector);
         if (!element || element.tagName !== 'SELECT') { lastAttemptError = `Select element not found with selector: ${currentSelector}`; continue; }
 
+        // A request that names no single option is refused before the page is
+        // scrolled or the select is touched.
+        let resolution = resolveSelectOption(element, params);
+        if (!resolution.choice) {
+          return fail(currentSelector, element, { errorCode: resolution.errorCode, error: resolution.error, outcome: 'failed', mayHaveExecuted: false });
+        }
+
         const readiness = await FSB.smartEnsureReady(element, 'selectOption');
         if (!readiness.ready) { lastAttemptError = `Element not ready: ${readiness.failureReason}`; continue; }
-        if (readiness.scrolled) { element = FSB.querySelectorWithShadow(currentSelector); if (!element) { lastAttemptError = 'Element became stale after scrolling'; continue; } }
+        if (readiness.scrolled) {
+          element = FSB.querySelectorWithShadow(currentSelector);
+          if (!element || element.tagName !== 'SELECT') { lastAttemptError = 'Element became stale after scrolling'; continue; }
+        }
+
+        // The page may have rebuilt the options during the wait, so the option
+        // is looked up again at the moment it is applied.
+        resolution = resolveSelectOption(element, params);
+        if (!resolution.choice) {
+          return fail(currentSelector, element, { errorCode: resolution.errorCode, error: resolution.error, outcome: 'failed', mayHaveExecuted: false });
+        }
+        const choice = resolution.choice;
 
         const preState = captureActionState(element, 'selectOption');
+        const positionsBefore = readSelectedPositions(element);
 
-        if (params.value !== undefined) { element.value = params.value; }
-        else if (params.index !== undefined) { element.selectedIndex = params.index; }
-        else if (params.text !== undefined) { const option = Array.from(element.options).find(opt => opt.text === params.text); if (option) { option.selected = true; } }
+        // Value and index requests replace the selection. A text request
+        // selects its option, which on a multiple select adds to the selection.
+        if (resolution.requestedBy === 'text') { choice.option.selected = true; }
+        else { element.selectedIndex = choice.index; }
 
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-        await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+        // No change event is sent when the option was already the selection.
+        const changed = readSelectedPositions(element) !== positionsBefore;
+        if (changed) {
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          await waitForPageStability({ maxWait: 1000, stableTime: 200 });
+        }
 
-        const postState = captureActionState(element, 'selectOption');
-        const verification = verifyActionEffect(preState, postState, 'selectOption');
-        lastVerification = verification;
-        if (!verification.verified) { lastAttemptError = `Selection had no verified effect: ${verification.reason}`; continue; }
+        // Success is decided on the select the page shows once it has settled,
+        // which is another element when the page replaced the select.
+        const live = element.isConnected ? element : FSB.querySelectorWithShadow(currentSelector);
+        if (!live || live.tagName !== 'SELECT' || !live.isConnected) {
+          return fail(currentSelector, element, {
+            error: `Option "${choice.shown}" was selected, but the select then left the page, so the selection could not be confirmed.`,
+            outcome: 'unknown', mayHaveExecuted: true
+          });
+        }
+        if (!selectHoldsOption(live, choice)) {
+          const current = describeSelectOptions(live)[live.selectedIndex];
+          // The change event has already reached the page's handlers, which
+          // may have acted on it before putting the select back.
+          return fail(currentSelector, live, {
+            errorCode: 'OPTION_NOT_KEPT',
+            error: `Option "${choice.shown}" was selected, but the select did not keep it. It now shows ${current ? `"${current.shown}"` : 'no option'}.`,
+            outcome: 'unknown', mayHaveExecuted: true
+          });
+        }
 
-        actionRecorder.record(null, 'selectOption', params, { selectorTried: selectors[0], selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(element), success: true, hadEffect: true, verification: verification, duration: Date.now() - startTime });
-        return { success: true, selected: params.value || params.text || params.index, selector: currentSelector, selectorIndex, usedFallback: selectorIndex > 0, hadEffect: true, verification: { verified: verification.verified, reason: verification.reason, changes: verification.changes } };
+        const selection = { selected: choice.shown, selectedValue: choice.value, matchedBy: resolution.matchedBy, selector: currentSelector, selectorIndex, usedFallback: selectorIndex > 0 };
+        if (!changed) {
+          record({ selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(live), success: true, hadEffect: false });
+          return { success: true, action: 'selectOption', alreadyInState: true, message: `Option "${choice.shown}" was already selected`, ...selection };
+        }
+
+        const effect = verifyActionEffect(preState, captureActionState(live, 'selectOption'), 'selectOption');
+        const verification = { verified: true, reason: effect.verified ? effect.reason : 'The select holds the chosen option', changes: effect.changes };
+        record({ selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(live), success: true, hadEffect: true, verification });
+        return { success: true, ...selection, hadEffect: true, verification };
       } catch (error) { lastAttemptError = error.message; }
     }
 
-    actionRecorder.record(null, 'selectOption', params, { selectorTried: selectors[0], selectorUsed: null, elementFound: false, success: false, error: lastAttemptError || 'Selection had no effect with any available selector', diagnostic: generateDiagnostic('noEffect', { selector: selectors[0] }), duration: Date.now() - startTime });
+    record({ selectorUsed: null, elementFound: false, success: false, error: lastAttemptError || 'Selection had no effect with any available selector', diagnostic: generateDiagnostic('noEffect', { selector: selectors[0] }) });
     return buildFailureReport('selectOption', selectors[0], null, lastAttemptError || 'Selection had no effect with any available selector');
   },
 
@@ -5013,6 +5306,35 @@ const tools = {
               selector: currentSelector
             };
           }
+        }
+
+        // A styled checkbox or radio hides the native input and draws the
+        // control with its label. The label is clicked in the input's place,
+        // and the toggle succeeds only when the input reached the wanted state.
+        const toggleLabel = FSB.visibleLabelOfHiddenToggle?.(element);
+        if (toggleLabel) {
+          const ticked = await tickThroughLabel(element, toggleLabel, params.checked !== undefined ? !!params.checked : !element.checked);
+          if (!ticked.dispatched) { lastAttemptError = ticked.error; continue; }
+          // The label was clicked, but the input did not reach the wanted
+          // state. The page may keep the state elsewhere or update it later,
+          // so no further selector is tried (a second click could toggle it
+          // back) and the outcome is reported as unknown.
+          if (!ticked.confirmed) {
+            actionRecorder.record(null, 'toggleCheckbox', params, { selectorTried: selectors[0], selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(toggleLabel), success: false, error: ticked.error, hadEffect: false, verification: ticked.verification, duration: Date.now() - startTime });
+            return {
+              success: false,
+              outcome: 'unknown',
+              mayHaveExecuted: true,
+              checked: element.checked,
+              viaLabel: true,
+              selector: currentSelector,
+              hadEffect: false,
+              error: `${ticked.error}. Inspect the page before retrying.`,
+              verification: ticked.verification ? { verified: ticked.verification.verified, reason: ticked.verification.reason, changes: ticked.verification.changes } : null
+            };
+          }
+          actionRecorder.record(null, 'toggleCheckbox', params, { selectorTried: selectors[0], selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(toggleLabel), success: true, hadEffect: true, verification: ticked.verification, duration: Date.now() - startTime });
+          return { success: true, checked: element.checked, viaLabel: true, selector: currentSelector, selectorIndex, usedFallback: selectorIndex > 0, hadEffect: true, verification: { verified: ticked.verification.verified, reason: ticked.verification.reason, changes: ticked.verification.changes } };
         }
 
         const readiness = await FSB.smartEnsureReady(element, 'toggleCheckbox');

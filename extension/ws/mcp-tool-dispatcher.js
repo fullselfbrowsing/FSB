@@ -4556,6 +4556,10 @@ async function handleFailTaskRoute({ params, payload }) {
 //   from utils/action-verification.js (importScripted into the SW). They run
 //   in SW context with serialized mutation records.
 // - 500ms safety net (D-09) caps total wait. partial:true is set on hit.
+//   click and type_text skip the wait when their content script reports
+//   pageStable and the harvest has already recorded a mutation; execute_js
+//   ends it 150 ms after the script when the harvest has recorded nothing and
+//   the script starts nothing that can change the page later.
 // - Cross-origin transition (D-08) skips DOM inspection and emits URL-only
 //   report with cross_origin:true.
 // - All harvest failures are swallowed (try/catch); the underlying action
@@ -4566,6 +4570,25 @@ async function handleFailTaskRoute({ params, payload }) {
 
 const _CHANGE_REPORT_SAFETY_NET_MS = 500;
 const _PAGE_INJECTION_TIMEOUT_MS = 750;
+// execute_js: how long after the script returns a harvest with nothing
+// recorded ends the settle wait.
+const _CHANGE_REPORT_QUIET_EXIT_MS = 150;
+// execute_js code that can change the page after it returns: a click or an
+// event a handler answers later, a request, a timer or promise, a navigation
+// or a scroll that loads more. Such a script keeps the full settle wait, so a
+// result rendered a few hundred ms later still reaches its change report.
+const _EXECUTE_JS_LATER_EFFECT_PATTERN = new RegExp([
+  '\\.(?:click|submit|requestSubmit|dispatchEvent|focus|scrollIntoView|postMessage)\\s*\\(',
+  '\\bscroll(?:To|By)\\s*\\(',
+  '\\b(?:fetch|XMLHttpRequest|sendBeacon|setTimeout|setInterval|requestAnimationFrame|Promise|async|await)\\b',
+  '\\.then\\s*\\(',
+  '\\blocation(?:\\.href)?\\s*=(?!=)',
+  '\\blocation\\.(?:assign|replace|reload)\\s*\\(',
+  '\\bhistory\\.(?:pushState|replaceState|back|forward|go)\\s*\\('
+].join('|'));
+// Tools whose content script waits for page stability after acting and
+// reports the outcome as pageStable.
+const _CONTENT_SETTLED_TOOLS = Object.freeze(['click', 'type_text']);
 let _changeReportSeq = 0;
 
 // Page-context harvest start: captures beforeState and starts a scoped
@@ -4940,6 +4963,64 @@ function _fsbWaitStableInPage() {
   } catch (_) { return Promise.resolve(true); }
 }
 
+// Page-context harvest peek: reports how many mutations the harvest observer
+// has recorded so far and whether the URL is still the one captured at
+// harvest start, without stopping the harvest. ok:false when the harvest has
+// no live observer, so nothing can be concluded.
+function _fsbHarvestPeekInPage(token) {
+  try {
+    const handles = window.__fsbChangeReportHandles || {};
+    const handle = handles[token];
+    if (!handle || !handle.observer) return { ok: false };
+    const startUrl = handle.beforeState ? handle.beforeState.url : null;
+    return { ok: true, mutationCount: handle.mutationCount, urlUnchanged: window.location.href === startUrl };
+  } catch (_) {
+    return { ok: false };
+  }
+}
+
+async function _safeGetTab(tabId) {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.get !== 'function') return null;
+    return (await chrome.tabs.get(tabId)) || null;
+  } catch (_) { return null; }
+}
+
+// Waits for the page to go quiet after an action. Resolves 'stable' when the
+// in-page waiter saw 300 ms without a mutation (it gives up at 450 ms), or
+// 'safety' when the 500 ms safety net wins first. With quietExit, it also
+// resolves 'quiet' 150 ms after the action when the harvest has recorded no
+// mutation, the URL is unchanged and the tab is not loading a new document;
+// once anything is recorded, only the waiter and the safety net can end it.
+function _awaitChangeReportSettle(tabId, harvestToken, quietExit) {
+  return new Promise((resolve) => {
+    let done = false;
+    let quietTimer = null;
+    const safetyTimer = setTimeout(() => finish('safety'), _CHANGE_REPORT_SAFETY_NET_MS);
+    function finish(winner) {
+      if (done) return;
+      done = true;
+      clearTimeout(safetyTimer);
+      if (quietTimer !== null) clearTimeout(quietTimer);
+      resolve(winner);
+    }
+    _injectFn(tabId, _fsbWaitStableInPage, []).then(() => finish('stable'), () => finish('stable'));
+    if (!quietExit) return;
+    quietTimer = setTimeout(() => {
+      quietTimer = null;
+      if (done) return;
+      Promise.all([_injectFn(tabId, _fsbHarvestPeekInPage, [harvestToken]), _safeGetTab(tabId)])
+        .then(([peek, tab]) => {
+          const loading = !tab || tab.status === 'loading'
+            || (typeof tab.pendingUrl === 'string' && tab.pendingUrl.length > 0);
+          if (!loading && peek && peek.ok === true && peek.mutationCount === 0 && peek.urlUnchanged === true) {
+            finish('quiet');
+          }
+        }, () => { /* the waiter or the safety net still ends the wait */ });
+    }, _CHANGE_REPORT_QUIET_EXIT_MS);
+  });
+}
+
 // Resolve the buildChangeReport / applyChangeReportSizeCap exports. In SW
 // context they live on globalThis (importScripts'd). In Node tests they
 // live on require().
@@ -4996,11 +5077,8 @@ async function _injectFn(tabId, func, args) {
 }
 
 async function _safeGetTabUrl(tabId) {
-  try {
-    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.get !== 'function') return null;
-    const t = await chrome.tabs.get(tabId);
-    return (t && typeof t.url === 'string') ? t.url : null;
-  } catch (_) { return null; }
+  const t = await _safeGetTab(tabId);
+  return (t && typeof t.url === 'string') ? t.url : null;
 }
 
 function _originOf(url) {
@@ -5299,14 +5377,33 @@ async function wrapWithChangeReport(ctx) {
 
   if (!startedHarvest) return expectCtx ? await _attachExpectResult(response, expectCtx, tabId, null) : response;
 
+  // click and type_text already waited for page stability in the content
+  // script after acting. That wait cannot see the page's own requests, so its
+  // "stable" means only that the DOM was quiet. The report is taken now when
+  // that wait saw the page settle and the harvest has already recorded a
+  // mutation. An action that has changed nothing yet may still be loading its
+  // result ("Load more", a type-ahead list), so the settle wait below runs, as
+  // it does when the content wait did not run or timed out.
+  const canonicalTool = (toolDef && typeof toolDef.name === 'string') ? toolDef.name : toolName;
+  let contentSettled = _CONTENT_SETTLED_TOOLS.indexOf(canonicalTool) !== -1
+    && !!response && typeof response === 'object' && response.pageStable === true;
+  if (contentSettled) {
+    const peek = await _injectFn(tabId, _fsbHarvestPeekInPage, [harvestToken]);
+    contentSettled = !!(peek && peek.ok === true && peek.mutationCount > 0);
+  }
+
   // Race waitStable vs 500ms safety net. partial:true on safety hit.
+  // execute_js may also end early when nothing has been recorded and its
+  // code starts nothing that can change the page later.
+  const quietExit = canonicalTool === 'execute_js'
+    && !(typeof params.code === 'string' && _EXECUTE_JS_LATER_EFFECT_PATTERN.test(params.code));
   let partial = false;
-  try {
-    const stableP = _injectFn(tabId, _fsbWaitStableInPage, []);
-    const safetyP = new Promise((resolve) => setTimeout(() => resolve('safety'), _CHANGE_REPORT_SAFETY_NET_MS));
-    const winner = await Promise.race([stableP, safetyP]);
-    partial = (winner === 'safety');
-  } catch (_) { partial = true; }
+  if (!contentSettled) {
+    try {
+      const winner = await _awaitChangeReportSettle(tabId, harvestToken, quietExit);
+      partial = (winner === 'safety');
+    } catch (_) { partial = true; }
+  }
 
   try {
     const afterUrl = await _safeGetTabUrl(tabId);
@@ -5366,6 +5463,497 @@ async function wrapWithChangeReport(ctx) {
   return expectCtx ? await _attachExpectResult(response, expectCtx, tabId, null) : response;
 }
 
+// =============================================================================
+// Page views on MCP action results
+// =============================================================================
+//
+// After a navigation the host's next call is almost always a page read. The
+// results of navigate, open_tab, go_back, go_forward, refresh, search and
+// switch_tab, of any action whose change_report shows a URL change or an
+// opened dialog, and of an action answered by the navigation it started
+// (runActionAcrossNavigation), therefore carry `view`: a compact text list of
+// the page's headings and interactive elements with refs the next call can use
+// (built by FSB.buildPageView in content/dom-analysis.js). Other results carry
+// no view: the host can predict the page they leave, and a view on every
+// action would cost more text than it saves.
+//
+// The view is read from the document the action left in the tab. A tool whose
+// result can arrive before that document commits waits for the commit; the
+// document then has to reach DOMContentLoaded (not the full load), the content
+// script is injected if the document has none, and the view is built. All of
+// it shares one PAGE_VIEW_WAIT_MS budget counted from the moment the action
+// result is ready. When the budget runs out the result carries
+// view_pending: true instead, so the host reads the page itself. Failed
+// actions, restricted pages and documents that cannot be scripted get neither
+// field.
+
+const PAGE_VIEW_WAIT_MS = 2500;
+const _PAGE_VIEW_TOOLS = Object.freeze(['navigate', 'open_tab', 'go_back', 'go_forward', 'refresh', 'search', 'switch_tab']);
+// The tab is gone afterwards, whatever its change_report says.
+const _PAGE_VIEW_EXCLUDED_TOOLS = Object.freeze(['close_tab']);
+// How often the readiness probe repeats while it waits for DOMContentLoaded.
+const _PAGE_VIEW_PROBE_INTERVAL_MS = 250;
+const _PAGE_VIEW_TIMED_OUT = Symbol('fsb-page-view-timed-out');
+// Marks a result that runActionAcrossNavigation built from a navigation, so
+// its view is read whatever its change_report says. A Symbol key never
+// reaches the wire or storage.
+const _ACTION_NAVIGATED = Symbol('fsb-action-navigated');
+
+function _pageViewToolName(toolNameOrVerb) {
+  try {
+    const def = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolNameOrVerb) : null;
+    if (def && typeof def.name === 'string') return def.name;
+  } catch (_) { /* fall back to the raw name */ }
+  return typeof toolNameOrVerb === 'string' ? toolNameOrVerb : '';
+}
+
+function _pageViewWanted(toolName, response) {
+  if (!response || typeof response !== 'object' || response.success !== true) return false;
+  if (_PAGE_VIEW_EXCLUDED_TOOLS.indexOf(toolName) !== -1) return false;
+  if (_PAGE_VIEW_TOOLS.indexOf(toolName) !== -1) return true;
+  if (response[_ACTION_NAVIGATED] === true) return true;
+  const report = response.change_report;
+  if (!report || typeof report !== 'object') return false;
+  if (report.url && typeof report.url === 'object' && report.url.changed === true) return true;
+  return Array.isArray(report.dialogs_opened) && report.dialogs_opened.length > 0;
+}
+
+// Records main-frame commits from before the action runs, so a commit that
+// lands before the result arrives is not missed. With a null tabId the last
+// few commits of every tab are kept until bindTab picks one (open_tab, and
+// navigate when it creates the tab). With newDocumentsOnly, updates within
+// the same document (fragment and history-state changes) are not recorded.
+function _watchPageViewCommits(tabId, newDocumentsOnly) {
+  const events = (typeof chrome !== 'undefined' && chrome.webNavigation) ? chrome.webNavigation : null;
+  if (!events || !events.onCommitted || typeof events.onCommitted.addListener !== 'function') return null;
+  let boundTab = Number.isFinite(tabId) ? tabId : null;
+  let seq = 0;
+  let wake = null;
+  const byTab = new Map();
+  const listeners = [];
+  const record = (details, newDocument) => {
+    if (!details || details.frameId !== 0 || !Number.isFinite(details.tabId)) return;
+    if (boundTab !== null && details.tabId !== boundTab) return;
+    let list = byTab.get(details.tabId);
+    if (!list) { list = []; byTab.set(details.tabId, list); }
+    list.push({ seq: ++seq, url: typeof details.url === 'string' ? details.url : '', newDocument });
+    if (list.length > 8) list.shift();
+    if (wake) wake();
+  };
+  const listen = (event, listener) => {
+    if (!event || typeof event.addListener !== 'function') return;
+    try { event.addListener(listener); listeners.push([event, listener]); } catch (_) { /* best-effort */ }
+  };
+  listen(events.onCommitted, (details) => record(details, true));
+  if (newDocumentsOnly !== true) {
+    listen(events.onReferenceFragmentUpdated, (details) => record(details, false));
+    listen(events.onHistoryStateUpdated, (details) => record(details, false));
+  }
+  const find = (accept, afterSeq) => {
+    const list = boundTab === null ? null : byTab.get(boundTab);
+    if (!list) return null;
+    for (const commit of list) {
+      if (commit.seq > afterSeq && accept(commit)) return commit;
+    }
+    return null;
+  };
+  return {
+    bindTab(id) {
+      if (boundTab !== null || !Number.isFinite(id)) return;
+      boundTab = id;
+      for (const key of Array.from(byTab.keys())) {
+        if (key !== id) byTab.delete(key);
+      }
+    },
+    lastSeq() {
+      const list = boundTab === null ? null : byTab.get(boundTab);
+      return list && list.length > 0 ? list[list.length - 1].seq : 0;
+    },
+    // The first commit after afterSeq that accept() takes, or null at the deadline.
+    async waitFor(accept, deadline, afterSeq) {
+      for (;;) {
+        const hit = find(accept, afterSeq || 0);
+        if (hit) return hit;
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) return null;
+        await new Promise((resolve) => {
+          const timer = setTimeout(done, remaining);
+          function done() { clearTimeout(timer); wake = null; resolve(); }
+          wake = done;
+        });
+      }
+    },
+    dispose() {
+      while (listeners.length > 0) {
+        const [event, listener] = listeners.pop();
+        try { event.removeListener(listener); } catch (_) { /* best-effort */ }
+      }
+      if (wake) wake();
+    }
+  };
+}
+
+// Which commit a tool's result has to be followed by before its view is read,
+// or null when the result already describes the committed document.
+function _pageViewCommitRule(toolName, response) {
+  const notBlank = (commit) => !/^about:blank(?:[?#]|$)/i.test(commit.url);
+  switch (toolName) {
+    case 'refresh': return (commit) => commit.newDocument;
+    case 'go_back':
+    case 'go_forward': return () => true;
+    case 'open_tab':
+    case 'navigate': return notBlank;
+    case 'search': return response && response.method === 'google-fallback' ? () => true : null;
+    default: return null;
+  }
+}
+
+// Runs in the page's isolated world, so page scripts cannot change what it reads.
+function _fsbPageViewProbeInPage() {
+  try {
+    return { readyState: document.readyState, fsbLoaded: window.__FSB_CONTENT_SCRIPT_LOADED__ === true };
+  } catch (_) {
+    return null;
+  }
+}
+
+// Runs in the content script's isolated world, where FSB lives.
+function _fsbBuildPageViewInPage() {
+  try {
+    const fsb = window.FSB;
+    if (!fsb || typeof fsb.buildPageView !== 'function') return null;
+    const built = fsb.buildPageView();
+    return built && typeof built.view === 'string' ? { view: built.view } : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Resolves when the tab's document has reached DOMContentLoaded (ready), when
+// it cannot be scripted (blocked), or at the deadline (neither).
+async function _awaitPageViewDocument(tabId, deadline) {
+  const events = (typeof chrome !== 'undefined' && chrome.webNavigation) ? chrome.webNavigation : null;
+  const dcl = events && events.onDOMContentLoaded && typeof events.onDOMContentLoaded.addListener === 'function'
+    ? events.onDOMContentLoaded
+    : null;
+  let fired = false;
+  let wake = null;
+  const listener = (details) => {
+    if (!details || details.tabId !== tabId || details.frameId !== 0) return;
+    fired = true;
+    if (wake) wake();
+  };
+  let listening = false;
+  if (dcl) {
+    try { dcl.addListener(listener); listening = true; } catch (_) { /* the probe still polls */ }
+  }
+  try {
+    for (;;) {
+      fired = false;
+      const probe = await _injectProbe(tabId, _fsbPageViewProbeInPage, []);
+      const page = probe.ok && probe.result && typeof probe.result === 'object' ? probe.result : null;
+      if (page && typeof page.readyState === 'string' && page.readyState !== 'loading') {
+        return { ready: true, documentId: probe.documentId || null, fsbLoaded: page.fsbLoaded === true };
+      }
+      if (!probe.ok && probe.reason !== 'timeout' && probe.reason !== 'no_result') {
+        return { ready: false, blocked: true };
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return { ready: false, blocked: false };
+      if (fired) continue;
+      await new Promise((resolve) => {
+        const timer = setTimeout(done, Math.min(remaining, _PAGE_VIEW_PROBE_INTERVAL_MS));
+        function done() { clearTimeout(timer); wake = null; resolve(); }
+        wake = done;
+      });
+    }
+  } finally {
+    if (listening) {
+      try { dcl.removeListener(listener); } catch (_) { /* best-effort */ }
+    }
+  }
+}
+
+// The promise's value, or _PAGE_VIEW_TIMED_OUT if the deadline comes first.
+// A rejection resolves to null.
+function _pageViewBefore(deadline, promise) {
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(promise).then((value) => value, () => null),
+    new Promise((resolve) => { timer = setTimeout(() => resolve(_PAGE_VIEW_TIMED_OUT), Math.max(0, deadline - Date.now())); })
+  ]).finally(() => { if (timer !== null) clearTimeout(timer); });
+}
+
+// The view is built through _injectProbe, the dispatcher's one isolated-world
+// injector: the content script's FSB lives in that world. A build that
+// outlasts the injector's timeout counts as the budget running out.
+async function _buildPageViewInTab(tabId) {
+  const built = await _injectProbe(tabId, _fsbBuildPageViewInPage, []);
+  if (built.ok) return built.result;
+  return built.reason === 'timeout' ? _PAGE_VIEW_TIMED_OUT : null;
+}
+
+// The view text, _PAGE_VIEW_TIMED_OUT, or null when no view can be read.
+async function _collectPageView(state, response, tabId, deadline) {
+  const toolName = state.toolName;
+  const destination = state.params && typeof state.params.url === 'string' ? state.params.url : null;
+  if (toolName === 'open_tab' && isRestrictedMcpUrl(destination || 'about:blank')) return null;
+  if (toolName === 'navigate' && destination !== null && isRestrictedMcpUrl(destination)) return null;
+
+  let watcher = state.watcher;
+  if (watcher) watcher.bindTab(tabId);
+  const rule = _pageViewCommitRule(toolName, response);
+  if (rule && watcher) {
+    const commit = await watcher.waitFor(rule, deadline, 0);
+    if (!commit) return _PAGE_VIEW_TIMED_OUT;
+  }
+
+  // A navigation still pending (a script redirect, or a result that came
+  // before its commit) is waited out as well.
+  let tab = await _safeGetTab(tabId);
+  if (tab && typeof tab.pendingUrl === 'string' && tab.pendingUrl) {
+    if (!watcher) {
+      watcher = _watchPageViewCommits(tabId);
+      state.watcher = watcher;
+      tab = await _safeGetTab(tabId);
+    }
+    let since = watcher ? watcher.lastSeq() : 0;
+    while (tab && typeof tab.pendingUrl === 'string' && tab.pendingUrl) {
+      if (!watcher) return _PAGE_VIEW_TIMED_OUT;
+      const commit = await watcher.waitFor(() => true, deadline, since);
+      if (!commit) return _PAGE_VIEW_TIMED_OUT;
+      since = commit.seq;
+      tab = await _safeGetTab(tabId);
+    }
+  }
+  if (!tab || isRestrictedMcpUrl(tab.url)) return null;
+
+  const page = await _awaitPageViewDocument(tabId, deadline);
+  if (!page.ready) return page.blocked ? null : _PAGE_VIEW_TIMED_OUT;
+
+  // A document with no FSB script is injected without the waits kept for a
+  // script whose port may be reconnecting (a page restored from the
+  // back/forward cache keeps its script and is never marked).
+  if (!page.fsbLoaded && typeof markContentScriptKnownEmpty === 'function') {
+    try { markContentScriptKnownEmpty({ tabId, documentId: page.documentId, transitionQualifiers: [] }); }
+    catch (_) { /* injection keeps its usual waits */ }
+  }
+  if (typeof ensureContentScriptInjected === 'function') {
+    const injected = await _pageViewBefore(deadline, ensureContentScriptInjected(tabId, 3, { domReady: true }));
+    if (injected === _PAGE_VIEW_TIMED_OUT) return _PAGE_VIEW_TIMED_OUT;
+    if (injected !== true) return null;
+  }
+  const built = await _pageViewBefore(deadline, _buildPageViewInTab(tabId));
+  if (built === _PAGE_VIEW_TIMED_OUT) return _PAGE_VIEW_TIMED_OUT;
+  return built && typeof built.view === 'string' && built.view ? built.view : null;
+}
+
+/**
+ * Run one MCP action and attach a page view to its result when the page
+ * changed in a way the caller cannot predict (see the section comment).
+ *
+ * @param {Object} ctx
+ * @param {string} ctx.toolName - MCP tool name or wire verb
+ * @param {number|null} ctx.tabId - target tab when the call names one
+ * @param {Object} ctx.params - the call's parameters
+ * @param {Function} ctx.execute - async () => response
+ * @param {Function} [ctx.resolveTabId] - async () => tab id, for results that carry none
+ * @returns {Promise<Object>} the response, with view or view_pending when one applies
+ */
+async function runActionWithPageView(ctx) {
+  const execute = ctx && ctx.execute;
+  if (typeof execute !== 'function') {
+    return { success: false, error: 'runActionWithPageView requires execute callback' };
+  }
+  const toolName = _pageViewToolName(ctx.toolName);
+  if (_PAGE_VIEW_EXCLUDED_TOOLS.indexOf(toolName) !== -1) return execute();
+  const state = {
+    toolName,
+    params: (ctx.params && typeof ctx.params === 'object') ? ctx.params : {},
+    watcher: _PAGE_VIEW_TOOLS.indexOf(toolName) !== -1
+      ? _watchPageViewCommits(Number.isFinite(ctx.tabId) ? ctx.tabId : null)
+      : null
+  };
+  try {
+    const response = await execute();
+    if (!_pageViewWanted(toolName, response)) return response;
+    try {
+      const deadline = Date.now() + PAGE_VIEW_WAIT_MS;
+      let tabId = Number.isFinite(response.tabId) ? response.tabId : (Number.isFinite(ctx.tabId) ? ctx.tabId : null);
+      if (tabId === null && typeof ctx.resolveTabId === 'function') {
+        const resolved = await _pageViewBefore(deadline, ctx.resolveTabId());
+        tabId = Number.isFinite(resolved) ? resolved : null;
+      }
+      if (tabId === null) return response;
+      const view = await _collectPageView(state, response, tabId, deadline);
+      if (view === _PAGE_VIEW_TIMED_OUT) response.view_pending = true;
+      else if (typeof view === 'string' && view) response.view = view;
+      if (response[_ACTION_NAVIGATED] === true) await _refreshNavigatedActionResult(response, tabId);
+    } catch (_) { /* a view never changes the action's result */ }
+    return response;
+  } finally {
+    if (state.watcher) state.watcher.dispose();
+  }
+}
+
+// =============================================================================
+// Actions answered by the navigation they started
+// =============================================================================
+//
+// A click or an Enter that starts a navigation often loses its content script
+// before the script can answer: the document is replaced and the connection
+// closes. On its own a closed connection is an unknown outcome. When the tab
+// also navigated after the action was sent (its URL changed, or its main frame
+// committed a new document), the action is reported as a success that
+// navigated, with the tab's new URL and title, and runActionWithPageView adds
+// the view of the new page.
+//
+// Nothing waits unless the connection closed, and then only while a commit is
+// due: a navigation is pending, or the main frame already holds a new document
+// whose commit has not been reported yet. That wait ends with the commit or
+// after ACTION_NAVIGATION_WAIT_MS. The unknown outcome is returned unchanged
+// when the tab shows no navigation, when none commits in that time, and when
+// the tab was already navigating as the action was sent, since that navigation
+// is not the action's. Reads and sheet fills are never rewritten: their answer
+// is their product, which a navigation cannot stand in for.
+//
+// A click or an Enter can also be answered before its navigation commits. A
+// link to a slow page, or a form whose server takes a second to reply, leaves
+// the old document in place and unchanged, so its content script answers
+// "dispatched, effect not confirmed" while the navigation is still pending.
+// That answer is checked the same way: when a navigation is due as the answer
+// arrives, its commit is awaited for at most ACTION_LATE_NAVIGATION_WAIT_MS
+// and the action is then reported as the navigation. With no navigation due,
+// the unknown outcome is returned at once.
+
+const ACTION_NAVIGATION_WAIT_MS = 1000;
+const ACTION_LATE_NAVIGATION_WAIT_MS = 3000;
+const _LATE_NAVIGATION_TOOLS = Object.freeze(['click', 'press_enter']);
+
+function _actionMayNavigateLate(toolNameOrVerb) {
+  let def = null;
+  try {
+    def = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolNameOrVerb) : null;
+  } catch (_) { def = null; }
+  return !!def && _LATE_NAVIGATION_TOOLS.includes(def.name);
+}
+
+function _actionAnswersWithNavigation(toolNameOrVerb) {
+  let def = null;
+  try {
+    def = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolNameOrVerb) : null;
+  } catch (_) { def = null; }
+  return !!def && def._route === 'content' && def._readOnly !== true && def.name !== 'fill_sheet';
+}
+
+// The tab with the id of the document in its main frame, or null when the
+// tab is gone. documentId is null where the browser does not report one.
+async function _readTabDocument(tabId) {
+  const events = (typeof chrome !== 'undefined' && chrome.webNavigation) ? chrome.webNavigation : null;
+  let frameRead = null;
+  if (events && typeof events.getFrame === 'function') {
+    try { frameRead = Promise.resolve(events.getFrame({ tabId, frameId: 0 })).then((frame) => frame, () => null); }
+    catch (_) { frameRead = null; }
+  }
+  const [tab, frame] = await Promise.all([_safeGetTab(tabId), frameRead]);
+  if (!tab) return null;
+  return {
+    tab,
+    url: typeof tab.url === 'string' ? tab.url : '',
+    pending: typeof tab.pendingUrl === 'string' && tab.pendingUrl.length > 0,
+    documentId: (frame && typeof frame.documentId === 'string' && frame.documentId) ? frame.documentId : null
+  };
+}
+
+// The tab once the navigation that followed an action has committed, or null
+// when it shows none by the deadline. `before` is the tab as it was when the
+// action was sent, with the number of new documents `watcher` had recorded in
+// its main frame by then.
+async function _awaitActionNavigation(tabId, before, watcher, deadline) {
+  if (!before || before.pending) return null;
+  for (;;) {
+    const seen = watcher ? watcher.lastSeq() : 0;
+    const now = await _readTabDocument(tabId);
+    if (!now) return null;
+    const navigated = seen > before.commits || (before.url !== '' && now.url !== '' && now.url !== before.url);
+    if (navigated && !now.pending) return now.tab;
+    // A changed document id alone is not taken as a navigation: it only says
+    // that a commit is about to be reported.
+    const commitDue = now.pending
+      || (before.documentId !== null && now.documentId !== null && now.documentId !== before.documentId);
+    if (!commitDue || !watcher || Date.now() >= deadline) return navigated ? now.tab : null;
+    const commit = await watcher.waitFor(() => true, deadline, seen);
+    if (!commit) return navigated ? now.tab : null;
+  }
+}
+
+// The page view waited for the new document to parse, so the tab now has the
+// title the document gave itself and the URL any redirect left it on.
+async function _refreshNavigatedActionResult(response, tabId) {
+  const tab = await _safeGetTab(tabId);
+  if (!tab || typeof tab.url !== 'string' || !tab.url) return;
+  response.url = tab.url;
+  response.domain = getDomainFromUrl(tab.url);
+  response.title = tab.title || '';
+}
+
+/**
+ * Run one content-script action of a live MCP call. When its connection
+ * closes and the tab navigated after the action was sent, the navigation is
+ * the answer (see the section comment); every other response is returned as
+ * execute() gave it.
+ *
+ * @param {Object} ctx
+ * @param {string} ctx.toolName - MCP tool name or wire verb
+ * @param {number} ctx.tabId - the tab the action runs in
+ * @param {Function} ctx.execute - async () => response
+ * @param {Function} ctx.connectionClosed - () => true once the action was sent
+ *   and its connection closed before an answer. A click or an Enter that was
+ *   answered with an unknown outcome is checked for a navigation as well.
+ * @returns {Promise<Object>} the response, or a success that names the navigation
+ */
+async function runActionAcrossNavigation(ctx) {
+  const execute = ctx && ctx.execute;
+  if (typeof execute !== 'function') {
+    return { success: false, error: 'runActionAcrossNavigation requires execute callback' };
+  }
+  const tabId = Number.isFinite(ctx.tabId) ? ctx.tabId : null;
+  if (tabId === null || typeof ctx.connectionClosed !== 'function' || !_actionAnswersWithNavigation(ctx.toolName)) {
+    return execute();
+  }
+  const watcher = _watchPageViewCommits(tabId, true);
+  try {
+    // Read before the action is sent. A click can start, and even commit, its
+    // navigation within a few milliseconds, so a read made alongside the send
+    // would already show the new page and hide the navigation.
+    const sentFrom = await _readTabDocument(tabId).then(
+      (doc) => (doc ? { ...doc, commits: watcher ? watcher.lastSeq() : 0 } : null),
+      () => null
+    );
+    const response = await execute();
+    if (!response || typeof response !== 'object' || response.success === true || response.mayHaveExecuted !== true) {
+      return response;
+    }
+    const closed = ctx.connectionClosed() === true;
+    // The content script answered, but could not confirm an effect: only a
+    // click or an Enter is looked at again, and only for a navigation.
+    const answeredUnconfirmed = !closed && response.outcome === 'unknown' && _actionMayNavigateLate(ctx.toolName);
+    if (!closed && !answeredUnconfirmed) return response;
+    try {
+      const wait = closed ? ACTION_NAVIGATION_WAIT_MS : ACTION_LATE_NAVIGATION_WAIT_MS;
+      const tab = await _awaitActionNavigation(tabId, sentFrom, watcher, Date.now() + wait);
+      if (!tab) return response;
+      const navigated = sanitizeSingleTab(_pageViewToolName(ctx.toolName), tab, { hadEffect: true, navigationTriggered: true });
+      Object.defineProperty(navigated, _ACTION_NAVIGATED, { value: true });
+      return navigated;
+    } catch (_) {
+      return response;
+    }
+  } finally {
+    if (watcher) watcher.dispose();
+  }
+}
+
 const _mcp_dispatcher_exports = {
   dispatchMcpToolRoute,
   dispatchMcpMessageRoute,
@@ -5384,6 +5972,13 @@ const _mcp_dispatcher_exports = {
   handleAgentStatusRoute,
   // Phase 245: change_report harvest wrap-around + toggle accessors (test-only).
   wrapWithChangeReport,
+  // Page views on action results.
+  runActionWithPageView,
+  PAGE_VIEW_WAIT_MS,
+  // Actions answered by the navigation they started.
+  runActionAcrossNavigation,
+  ACTION_NAVIGATION_WAIT_MS,
+  ACTION_LATE_NAVIGATION_WAIT_MS,
   _getChangeReportsEnabled,
   _setChangeReportsEnabledForTest,
   // Phase 69 same-call expect helpers (test-only accessors).
@@ -5430,6 +6025,10 @@ if (typeof globalThis !== 'undefined') {
   // the same SW global scope) so action-tool dispatch can opt into the
   // change_report wrap-around without a circular import.
   globalThis.wrapWithChangeReport = wrapWithChangeReport;
+  // The bridge client runs each MCP action call through this to attach page views.
+  globalThis.runActionWithPageView = runActionWithPageView;
+  // The bridge client sends each content-script action of a live call through this.
+  globalThis.runActionAcrossNavigation = runActionAcrossNavigation;
   // Surface the connection-scoped client-label cache reset so the bridge
   // client can clear it on every fresh _ws.onopen (different MCP client
   // attaching on the same port must not inherit the prior client's label).

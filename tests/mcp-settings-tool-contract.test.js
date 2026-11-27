@@ -546,7 +546,7 @@ async function partContract() {
 
     const element = mcp.mapFSBError({ success: false, error: 'Element not found' });
     check(element.isError === true
-      && errorText(element) === 'Detected: Page navigation\nWhy: Element not found\nNext action: Refresh page state with read_page or get_dom_snapshot, then retry.',
+      && errorText(element) === 'Detected: Element lookup\nWhy: Element not found\nNext action: Take a fresh get_page_snapshot and retry with a selector or ref from it, or use a different selector.',
     "{success:false, error:'Element not found'} still renders the element_not_found text");
 
     const allowedSentence = 'maxIterations must be a whole number from 50 to 500. Allowed: 50 to 500.';

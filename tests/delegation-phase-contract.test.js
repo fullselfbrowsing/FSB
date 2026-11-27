@@ -191,6 +191,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/jev-fast-upstream-contract.test.js',
   'node tests/jev-fast-settings.test.js',
   'node tests/jev-fast-menu.test.js',
+  'node tests/snapshot-ref-addressing.test.js',
   'node tests/jev-fast-path.test.js',
   'node tests/jev-fast-start-path.test.js',
   'node tests/jev-fast-loop.test.js',
@@ -214,6 +215,19 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/about-knowledge-categories-parity.test.js',
   'node tests/showcase-depth-ghost-parity.test.js',
   'node tests/icon-fonts-parity.test.js',
+  'node tests/content-script-known-empty.test.js',
+  'node tests/mcp-read-tool-content-params.test.js',
+  'node tests/mcp-execute-js-promise.test.js',
+  'node tests/mcp-visual-tick-nonblocking.test.js',
+  'node tests/mcp-empty-change-report-wire.test.js',
+  'node tests/mcp-compact-result-json.test.js',
+  'node tests/change-report-settle-shortcuts.test.js',
+  'node tests/name-binding.test.js',
+  'node tests/hidden-tab-readiness.test.js',
+  'node tests/select-option-matching.test.js',
+  'node tests/mcp-action-navigation.test.js',
+  'node tests/styled-toggle-label.test.js',
+  'node tests/mcp-page-view.test.js',
 ]);
 
 const SKOPEO_ROOT_TEST_COMMANDS = Object.freeze([

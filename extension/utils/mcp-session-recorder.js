@@ -129,7 +129,11 @@
     'url', 'resultingUrl', 'tabId', 'title', 'domain', 'id',
     'receipt', 'receiptCid', 'signerKid', 'manifestHash',
     'clicked', 'changed', 'alreadyClosed', 'recovered', 'shape',
-    'updatedRows', 'updatedColumns', 'updatedCells', 'updatedSheets'
+    'updatedRows', 'updatedColumns', 'updatedCells', 'updatedSheets',
+    // A text= name target: the element it bound to ({ref, role, name, by}),
+    // or, when it did not bind, how many candidates it found. Kept locally
+    // for calibrating the binder; the target text stays in the request params.
+    'bound', 'candidateCount'
   ]);
   var JOURNAL_RESULT_PROJECTION_ACTION = 'journal-action-v1';
   var JOURNAL_RESULT_PROJECTION_FULL = 'journal-full-v1';

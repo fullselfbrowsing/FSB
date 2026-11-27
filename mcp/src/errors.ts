@@ -53,9 +53,15 @@ const LAYER_LABELS = {
   tabOwnership: 'Tab ownership',
   restrictedPage: 'Restricted page',
   pageNavigation: 'Page navigation',
+  elementLookup: 'Element lookup',
   visualSession: 'Visual session contract',
   sessionLookup: 'Session lookup',
   settings: 'Settings',
+  nameAmbiguous: 'Target name matched more than one element',
+  nameNotFound: 'Target name matched no element',
+  nameNeedsConfirmation: 'Target name matched a control that can commit',
+  optionNotFound: 'Option not found',
+  optionAmbiguous: 'Option matched more than one choice',
 } as const;
 
 // Phase 66.1: the extension writes every SETTING_ sentence, Allowed clause and
@@ -88,6 +94,15 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'PAGE_UNRESPONSIVE',
   'ACTION_RESPONSE_TIMEOUT',
   'TAB_NOT_FOREGROUND',
+  // A selector text=<name> (or click text) that did not bind to one element.
+  // The extension writes the candidate refs into the error text.
+  'BIND_AMBIGUOUS',
+  'BIND_NOT_FOUND',
+  'BIND_NEEDS_CONFIRMATION',
+  // select_option named no single option; the select was not touched. The
+  // extension lists the options the select offers in the error text.
+  'OPTION_NOT_FOUND',
+  'OPTION_AMBIGUOUS',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -200,6 +215,56 @@ function isBridgeOwnershipError(
     || /bridge disconnected|port 7225|relay|disconnected mode/i.test(errorMsg);
 }
 
+const ELEMENT_WORDS = /\b(elements?|selectors?|refs?)\b/i;
+
+/**
+ * A selector or element ref that matched nothing, a ref from an older
+ * snapshot, or a selector the page could not parse. Left to the default arm
+ * these would get the generic page-navigation advice, which reads as if the
+ * page had moved. Only the two keys those messages resolve to are considered, and
+ * a "not found" message must name an element, selector or ref, so a missing
+ * tab, session or credential keeps its previous text.
+ */
+function describeElementLookupFailure(
+  errorKey: string,
+  fsbResult: Record<string, unknown> | null | undefined,
+  errorMsg: string,
+): ErrorDetail | null {
+  if (errorKey !== 'element_not_found' && errorKey !== 'action_rejected') return null;
+  const explicitCode = typeof fsbResult?.errorCode === 'string'
+    ? fsbResult.errorCode
+    : (typeof fsbResult?.code === 'string' ? fsbResult.code : '');
+
+  const stale = fsbResult?.refStale === true
+    || /^unknown ref\b/i.test(errorMsg)
+    || (/\bstale\b/i.test(errorMsg) && ELEMENT_WORDS.test(errorMsg));
+  if (stale) {
+    return {
+      detected: LAYER_LABELS.elementLookup,
+      why: errorMsg || 'The element ref comes from an earlier snapshot and no longer points at the page.',
+      nextAction: 'The page changed after that snapshot. Take a fresh get_page_snapshot and retry with a ref from it.',
+    };
+  }
+
+  if (errorKey === 'element_not_found'
+      && (/^element_not_found$/i.test(explicitCode) || ELEMENT_WORDS.test(errorMsg))) {
+    return {
+      detected: LAYER_LABELS.elementLookup,
+      why: errorMsg || 'The selector or element ref matched no element on the current page.',
+      nextAction: 'Take a fresh get_page_snapshot and retry with a selector or ref from it, or use a different selector.',
+    };
+  }
+
+  if (errorKey === 'action_rejected' && /not a valid selector|invalid selector/i.test(errorMsg)) {
+    return {
+      detected: LAYER_LABELS.elementLookup,
+      why: errorMsg,
+      nextAction: 'Fix the selector syntax, or take a get_page_snapshot and use a selector or ref from it.',
+    };
+  }
+  return null;
+}
+
 function buildLayeredDetail(
   errorKey: string,
   fsbResult: Record<string, unknown> | null | undefined,
@@ -242,6 +307,9 @@ function buildLayeredDetail(
     };
   }
 
+  const elementLookup = describeElementLookupFailure(errorKey, fsbResult, errorMsg);
+  if (elementLookup) return elementLookup;
+
   switch (errorKey) {
     case 'package_version_mismatch':
       return {
@@ -282,6 +350,36 @@ function buildLayeredDetail(
         detected: LAYER_LABELS.pageResponsiveness,
         why: 'The current page did not respond before the page-read deadline.',
         nextAction: 'Use navigate or close_tab to recover the tab. Inspect page state before repeating any mutation.',
+      };
+    case 'BIND_AMBIGUOUS':
+      return {
+        detected: LAYER_LABELS.nameAmbiguous,
+        why: errorMsg || 'The text= name matched more than one element, so nothing was executed.',
+        nextAction: 'Nothing was executed. Retry with one of the listed refs as the selector, or with a more specific text= name.',
+      };
+    case 'BIND_NOT_FOUND':
+      return {
+        detected: LAYER_LABELS.nameNotFound,
+        why: errorMsg || 'No visible element fitting this tool has that name, so nothing was executed.',
+        nextAction: 'Nothing was executed. Retry with one of the listed refs if one fits; otherwise take get_page_snapshot to find the element (scroll first if it may be off screen).',
+      };
+    case 'BIND_NEEDS_CONFIRMATION':
+      return {
+        detected: LAYER_LABELS.nameNeedsConfirmation,
+        why: errorMsg || 'The name matched a control that can commit without an exact name unique on the page, so nothing was executed.',
+        nextAction: 'Nothing was executed. If the listed element is the one you mean, retry with its ref as the selector.',
+      };
+    case 'OPTION_NOT_FOUND':
+      return {
+        detected: LAYER_LABELS.optionNotFound,
+        why: errorMsg || 'No option of the select matches that value or text, so nothing was changed.',
+        nextAction: 'Nothing was changed. Retry with the value or visible text of one of the listed options.',
+      };
+    case 'OPTION_AMBIGUOUS':
+      return {
+        detected: LAYER_LABELS.optionAmbiguous,
+        why: errorMsg || 'More than one option matches that text, so nothing was changed.',
+        nextAction: 'Nothing was changed. Retry with the value of the option you mean, or with its full visible text.',
       };
     case 'TAB_NOT_FOREGROUND':
       return {
@@ -447,8 +545,9 @@ function appendRawError(text: string, errorMsg: string, errorKey: string): strin
 
 /**
  * Map an FSB result object to an MCP tool content response.
- * Successful results are JSON-stringified; failures are mapped to
- * human-readable error messages with contextual placeholders filled in.
+ * Successful results are JSON-stringified without indentation, since the
+ * host reads every character; failures are mapped to human-readable error
+ * messages with contextual placeholders filled in.
  *
  * IMPORTANT: The raw error from the extension is always appended to help
  * with debugging. The generic messages alone are not sufficient to
@@ -459,7 +558,7 @@ export function mapFSBError(
   context?: Record<string, string>,
 ): { content: Array<{ type: 'text'; text: string }>; isError?: boolean } {
   if (fsbResult && fsbResult.success) {
-    return { content: [{ type: 'text', text: JSON.stringify(fsbResult, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(fsbResult) }] };
   }
 
   if (fsbResult?.mayHaveExecuted === true) {

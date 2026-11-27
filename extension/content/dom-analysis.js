@@ -1726,6 +1726,17 @@
   // ============================================================================
 
   /**
+   * The visible label that stands in for a styled checkbox or radio whose
+   * native input is hidden (opacity 0, no size, display none), else null.
+   * Such an input is listed in its label's place, and the label's box is the
+   * one that says where the control is.
+   */
+  function labelOfHiddenToggle(el) {
+    const find = FSB.visibleLabelOfHiddenToggle;
+    return typeof find === 'function' ? find(el) : null;
+  }
+
+  /**
    * Calculate relevance score for an element
    */
   function calculateElementScore(element, taskType, prioritizeViewport) {
@@ -1733,7 +1744,7 @@
 
     // Viewport bonus
     if (prioritizeViewport) {
-      const rect = element.getBoundingClientRect();
+      const rect = (labelOfHiddenToggle(element) || element).getBoundingClientRect();
       if (rect.top >= 0 && rect.bottom <= window.innerHeight &&
           rect.left >= 0 && rect.right <= window.innerWidth) {
         score += 10;
@@ -1914,7 +1925,7 @@
     }
 
     // Stage 2: Filter by visibility
-    const visible = candidateArray.filter(el => {
+    const isShown = (el) => {
       // Bypass ALL visibility checks for FSB-injected canvas editor elements
       if (el.dataset.fsbRole) return true;
 
@@ -1939,7 +1950,22 @@
       if (el.getAttribute('aria-hidden') === 'true') return false;
 
       return true;
-    });
+    };
+
+    // A styled checkbox or radio hides the native input and draws the control
+    // with its label. The input is listed while that label is shown, and its
+    // labels are left out, so the control is listed once and as itself.
+    const shown = new Set(candidateArray.filter(isShown));
+    const drawnByLabel = new Set();
+    const standInLabels = new Set();
+    for (const el of candidateArray) {
+      if (shown.has(el) || el.getAttribute('aria-hidden') === 'true') continue;
+      const label = labelOfHiddenToggle(el);
+      if (!label || !isShown(label)) continue;
+      drawnByLabel.add(el);
+      for (const other of FSB.controlLabels(el)) standInLabels.add(other);
+    }
+    const visible = candidateArray.filter(el => drawnByLabel.has(el) || (shown.has(el) && !standInLabels.has(el)));
 
     // Log when fsbElements are filtered by visibility
     {
@@ -2310,6 +2336,13 @@
    * @returns {Array<{region: string, text: string}>} Array of region-tagged lines
    */
   function walkDOMToMarkdown(root, interactiveSet, refMap, guideAnnotations) {
+    function containsOtherInteractive(node) {
+      for (const other of interactiveSet) {
+        if (other !== node && node.contains(other)) return true;
+      }
+      return false;
+    }
+
     const lines = [];
     let currentLine = '';
     let listDepth = 0;
@@ -2348,8 +2381,9 @@
 
       if (node.nodeType !== Node.ELEMENT_NODE) return;
 
-      // Skip hidden elements (entire subtree)
-      if (!isVisibleForSnapshot(node)) return;
+      // Skip hidden elements (entire subtree). A listed checkbox or radio that
+      // is drawn by its visible label stays, whatever hides the input itself.
+      if (!isVisibleForSnapshot(node) && !(interactiveSet.has(node) && FSB.visibleLabelOfHiddenToggle?.(node))) return;
 
       const tag = node.tagName.toLowerCase();
 
@@ -2363,7 +2397,10 @@
         currentRegion = nodeRegion;
       }
 
-      // Interactive elements: emit ref inline, skip children (Pitfall 1)
+      // Interactive elements: emit ref inline, skip children (Pitfall 1),
+      // unless they hold other interactive elements. A <label> wrapping its
+      // <input> is the common case: skipping its children hid the input, so
+      // the field never got a ref and could not be typed into.
       if (interactiveSet.has(node)) {
         const refStr = formatInlineRef(node, refMap, guideAnnotations);
         if (refStr) {
@@ -2372,7 +2409,12 @@
           }
           currentLine += refStr;
         }
-        return; // Don't recurse into interactive element children
+        if (containsOtherInteractive(node)) {
+          for (const child of node.childNodes) {
+            visit(child);
+          }
+        }
+        return;
       }
 
       // Image handling
@@ -2725,6 +2767,248 @@
     };
   }
 
+  // --------------------------------------------------------------------------
+  // PAGE VIEW
+  // --------------------------------------------------------------------------
+  //
+  // A compact, addressable view of the page for action results whose page the
+  // caller cannot predict (a navigation, a URL change, an opened dialog). It
+  // reuses the snapshot's element pipeline, regions, roles, names and refs:
+  //
+  //   <title> | <origin><path>
+  //   # <heading>
+  //   e<ref> <role> "<name>" = "<value>" [checked] [expanded] [disabled]
+  //   +<n> more interactive elements; get_page_snapshot gives the full list.
+  //
+  // At most PAGE_VIEW_MAX_LINES lines follow the title line, headings
+  // included, and the whole view stays within PAGE_VIEW_MAX_CHARS. An open
+  // dialog comes first, then main content, then header, navigation, sidebar
+  // and footer; within a region, document order. A heading is shown only
+  // before the first listed element under it. Every listed element is
+  // registered in FSB.refMap, so its ref works in the next call and in later
+  // snapshots of the same document. A value is shown only for a field that is
+  // not a password, hidden or file input, not a payment, one-time-code or
+  // password field by autocomplete, name or id, and not filled from the vault.
+
+  const PAGE_VIEW_MAX_LINES = 30;
+  const PAGE_VIEW_MAX_CHARS = 2000;
+  const PAGE_VIEW_REGION_ORDER = ['@dialog', '@main', '@header', '@nav', '@aside', '@footer'];
+  const PAGE_VIEW_HIDDEN_VALUE_TYPES = ['password', 'hidden', 'file'];
+  const PAGE_VIEW_NO_VALUE_TYPES = ['checkbox', 'radio', 'button', 'submit', 'reset', 'image'];
+  const PAGE_VIEW_SENSITIVE_AUTOCOMPLETE = /^(?:cc-.+|one-time-code|current-password|new-password)$/;
+  // Same terms as the change report's sensitive-field rule.
+  const PAGE_VIEW_SENSITIVE_NAME = new RegExp('(?<![a-z])(?:t?otp|pwd|cvv|cvc|cc[-_ ]?num(?:ber)?)(?![a-z])|pass(?:wd|[-_ ]?(?:word|code))|card[-_ ]?num(?:ber)?|security[-_ ]?code|one[-_ ]?time[-_ ]?(?:code|pass)', 'i');
+
+  // The selector stored with a ref, chosen as buildMarkdownSnapshot chooses
+  // it: the first non-XPath selector generateSelectors offers, else its first.
+  function pageViewSelector(el, generateSelectors) {
+    const sels = generateSelectors(el);
+    const cssSelector = sels.find(s => typeof s === 'string' ? !s.startsWith('//') : !s.selector?.startsWith('//'));
+    return typeof cssSelector === 'string' ? cssSelector : (cssSelector?.selector || sels[0]?.selector || sels[0] || '');
+  }
+
+  function pageViewClip(text, max) {
+    const clean = String(text === null || text === undefined ? '' : text).replace(/\s+/g, ' ').trim();
+    return clean.length > max ? clean.slice(0, max - 3) + '...' : clean;
+  }
+
+  // Origin and path of the page, without query string or fragment.
+  function pageViewAddress() {
+    const href = String(window.location.href || '');
+    try {
+      const url = new URL(href);
+      return (url.origin && url.origin !== 'null' ? url.origin : url.protocol) + url.pathname;
+    } catch (_e) {
+      return href.split(/[?#]/)[0];
+    }
+  }
+
+  function pageViewAttr(el, name) {
+    try {
+      return String((typeof el.getAttribute === 'function' && el.getAttribute(name)) || '');
+    } catch (_e) {
+      return '';
+    }
+  }
+
+  function pageViewValueHidden(el) {
+    const tag = String(el.tagName || '').toUpperCase();
+    if (tag === 'INPUT' && PAGE_VIEW_HIDDEN_VALUE_TYPES.includes(String(el.type || '').toLowerCase())) return true;
+    const autocomplete = pageViewAttr(el, 'autocomplete').toLowerCase();
+    if (autocomplete.split(/\s+/).some((token) => PAGE_VIEW_SENSITIVE_AUTOCOMPLETE.test(token))) return true;
+    for (const raw of [pageViewAttr(el, 'name'), pageViewAttr(el, 'id'), autocomplete]) {
+      const words = raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+      if (raw && PAGE_VIEW_SENSITIVE_NAME.test(words)) return true;
+    }
+    const marks = FSB.vaultFilledElements;
+    return !!(marks && typeof marks.has === 'function' && marks.has(el));
+  }
+
+  function pageViewValue(el) {
+    if (pageViewValueHidden(el)) return '';
+    const tag = String(el.tagName || '').toUpperCase();
+    let raw = '';
+    if (tag === 'INPUT') {
+      if (PAGE_VIEW_NO_VALUE_TYPES.includes(String(el.type || '').toLowerCase())) return '';
+      raw = el.value;
+    } else if (tag === 'TEXTAREA') {
+      raw = el.value;
+    } else if (tag === 'SELECT') {
+      const option = el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+      raw = option ? (option.text || option.value) : el.value;
+    } else if (el.isContentEditable === true || pageViewAttr(el, 'contenteditable') === 'true') {
+      raw = el.innerText || el.textContent;
+    }
+    return pageViewClip(typeof raw === 'string' ? raw : '', 40);
+  }
+
+  function pageViewStates(el) {
+    const tag = String(el.tagName || '').toUpperCase();
+    const type = String(el.type || '').toLowerCase();
+    const states = [];
+    const nativeToggle = tag === 'INPUT' && (type === 'checkbox' || type === 'radio');
+    if (nativeToggle ? el.checked === true : pageViewAttr(el, 'aria-checked').toLowerCase() === 'true') {
+      states.push('[checked]');
+    }
+    let expanded = pageViewAttr(el, 'aria-expanded').toLowerCase() === 'true';
+    const parent = el.parentElement;
+    if (!expanded && tag === 'SUMMARY' && parent && String(parent.tagName || '').toUpperCase() === 'DETAILS') {
+      expanded = typeof parent.hasAttribute === 'function' && parent.hasAttribute('open');
+    }
+    if (expanded) states.push('[expanded]');
+    if (el.disabled === true || pageViewAttr(el, 'aria-disabled').toLowerCase() === 'true') states.push('[disabled]');
+    return states;
+  }
+
+  function pageViewHeadings() {
+    let nodes;
+    try {
+      nodes = document.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]');
+    } catch (_e) {
+      return [];
+    }
+    const headings = [];
+    for (const node of nodes) {
+      if (headings.length >= 200) break;
+      if (!isVisibleForSnapshot(node)) continue;
+      try {
+        const rect = node.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+      } catch (_e) { /* keep the heading */ }
+      const text = pageViewClip(node.textContent, 80);
+      if (text) headings.push({ el: node, heading: text });
+    }
+    return headings;
+  }
+
+  // 4 = DOCUMENT_POSITION_FOLLOWING, 2 = DOCUMENT_POSITION_PRECEDING.
+  function pageViewDocumentOrder(a, b) {
+    if (a.el !== b.el && typeof a.el.compareDocumentPosition === 'function') {
+      try {
+        const position = a.el.compareDocumentPosition(b.el);
+        if (position & 4) return -1;
+        if (position & 2) return 1;
+      } catch (_e) { /* fall back to collection order */ }
+    }
+    return a.index - b.index;
+  }
+
+  /**
+   * Build the compact page view described above.
+   * @returns {{ view: string, shown: number, more: number }}
+   */
+  function buildPageView() {
+    const refMap = FSB.refMap;
+    const generateSelectors = FSB.generateSelectors;
+    refMap.reset();
+    refMap.generationUrl = window.location.href;
+
+    const title = pageViewClip(document.title || 'Untitled Page', 120);
+    const header = `${title} | ${pageViewClip(pageViewAddress(), 300)}`;
+
+    // Every visible interactive element, from the snapshot's pipeline.
+    const visible = getFilteredElements({
+      maxElements: Infinity,
+      viewportComplete: true,
+      prioritizeViewport: true,
+      taskType: 'general'
+    });
+    const items = visible.map((el) => ({ el, region: getRegion(el), heading: null }));
+    for (const heading of pageViewHeadings()) {
+      items.push({ el: heading.el, region: getRegion(heading.el), heading: heading.heading });
+    }
+    items.forEach((item, index) => { item.index = index; });
+    const regionRank = (region) => {
+      const rank = PAGE_VIEW_REGION_ORDER.indexOf(region);
+      return rank === -1 ? PAGE_VIEW_REGION_ORDER.length : rank;
+    };
+    items.sort((a, b) => (regionRank(a.region) - regionRank(b.region)) || pageViewDocumentOrder(a, b));
+
+    // A container of another listed control (a label around its input,
+    // details around its summary) is left out for the control. In document
+    // order a container's first listed descendant is the next listed element.
+    let containers = 0;
+    let previous = null;
+    for (const item of items) {
+      if (item.heading) continue;
+      if (previous && previous.region === item.region && previous.el.contains(item.el)) {
+        previous.container = true;
+        containers++;
+      }
+      previous = item;
+    }
+
+    // Room kept for the closing line.
+    const closingRoom = 80;
+    const lines = [];
+    let used = header.length;
+    let shown = 0;
+    let pending = null;
+    let region = null;
+    for (const item of items) {
+      if (item.region !== region) {
+        region = item.region;
+        pending = null;
+      }
+      if (item.heading) {
+        pending = item;
+        continue;
+      }
+      if (item.container) continue;
+      const el = item.el;
+      const role = getImplicitRole(el) || String(el.tagName || '').toLowerCase();
+      const name = pageViewClip((computeAccessibleName(el)?.name) || el.dataset?.fsbLabel || '', 60);
+      const headingLine = pending && !pending.el.contains(el) && pending.heading !== name
+        ? `# ${pending.heading}`
+        : null;
+      const needed = headingLine ? 2 : 1;
+      if (lines.length + needed > PAGE_VIEW_MAX_LINES) break;
+      const ref = refMap.register(el, pageViewSelector(el, generateSelectors), role, name);
+      let line = `${ref} ${role}`;
+      if (name) line += ` "${name}"`;
+      const value = pageViewValue(el);
+      if (value) line += ` = "${value}"`;
+      const states = pageViewStates(el);
+      if (states.length > 0) line += ` ${states.join(' ')}`;
+      const cost = line.length + 1 + (headingLine ? headingLine.length + 1 : 0);
+      if (used + cost > PAGE_VIEW_MAX_CHARS - closingRoom) break;
+      if (headingLine) lines.push(headingLine);
+      lines.push(line);
+      used += cost;
+      shown++;
+      pending = null;
+    }
+
+    const more = Math.max(0, visible.length - containers - shown);
+    if (more > 0) lines.push(`+${more} more interactive elements; get_page_snapshot gives the full list.`);
+    let view = [header, ...lines].join('\n');
+    if (view.length > PAGE_VIEW_MAX_CHARS) {
+      view = view.slice(0, PAGE_VIEW_MAX_CHARS);
+      view = view.slice(0, Math.max(view.lastIndexOf('\n'), 0)) || view;
+    }
+    return { view, shown, more };
+  }
+
   /**
    * Extract page text as markdown with no element refs.
    * Used by the readpage CLI command for content reading/summarization.
@@ -3058,7 +3342,9 @@
       try {
         if (node.nodeType !== Node.ELEMENT_NODE) return;
 
-        const rect = node.getBoundingClientRect();
+        // A checkbox or radio drawn by its label is placed by that label's box.
+        const box = labelOfHiddenToggle(node) || node;
+        const rect = box.getBoundingClientRect();
 
         const semanticId = generateSemanticElementId(node, totalElementCount);
 
@@ -3101,7 +3387,7 @@
           accessibilityName: computeAccessibleName(node),
           implicitRole: getImplicitRole(node),
           ariaRelationships: getARIARelationships(node),
-          actionability: isElementActionable(node),
+          actionability: isElementActionable(box),
           selectors: generateSelectors(node, semanticId).map(s => s.selector),
           cluster: getElementCluster(node),
           context: {
@@ -4442,9 +4728,12 @@
     };
     const inputType = tag === 'INPUT' ? jevInputType(el) : null;
     const autocomplete = jevCollapse(jevAttr(el, 'autocomplete') || '');
+    // A checkbox or radio drawn by its label is hidden itself: the strict
+    // resolver would refuse it, so it is never offered as a fast step.
     const hidden = inputType === 'hidden'
       || (typeof el.hasAttribute === 'function' && el.hasAttribute('hidden'))
-      || jevAttr(el, 'aria-hidden') === 'true';
+      || jevAttr(el, 'aria-hidden') === 'true'
+      || labelOfHiddenToggle(el) !== null;
     const vaultFilled = jevIsVaultFilled(el);
     const risk = classifyJevRisk(el, { label, purpose: rawPurpose, formCache });
     const disabled = el.disabled === true || jevLower(jevAttr(el, 'aria-disabled') || '') === 'true';
@@ -4788,6 +5077,775 @@
   // ==== Phase 68 fast-mode element menu (end) ====
 
   // ============================================================================
+  // NAME BINDING: a selector "text=<visible name>" addresses an element
+  // ============================================================================
+  //
+  // bindTargetByName resolves a visible name to exactly one element of the
+  // current document, deterministically and in code, or explains why it could
+  // not. It never acts. Candidates are the visible elements whose role fits
+  // the tool (enabled ones only, except for reads), in the light DOM and open
+  // shadow roots; for click, double click, right click and hover that includes
+  // an element whose computed cursor is pointer, the usual mark of one made
+  // clickable by script. Names are compared after normalising case, whitespace,
+  // punctuation and a trailing count such as "Cart (2)". Ranks, best first:
+  //   exact   - the normalised name equals the target;
+  //   match   - every target word is in the name, label, placeholder,
+  //             aria-label, title or alt text;
+  //   context - the name supplies at least one target word and the rest are in
+  //             the item around it (its headings, aria-label and plain text).
+  // A target wrapped in quotes binds by exact name only. An element is bound
+  // only when the best rank holds exactly one candidate. "2nd <name>" or
+  // "last <name>" picks by position among exact matches that form one
+  // repeated list. A control that can commit (FSB.classifyJevRisk) is bound
+  // only by an exact name that is unique in the whole document; anything else
+  // needs the caller to retry with the listed ref. Password, hidden, file,
+  // payment or one-time-code fields and fields filled from the vault are never
+  // bound by name. Bound and listed elements are registered in FSB.refMap.
+
+  const BIND_SELECTOR_PREFIX = /^\s*text\s*=/i;
+  const BIND_LIMITS = Object.freeze({
+    POOL_VISIT_MAX: 20000,     // elements walked before the pool counts as truncated
+    COUNT_VISIT_MAX: 100000,   // elements walked by the whole-document exact-name count
+    TEXT_CHARS: 200,           // characters of text read as a text block's name or an item's text
+    TARGET_CHARS: 200,
+    LISTED: 5,                 // candidates written into a refusal
+    LISTED_NAME_CHARS: 60,
+    BOUND_NAME_CHARS: 80,
+    CONTEXT_CHARS: 40,
+    CONTEXT_LEVELS: 8,
+    CONTEXT_HEADINGS: 3
+  });
+  // Content verb -> the kind of element its target must be.
+  const BIND_TOOL_FAMILIES = Object.freeze({
+    click: 'interactive',
+    doubleClick: 'interactive',
+    rightClick: 'interactive',
+    hover: 'interactive',
+    pressEnter: 'interactive',
+    focus: 'interactive',
+    type: 'field',
+    clearInput: 'field',
+    selectOption: 'select',
+    toggleCheckbox: 'toggle',
+    getText: 'named',
+    getAttribute: 'named',
+    scrollToElement: 'named',
+    setAttribute: 'named',
+    selectTextRange: 'named',
+    dropfile: 'named'
+  });
+  // These read or scroll and change nothing on the page, so a match on a
+  // control that can commit needs no confirmation for them.
+  const BIND_READ_TOOLS = new Set(['getText', 'getAttribute', 'scrollToElement']);
+  // Pointer verbs also take an element made clickable only by script: one
+  // with no role, handler attribute or tab stop whose computed cursor is
+  // pointer counts as weakly interactive for them.
+  const BIND_POINTER_TOOLS = new Set(['click', 'doubleClick', 'rightClick', 'hover']);
+  const BIND_FAMILY_NOUNS = Object.freeze({
+    interactive: 'interactive element',
+    field: 'text field',
+    select: 'dropdown or list box',
+    toggle: 'checkbox, radio button or switch',
+    named: 'element'
+  });
+  const BIND_BY_WORDS = Object.freeze({
+    match: 'by its words rather than exactly',
+    context: 'with help from nearby text rather than exactly',
+    ordinal: 'by its position in a list rather than by an exact unique name'
+  });
+  const BIND_NATIVE_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'SUMMARY']);
+  const BIND_INTERACTIVE_ROLES = new Set([
+    'button', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'tab', 'treeitem',
+    'checkbox', 'radio', 'switch', 'textbox', 'searchbox', 'combobox', 'listbox', 'slider', 'spinbutton'
+  ]);
+  const BIND_FIELD_ROLES = new Set(['textbox', 'searchbox', 'combobox']);
+  const BIND_SELECT_ROLES = new Set(['combobox', 'listbox']);
+  const BIND_TOGGLE_ROLES = new Set(['checkbox', 'radio', 'switch']);
+  const BIND_TEXT_BLOCK_TAGS = new Set([
+    'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'LI', 'DT', 'DD', 'TD', 'TH', 'CAPTION', 'FIGCAPTION',
+    'LEGEND', 'LABEL', 'BLOCKQUOTE', 'PRE'
+  ]);
+  const BIND_TEXT_BLOCK_ROLES = new Set([
+    'heading', 'cell', 'gridcell', 'columnheader', 'rowheader', 'listitem', 'status', 'alert', 'note',
+    'tooltip', 'term', 'definition'
+  ]);
+  const BIND_NON_TEXT_INPUT_TYPES = new Set([
+    'checkbox', 'radio', 'submit', 'button', 'reset', 'image', 'hidden', 'file', 'password', 'range', 'color'
+  ]);
+  const BIND_NEVER_INPUT_TYPES = new Set(['password', 'hidden', 'file']);
+  // Walked as candidates themselves but never into: no page element's visible
+  // name lives inside these.
+  const BIND_SKIP_SUBTREE_TAGS = new Set([
+    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'IFRAME', 'OBJECT', 'EMBED', 'SELECT', 'DATALIST',
+    'CANVAS', 'VIDEO', 'AUDIO'
+  ]);
+  const BIND_ITEM_TAGS = new Set(['LI', 'TR', 'ARTICLE', 'SECTION', 'FORM', 'FIELDSET', 'DIALOG', 'ASIDE', 'NAV', 'HEADER', 'FOOTER']);
+  const BIND_ITEM_ROLES = new Set(['listitem', 'row', 'article', 'group', 'dialog', 'alertdialog', 'region', 'navigation', 'form', 'tabpanel']);
+  const BIND_ITEM_CLASS_PATTERN = /(?:^|[\s_-])(?:card|tile|item|product|result|entry|row|listing)(?:$|[\s_-])/i;
+  const BIND_HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6, [role="heading"], legend, caption';
+  const BIND_ORDINAL_PATTERN = /^(?:the\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|(\d{1,3})(?:st|nd|rd|th))\s+(.+)$/i;
+  const BIND_ORDINAL_WORDS = Object.freeze({
+    first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10
+  });
+
+  // Lower case, NFKC, apostrophes dropped, & read as "and", a trailing count
+  // such as "(2)" or "[99+]" removed, punctuation and symbols read as spaces.
+  function bindNormalize(text) {
+    let s = typeof text === 'string' ? text : '';
+    try {
+      s = s.normalize('NFKC');
+    } catch (_e) {
+      // keep the text as given
+    }
+    s = s.toLowerCase()
+      .replace(/['‘’`]/g, '')
+      .replace(/&/g, ' and ')
+      .replace(/\s*[([]\s*\d[\d.,]*\+?\s*[)\]]\s*$/, '')
+      .replace(/[\p{P}\p{S}]+/gu, ' ');
+    return s.replace(/\s+/g, ' ').trim();
+  }
+
+  function bindTokens(normalized) {
+    return normalized ? normalized.split(' ') : [];
+  }
+
+  function bindQuote(text) {
+    return '"' + String(text).replace(/"/g, "'") + '"';
+  }
+
+  // The name after a "text=" prefix (prefix case-insensitive), else null.
+  function parseNameSelector(selector) {
+    if (typeof selector !== 'string' || !BIND_SELECTOR_PREFIX.test(selector)) return null;
+    return selector.replace(BIND_SELECTOR_PREFIX, '');
+  }
+
+  // FSB's own UI is found by its host ids. data-fsb-role is not a marker for
+  // it: getFilteredElements stamps that attribute on page elements (the Docs
+  // editor and title, the Sheets formula bar), which must stay bindable.
+  function bindIsHostNode(el) {
+    const hosts = FSB.FSB_HOST_IDS;
+    return !!(hosts && typeof hosts.has === 'function' && el.id && hosts.has(el.id));
+  }
+
+  // Depth-first walk in document order over document.body, entering open
+  // shadow roots (their content comes before the host's light children).
+  // FSB's own UI is skipped with everything under it. complete is false when
+  // the walk stopped at maxVisit elements.
+  function bindWalk(visit, maxVisit) {
+    const body = typeof document !== 'undefined' && document ? document.body : null;
+    if (!body) return { complete: true };
+    const stack = [];
+    const pushChildren = (parent) => {
+      const kids = parent && parent.children;
+      if (!kids || typeof kids.length !== 'number') return;
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    };
+    pushChildren(body);
+    let visited = 0;
+    while (stack.length > 0) {
+      const el = stack.pop();
+      if (!el || el.nodeType !== 1) continue;
+      if (visited >= maxVisit) return { complete: false };
+      visited++;
+      if (bindIsHostNode(el)) continue;
+      visit(el);
+      if (BIND_SKIP_SUBTREE_TAGS.has(jevTag(el))) continue;
+      pushChildren(el);
+      const root = el.shadowRoot;
+      if (root && typeof root === 'object') pushChildren(root);
+    }
+    return { complete: true };
+  }
+
+  function bindHasTabStop(el) {
+    const raw = jevAttr(el, 'tabindex');
+    if (raw === null) return false;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0;
+  }
+
+  // 3 native control or link, 2 explicit interactive role, 1 other clickable
+  // (click handler, tab stop, editable region, label), 0 not interactive.
+  function bindStrength(el) {
+    const tag = jevTag(el);
+    if (BIND_NATIVE_TAGS.has(tag) || (tag === 'A' && jevAttr(el, 'href') !== null)) return 3;
+    if (BIND_INTERACTIVE_ROLES.has(jevExplicitRole(el))) return 2;
+    if (jevIsEditableRegion(el) || jevAttr(el, 'onclick') !== null || bindHasTabStop(el) || tag === 'LABEL') return 1;
+    return 0;
+  }
+
+  function bindHasOwnText(el) {
+    const kids = el.childNodes;
+    if (!kids || typeof kids.length !== 'number') return false;
+    for (let i = 0; i < kids.length; i++) {
+      const node = kids[i];
+      if (node && node.nodeType === 3 && typeof node.nodeValue === 'string' && /\S/.test(node.nodeValue)) return true;
+    }
+    return false;
+  }
+
+  function bindIsTextBlock(el) {
+    const tag = jevTag(el);
+    if (BIND_TEXT_BLOCK_TAGS.has(tag) || BIND_TEXT_BLOCK_ROLES.has(jevExplicitRole(el))) return true;
+    if (tag === 'OPTION' || jevSafeTextSkipTags.has(tag)) return false;
+    return bindHasOwnText(el);
+  }
+
+  function bindFits(el, family) {
+    const tag = jevTag(el);
+    const role = jevExplicitRole(el);
+    switch (family) {
+      case 'field':
+        if (tag === 'TEXTAREA') return true;
+        if (tag === 'INPUT') return !BIND_NON_TEXT_INPUT_TYPES.has(jevInputType(el));
+        if (tag === 'SELECT') return false;
+        return jevIsEditableRegion(el) || BIND_FIELD_ROLES.has(role);
+      case 'select':
+        return tag === 'SELECT' || BIND_SELECT_ROLES.has(role);
+      case 'toggle':
+        if (tag === 'INPUT') {
+          const type = jevInputType(el);
+          return type === 'checkbox' || type === 'radio';
+        }
+        return BIND_TOGGLE_ROLES.has(role);
+      case 'interactive':
+        return bindStrength(el) > 0;
+      case 'named':
+        return bindStrength(el) > 0 || bindIsTextBlock(el);
+      default:
+        return false;
+    }
+  }
+
+  // Password, hidden and file inputs, payment / one-time-code / password
+  // autocomplete fields and fields filled from the vault: by selector or ref only.
+  function bindIsNeverBound(el) {
+    if (jevTag(el) === 'INPUT' && BIND_NEVER_INPUT_TYPES.has(jevInputType(el))) return true;
+    return jevIsSensitiveField(el) || jevIsVaultFilled(el);
+  }
+
+  // An element that may be clickable only by script: it carries a name of
+  // its own (text, aria-label or title). Its cursor is read later, and only
+  // when its name already matches the target.
+  function bindMayBePointerTarget(el) {
+    const tag = jevTag(el);
+    if (tag === 'OPTION' || jevSafeTextSkipTags.has(tag)) return false;
+    return bindHasOwnText(el) || jevAttr(el, 'aria-label') !== null || jevAttr(el, 'title') !== null;
+  }
+
+  function bindHasPointerCursor(el) {
+    const style = jevComputedStyle(el);
+    return !!style && style.cursor === 'pointer';
+  }
+
+  // The visible name: the accessible label for controls; for other elements
+  // the aria-label, else their text, else their title.
+  function bindNameOf(el, strength) {
+    if (strength > 0) {
+      const label = jevMenuLabel(el);
+      if (label || jevIsFieldLike(el)) return label;
+    } else {
+      const ariaLabel = jevNameText(jevAttr(el, 'aria-label'));
+      if (ariaLabel) return ariaLabel;
+    }
+    const text = jevCut(jevCollapse(jevSafeText(el, BIND_LIMITS.TEXT_CHARS)), BIND_LIMITS.TEXT_CHARS);
+    return text || jevNameText(jevAttr(el, 'title'));
+  }
+
+  // Name plus every other attribute or label that names the element. Never
+  // the value property; the value attribute only for button-type inputs.
+  function bindExtraText(el, name) {
+    const parts = [name];
+    for (const attr of ['aria-label', 'placeholder', 'title', 'alt']) {
+      const value = jevAttr(el, attr);
+      if (value) parts.push(value.slice(0, BIND_LIMITS.TEXT_CHARS));
+    }
+    const tag = jevTag(el);
+    if (tag === 'INPUT' && jevButtonInputTypes.includes(jevInputType(el))) parts.push(el.getAttribute('value') || '');
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') parts.push(jevLabelElementsText(el));
+    return parts.join(' ');
+  }
+
+  function bindIsVisible(el) {
+    try {
+      if (typeof el.checkVisibility === 'function'
+          && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
+      const rect = el.getBoundingClientRect();
+      if (!rect || !(rect.width > 0) || !(rect.height > 0)) return false;
+      const style = jevComputedStyle(el);
+      if (style && (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+          || parseFloat(style.opacity) === 0)) return false;
+      return !(typeof el.closest === 'function' && el.closest('[aria-hidden="true"], [inert]'));
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  // The control a label names: label.control, its for= target, or a control inside it.
+  function bindLabelControl(label) {
+    try {
+      if (label.control && typeof label.control === 'object') return label.control;
+      const forId = jevAttr(label, 'for');
+      if (forId) {
+        const target = jevById(forId);
+        if (target) return target;
+      }
+      return typeof label.querySelector === 'function' ? label.querySelector('input, select, textarea') : null;
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  // A visually hidden native checkbox or radio counts as visible while one of
+  // its labels is: that label is what the user sees and clicks.
+  function bindIsVisibleFor(el) {
+    if (bindIsVisible(el)) return true;
+    if (jevTag(el) !== 'INPUT') return false;
+    const type = jevInputType(el);
+    if (type !== 'checkbox' && type !== 'radio') return false;
+    const labels = [];
+    if (el.labels && typeof el.labels.length === 'number') {
+      for (let i = 0; i < el.labels.length; i++) labels.push(el.labels[i]);
+    } else if (typeof el.closest === 'function') {
+      const wrapping = el.closest('label');
+      if (wrapping) labels.push(wrapping);
+    }
+    return labels.some((label) => bindIsVisible(label));
+  }
+
+  function bindIsEnabled(el) {
+    if (el.disabled === true) return false;
+    if (jevLower(jevAttr(el, 'aria-disabled') || '') === 'true') return false;
+    try {
+      if (typeof el.matches === 'function' && el.matches(':disabled')) return false;
+    } catch (_e) {
+      // a matcher without :disabled support falls back to the checks above
+    }
+    return true;
+  }
+
+  // The item an element sits in: the nearest list item, row, article, section,
+  // form, dialog, card-like block or ancestor holding a heading.
+  function bindItemContainer(el) {
+    let node = el.parentElement;
+    for (let level = 0; node && level < BIND_LIMITS.CONTEXT_LEVELS; level++, node = node.parentElement) {
+      const tag = jevTag(node);
+      if (tag === 'BODY' || tag === 'HTML') return null;
+      if (BIND_ITEM_TAGS.has(tag) || BIND_ITEM_ROLES.has(jevExplicitRole(node))) return node;
+      const cls = jevAttr(node, 'class');
+      if (cls && BIND_ITEM_CLASS_PATTERN.test(cls)) return node;
+      try {
+        if (typeof node.querySelector === 'function' && node.querySelector(BIND_HEADING_SELECTOR)) return node;
+      } catch (_e) {
+        // keep walking up
+      }
+    }
+    return null;
+  }
+
+  // Text of root without form controls, editable regions, interactive
+  // elements (their names belong to them, not to the item) or skipEl.
+  function bindPlainText(root, maxChars, skipEl) {
+    const budget = maxChars * 2 + 2;
+    const stack = [];
+    const pushChildren = (parent) => {
+      const kids = parent.childNodes;
+      if (!kids || typeof kids.length !== 'number') return;
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    };
+    let out = '';
+    pushChildren(root);
+    while (stack.length > 0 && out.length < budget) {
+      const current = stack.pop();
+      if (!current) continue;
+      if (current.nodeType === 3) {
+        out = jevAppendText(out, current.nodeValue);
+        continue;
+      }
+      if (current.nodeType !== 1 || current === skipEl || jevSafeTextSkips(current) || bindStrength(current) > 0) continue;
+      out = jevAppendText(out, ' ');
+      pushChildren(current);
+    }
+    return jevCut(out.trim(), maxChars);
+  }
+
+  // Words around an entry (its item's aria-label, headings and plain text)
+  // and a short label for listings. Computed once per entry.
+  function bindContextOf(entry) {
+    if (entry.ctx) return entry.ctx;
+    let text = '';
+    let short = '';
+    const container = bindItemContainer(entry.el);
+    if (container) {
+      const headings = [];
+      try {
+        const found = container.querySelectorAll(BIND_HEADING_SELECTOR);
+        for (let i = 0; i < found.length && headings.length < BIND_LIMITS.CONTEXT_HEADINGS; i++) {
+          const heading = jevNameText(jevSafeText(found[i], jevMenuConstants.LABEL_CHARS));
+          if (heading) headings.push(heading);
+        }
+      } catch (_e) {
+        // no headings
+      }
+      const label = jevNameText(jevAttr(container, 'aria-label'));
+      short = jevCut(headings.find((heading) => bindNormalize(heading) !== entry.nName) || label || '', BIND_LIMITS.CONTEXT_CHARS);
+      text = [label].concat(headings, [bindPlainText(container, BIND_LIMITS.TEXT_CHARS, entry.el)]).join(' ');
+    }
+    entry.ctx = { tokens: new Set(bindTokens(bindNormalize(text))), short };
+    return entry.ctx;
+  }
+
+  // Of two matched elements where one contains the other, keep the more
+  // interactive one, or the inner one when they are equally interactive.
+  function bindDedupe(list) {
+    if (list.length < 2) return list.slice();
+    const byElement = new Map(list.map((entry) => [entry.el, entry]));
+    const dropped = new Set();
+    for (const inner of list) {
+      for (let node = inner.el.parentElement; node; node = node.parentElement) {
+        const outer = byElement.get(node);
+        if (!outer) continue;
+        if (outer.strength > inner.strength) dropped.add(inner);
+        else dropped.add(outer);
+      }
+    }
+    return list.filter((entry) => !dropped.has(entry));
+  }
+
+  // Every visible (and, except for reads, enabled) bindable element of the
+  // family that shares at least one word with the target, in document order.
+  // excludedExact: a field that is never bound by name carries the exact name.
+  // pointer: elements with a pointer cursor count as weakly interactive.
+  function bindCollect(family, nTarget, targetTokens, pointer) {
+    const entries = [];
+    let order = 0;
+    let excludedExact = false;
+    const walk = bindWalk((el) => {
+      const index = order++;
+      if (bindIsNeverBound(el)) {
+        // A password input is a text field for this purpose, though never a candidate.
+        const fits = family === 'field' ? (jevTag(el) === 'INPUT' || bindFits(el, family)) : bindFits(el, family);
+        if (!excludedExact && fits && bindNormalize(bindNameOf(el, bindStrength(el))) === nTarget) excludedExact = true;
+        return;
+      }
+      let needsPointer = false;
+      if (!bindFits(el, family)) {
+        if (pointer !== true || !bindMayBePointerTarget(el)) return;
+        needsPointer = true;
+      }
+      // A label gives way to its control when the control is a candidate
+      // itself: a visible one, or a hidden checkbox or radio it draws.
+      if (family === 'interactive' && jevTag(el) === 'LABEL') {
+        const control = bindLabelControl(el);
+        if (control && bindIsVisibleFor(control)) return;
+      }
+      const strength = needsPointer ? 1 : bindStrength(el);
+      const name = bindNameOf(el, needsPointer ? 0 : strength);
+      const nName = bindNormalize(name);
+      const nameTokens = new Set(bindTokens(nName));
+      const extraTokens = new Set(bindTokens(bindNormalize(bindExtraText(el, name))));
+      if (!targetTokens.some((token) => nameTokens.has(token) || extraTokens.has(token))) return;
+      entries.push({ el, index, strength, name, nName, nameTokens, extraTokens, needsPointer, ctx: null, inViewport: false, role: '', ref: null });
+    }, BIND_LIMITS.POOL_VISIT_MAX);
+    const usable = [];
+    for (const entry of entries) {
+      if (entry.needsPointer && !bindHasPointerCursor(entry.el)) continue;
+      if (!bindIsVisibleFor(entry.el)) continue;
+      if (family !== 'named' && !bindIsEnabled(entry.el)) continue;
+      entry.inViewport = jevCentreInViewport(entry.el);
+      usable.push(entry);
+    }
+    return { entries: usable, complete: walk.complete, excludedExact };
+  }
+
+  function bindCovers(entry, token, withContext) {
+    return entry.nameTokens.has(token) || entry.extraTokens.has(token)
+      || (withContext === true && bindContextOf(entry).tokens.has(token));
+  }
+
+  // The best rank with any candidate and its candidates (nesting removed).
+  function bindRank(entries, nTarget, exactOnly) {
+    const tokens = bindTokens(nTarget);
+    const exact = entries.filter((entry) => entry.nName === nTarget);
+    if (exact.length > 0 || exactOnly) return { by: 'exact', list: bindDedupe(exact) };
+    const match = entries.filter((entry) => tokens.every((token) => bindCovers(entry, token, false)));
+    if (match.length > 0) return { by: 'match', list: bindDedupe(match) };
+    const context = entries.filter((entry) => tokens.every((token) => bindCovers(entry, token, true)));
+    return { by: 'context', list: bindDedupe(context) };
+  }
+
+  // Exact matches form one repeated list when, below their lowest common
+  // ancestor, each sits in its own child and those children share tag and role.
+  function bindOneRepeatedList(list) {
+    if (list.length < 2) return list.length === 1;
+    const chains = list.map((entry) => {
+      const chain = [];
+      for (let node = entry.el; node; node = node.parentElement) chain.push(node);
+      return chain.reverse();
+    });
+    let depth = 0;
+    for (;;) {
+      const node = chains[0][depth];
+      if (!node || !chains.every((chain) => chain[depth] === node)) break;
+      depth++;
+    }
+    if (depth === 0) return false;
+    const rows = chains.map((chain) => chain[depth]);
+    if (rows.some((row) => !row) || new Set(rows).size !== rows.length) return false;
+    const tag = jevTag(rows[0]);
+    const role = jevExplicitRole(rows[0]);
+    return rows.every((row) => jevTag(row) === tag && jevExplicitRole(row) === role);
+  }
+
+  function bindRegister(entry) {
+    if (!entry.role) entry.role = jevMenuRole(entry.el);
+    if (entry.ref) return entry.ref;
+    const refs = FSB.refMap;
+    if (!refs || typeof refs.register !== 'function') return null;
+    let selector = '';
+    try {
+      const generated = typeof FSB.generateSelectors === 'function' ? FSB.generateSelectors(entry.el) : null;
+      const css = Array.isArray(generated)
+        ? generated.find((item) => (typeof item === 'string' ? item : (item && item.selector) || '').charAt(0) !== '/')
+        : null;
+      selector = typeof css === 'string' ? css : (css && typeof css.selector === 'string' ? css.selector : '');
+    } catch (_e) {
+      selector = '';
+    }
+    entry.ref = refs.register(entry.el, selector, entry.role, jevCut(entry.name, BIND_LIMITS.LISTED_NAME_CHARS));
+    return entry.ref;
+  }
+
+  // Up to LISTED entries, in-viewport ones first, written in document order.
+  function bindPickListed(list, score) {
+    const ranked = list.slice().sort((a, b) => {
+      if (score) {
+        const diff = score(b) - score(a);
+        if (diff !== 0) return diff;
+      }
+      if (a.inViewport !== b.inViewport) return a.inViewport ? -1 : 1;
+      return a.index - b.index;
+    });
+    return ranked.slice(0, BIND_LIMITS.LISTED).sort((a, b) => a.index - b.index);
+  }
+
+  // One line per entry: e<ref> <role> "<name>", plus [context] when listed
+  // entries share role and name, or when context decided the match.
+  function bindCandidateLines(listed, forceContext) {
+    for (const entry of listed) bindRegister(entry);
+    const key = (entry) => entry.role + '\u0000' + entry.nName;
+    const counts = new Map();
+    for (const entry of listed) counts.set(key(entry), (counts.get(key(entry)) || 0) + 1);
+    return listed.map((entry) => {
+      const name = jevCut(entry.name, BIND_LIMITS.LISTED_NAME_CHARS).replace(/"/g, "'");
+      let line = `${entry.ref || '(no ref)'} ${entry.role} "${name}"`;
+      if (forceContext === true || counts.get(key(entry)) > 1) {
+        const short = bindContextOf(entry).short.replace(/[[\]]/g, '');
+        if (short) line += ` [${short}]`;
+      }
+      return line;
+    });
+  }
+
+  function bindRefusal(errorCode, error, candidateCount) {
+    return { ok: false, errorCode, error, candidateCount };
+  }
+
+  function bindAmbiguous(shown, list) {
+    const listed = bindPickListed(list, null);
+    const lines = bindCandidateLines(listed, false);
+    const more = list.length > listed.length ? ` (first ${listed.length} of ${list.length})` : '';
+    return bindRefusal('BIND_AMBIGUOUS',
+      `text=${shown} matches ${list.length} elements, so nothing was executed. Candidates${more}:\n`
+        + `${lines.join('\n')}\nRetry with one of these refs as the selector.`,
+      list.length);
+  }
+
+  // Exact matches across the whole document, open shadow roots included,
+  // hidden and disabled elements included; an element nested in another
+  // with the same name is one target. Infinity when the page is too large.
+  // pointer: pointer-cursor elements count too (cursor read only on a name match).
+  function bindExactCount(nTarget, family, pointer) {
+    const matches = [];
+    const walk = bindWalk((el) => {
+      if (!bindFits(el, family)) {
+        if (pointer === true && bindMayBePointerTarget(el) && bindNormalize(bindNameOf(el, 0)) === nTarget
+            && bindHasPointerCursor(el)) matches.push(el);
+        return;
+      }
+      if (jevTag(el) === 'LABEL' && bindLabelControl(el)) return;
+      if (bindNormalize(bindNameOf(el, bindStrength(el))) === nTarget) matches.push(el);
+    }, BIND_LIMITS.COUNT_VISIT_MAX);
+    if (!walk.complete) return Infinity;
+    const found = new Set(matches);
+    let count = 0;
+    for (const el of matches) {
+      let nested = false;
+      for (let node = el.parentElement; node; node = node.parentElement) {
+        if (found.has(node)) {
+          nested = true;
+          break;
+        }
+      }
+      if (!nested) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Bind a visible name to one element for a content verb. Returns null when
+   * the verb takes no element target; {ok:true, element, ref, bound} when
+   * exactly one element is bound (registered in FSB.refMap; bound is
+   * {ref, role, name, by}); otherwise {ok:false, errorCode, error,
+   * candidateCount} with errorCode BIND_AMBIGUOUS, BIND_NOT_FOUND or
+   * BIND_NEEDS_CONFIRMATION and an error naming up to five candidate refs,
+   * each already registered so it works at once. Never acts on the page.
+   */
+  function bindTargetByName(rawName, tool) {
+    const family = typeof tool === 'string' && Object.prototype.hasOwnProperty.call(BIND_TOOL_FAMILIES, tool)
+      ? BIND_TOOL_FAMILIES[tool]
+      : null;
+    if (!family) return null;
+    let text = jevCollapse(typeof rawName === 'string' ? rawName : '');
+    let exactOnly = false;
+    const quoted = text.match(/^(["'])(.*)\1$/);
+    if (quoted) {
+      text = jevCollapse(quoted[2]);
+      exactOnly = true;
+    }
+    text = jevCut(text, BIND_LIMITS.TARGET_CHARS);
+    const shown = bindQuote(text);
+    const nTarget = bindNormalize(text);
+    if (!nTarget) {
+      return bindRefusal('BIND_NOT_FOUND',
+        `text=${shown} has no letters or digits to match, so nothing was executed. Use a CSS selector or a ref from get_page_snapshot.`, 0);
+    }
+    const targetTokens = bindTokens(nTarget);
+    const pointer = BIND_POINTER_TOOLS.has(tool);
+    const pool = bindCollect(family, nTarget, targetTokens, pointer);
+    const full = bindRank(pool.entries, nTarget, exactOnly);
+    // The name belongs to a password, payment, one-time-code or vault-filled
+    // field: no other element is bound in its place by looser rules.
+    if (pool.excludedExact && !(full.by === 'exact' && full.list.length > 0)) {
+      return bindRefusal('BIND_NOT_FOUND',
+        `text=${shown} names a password, payment or vault-filled field, which is never bound by name, so nothing was executed. `
+          + 'Use fill_credential or use_payment_method, or a selector or ref from get_page_snapshot.',
+        0);
+    }
+
+    let chosen = null;
+    let by = full.by;
+    if ((full.by === 'exact' || full.by === 'match') && full.list.length > 0) {
+      if (full.list.length > 1) return bindAmbiguous(shown, full.list);
+      chosen = full.list[0];
+    } else {
+      const ordinal = exactOnly ? null : text.match(BIND_ORDINAL_PATTERN);
+      const nRest = ordinal ? bindNormalize(ordinal[3]) : '';
+      const rest = nRest ? bindRank(pool.entries, nRest, true) : null;
+      // A position needs a list: with one element named by the rest, the
+      // leading word is more likely part of the name ("Last name" with only a
+      // "Name" field), so the target is not read as an ordinal.
+      if (rest && rest.list.length > 1) {
+        const items = rest.list.slice().sort((a, b) => a.index - b.index);
+        const word = ordinal[1].toLowerCase();
+        const position = word === 'last' ? items.length : (ordinal[2] ? parseInt(ordinal[2], 10) : BIND_ORDINAL_WORDS[word]);
+        const restShown = bindQuote(jevCollapse(ordinal[3]));
+        const oneRole = new Set(items.map((entry) => jevMenuRole(entry.el))).size === 1;
+        if (!pool.complete || !oneRole || !bindOneRepeatedList(items)) {
+          const listed = bindPickListed(items, null);
+          const reason = pool.complete
+            ? `the ${items.length} elements named ${restShown} are not one repeated list`
+            : `the page is too large to count the elements named ${restShown}`;
+          return bindRefusal('BIND_AMBIGUOUS',
+            `text=${shown}: ${reason}, so the position is ambiguous and nothing was executed. Candidates:\n`
+              + `${bindCandidateLines(listed, true).join('\n')}\nRetry with one of these refs as the selector.`,
+            items.length);
+        }
+        if (!(position >= 1 && position <= items.length)) {
+          const listed = bindPickListed(items, null);
+          return bindRefusal('BIND_NOT_FOUND',
+            `text=${shown}: only ${items.length} visible ${items.length === 1 ? 'element is' : 'elements are'} named ${restShown}, so nothing was executed. Candidates:\n`
+              + `${bindCandidateLines(listed, true).join('\n')}\nRetry with one of these refs as the selector.`,
+            items.length);
+        }
+        chosen = items[position - 1];
+        by = 'ordinal';
+      } else if (full.list.length > 1) {
+        return bindAmbiguous(shown, full.list);
+      } else if (full.list.length === 1) {
+        chosen = full.list[0];
+      }
+    }
+
+    if (!chosen) {
+      const noun = BIND_FAMILY_NOUNS[family];
+      const qualifier = family === 'named' ? 'visible' : 'visible, enabled';
+      const truncated = pool.complete ? '' : ` Only the first ${BIND_LIMITS.POOL_VISIT_MAX} elements of this very large page were searched.`;
+      const covered = (entry) => targetTokens.filter((token) => bindCovers(entry, token, false)).length;
+      const near = bindPickListed(pool.entries, covered);
+      if (near.length === 0) {
+        return bindRefusal('BIND_NOT_FOUND',
+          `No ${qualifier} ${noun} is named text=${shown}, so nothing was executed.${truncated} `
+            + 'Take a get_page_snapshot to find it; scroll first if it may be off screen.',
+          0);
+      }
+      return bindRefusal('BIND_NOT_FOUND',
+        `No ${qualifier} ${noun} is named text=${shown}, so nothing was executed.${truncated} Closest names:\n`
+          + `${bindCandidateLines(near, false).join('\n')}\nRetry with one of these refs as the selector, or take a get_page_snapshot.`,
+        0);
+    }
+
+    // Text fields are often named with a leading position word ("First name",
+    // "Last name"), so a field picked by position is confirmed before typing.
+    if (family === 'field' && by === 'ordinal') {
+      const [line] = bindCandidateLines([chosen], true);
+      return bindRefusal('BIND_NEEDS_CONFIRMATION',
+        `text=${shown} matched ${line} ${BIND_BY_WORDS.ordinal}, and text fields are often named with a leading position word, so nothing was executed. `
+          + `If it is the right element, retry with ${chosen.ref} as the selector.`,
+        1);
+    }
+
+    if (!BIND_READ_TOOLS.has(tool)) {
+      let risk;
+      try {
+        risk = classifyJevRisk(chosen.el, {});
+      } catch (_e) {
+        risk = 'unclassified';
+      }
+      if (risk !== null) {
+        let why = '';
+        if (by !== 'exact') {
+          why = `it matched ${BIND_BY_WORDS[by]}`;
+        } else if (!pool.complete) {
+          why = 'the page is too large to prove that name unique';
+        } else {
+          const count = bindExactCount(nTarget, family, pointer);
+          if (count === Infinity) why = 'the page is too large to prove that name unique';
+          else if (count !== 1) why = `${count} elements in the page carry that exact name, hidden ones included`;
+        }
+        if (why) {
+          const [line] = bindCandidateLines([chosen], by === 'context' || by === 'ordinal');
+          return bindRefusal('BIND_NEEDS_CONFIRMATION',
+            `text=${shown} matched ${line}, a control that can commit (${risk}), but ${why}, so nothing was executed. `
+              + `If it is the right element, retry with ${chosen.ref} as the selector.`,
+            1);
+        }
+      }
+    }
+
+    const ref = bindRegister(chosen);
+    if (!ref) {
+      return bindRefusal('BIND_NOT_FOUND', `text=${shown} matched an element that could not be given a ref, so nothing was executed.`, 1);
+    }
+    return {
+      ok: true,
+      element: chosen.el,
+      ref,
+      bound: { ref, role: chosen.role, name: jevCut(chosen.name, BIND_LIMITS.BOUND_NAME_CHARS), by }
+    };
+  }
+
+  // ============================================================================
   // EXPORT TO NAMESPACE
   // ============================================================================
 
@@ -4826,8 +5884,11 @@
   FSB.jevContentVerbOps = jevContentVerbOps;
   FSB.resolveJevHandle = resolveJevHandle;
   FSB.noteJevCaptureObservation = noteJevCaptureObservation;
+  FSB.parseNameSelector = parseNameSelector;
+  FSB.bindTargetByName = bindTargetByName;
   FSB.findElementByStrategies = findElementByStrategies;
   FSB.buildMarkdownSnapshot = buildMarkdownSnapshot;
+  FSB.buildPageView = buildPageView;
   FSB.findMainContentRoot = findMainContentRoot;
   FSB.extractPageText = extractPageText;
   FSB.getStructuredDOM = getStructuredDOM;

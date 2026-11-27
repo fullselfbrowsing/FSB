@@ -209,7 +209,9 @@ function parseResponseJson(text) {
 // ---------------------------------------------------------------------------
 // mapFSBError byte fixtures (D-21, D-22 item 2): full output strings captured
 // from mcp/build/errors.js before 69-06 Task 2 edited errors.ts, pasted
-// verbatim and compared with ===.
+// verbatim and compared with ===. The two success texts are the compact,
+// unindented serialization the success branch emits since results stopped
+// being pretty-printed.
 // ---------------------------------------------------------------------------
 
 const ERRORS_BUILD_PATH = path.join(__dirname, '..', 'mcp', 'build', 'errors.js');
@@ -219,7 +221,7 @@ const MAP_FIXTURES = Object.freeze([
     label: 'success',
     input: { success: true, tool: 'click' },
     isError: undefined,
-    text: '{\n  "success": true,\n  "tool": "click"\n}',
+    text: '{"success":true,"tool":"click"}',
   },
   {
     label: 'unknown outcome',
@@ -240,16 +242,22 @@ const MAP_FIXTURES = Object.freeze([
     text: 'Detected: Action outcome unknown\nWhy: No response within 30000ms\nNext action: The operation may still be running. Wait for it to settle, then inspect the current page before deciding whether to retry.\n\n{"outcome":"unknown","mayHaveExecuted":true}',
   },
   {
-    label: 'generic error',
+    label: 'element not found',
     input: { success: false, error: 'element not found' },
     isError: true,
-    text: 'Detected: Page navigation\nWhy: element not found\nNext action: Refresh page state with read_page or get_dom_snapshot, then retry.',
+    text: 'Detected: Element lookup\nWhy: element not found\nNext action: Take a fresh get_page_snapshot and retry with a selector or ref from it, or use a different selector.',
+  },
+  {
+    label: 'generic error',
+    input: { success: false, error: 'something went wrong' },
+    isError: true,
+    text: 'Detected: Page navigation\nWhy: something went wrong\nNext action: Refresh page state with read_page or get_dom_snapshot, then retry.',
   },
   {
     label: 'success with expect_result',
     input: { success: true, tool: 'click', expect_result: { status: 'verified', checks: [{ kind: 'text_visible', expected: 'Saved', observed: 'Saved', status: 'met' }], waited_ms: 40, timeout_ms: 2000 } },
     isError: undefined,
-    text: '{\n  "success": true,\n  "tool": "click",\n  "expect_result": {\n    "status": "verified",\n    "checks": [\n      {\n        "kind": "text_visible",\n        "expected": "Saved",\n        "observed": "Saved",\n        "status": "met"\n      }\n    ],\n    "waited_ms": 40,\n    "timeout_ms": 2000\n  }\n}',
+    text: '{"success":true,"tool":"click","expect_result":{"status":"verified","checks":[{"kind":"text_visible","expected":"Saved","observed":"Saved","status":"met"}],"waited_ms":40,"timeout_ms":2000}}',
   },
 ]);
 
@@ -354,8 +362,8 @@ function unsupportedResult(checks, timeoutMs) {
         `${golden.name}: options.timeout is ${golden.timeout} (got ${sent.options && sent.options.timeout})`);
 
       console.log(`  G3 ${golden.name}:`);
-      check(responseText(outcome) === JSON.stringify(outcome.canned[0], null, 2) && outcome.result.isError === undefined,
-        `${golden.name}: response text is the canned result's JSON.stringify(result, null, 2), no isError`);
+      check(responseText(outcome) === JSON.stringify(outcome.canned[0]) && outcome.result.isError === undefined,
+        `${golden.name}: response text is the canned result's compact JSON.stringify(result), no isError`);
     }
 
     // -----------------------------------------------------------------------
@@ -446,7 +454,7 @@ function unsupportedResult(checks, timeoutMs) {
         'click with expect: null sends the G1 click bytes');
       check(sent && !hasOwn(sent.message.payload, 'expect') && sent.options.timeout === golden.timeout,
         'click with expect: null adds no expect key and keeps the 30 s timeout');
-      check(responseText(outcome) === JSON.stringify(outcome.canned[0], null, 2),
+      check(responseText(outcome) === JSON.stringify(outcome.canned[0]),
         'click with expect: null returns the canned bytes (no fill)');
     }
 
@@ -458,7 +466,7 @@ function unsupportedResult(checks, timeoutMs) {
       check(outcome.error === null && outcome.dispatches.length === 1 && sent && wireJson(sent) === JSON.stringify(golden.payload),
         `${name} with expect sends the G1 ${name} bytes (expect stripped, never reaches params)`);
       check(sent && sent.options.timeout === golden.timeout, `${name} keeps its ${golden.timeout} ms timeout`);
-      check(responseText(outcome) === JSON.stringify(outcome.canned[0], null, 2), `${name} with expect returns the canned bytes (no fill)`);
+      check(responseText(outcome) === JSON.stringify(outcome.canned[0]), `${name} with expect returns the canned bytes (no fill)`);
     }
 
     // -----------------------------------------------------------------------
@@ -559,7 +567,7 @@ function unsupportedResult(checks, timeoutMs) {
           + 'value expected [redacted], long expected capped at 120, timeout clamped)');
       check(body && Object.keys(body).pop() === 'expect_result', 'expect_result is added last');
       check(typeof text === 'string' && !text.includes('hunter2'), 'the value check never echoes the expected value');
-      check(text === JSON.stringify({ success: true, tool: 'click', expect_result: body && body.expect_result }, null, 2),
+      check(text === JSON.stringify({ success: true, tool: 'click', expect_result: body && body.expect_result }),
         'the filled response is the canned result plus expect_result, nothing else');
     }
     {
@@ -567,7 +575,7 @@ function unsupportedResult(checks, timeoutMs) {
       cannedFor = () => ({ success: true, tool: 'click', expect_result: existing });
       const outcome = await call('click', { ...goldenByName.get('click').args, expect: { text_visible: 'Saved' } });
       cannedFor = defaultCanned;
-      check(responseText(outcome) === JSON.stringify({ success: true, tool: 'click', expect_result: existing }, null, 2),
+      check(responseText(outcome) === JSON.stringify({ success: true, tool: 'click', expect_result: existing }),
         'an extension expect_result passes through unchanged');
     }
     {

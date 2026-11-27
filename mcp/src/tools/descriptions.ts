@@ -33,9 +33,11 @@ export const MCP_COMMON_PARAM_DESCRIPTIONS: TextTable = Object.freeze({
 });
 
 // Appended (after one space) to the description of every action tool whose
-// registry entry has _emitChangeReport === true.
+// registry entry has _emitChangeReport === true. The extension sends a
+// change_report that records nothing as {changed:false}; no change_report at
+// all means the change was not observed.
 export const MCP_CHANGE_REPORT_SENTENCE =
-  'Returns change_report (what changed); if the outcome is unknown, inspect the page before retrying.';
+  'Returns change_report (what changed, or changed:false; absent if not observed), plus view (page refs) on a URL change or dialog; if the outcome is unknown, inspect the page before retrying.';
 
 // The description of the optional `expect` parameter (published by plan 69-06).
 export const MCP_EXPECT_DESCRIPTION =
@@ -44,14 +46,14 @@ export const MCP_EXPECT_DESCRIPTION =
 // Tool name -> short MCP description.
 export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   // --- registry action tools (registerManualTools, Phase 69 plan 02) ---
-  execute_js: 'Execute JavaScript in the page as a function body; use return to send a value back (stringified; Promises are not awaited, so poll a window key for async work). Try it first for DOM reads, clicks and scrolls: it avoids overlay, viewport and CDP timeout issues. Verify a JS click with read_page. Fall back to native tools when a JS click changes nothing (click), for typing into controlled inputs (type_text), for real drags (drag_drop or drag), and for submits that need validated input (click the submit button).',
-  navigate: 'Navigate the tab to a URL; returns the final URL after redirects.',
-  search: 'Search the current site with its own search box, found automatically; falls back to Google when the site has none. Read results with read_page.',
+  execute_js: 'Execute JavaScript in the page as a function body; use return to send a value back (stringified; a returned Promise is awaited for up to 10 s). Try it first for DOM reads, clicks and scrolls: it avoids overlay, viewport and CDP timeout issues. Verify a JS click with read_page. Fall back to native tools when a JS click changes nothing (click), for typing into controlled inputs (type_text), for real drags (drag_drop or drag), and for submits that need validated input (click the submit button).',
+  navigate: 'Navigate the tab to a URL; returns the final URL after redirects and a compact view of the page with element refs, so you can act without reading it first (on view_pending, read it).',
+  search: 'Search the current site with its own search box, found automatically; falls back to Google when the site has none. Returns a compact view of the results page with element refs; use read_page for full text.',
   go_back: 'Go back one page in browser history; returns the new URL.',
   go_forward: 'Go forward one page in browser history; returns the new URL.',
   refresh: 'Refresh (reload) the current page; returns its URL.',
-  click: 'Click an element by CSS selector, element ref (e5) from get_dom_snapshot, or visible text. Custom (non-native) dropdowns take two clicks: open the control, then click the option; select_option is for native <select> only. For canvas or overlay targets, use click_at.',
-  type_text: 'Type text into an editable field by selector or ref. Replaces existing text by default (clear_first false appends); in Google Docs it inserts at the cursor unless clear_first is true. Returns the rendered text.',
+  click: 'Click an element by CSS selector, element ref (e5) from get_dom_snapshot, or visible name (selector text=Save, no snapshot needed). Custom (non-native) dropdowns take two clicks: open the control, then click the option; select_option is for native <select> only. For canvas or overlay targets, use click_at.',
+  type_text: 'Type text into an editable field by selector, ref or text=<field label>. Replaces existing text by default (clear_first false appends); in Google Docs it inserts at the cursor unless clear_first is true. Returns the rendered text.',
   press_enter: 'Press Enter to submit a form or confirm input; falls back to clicking the submit button if Enter has no effect.',
   press_key: 'Press a keyboard key, optionally with ctrl, shift or alt, for shortcuts and special keys such as Escape, Tab or ArrowDown.',
   select_option: 'Select an option in a native <select> dropdown by value or visible text. Native <select> only: for custom (div-based) dropdowns use two clicks, first on the control and then on the option. If no error is returned but the value does not change, it is a custom dropdown.',
@@ -68,7 +70,7 @@ export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   scroll_to_top: 'Scroll to the top of the page.',
   scroll_to_bottom: 'Scroll to the bottom of the page, for example to load lazy content.',
   scroll_to_element: 'Scroll an element into view; returns its position.',
-  open_tab: 'Open a URL in a new tab; returns the tab ID. The tab opens in the background unless active is true.',
+  open_tab: 'Open a URL in a new tab; returns the tab ID and a compact view of the page with element refs. The tab opens in the background unless active is true.',
   switch_tab: 'Switch to a tab this agent owns, by tab ID from list_tabs. The foreground tab does not change unless active is true.',
   close_tab: 'Close a tab this agent owns without changing the foreground tab. It refuses to close the active tab unless allow_active is true; set that only when the user asks to close the active tab.',
   fill_sheet: 'Fill Google Sheets cells with CSV data, starting at a given cell. Open the sheet first; large fills can take minutes.',
@@ -142,21 +144,36 @@ export const MCP_PARAM_DESCRIPTIONS: Readonly<Record<string, TextTable>> = Objec
     code: 'JavaScript function body; use return to send a value back.',
   }),
   click: Object.freeze({
-    selector: 'CSS selector or element ref (e5) from get_dom_snapshot.',
-    text: 'Visible text to click instead of a selector; first visible case-insensitive match.',
+    selector: 'CSS selector, element ref (e5) from get_dom_snapshot, or text=<visible name>.',
+    text: 'Visible name to click instead of a selector, as selector text=<name>. Several matches return candidate refs and click nothing.',
   }),
   type_text: Object.freeze({
-    selector: 'CSS selector or element ref of the field.',
+    selector: 'CSS selector, element ref, or text=<field label> of the field.',
     clear_first: 'Replace existing text; default true, but false in Google Docs (inserts at the cursor). False appends.',
   }),
   select_option: Object.freeze({
-    selector: 'CSS selector or element ref of the <select>.',
+    selector: 'CSS selector, element ref, or text=<label> of the <select>.',
     value: 'Option value or visible text.',
   }),
   select_text_range: Object.freeze({
-    selector: 'CSS selector or element ref of the container.',
+    selector: 'CSS selector, element ref, or text=<visible name> of the container.',
     startOffset: "Start offset in the element's text (0-based).",
     endOffset: 'End offset (exclusive).',
+  }),
+  press_enter: Object.freeze({
+    selector: 'Optional CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  check_box: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name> of the checkbox.',
+  }),
+  hover: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  right_click: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  double_click: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
   }),
   drag_drop: Object.freeze({
     sourceSelector: 'Selector or ref of the element to drag.',
@@ -168,6 +185,18 @@ export const MCP_PARAM_DESCRIPTIONS: Readonly<Record<string, TextTable>> = Objec
     selector: 'CSS selector of the dropzone.',
     fileName: 'File name, such as photo.jpg.',
     mimeType: 'MIME type, such as text/plain or image/png.',
+  }),
+  focus: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  clear_input: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<field label>.',
+  }),
+  scroll_to_element: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
+  }),
+  set_attribute: Object.freeze({
+    selector: 'CSS selector, ref (e5) or text=<visible name>.',
   }),
   open_tab: Object.freeze({
     active: 'True foregrounds the new tab (steals focus); default false opens it in the background.',
@@ -206,10 +235,10 @@ export const MCP_PARAM_DESCRIPTIONS: Readonly<Record<string, TextTable>> = Objec
 
   // --- registry read-only tools ---
   get_text: Object.freeze({
-    selector: 'CSS selector or element ref (e3) from get_dom_snapshot.',
+    selector: 'CSS selector, element ref (e3) from get_dom_snapshot, or text=<visible name>.',
   }),
   get_attribute: Object.freeze({
-    selector: 'CSS selector or element ref (e7) from get_dom_snapshot.',
+    selector: 'CSS selector, element ref (e7) from get_dom_snapshot, or text=<visible name>.',
     attribute: 'Attribute name, such as href, src or value.',
   }),
   complete_task: Object.freeze({

@@ -333,8 +333,8 @@ async function main() {
   const branchAt = errorsSource.indexOf('if (fsbResult && fsbResult.success) {');
   const branchEnd = branchAt >= 0 ? errorsSource.indexOf('}', branchAt + 'if (fsbResult && fsbResult.success) {'.length) : -1;
   const branch = branchAt >= 0 && branchEnd > branchAt ? errorsSource.slice(branchAt, branchEnd) : '';
-  check(branch.indexOf('JSON.stringify(fsbResult, null, 2)') !== -1,
-    'mapFSBError stringifies a success result whole (JSON.stringify(fsbResult, null, 2)) inside the fsbResult && fsbResult.success branch');
+  check(branch.indexOf('JSON.stringify(fsbResult)') !== -1,
+    'mapFSBError stringifies a success result whole (JSON.stringify(fsbResult)) inside the fsbResult && fsbResult.success branch');
 
   console.log('\nResults: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);
