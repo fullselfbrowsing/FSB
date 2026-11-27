@@ -1228,6 +1228,43 @@ function isRestrictedMcpUrl(url) {
   return restrictedProtocols.some(protocol => url.startsWith(protocol));
 }
 
+// MCP agents automate web pages, never an extension's own pages: a click in
+// FSB's Control Panel would change settings (or grant consent) around the
+// settings tool's rules. chrome.tabs.create/update resolve a relative URL
+// against the extension's origin ('ui/control_panel.html' opens the Control
+// Panel), so a target is judged by the URL Chrome would actually open.
+const MCP_EXTENSION_PAGE_ERROR = 'Extension pages cannot be opened or driven over MCP. '
+  + 'Use the settings tool to read or change FSB settings, and a full https:// URL to open a web page.';
+
+function resolveMcpTargetUrl(raw) {
+  if (typeof raw !== 'string') return null;
+  let base = 'chrome-extension://invalid/';
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+      base = chrome.runtime.getURL('');
+    }
+  } catch (_e) { /* keep the placeholder base: relative input still resolves to an extension page */ }
+  try {
+    return new URL(raw.trim(), base);
+  } catch (_e) {
+    return null;
+  }
+}
+
+function isMcpExtensionPageTarget(raw) {
+  const resolved = resolveMcpTargetUrl(raw);
+  return !!resolved && resolved.protocol === 'chrome-extension:';
+}
+
+function refuseMcpExtensionPage(tool, url) {
+  return buildRestrictedMcpResponse({
+    currentUrl: typeof url === 'string' ? url : '',
+    pageType: 'Chrome extension page',
+    tool,
+    error: MCP_EXTENSION_PAGE_ERROR
+  });
+}
+
 function getPageTypeDescriptionForMcp(url) {
   if (!url) return 'Restricted page';
   if (url.startsWith('chrome://')) return 'Chrome internal page';
@@ -1444,6 +1481,7 @@ async function handleNavigateRoute({ params, client, tab }) {
   if (!params?.url || typeof params.url !== 'string') {
     return createMcpInvalidParamsError('navigate', 'navigate requires url');
   }
+  if (isMcpExtensionPageTarget(params.url)) return refuseMcpExtensionPage('navigate', params.url);
 
   try {
     getChromeTabsApi();
@@ -1980,6 +2018,9 @@ async function createMcpControlledTab({ tool, url = 'about:blank', active = fals
 
 async function handleOpenTabRoute({ params }) {
   const { agentId } = params || {};
+  if (params && typeof params.url === 'string' && isMcpExtensionPageTarget(params.url)) {
+    return refuseMcpExtensionPage('open_tab', params.url);
+  }
   // Phase 240: agentId now load-bearing for the bindTab D-08 site below.
   try {
     getChromeTabsApi();
@@ -2065,6 +2106,11 @@ async function handleSwitchTabRoute({ params }) {
     const forceForeground = !!(toolDef && toolDef._forceForeground === true && params.active === true);
 
     let tab = await chrome.tabs.get(params.tabId);
+    // Never claim a tab that shows an extension page (the user's open
+    // Control Panel, for one): the claim itself is refused.
+    if (tab && (isMcpExtensionPageTarget(tab.url) || isMcpExtensionPageTarget(tab.pendingUrl))) {
+      return refuseMcpExtensionPage('switch_tab', tab.url || tab.pendingUrl);
+    }
     const bindResult = await bindClaimedTabOrError({ tool: 'switch_tab', tabId: params.tabId, agentId });
     if (bindResult && bindResult.success === false) return bindResult;
 
@@ -4466,7 +4512,9 @@ const _mcp_dispatcher_exports = {
   _withSettingsWriteLock,
   // Phase 66.1 D-19 recording sanitizers (test access).
   sanitizeMcpMessageRequestForRecording,
-  sanitizeMcpMessageResponseForRecording
+  sanitizeMcpMessageResponseForRecording,
+  // Extension pages are never an MCP target (test access).
+  isMcpExtensionPageTarget
 };
 
 if (typeof globalThis !== 'undefined') {

@@ -189,6 +189,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/settings-panel-sync.test.js',
   'node tests/mcp-settings-route.test.js',
   'node tests/mcp-settings-tool-contract.test.js',
+  'node tests/mcp-extension-page-guard.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
