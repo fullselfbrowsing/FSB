@@ -129,6 +129,19 @@ for (const phrase of [
     !html.includes(phrase),
     'current builds have no Sync tab, pairing or server sync; word this for v0.9.95 and earlier');
 }
+// From v0.9.31 through v0.9.95 the service worker registered a key and opened
+// the relay socket at every browser start, paired or not, so the Background
+// Agents section must not say the relay was only reached after pairing.
+{
+  const deprecated = (html.match(/<p i18n="@@privacy\.section\.bgAgents\.deprecated">([\s\S]*?)<\/p>/) || [])[1] || '';
+  check('Background Agents section does not claim the relay was only contacted after pairing',
+    !/only contacted when you paired/.test(html),
+    'builds from v0.9.31 through v0.9.95 connected to the relay whether or not a Sync session was paired');
+  check('Background Agents section says v0.9.31 through v0.9.95 connected at every browser start',
+    /From <span[^>]*>v0\.9\.31<\/span> through <span[^>]*>v0\.9\.95<\/span>/.test(deprecated) &&
+      /connected to it at every browser start, whether or not you paired a Sync session/.test(deprecated),
+    'bgAgents.deprecated no longer describes the unconditional relay connection');
+}
 
 // =============================================================================
 // 2. Five collected fields enumerated.
