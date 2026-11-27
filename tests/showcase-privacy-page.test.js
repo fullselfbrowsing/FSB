@@ -260,6 +260,9 @@ const sep29Body = sep29Start >= 0 && sep29End > sep29Start ? archiveHtml.slice(s
 check('the September 29 archive note names September 29, 2026',
   /<p class="archive-note">[^<]*September 29, 2026[^<]*<\/p>/.test(sep29Body),
   'archive note must say the text stood from September 29, 2026');
+check('the September 29 archive note names the November 27, 2026 update that replaced it',
+  /<p class="archive-note">[^<]*before the November 27, 2026 update\.<\/p>/.test(sep29Body),
+  'the archive note must name the update that followed the archived text');
 check('the September 29 archive keeps the earlier native-host registration sentence',
   sep29Body.includes('is registered only by an explicit action you take, by running <code [attr.translate]="\'no\'">fsb-mcp-server install --native-host</code>'),
   'the archived body must hold the September 29 wording of the registration bullet');
@@ -292,6 +295,60 @@ check('the September 29 archive carries no nested i18n markers',
   check('the bullet names the opt-out and removal commands',
     text.includes('--no-native-host') && text.includes('fsb-mcp-server uninstall --native-host'),
     'the bullet must say how to skip and how to remove the host');
+}
+
+// =============================================================================
+// 9. Logins and cards come from 1Password. FSB's own PIN vault is gone, so the
+//    policy says what the 1Password connection stores, what the AI sees, and
+//    that FSB keeps no logins, cards or CVVs, and no longer claims a local
+//    credential manager or payment-method vault.
+// =============================================================================
+{
+  const unit = (id) => ((html.match(new RegExp(`i18n="@@privacy\\.section\\.${id.replace(/\./g, '\\.')}">([\\s\\S]*?)</(?:li|p|h2)>`)) || [])[1] || '')
+    .replace(/<[^>]+>/g, '');
+  check('the Connecting 1Password section has its stable anchor',
+    /<h2 data-depth-anchor="\d+" id="onepassword" i18n="@@privacy\.section\.onePassword\.title">/.test(html),
+    'the 1Password section needs id="onepassword"');
+  check('FSB keeps no passwords or cards of its own',
+    unit('onePassword.body').includes('keeps no passwords or cards of its own'),
+    'the 1Password section must say FSB keeps no logins or cards');
+  const settings = unit('onePassword.li.2');
+  check('the settings file, its permissions and the unencrypted service-account token are disclosed',
+    settings.includes('~/.fsb/onepassword.json') && settings.includes('readable only by you') &&
+      settings.includes('service-account token') && settings.includes('rather than encrypted'),
+    'the policy must name onepassword.json, its owner-only access and that the token is not encrypted');
+  check('Disconnect deletes the settings file',
+    unit('onePassword.li.3').includes('Disconnect deletes onepassword.json'),
+    'the policy must say what Disconnect removes');
+  check('nothing about logins or cards reaches FSB servers',
+    unit('onePassword.li.4').includes("Nothing about your logins or cards is sent to FSB's servers"),
+    'the policy must say no login or card data goes to FSB servers');
+  check('the old vault is disclosed until it is moved or deleted',
+    /stay encrypted/.test(unit('onePassword.li.5')) && unit('onePassword.li.5').includes('batches of 10'),
+    'the policy must say old vault entries stay until moved or deleted');
+  check('an https login is never filled on an http page',
+    unit('autoPasswords.li.1').includes('never filled on an http page'),
+    'the logins section must keep the https rule');
+  check('passwords and one-time codes never reach an MCP client',
+    unit('autoPasswords.li.4').includes('never to an MCP client'),
+    'the logins section must say secrets never reach MCP clients');
+  check('cards fill only on https pages',
+    unit('paymentMethods.li.1').includes('only on https pages'),
+    'the cards section must keep the https-only rule');
+  check('the card-approval line says FSB shows no prompt over MCP and names use_payment_method',
+    unit('paymentMethods.li.5').includes('shows no prompt of its own') && unit('paymentMethods.li.5').includes('use_payment_method'),
+    'the cards section must say who asks before a card is filled');
+  check('expiry is no longer claimed to stay out of AI prompts',
+    !/expiry are never included/.test(unit('paymentMethods.li.2')) && unit('paymentMethods.li.4').includes('expiry month and year'),
+    'agents see the expiry month and year, so the policy must say so');
+  check('FSB never stores a CVV',
+    unit('paymentMethods.li.6').includes('never stores a CVV'),
+    'the cards section must say no CVV is stored');
+  for (const removed of ['credential manager', 'payment-method vault', 'vault-derived key', 'PBKDF2']) {
+    check(`the current policy no longer claims the removed vault (${removed})`,
+      !html.includes(removed),
+      `"${removed}" describes the PIN vault that 1Password replaced`);
+  }
 }
 
 console.log(`\n=== showcase-privacy-page.test results: ${passed} passed, ${failed} failed ===`);
