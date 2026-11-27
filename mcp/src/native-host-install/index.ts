@@ -2616,8 +2616,22 @@ export async function uninstallNativeHostBrowser(
           runtime.markerFact,
           installedExtensionId,
         );
+        // Once this browser's registration is gone, a stop is a partial
+        // removal: "not changed" would hide that the browser can no longer
+        // reach the helper.
+        const partly = (reason: string): NativeHostUninstallResult => browserUninstallResult(
+          dependencies,
+          browser,
+          'partial',
+          reason,
+          receipt.origin,
+          receipt.packageVersion,
+        );
         if (!removed.ok) {
-          return browserUninstallResult(dependencies, browser, 'refused', removed.reason, receipt.origin, receipt.packageVersion);
+          // On Windows the registry value can go before its emptied key fails to.
+          return removed.registrationRemoved
+            ? partly(removed.reason)
+            : browserUninstallResult(dependencies, browser, 'refused', removed.reason, receipt.origin, receipt.packageVersion);
         }
         if (remaining.length > 0) {
           return browserUninstallResult(
@@ -2635,18 +2649,16 @@ export async function uninstallNativeHostBrowser(
         } catch {
           unchanged = false;
         }
-        if (!unchanged) {
-          return browserUninstallResult(dependencies, browser, 'refused', 'boundary-changed', receipt.origin, receipt.packageVersion);
-        }
+        if (!unchanged) return partly('boundary-changed');
         await stopRefreshingWakeLock(wake);
-        if (!await stillHeld(lease)) {
-          return browserUninstallResult(dependencies, browser, 'refused', 'lock-lost', receipt.origin, receipt.packageVersion);
-        }
+        if (!await stillHeld(lease)) return partly('lock-lost');
         try {
           await dependencies.runtime.removeExactRuntime(receipt);
         } catch {
-          await restoreRegistrations(dependencies, lease, [browser], installedExtensionId);
-          return browserUninstallResult(dependencies, browser, 'refused', 'runtime-remove-failed', receipt.origin, receipt.packageVersion);
+          const restored = await restoreRegistrations(dependencies, lease, [browser], installedExtensionId);
+          return restored.includes(browser)
+            ? browserUninstallResult(dependencies, browser, 'refused', 'runtime-remove-failed', receipt.origin, receipt.packageVersion)
+            : partly('runtime-remove-failed');
         }
         return browserUninstallResult(dependencies, browser, 'removed', 'removed', receipt.origin, receipt.packageVersion);
       } finally {

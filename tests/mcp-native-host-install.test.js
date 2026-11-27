@@ -2224,7 +2224,7 @@ function recordingOperations(calls, script = {}) {
     },
     readOptOut: () => {
       calls.push(Object.freeze({ operation: 'readOptOut' }));
-      return null;
+      return next('readOptOut', undefined, null);
     },
     writeOptOut: (reason) => {
       calls.push(Object.freeze({ operation: 'writeOptOut', reason }));
@@ -2269,7 +2269,7 @@ const ops = {
     if (results.uninstallAllThrows) throw new Error('SENSITIVE_UNINSTALL_FAILURE');
     return pick('uninstallAll', null);
   },
-  readOptOut: () => { calls.push({ operation: 'readOptOut' }); return null; },
+  readOptOut: () => { calls.push({ operation: 'readOptOut' }); return pick('readOptOut', null); },
   writeOptOut: (reason) => { calls.push({ operation: 'writeOptOut', reason }); },
   clearOptOut: () => { calls.push({ operation: 'clearOptOut' }); },
 };
@@ -2427,6 +2427,7 @@ async function runCliRouting() {
     deepEqual(
       calls.slice(before),
       [
+        { operation: 'readOptOut' },
         { operation: 'writeOptOut', reason: 'uninstall-native-host' },
         { operation: 'uninstallAll', request: {} },
       ],
@@ -2449,6 +2450,66 @@ async function runCliRouting() {
       [{ operation: 'uninstall', request: { browser } }],
       `${browser} uninstall removes only that browser's registration and writes no opt-out`,
     );
+  }
+
+  // A removal refused before it changed anything withdraws the opt-out it
+  // wrote, so the helper it kept goes on updating at server start.
+  {
+    const optOutCalls = (script) => {
+      const local = [];
+      return { local, operations: recordingOperations(local, script) };
+    };
+    const REFUSED = Object.freeze({ outcome: 'refused', reason: 'daemon-busy', removedBrowsers: [] });
+    {
+      const { local, operations: refusing } = optOutCalls({ uninstallAll: REFUSED });
+      const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true }, refusing));
+      deepEqual(
+        local.map((call) => call.operation),
+        ['readOptOut', 'writeOptOut', 'uninstallAll', 'clearOptOut'],
+        'a refused uninstall --native-host withdraws the opt-out it wrote',
+      );
+      equal(result.exitCode, 1, 'the refused uninstall still exits nonzero');
+      check(result.stderr.includes('Native messaging host was not changed: daemon-busy'), 'the refusal is reported as before');
+    }
+    {
+      const { local, operations: refusing } = optOutCalls({
+        uninstallAll: REFUSED,
+        readOptOut: Object.freeze({ at: 1, reason: 'install-no-native-host' }),
+      });
+      await captureCliAction(() => cli.runUninstall({ 'native-host': true }, refusing));
+      check(!operationNames(local).includes('clearOptOut'), 'an opt-out that was there before the uninstall stays');
+    }
+    {
+      const { local, operations: partial } = optOutCalls({
+        uninstallAll: Object.freeze({ outcome: 'refused', reason: 'lock-lost', removedBrowsers: ['chrome'] }),
+      });
+      const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true }, partial));
+      check(!operationNames(local).includes('clearOptOut'), 'a partial removal keeps the opt-out');
+      check(result.stderr.includes('only partly removed: lock-lost'), 'the partial removal says so');
+    }
+    {
+      const { local, operations: throwing } = optOutCalls({
+        uninstallAll: () => { throw new Error('SENSITIVE'); },
+      });
+      const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true }, throwing));
+      check(!operationNames(local).includes('clearOptOut'), 'an uninstall that failed unexpectedly keeps the opt-out');
+      equal(result.exitCode, 1);
+      check(!result.stderr.includes('SENSITIVE'), 'the failure detail is not printed');
+    }
+  }
+
+  // A per-browser uninstall that removed the registration but stopped after
+  // it says so, worded like the uninstall-all case.
+  {
+    const local = [];
+    const partial = recordingOperations(local, {
+      uninstall: nativeReceipt('partial', { reason: 'lock-lost' }),
+    });
+    const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true, browser: 'edge' }, partial));
+    equal(result.exitCode, 1, 'a partial per-browser uninstall exits nonzero');
+    check(result.stderr.includes('Native messaging host was only partly removed: lock-lost'), 'the partial per-browser uninstall names its stop');
+    check(result.stderr.includes('Removed registrations: Edge'), 'and the browser whose registration went');
+    check(!result.stderr.includes('was not changed'), 'it never claims nothing changed');
   }
 
   {
@@ -3766,6 +3827,8 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
     },
     recheckExactRuntime: async (receipt) => {
       trace.push('runtime:recheck');
+      // failRecheck: the runtime changed under the lock after the inspection.
+      if (options.failRecheck) return false;
       return Boolean(stable && stable.state === 'exact' && stable.receipt === receipt);
     },
     removeExactRuntime: async (receipt) => {
@@ -4729,7 +4792,34 @@ async function runEnsureTransaction() {
       });
       const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
       equal(result.reason, 'runtime-remove-failed', `${platformName} the last per-browser uninstall reports the runtime removal`);
+      equal(result.status, 'refused', `${platformName} with the registration put back, nothing changed`);
       deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the last registration is put back`);
+    }
+    {
+      // The lock is lost after the last registration went: it cannot be put
+      // back without the lock, so the result says the removal was partial.
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        loseLock: (trace) => trace.some((entry) => entry.startsWith('file:delete:') || entry.startsWith('registry:delete:')),
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.status, 'partial', `${platformName} a last per-browser uninstall that loses its lock after the removal is partial`);
+      equal(result.reason, 'lock-lost', `${platformName} the partial removal names the lost lock`);
+      deepEqual(harness.registeredBrowsers(), [], `${platformName} the registration is gone`);
+      check(harness.stable() !== null, `${platformName} the runtime is not removed without the lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        failRecheck: true,
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.status, 'partial', `${platformName} a runtime that changed after the last registration went is a partial removal`);
+      equal(result.reason, 'boundary-changed', `${platformName} the partial removal names the changed runtime`);
+      deepEqual(harness.registeredBrowsers(), [], `${platformName} the registration is gone`);
+      check(!harness.trace.includes('runtime:remove'), `${platformName} a changed runtime is never removed`);
     }
     {
       // An exact runtime left with no registration at all is repaired by the
@@ -5194,6 +5284,19 @@ async function runEnsureTransaction() {
     equal(result.reason, 'registry-key-cleanup-failed', 'win32 uninstall-all reports the failed key cleanup');
     deepEqual(result.removedBrowsers, ['chrome'], 'win32 uninstall-all lists the browser whose value it already removed');
     deepEqual(harness.registeredBrowsers(), ['edge'], 'win32 uninstall-all stops before the next browser');
+  }
+  {
+    // The same key cleanup failure in a per-browser uninstall: the value is
+    // gone, so the result is partial, not "not changed".
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      failKeyCleanups: ['chrome'],
+    });
+    const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+    equal(result.status, 'partial', 'win32 a per-browser uninstall whose key cleanup fails is partial');
+    equal(result.reason, 'registry-key-cleanup-failed', 'win32 the partial removal names the key cleanup');
+    deepEqual(harness.registeredBrowsers(), ['edge'], 'win32 Chrome is unregistered and Edge keeps its registration');
   }
   for (const platformName of ['darwin', 'linux', 'win32']) {
     const harness = fakeEnsureHarness(modules, platformName, {});

@@ -327,6 +327,16 @@ function printNativeUninstallResult(result, browser) {
         printNativeHostRefusal(receipt.reason, receipt.location);
         return;
     }
+    // The registration went but the step after it stopped; worded like the
+    // uninstall-all case, since that browser can no longer reach the helper.
+    if (receipt.status === 'partial') {
+        console.error(`Native messaging host was only partly removed: ${stableNativeRefusalReason(receipt.reason)}`);
+        console.error(`Removed registrations: ${browser ? NATIVE_HOST_BROWSER_LABELS[browser] : 'This browser'}`);
+        console.error(`Expected location: ${location}`);
+        console.error('Run npx -y fsb-mcp-server@latest doctor for repair details.');
+        process.exitCode = 1;
+        return;
+    }
     if (location === 'Unavailable'
         || (receipt.status !== 'removed' && receipt.status !== 'not-installed')) {
         printNativeHostRefusal('unavailable', location);
@@ -441,6 +451,15 @@ function printHelperEnsureResult(value) {
         default:
             console.error('\u26A0 ' + HELPER_LABEL + ' was not changed: ' + reason + '. ' + DOCTOR_HINT);
     }
+}
+/** An uninstall-all that removed nothing: refused, unavailable, or kept. */
+function nativeUninstallChangedNothing(value) {
+    const result = plainRecord(value);
+    if (!result)
+        return false;
+    if (result.outcome !== 'refused' && result.outcome !== 'unavailable' && result.outcome !== 'kept')
+        return false;
+    return Array.isArray(result.removedBrowsers) && result.removedBrowsers.length === 0;
 }
 function printNativeUninstallAllResult(value) {
     const result = plainRecord(value);
@@ -1590,18 +1609,41 @@ export async function runUninstall(flags, nativeHostOperations = unavailableNati
         }
         // Every registration and the helper's files, however they were installed.
         // The opt-out is written first, so no automatic refresh races the removal.
+        // A removal refused before it changed anything withdraws the opt-out it
+        // wrote, so the helper it kept goes on updating at server start; an
+        // opt-out that was there before stays.
+        let optedOutBefore = true;
+        try {
+            optedOutBefore = nativeHostOperations.readOptOut() !== null;
+        }
+        catch {
+            // Unreadable: keep whatever is there.
+        }
+        let wroteOptOut = false;
         try {
             nativeHostOperations.writeOptOut('uninstall-native-host');
+            wroteOptOut = true;
         }
         catch {
             // A refresh never recreates a helper that is gone.
         }
+        let removal;
         try {
-            printNativeUninstallAllResult(await nativeHostOperations.uninstallAll(Object.freeze({})));
+            removal = await nativeHostOperations.uninstallAll(Object.freeze({}));
         }
         catch {
             printNativeHostRefusal('unavailable', expectedNativeHostRoot());
+            return;
         }
+        if (wroteOptOut && !optedOutBefore && nativeUninstallChangedNothing(removal)) {
+            try {
+                nativeHostOperations.clearOptOut();
+            }
+            catch {
+                // The opt-out stays; a later install withdraws it.
+            }
+        }
+        printNativeUninstallAllResult(removal);
         return;
     }
     // Capture --all before expansion (Pitfall 4)

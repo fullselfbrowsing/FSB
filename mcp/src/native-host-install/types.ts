@@ -435,7 +435,9 @@ export type NativeHostInstallResult = Readonly<{
 }>;
 
 export type NativeHostUninstallResult = Readonly<{
-  status: 'removed' | 'not-installed' | 'refused';
+  // partial: the browser's registration is gone, but the step after it
+  // stopped for `reason`, so the helper's files stay.
+  status: 'removed' | 'not-installed' | 'refused' | 'partial';
   reason: string;
   location: string;
   origin: string | null;
