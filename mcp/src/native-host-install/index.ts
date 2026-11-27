@@ -2259,9 +2259,13 @@ function browserInstallResult(
  * and the extension's repair command names its own ID, so refusing would
  * leave no way forward short of uninstalling first. It is replaced only when
  * no browser profile holds the extension it serves, so a build that still
- * uses it keeps it. A helper set up with `install --native-host`, one newer
- * than this package, and a browser registration this package does not own
- * are refused as before.
+ * uses it keeps it. Only a helper for the Web Store ID qualifies: detection
+ * finds an extension by the folder a browser keeps under each profile's
+ * Extensions directory, which a store install gets and an unpacked build
+ * never does, so a helper serving any other ID may still be in use and is
+ * kept. A helper set up with `install --native-host`, one newer than this
+ * package, and a browser registration this package does not own are refused
+ * as before.
  */
 async function replaceableAutoHelper(
   dependencies: NativeHostEnsureDependencies,
@@ -2276,6 +2280,7 @@ async function replaceableAutoHelper(
   if (
     helper.provenance !== 'explicit'
     || runtimeProvenance(helper.runtime) !== 'auto'
+    || helper.servedExtensionId !== NATIVE_HOST_DEFAULT_EXTENSION_ID
     || helper.target.state === 'other'
   ) {
     return false;
@@ -2295,8 +2300,9 @@ async function replaceableAutoHelper(
  * the original install transaction. With another browser already registered
  * to the same current runtime it adds this browser's registration instead of
  * refusing; any other registration it does not own still refuses. A helper
- * `install` set up for an extension no browser profile holds is replaced by
- * one for the extension this install names (replaceableAutoHelper).
+ * `install` set up for the Web Store ID while no browser profile holds the
+ * store build is replaced by one for the extension this install names
+ * (replaceableAutoHelper).
  */
 export async function installNativeHostBrowser(
   requestValue: NativeHostInstallRequest,

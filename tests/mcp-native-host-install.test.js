@@ -5054,6 +5054,22 @@ async function runEnsureTransaction() {
     equal(result.reason, 'ownership-mismatch', `${label} is not replaced for another extension`);
     equal(ensureMutations(harness.trace).length, 0, `${label} is left untouched`);
   }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // An unpacked build never gets the folder detection looks for, so an
+    // automatic helper serving one would always look unused.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { provenance: 'auto', extensionId: DEVELOPMENT_EXTENSION_ID },
+      registered: ['chrome'],
+      detected: () => [],
+    });
+    const result = await installer.installNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+    equal(result.status, 'refused', `${platformName} an automatic helper for an unpacked build is not replaced`);
+    equal(result.reason, 'ownership-mismatch', `${platformName} the unpacked build's helper is reported as owned by another extension`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the unpacked build's helper is left untouched`);
+    check(!harness.trace.some((entry) => entry.startsWith('detect:')), `${platformName} detection, which cannot see an unpacked build, is not consulted`);
+    equal(harness.stable().marker.origin, DEVELOPMENT_ORIGIN, `${platformName} the unpacked build keeps its helper`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the unpacked build keeps its registration`);
+  }
   {
     const harness = fakeEnsureHarness(modules, 'linux', {
       installed: { version: '0.9.0', provenance: 'auto' },
