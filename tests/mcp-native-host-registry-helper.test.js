@@ -111,7 +111,10 @@ async function importHelper() {
 
 async function withFixture(action) {
   const createdRoot = mkdtempSync(path.join(os.tmpdir(), 'fsb-registry-helper-'));
-  const packageRoot = realpathSync(createdRoot);
+  // The native realpath, which the helper checks the root against. The JS
+  // realpathSync keeps Windows 8.3 names such as the CI runner's RUNNER~1,
+  // and the helper then refuses the root as moved.
+  const packageRoot = realpathSync.native(createdRoot);
   try {
     const artifacts = writeArtifactSet(packageRoot);
     await action({ packageRoot, artifacts });
