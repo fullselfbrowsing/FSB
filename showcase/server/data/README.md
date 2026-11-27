@@ -182,37 +182,38 @@ centroid.
 
 ## Production deployment (Fly `/data` volume)
 
-`fly.toml` points `DBIP_DATASET_PATH`, `DBIP_IPV6_DATASET_PATH`, and
-`DBIP_PLACES_DATASET_PATH` at `/data/dbip-city/`. The datasets are **not** baked
-into the Docker image (they would bloat every deploy); they live on the existing
-`fsb_data` volume mounted at `/data`. To refresh:
+`fly.toml` points the datasets at `/data/dbip-city/`:
+- `DBIP_DATASET_PATH` and `DBIP_IPV6_DATASET_PATH` at the binary tables
+  `dbip-city-lite.bin` and `dbip-city-lite.ipv6.bin`;
+- `DBIP_PLACES_DATASET_PATH` at the places CSV.
+
+The datasets are **not** baked into the Docker image (they would bloat every
+deploy); they live on the existing `fsb_data` volume mounted at `/data`. To
+refresh:
 
 ```bash
-# Upload compressed copies (sftp is slow; the CSVs gzip ~6x), then unpack in place:
+# Upload compressed copies (sftp is slow), then unpack in place:
 fly ssh console -a fsb-server -C "mkdir -p /data/dbip-city.new"
-fly ssh sftp put -a fsb-server dbip-city-lite.csv.gz        /data/dbip-city.new/dbip-city-lite.csv.gz
-fly ssh sftp put -a fsb-server dbip-city-lite.ipv6.csv.gz   /data/dbip-city.new/dbip-city-lite.ipv6.csv.gz
+fly ssh sftp put -a fsb-server dbip-city-lite.bin.gz        /data/dbip-city.new/dbip-city-lite.bin.gz
+fly ssh sftp put -a fsb-server dbip-city-lite.ipv6.bin.gz   /data/dbip-city.new/dbip-city-lite.ipv6.bin.gz
 fly ssh sftp put -a fsb-server dbip-city-lite.places.csv.gz /data/dbip-city.new/dbip-city-lite.places.csv.gz
-fly ssh console -a fsb-server -C "sh -c 'cd /data/dbip-city.new && gunzip -f *.gz && sha256sum *.csv'"
+fly ssh console -a fsb-server -C "sh -c 'cd /data/dbip-city.new && gunzip -f *.gz && sha256sum *'"
 # Compare the sums with the local files, swap the directory, and restart so the
 # server reopens the files (an open descriptor keeps reading the old inode):
 fly ssh console -a fsb-server -C "sh -c 'rm -rf /data/dbip-city.old && mv /data/dbip-city /data/dbip-city.old && mv /data/dbip-city.new /data/dbip-city'"
 fly machine restart -a fsb-server
 ```
 
-The volume is ~1 GB and one generation of the CSV files is ~395 MB, so delete
-`/data/dbip-city.old` once the new files are confirmed.
+The volume is ~1 GB. One generation of the binary tables plus the places file
+is ~90 MB, so two fit easily. Delete `/data/dbip-city.old` once the new files
+are confirmed.
 
-To serve the binary tables instead, use the same steps:
-1. Upload `dbip-city-lite.bin`, `dbip-city-lite.ipv6.bin` and the places CSV.
-   This generation is ~90 MB.
-2. Compare their sha256 sums with the local files.
-3. Point `DBIP_DATASET_PATH` and `DBIP_IPV6_DATASET_PATH` in `fly.toml` at the
-   `.bin` files.
+To serve the CSVs instead (for example, to roll back):
+1. Upload them the same way. One CSV generation is ~395 MB.
+2. Point the two range paths in `fly.toml` at the `.csv` files.
 
-Rolling back is pointing them at the CSVs again. Because of graceful
-degradation, deploying **before** the files exist is safe — regions resolve to
-`'unknown'` until the upload + restart.
+Because of graceful degradation, deploying **before** the files exist is safe:
+regions resolve to `'unknown'` until the upload + restart.
 
 ## Privacy posture
 
