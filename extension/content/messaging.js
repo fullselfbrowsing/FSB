@@ -1137,6 +1137,9 @@
                 ? `Element ref "${params.ref}"${described} is stale: its element is no longer on the page. The action was not executed. Take a fresh get_page_snapshot and use its refs.`
                 : `Unknown ref "${params.ref}": this page never issued it (the page may have reloaded or navigated since that snapshot). The action was not executed. Take a fresh get_page_snapshot and use its refs.`;
               logger.warn('Stale or unknown ref', { sessionId: FSB.sessionId, ref: params.ref });
+              if (isManualMCP) {
+                try { FSB.viewportGlow.destroy(); } catch (e) { /* non-blocking */ }
+              }
               sendResponse({ success: false, error: errorMsg, tool, refStale: true, outcome: 'failed', mayHaveExecuted: false });
               return;
             }

@@ -464,11 +464,15 @@ test('a ref this document never issued is refused as unknown', () => {
   const ctx = loadContentScripts();
   buildForm(ctx);
   snapshot(ctx);
+  const glow = [];
+  ctx.FSB.viewportGlow = { show: (state) => glow.push('show:' + state), setState: noop, destroy: () => glow.push('destroy') };
   for (const ref of ['e999', 'e0', 'e01']) {
+    glow.length = 0;
     const outcome = ctx.execute('type', { selector: ref, text: 'x' });
     assert.equal(outcome.result, null, ref);
     assert.match(outcome.refused[0].error, new RegExp(`^Unknown ref "${ref}": this page never issued it`));
     assert.equal(outcome.refused[0].mayHaveExecuted, false);
+    assert.deepEqual(glow, ['show:acting', 'destroy'], `${ref}: the acting glow is cleared when nothing runs`);
   }
   assert.deepEqual(ctx.toolCalls, []);
 });
