@@ -115,23 +115,51 @@
     if (tabIds.length === 0) {
       return { success: false, code: 'NO_OWNED_TAB', agentId };
     }
-    if (tabIds.length > 1) {
-      const selectedTabId = (typeof reg.getSelectedTabId === 'function')
-        ? reg.getSelectedTabId(agentId)
-        : null;
-      if (Number.isFinite(selectedTabId) && tabIds.indexOf(selectedTabId) !== -1) {
-        return { tabId: selectedTabId, ownershipToken: null, skipGate: false };
-      }
+    const picked = pickOwnedTab(reg, agentId, tabIds);
+    if (picked === null) {
       return { success: false, code: 'AMBIGUOUS_TAB', agentId, tabIds: tabIds.slice() };
     }
-    return { tabId: tabIds[0], ownershipToken: null, skipGate: false };
+    return { tabId: picked, ownershipToken: null, skipGate: false };
+  }
+
+  // D-01 among the agent's own tabs when the call names none: the only tab,
+  // or the selected one of several. Null when neither applies.
+  function pickOwnedTab(reg, agentId, tabIds) {
+    if (tabIds.length === 1) return tabIds[0];
+    if (tabIds.length > 1 && typeof reg.getSelectedTabId === 'function') {
+      const selectedTabId = reg.getSelectedTabId(agentId);
+      if (Number.isFinite(selectedTabId) && tabIds.indexOf(selectedTabId) !== -1) {
+        return selectedTabId;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The tab resolveAgentTabOrError would pick for a call that names no tab,
+   * or null when it would refuse or the agent is a legacy surface.
+   * Synchronous and read-only: the toolbar icon uses it to claim the tab a
+   * call will land on before routing finishes, so the status pill on that
+   * page can play the icon's motion.
+   */
+  function peekAgentTabId(agentId) {
+    if (typeof agentId !== 'string' || agentId.length === 0 || agentId.startsWith('legacy:')) {
+      return null;
+    }
+    const reg = (typeof globalThis !== 'undefined') ? globalThis.fsbAgentRegistryInstance : null;
+    if (!reg || typeof reg.getAgentTabs !== 'function') return null;
+    const owned = reg.getAgentTabs(agentId);
+    if (!Array.isArray(owned)) return null;
+    return pickOwnedTab(reg, agentId, owned.filter(Number.isFinite));
   }
 
   exports.resolveAgentTabOrError = resolveAgentTabOrError;
+  exports.peekAgentTabId = peekAgentTabId;
 
   // Browser SW global registration so call sites can consult the resolver
   // without tracking an importScripts symbol.
   if (typeof globalThis !== 'undefined') {
     globalThis.resolveAgentTabOrError = resolveAgentTabOrError;
+    globalThis.peekAgentTabId = peekAgentTabId;
   }
 })(typeof module !== 'undefined' && module.exports ? module.exports : {});

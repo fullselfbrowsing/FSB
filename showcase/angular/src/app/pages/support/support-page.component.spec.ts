@@ -78,7 +78,7 @@ describe('Support FAQ layout', () => {
     // The depth engine fits a plane without it, so opening an answer never shrinks
     // the plane; it scrolls inside itself instead while the answer does not fit.
     const answers = Array.from(host.querySelectorAll('.faq-answer'));
-    expect(answers.length).toBe(15);
+    expect(answers.length).toBe(14);
     expect(answers.every(a => a.hasAttribute('data-depth-grows'))).toBeTrue();
   });
 
@@ -135,13 +135,13 @@ describe('Support FAQ layout', () => {
     expect(answer('install').inert).toBeTrue();
 
     // The questions are split across two planes; one open answer covers both.
-    toggle('remote');
-    expectFullyVisible('remote');
+    toggle('learn');
+    expectFullyVisible('learn');
     expect(answer('mcp').getBoundingClientRect().height).toBe(0);
     expect(answer('mcp').inert).toBeTrue();
 
-    toggle('remote');
-    expect(answer('remote').getBoundingClientRect().height).toBe(0);
+    toggle('learn');
+    expect(answer('learn').getBoundingClientRect().height).toBe(0);
     expect(host.querySelectorAll('.faq-item.active').length).toBe(0);
     expect(host.querySelectorAll('.faq-question[aria-expanded="true"]').length).toBe(0);
   });

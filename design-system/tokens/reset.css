@@ -1,0 +1,40 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-body);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: var(--leading-body);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+a { color: var(--primary); text-decoration: none; transition: color var(--transition-fast); }
+a:hover { color: var(--primary-hover); }
+
+img { display: block; height: auto; max-width: 100%; }
+ul, ol { list-style: none; }
+button { background: none; border: none; cursor: pointer; font-family: inherit; }
+
+h1, h2, h3, h4, h5, h6 { color: var(--text-primary); font-weight: var(--weight-bold); line-height: var(--leading-tight); }
+h1 { font-size: var(--text-h1); }
+h2 { font-size: var(--text-h2); }
+h3 { font-size: var(--text-h3); }
+p { color: var(--text-secondary); line-height: var(--leading-relaxed); }
+code, .mono { font-family: var(--font-mono); }
+
+::selection { background: rgba(255, 107, 53, 0.22); color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

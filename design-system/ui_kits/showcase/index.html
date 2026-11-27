@@ -1,0 +1,81 @@
+<!-- @dsCard group="Showcase Site" viewport="1280x760" subtitle="Marketing site — home and agents directory" name="Showcase site" -->
+<!-- @startingPoint section="Screens" subtitle="Full marketing page: nav, hero, features, comparison, footer" viewport="1280x760" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FSB — Showcase site</title>
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+@keyframes heroGlow {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 1; }
+  33% { transform: scale(1.08) translate(2%, -3%); opacity: .85; }
+  66% { transform: scale(.95) translate(-2%, 2%); opacity: .9; }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="HomeScreen.jsx"></script>
+<script type="text/babel" src="AgentsScreen.jsx"></script>
+<script type="text/babel" data-presets="react">
+function resolveNS(probe) {
+  for (const k of Object.keys(window)) {
+    const v = window[k];
+    if (v && typeof v === 'object' && typeof v[probe] === 'function') return v;
+  }
+  return {};
+}
+const NS = resolveNS('FsbMark');
+const { NavBar, Footer } = NS;
+
+const LINKS = [
+  { label: 'Home', href: '#home' },
+  { label: 'Agents', href: '#agents' },
+  { label: 'About', href: '#about' },
+  { label: 'Dashboard', href: '#dashboard' },
+  { label: 'Privacy', href: '#privacy' },
+];
+
+function App() {
+  const [page, setPage] = React.useState('Home');
+  const [theme, setTheme] = React.useState('dark');
+
+  React.useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
+
+  const Screen = page === 'Agents' ? window.AgentsScreen : window.HomeScreen;
+
+  return (
+    <React.Fragment>
+      <NavBar active={page} links={LINKS} onNavigate={(l) => setPage(l.label)} />
+      <Screen NS={NS} onNavigate={setPage} />
+      <Footer
+        version="&#9661;X.Y.Z"
+        columns={[
+          { title: 'Pages', links: LINKS.slice(0, 3) },
+          { title: 'Project', links: [{ label: 'GitHub', href: '#' }, { label: 'Changelog', href: '#' }, { label: 'License', href: '#' }] },
+          { title: 'Research', links: [{ label: 'Lattice', href: '#' }, { label: 'PhantomStream', href: '#' }, { label: 'Prometheus', href: '#' }] },
+        ]}
+        bottomLinks={[{ label: 'Privacy', href: '#' }, { label: 'Support', href: '#' }]}
+      />
+      <button
+        onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+        aria-label="Toggle theme"
+        style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 1000, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', color: 'var(--text-muted)', fontSize: '1.1rem', backdropFilter: 'blur(8px)' }}
+      >
+        <i className={theme === 'dark' ? 'fa-regular fa-sun' : 'fa-regular fa-moon'} />
+      </button>
+    </React.Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -59,11 +59,6 @@
                 "output": "assets"
               },
               {
-                "glob": "dashboard-runtime-state.js",
-                "input": "../js",
-                "output": "assets"
-              },
-              {
                 "glob": "fsb-knowledge-data.js",
                 "input": "../js",
                 "output": "assets"
@@ -72,15 +67,11 @@
                 "glob": "knowledge-graph.js",
                 "input": "../js",
                 "output": "assets"
-              },
-              {
-                "glob": "phantom-stream-viewer.js",
-                "input": "../js",
-                "output": "assets"
               }
             ],
             "styles": [
               "src/styles/icons/icons.generated.css",
+              "src/styles/fsb-wordmark.css",
               "src/styles.scss",
               "src/styles/depth.scss"
             ],
@@ -162,6 +153,7 @@
             ],
             "styles": [
               "src/styles/icons/icons.generated.css",
+              "src/styles/fsb-wordmark.css",
               "src/styles.scss",
               "src/styles/depth.scss"
             ]

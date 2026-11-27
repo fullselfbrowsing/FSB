@@ -1,0 +1,24 @@
+<!-- @dsCard group="Spacing" viewport="700x200" subtitle="1200px container, 24px gutters" name="Layout constants" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.rows{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.r{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card)}
+.r b{font-size:.8rem;color:var(--text-primary);display:block}
+.v{font-family:var(--font-mono);font-size:.78rem;color:var(--text-secondary)}
+</style>
+</head>
+<body>
+<div class="rows">
+<div class="r"><span><b>Nav height</b><span class="var">--nav-height</span></span><span class="v">64px</span></div><div class="r"><span><b>Max width</b><span class="var">--max-width</span></span><span class="v">1200px</span></div><div class="r"><span><b>Section padding</b><span class="var">--section-padding</span></span><span class="v">80px 0</span></div><div class="r"><span><b>Container gutter</b><span class="var">--gutter</span></span><span class="v">24px</span></div>
+</div>
+</body>
+</html>

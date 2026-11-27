@@ -11,13 +11,13 @@
           <div class="privacy-header" data-di="0">
             <div class="section-label" i18n="@@privacy.header.kicker">Legal</div>
             <h1 i18n="@@privacy.header.title">Privacy Policy</h1>
-            <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: September 29, 2026</p>
+            <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: November 27, 2026</p>
           </div>
 
           <div class="privacy-content">
             <!-- TLDR -->
             <div class="privacy-callout" data-di="0.12">
-              <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> runs inside your browser, and no browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers. AI calls go directly from your browser to the provider you choose. API keys and credentials are encrypted locally, and memory data stays on your device. If you install the optional local agent service, <span [attr.translate]="'no'">FSB</span> can also be driven by an <span [attr.translate]="'no'">MCP</span> client running on your own machine over a loopback connection, and by coding-agent <span [attr.translate]="'no'">CLIs</span> you have already installed. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a routerLink="/stats">/stats</a> page. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
+              <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> runs inside your browser, and no browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers. AI calls go directly from your browser to the provider you choose. API keys are encrypted locally, logins and cards come from your own <span [attr.translate]="'no'">1Password</span>, and memory data stays on your device. If you install the optional local agent service, <span [attr.translate]="'no'">FSB</span> can also be driven by an <span [attr.translate]="'no'">MCP</span> client running on your own machine over a loopback connection, and by coding-agent <span [attr.translate]="'no'">CLIs</span> you have already installed. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a routerLink="/stats">/stats</a> page. If you paired <span [attr.translate]="'no'">Remote Dashboard</span> on <span [attr.translate]="'no'">v0.9.95</span> or earlier, transient live-preview frames could pass through the relay during the session, but they were not stored. Everything is open source and auditable.</p>
             </div>
           </div>
         </div>
@@ -50,7 +50,7 @@
             <ul>
               <li i18n="@@privacy.section.dataCollection.permissions.li.1"><strong>DOM and tabs</strong>, <code [attr.translate]="'no'">activeTab</code>, <code [attr.translate]="'no'">scripting</code>, <code [attr.translate]="'no'">tabs</code>, <code [attr.translate]="'no'">windows</code>, <code [attr.translate]="'no'">sidePanel</code>, and host permission <code [attr.translate]="'no'">&lt;all_urls&gt;</code>: read and write the active tab, inject the automation content script, list and switch tabs, and render the side panel</li>
               <li i18n="@@privacy.section.dataCollection.permissions.li.2"><strong>Advanced automation</strong>, <code [attr.translate]="'no'">debugger</code>: attach the <span [attr.translate]="'no'">Chrome DevTools Protocol</span> for coordinate-based clicks, drag, and key-hold actions that the regular <span [attr.translate]="'no'">DOM</span>&nbsp;<span [attr.translate]="'no'">API</span> cannot perform. <code [attr.translate]="'no'">webNavigation</code>: observe navigation start/finish events so automation waits for the right moment</li>
-              <li i18n="@@privacy.section.dataCollection.permissions.li.3"><strong>Local storage</strong>, <code [attr.translate]="'no'">storage</code>, <code [attr.translate]="'no'">unlimitedStorage</code>: store your settings, credentials, payment methods, and memory in <code [attr.translate]="'no'">chrome.storage.local</code> on your device. Unlimited storage lifts the default 10&nbsp;MB quota so memory and session logs can grow without hitting a wall</li>
+              <li i18n="@@privacy.section.dataCollection.permissions.li.3"><strong>Local storage</strong>, <code [attr.translate]="'no'">storage</code>, <code [attr.translate]="'no'">unlimitedStorage</code>: store your settings and memory in <code [attr.translate]="'no'">chrome.storage.local</code> on your device, along with any old <span [attr.translate]="'no'">FSB</span> vault entries you have not yet moved to <span [attr.translate]="'no'">1Password</span>. Unlimited storage lifts the default 10&nbsp;MB quota so memory and session logs can grow without hitting a wall</li>
               <li i18n="@@privacy.section.dataCollection.permissions.li.4"><strong><span [attr.translate]="'no'">UX</span> helpers</strong>, <code [attr.translate]="'no'">clipboardWrite</code>: write copy-to-clipboard results from automation. <code [attr.translate]="'no'">alarms</code>: schedule background housekeeping. <code [attr.translate]="'no'">offscreen</code>: host the speech-to-text recorder in a hidden document because service workers cannot capture audio directly</li>
               <li i18n="@@privacy.section.dataCollection.permissions.li.5"><strong>Local service</strong>, <code [attr.translate]="'no'">nativeMessaging</code>: start the optional local agent service described under <a href="#local-service">Local Agent Service and Native Messaging</a> below. Nothing about the pages you visit crosses that channel. <code [attr.translate]="'no'">system.memory</code>: read the total installed <span [attr.translate]="'no'">RAM</span> figure only, so <span [attr.translate]="'no'">FSB</span> can suggest a sensible limit on how many agents run at once. The available-memory and per-processor breakdowns are never read, and the figure never leaves the extension</li>
             </ul>
@@ -61,7 +61,7 @@
             <p i18n="@@privacy.section.dataStorage.body">All settings and data are stored locally in <span [attr.translate]="'no'">Chrome</span>'s extension storage.</p>
             <ul>
               <li i18n="@@privacy.section.dataStorage.li.1">Configuration is stored in <code [attr.translate]="'no'">chrome.storage.local</code></li>
-              <li i18n="@@privacy.section.dataStorage.li.2">API keys, credentials, and payment methods are encrypted before storage</li>
+              <li i18n="@@privacy.section.dataStorage.li.2">API keys are encrypted before storage. <span [attr.translate]="'no'">FSB</span> stores no logins or cards of its own; they stay in your <span [attr.translate]="'no'">1Password</span></li>
               <li i18n="@@privacy.section.dataStorage.li.3">Session logs are stored locally and can be cleared at any time</li>
               <li i18n="@@privacy.section.dataStorage.li.4">Analytics data (task counts, success rates) stays on your device</li>
             </ul>
@@ -73,19 +73,20 @@
               <li i18n="@@privacy.section.external.li.1">Hosted API calls are made only to the provider you select (<span [attr.translate]="'no'">xAI</span>, <span [attr.translate]="'no'">OpenAI</span>, <span [attr.translate]="'no'">Anthropic</span>, <span [attr.translate]="'no'">Google</span>, or <span [attr.translate]="'no'">OpenRouter</span>)</li>
               <li i18n="@@privacy.section.external.li.2"><span [attr.translate]="'no'">LM Studio</span> uses a local <span [attr.translate]="'no'">OpenAI</span>-compatible server on your device and does not require an API key</li>
               <li i18n="@@privacy.section.external.li.3">Sent data includes: task description, <span [attr.translate]="'no'">DOM</span> structure summary, and action context</li>
-              <li i18n="@@privacy.section.external.li.4" id="relay-non-persistence">If you pair <span [attr.translate]="'no'">Remote Dashboard</span> or use legacy Background Agents sync, an optional relay server handles <span [attr.translate]="'no'">WebSocket</span> messages for that session. Live-preview frames may pass through the relay transiently, but none of the following is ever persisted on an <span [attr.translate]="'no'">FSB</span> server: page content, <span [attr.translate]="'no'">DOM</span> data, browsing history, screenshots, AI prompts, AI responses, cookies, tokens, or site <span [attr.translate]="'no'">API</span> payloads. This is opt-in only</li>
+              <li i18n="@@privacy.section.external.li.4" id="relay-non-persistence">If you paired <span [attr.translate]="'no'">Remote Dashboard</span> on <span [attr.translate]="'no'">v0.9.95</span> or earlier, or used legacy Background Agents sync, an optional relay server handled <span [attr.translate]="'no'">WebSocket</span> messages for that session. Live-preview frames could pass through the relay transiently, but none of the following is ever persisted on an <span [attr.translate]="'no'">FSB</span> server: page content, <span [attr.translate]="'no'">DOM</span> data, browsing history, screenshots, AI prompts, AI responses, cookies, tokens, or site <span [attr.translate]="'no'">API</span> payloads. This was opt-in only</li>
               <li i18n="@@privacy.section.external.li.5">Each provider has their own privacy policy governing how they handle API requests</li>
+              <li i18n="@@privacy.section.external.li.6"><span [attr.translate]="'no'">1Password</span>: once you connect it, <span [attr.translate]="'no'">FSB</span>'s local server talks to your <span [attr.translate]="'no'">1Password</span> desktop app, or to <span [attr.translate]="'no'">1Password</span>'s servers if you set up a service account</li>
             </ul>
 
             <!-- Local Agent Service / native messaging (v0.9.91) -->
             <h2 data-depth-anchor="3" id="local-service" i18n="@@privacy.section.localService.title">Local Agent Service and Native Messaging</h2>
             <p i18n="@@privacy.section.localService.body"><span [attr.translate]="'no'">FSB</span> can be driven by an <span [attr.translate]="'no'">MCP</span> client running on your own machine. That requires a small local agent service which you install yourself, and the <code [attr.translate]="'no'">nativeMessaging</code> permission exists solely so the extension can start it. <span [attr.translate]="'no'">Chrome</span> cannot launch a local program directly, so this is the only supported mechanism.</p>
             <ul>
-              <li i18n="@@privacy.section.localService.li.1">The messaging host <code [attr.translate]="'no'">io.github.fullselfbrowsing.fsb_native_host</code> is registered only by an explicit action you take, by running <code [attr.translate]="'no'">fsb-mcp-server install --native-host</code>. The extension cannot install it, and its registration names one permitted extension origin</li>
+              <li i18n="@@privacy.section.localService.li.1">The messaging host <code [attr.translate]="'no'">io.github.fullselfbrowsing.fsb_native_host</code> is registered only when you run <code [attr.translate]="'no'">fsb-mcp-server install</code>, either to add <span [attr.translate]="'no'">FSB</span> to an <span [attr.translate]="'no'">MCP</span> client or with <code [attr.translate]="'no'">--native-host</code>. Adding a client registers it in each browser where <span [attr.translate]="'no'">FSB</span> is installed, or in <span [attr.translate]="'no'">Chrome</span> when none is found; <code [attr.translate]="'no'">--native-host</code> registers it in <span [attr.translate]="'no'">Chrome</span> unless you name another browser with <code [attr.translate]="'no'">--browser</code>, and each registration names one permitted extension origin. When <span [attr.translate]="'no'">FSB</span>'s local server starts, it only refreshes a host you have already registered and never registers one itself. The extension cannot install it. To add a client without it, pass <code [attr.translate]="'no'">--no-native-host</code>; to remove it, run <code [attr.translate]="'no'">fsb-mcp-server uninstall --native-host</code></li>
               <li i18n="@@privacy.section.localService.li.2">The exchange is a closed schema. <span [attr.translate]="'no'">FSB</span> sends a version number, an action of either <code [attr.translate]="'no'">wake</code> or <code [attr.translate]="'no'">bootstrap</code>, and a locally generated correlation identifier; it receives that identifier back with an outcome and a reason drawn from a fixed list. Any additional field is rejected outright and messages are capped at 4&nbsp;KB. No <span [attr.translate]="'no'">URL</span>, tab, page content, or <span [attr.translate]="'no'">DOM</span> data exists anywhere in this schema</li>
               <li i18n="@@privacy.section.localService.li.3">A successful start returns a pairing code. This is a loopback authentication secret generated on your device and stored with owner-only permissions, rotated every time the service starts. It carries no information about you or your browsing</li>
               <li i18n="@@privacy.section.localService.li.4">The service listens on your machine only. The extension bridge refuses to bind any address that is not loopback, and the <span [attr.translate]="'no'">MCP</span> endpoint binds <code [attr.translate]="'no'">127.0.0.1</code> by default and whenever <span [attr.translate]="'no'">FSB</span> starts it</li>
-              <li i18n="@@privacy.section.localService.li.5">Under its own directory the service keeps only operational records: a diagnostics log of delegated-run outcomes restricted to a fixed field list, and a process-supervision journal. Task text, environment values, binary paths, and error text never reach either of them, and entries carrying credential-shaped values are discarded rather than written</li>
+              <li i18n="@@privacy.section.localService.li.5">Under its own directory the service keeps only operational records: a diagnostics log of delegated-run outcomes restricted to a fixed field list, and a process-supervision journal. Task text, environment values, binary paths, and error text never reach either of them, and entries carrying credential-shaped values are discarded rather than written. Connecting <span [attr.translate]="'no'">1Password</span> adds one settings file, described under Connecting <span [attr.translate]="'no'">1Password</span></li>
               <li i18n="@@privacy.section.localService.li.6">If the host is not installed, the feature simply does not start. Nothing is transmitted, and the rest of the extension continues to work normally</li>
             </ul>
 
@@ -111,6 +112,7 @@
 
             <!-- PhantomStream / Remote Dashboard -->
             <h2 data-depth-anchor="6" i18n="@@privacy.section.phantomStream.title"><span [attr.translate]="'no'">Remote Dashboard</span> and <span [attr.translate]="'no'">PhantomStream</span> Live Preview</h2>
+            <p i18n="@@privacy.section.phantomStream.retired"><strong>Retired after <span [attr.translate]="'no'">v0.9.95</span>.</strong>&nbsp;That was the last version of <span [attr.translate]="'no'">FSB</span> with <span [attr.translate]="'no'">Remote Dashboard</span>, remote control, and live preview. Newer versions never open the relay connection, and they delete the stored hash key and server address when they update. Older installs may still connect, but the server only answers their keepalive pings and discards everything else they send without storing it. The disclosures below describe how the feature worked in <span [attr.translate]="'no'">v0.9.95</span> and earlier.</p>
             <p i18n="@@privacy.section.phantomStream.body">When you pair <span [attr.translate]="'no'">Remote Dashboard</span>, <span [attr.translate]="'no'">FSB</span> can show a live preview of the active browser tab using <span [attr.translate]="'no'">PhantomStream</span>. The preview streams structured <span [attr.translate]="'no'">DOM</span> data instead of pixels: an initial snapshot, <span [attr.translate]="'no'">MutationObserver</span> diffs, scroll position, automation overlays, dialog state, media playback state, and remote-control messages over <span [attr.translate]="'no'">WebSocket</span>.</p>
             <ul>
               <li i18n="@@privacy.section.phantomStream.li.1">The relay forwards live-preview frames only to the paired dashboard session. Nothing from the preview stream is persisted on <span [attr.translate]="'no'">FSB</span> servers. See the <a href="#relay-non-persistence">list under External Services</a> above</li>
@@ -132,31 +134,42 @@
               <li i18n="@@privacy.section.apiKeys.li.3">Keys are never logged, exported, or shared</li>
             </ul>
 
-            <!-- Auto-Passwords -->
-            <h2 data-depth-anchor="9" i18n="@@privacy.section.autoPasswords.title">Auto-Passwords</h2>
-            <p i18n="@@privacy.section.autoPasswords.body"><span [attr.translate]="'no'">FSB</span> includes an optional credential manager for saving logins on your device.</p>
+            <!-- Connecting 1Password (v0.9.99) -->
+            <h2 data-depth-anchor="9" id="onepassword" i18n="@@privacy.section.onePassword.title">Connecting <span [attr.translate]="'no'">1Password</span></h2>
+            <p i18n="@@privacy.section.onePassword.body"><span [attr.translate]="'no'">FSB</span> keeps no passwords or cards of its own. Logins and cards come from your <span [attr.translate]="'no'">1Password</span>, read by <span [attr.translate]="'no'">FSB</span>'s local server (<code [attr.translate]="'no'">fsb-mcp-server</code>) with the <span [attr.translate]="'no'">1Password</span> SDK.</p>
             <ul>
-              <li i18n="@@privacy.section.autoPasswords.li.1">Credentials are encrypted at rest using <span [attr.translate]="'no'">AES-GCM</span> with 256-bit keys and <span [attr.translate]="'no'">PBKDF2</span> key derivation</li>
-              <li i18n="@@privacy.section.autoPasswords.li.2">When the AI analyzes a page, password field values are replaced with <code [attr.translate]="'no'">[hidden]</code>. The actual password is never included in any AI prompt</li>
-              <li i18n="@@privacy.section.autoPasswords.li.3">Auto-fill is performed by the content script injecting values directly into the <span [attr.translate]="'no'">DOM</span>, with no AI involvement in the credential flow</li>
-              <li i18n="@@privacy.section.autoPasswords.li.4">The credential list view only shows usernames and domains. Passwords are decrypted individually and only when needed for auto-fill</li>
-              <li i18n="@@privacy.section.autoPasswords.li.5">Credentials are stored per-domain with parent domain fallback (e.g., <span [attr.translate]="'no'">accounts.google.com</span> inherits from <span [attr.translate]="'no'">google.com</span>)</li>
+              <li i18n="@@privacy.section.onePassword.li.1">With the <span [attr.translate]="'no'">1Password</span> desktop app, <span [attr.translate]="'no'">1Password</span> asks you to approve <span [attr.translate]="'no'">FSB</span>. A service account you set up in a terminal talks to <span [attr.translate]="'no'">1Password</span>'s servers instead. Either way, the SDK identifies itself to <span [attr.translate]="'no'">1Password</span> as <span [attr.translate]="'no'">FSB</span>, with its version and your operating system's name</li>
+              <li i18n="@@privacy.section.onePassword.li.2">The server keeps its settings in <code [attr.translate]="'no'">~/.fsb/onepassword.json</code>, readable only by you: the sign-in kind and account name, the vault limit and save vault, and, if you set one up, a service-account token, stored as written rather than encrypted. The extension stores only a signed-in flag and your account name in <code [attr.translate]="'no'">chrome.storage.local</code></li>
+              <li i18n="@@privacy.section.onePassword.li.3">Disconnect deletes <code [attr.translate]="'no'">onepassword.json</code> and forgets the session. The account name stays in the extension to prefill the field, and items already saved in <span [attr.translate]="'no'">1Password</span> stay there</li>
+              <li i18n="@@privacy.section.onePassword.li.4">Nothing about your logins or cards is sent to <span [attr.translate]="'no'">FSB</span>'s servers</li>
+              <li i18n="@@privacy.section.onePassword.li.5">Entries from the old <span [attr.translate]="'no'">FSB</span> vault stay encrypted in <code [attr.translate]="'no'">chrome.storage.local</code> until you move them or delete the old vault. They move to <span [attr.translate]="'no'">1Password</span> in batches of 10, and each batch is erased once <span [attr.translate]="'no'">1Password</span> confirms it. <span [attr.translate]="'no'">FSB</span> no longer fills from them</li>
             </ul>
 
-            <!-- Payment Methods -->
-            <h2 data-depth-anchor="10" i18n="@@privacy.section.paymentMethods.title">Payment Methods</h2>
-            <p i18n="@@privacy.section.paymentMethods.body"><span [attr.translate]="'no'">FSB</span> includes an optional payment-method vault for saving card details on your device and auto-filling them at checkout.</p>
+            <!-- Logins from 1Password -->
+            <h2 data-depth-anchor="10" i18n="@@privacy.section.autoPasswords.title">Logins from <span [attr.translate]="'no'">1Password</span></h2>
+            <p i18n="@@privacy.section.autoPasswords.body">When a task needs to sign in, <span [attr.translate]="'no'">FSB</span>'s local server reads a matching login from your <span [attr.translate]="'no'">1Password</span> and the extension fills it into the page.</p>
             <ul>
-              <li i18n="@@privacy.section.paymentMethods.li.1">Card details (number, expiry, cardholder, and zip) are encrypted at rest using <span [attr.translate]="'no'">AES-GCM</span> with the same vault-derived key used for credentials</li>
-              <li i18n="@@privacy.section.paymentMethods.li.2">When the AI analyzes a checkout page, any detected card-number field values are replaced with <code [attr.translate]="'no'">[hidden]</code> before the prompt is built. Card numbers, <span [attr.translate]="'no'">CVV</span>, and expiry are never included in any AI prompt</li>
+              <li i18n="@@privacy.section.autoPasswords.li.1">A login is filled only on a site that one of its saved websites matches, following the item's own autofill setting. A login saved for an <code [attr.translate]="'no'">https</code> site is never filled on an <code [attr.translate]="'no'">http</code> page, and the fill is refused if the tab moves to another origin first</li>
+              <li i18n="@@privacy.section.autoPasswords.li.2">When the AI analyzes a page, password field values are replaced with <code [attr.translate]="'no'">[hidden]</code>. The actual password is never included in any AI prompt</li>
+              <li i18n="@@privacy.section.autoPasswords.li.3">Auto-fill is performed by the content script injecting values directly into the <span [attr.translate]="'no'">DOM</span>, with no AI involvement in the credential flow</li>
+              <li i18n="@@privacy.section.autoPasswords.li.4">The AI and <span [attr.translate]="'no'">MCP</span> clients see a login's title, site, and username, plus the vault it is in when several logins match. Passwords and one-time codes go only from the local server, over the paired loopback connection, to the extension, and never to an <span [attr.translate]="'no'">MCP</span> client</li>
+              <li i18n="@@privacy.section.autoPasswords.li.5">When <span [attr.translate]="'no'">1Password</span> has no login for the site, <span [attr.translate]="'no'">FSB</span> can ask you to type one in an <span [attr.translate]="'no'">FSB</span> frame the page cannot read. <span [attr.translate]="'no'">FSB</span> fills it and keeps no copy. With Save to <span [attr.translate]="'no'">1Password</span> on, the default when a save vault is set, it is saved to <span [attr.translate]="'no'">1Password</span>, titled with the site and tagged <span [attr.translate]="'no'">FSB</span></li>
+            </ul>
+
+            <!-- Payment cards from 1Password -->
+            <h2 data-depth-anchor="11" i18n="@@privacy.section.paymentMethods.title">Payment Cards from <span [attr.translate]="'no'">1Password</span></h2>
+            <p i18n="@@privacy.section.paymentMethods.body"><span [attr.translate]="'no'">FSB</span> keeps no card details of its own. Cards come from your <span [attr.translate]="'no'">1Password</span> and are filled at checkout.</p>
+            <ul>
+              <li i18n="@@privacy.section.paymentMethods.li.1">Cards fill only on <code [attr.translate]="'no'">https</code> pages, and a fill stops if the tab's origin changes before the card is written</li>
+              <li i18n="@@privacy.section.paymentMethods.li.2">When the AI analyzes a checkout page, any detected card-number field values are replaced with <code [attr.translate]="'no'">[hidden]</code> before the prompt is built. Card numbers and <span [attr.translate]="'no'">CVV</span> are never included in any AI prompt</li>
               <li i18n="@@privacy.section.paymentMethods.li.3">Auto-fill happens via the content script writing directly into the page's <span [attr.translate]="'no'">DOM</span> fields, bypassing the AI entirely</li>
-              <li i18n="@@privacy.section.paymentMethods.li.4">The list view shows only a card nickname and last-4 digits. Full numbers are decrypted in memory only at the moment of fill</li>
-              <li i18n="@@privacy.section.paymentMethods.li.5">An <span [attr.translate]="'no'">MCP</span> client can request a payment fill via <code [attr.translate]="'no'">use_payment_method</code>, but the user is shown an in-extension confirmation prompt before any card data is written into the page</li>
-              <li i18n="@@privacy.section.paymentMethods.li.6"><span [attr.translate]="'no'">CVV</span> is never persisted unless you opt in per-card, and even then it is encrypted alongside the rest of the record</li>
+              <li i18n="@@privacy.section.paymentMethods.li.4">The AI and <span [attr.translate]="'no'">MCP</span> clients see a card's title, brand, last four digits, cardholder name, and expiry month and year. Cards in shared vaults appear too, so another person's name can show</li>
+              <li i18n="@@privacy.section.paymentMethods.li.5">In autopilot, the side panel asks you before a card is filled. Over <span [attr.translate]="'no'">MCP</span>, <span [attr.translate]="'no'">FSB</span> shows no prompt of its own: <code [attr.translate]="'no'">use_payment_method</code> tells the agent to ask you first and name the card and the merchant</li>
+              <li i18n="@@privacy.section.paymentMethods.li.6"><span [attr.translate]="'no'">FSB</span> never stores a <span [attr.translate]="'no'">CVV</span>. It is read from <span [attr.translate]="'no'">1Password</span> only for the fill</li>
             </ul>
 
             <!-- Speech-to-Text -->
-            <h2 data-depth-anchor="11" i18n="@@privacy.section.speechToText.title">Speech-to-Text</h2>
+            <h2 data-depth-anchor="12" i18n="@@privacy.section.speechToText.title">Speech-to-Text</h2>
             <p i18n="@@privacy.section.speechToText.body"><span [attr.translate]="'no'">FSB</span> includes an optional microphone input for the prompt box. The default provider runs entirely in your browser; an optional <span [attr.translate]="'no'">OpenAI</span> Whisper fallback can be enabled in settings if you want higher accuracy.</p>
             <ul>
               <li i18n="@@privacy.section.speechToText.li.1">Default provider: the browser's native <code [attr.translate]="'no'">SpeechRecognition</code>&nbsp;<span [attr.translate]="'no'">API</span>. Audio is processed by <span [attr.translate]="'no'">Chrome</span> and never leaves your device through <span [attr.translate]="'no'">FSB</span></li>
@@ -167,7 +180,7 @@
             </ul>
 
             <!-- Prompt Injection Prevention -->
-            <h2 data-depth-anchor="12" i18n="@@privacy.section.promptInjection.title">Prompt Injection Prevention</h2>
+            <h2 data-depth-anchor="13" i18n="@@privacy.section.promptInjection.title">Prompt Injection Prevention</h2>
             <p i18n="@@privacy.section.promptInjection.body">Web pages can contain hidden text designed to hijack AI agents. <span [attr.translate]="'no'">FSB</span> implements multi-layered defenses to ensure the AI only follows your instructions, never instructions embedded in page content.</p>
             <ul>
               <li i18n="@@privacy.section.promptInjection.li.1">All page content is wrapped in <code [attr.translate]="'no'">[PAGE_CONTENT]</code> boundary markers, and the AI is instructed to never follow instructions found within these markers</li>
@@ -179,19 +192,19 @@
             </ul>
 
             <!-- Background Agents & Server Sync -->
-            <h2 data-depth-anchor="13" i18n="@@privacy.section.bgAgents.title">Background Agents and Server Sync</h2>
-            <p i18n="@@privacy.section.bgAgents.deprecated"><strong>Deprecated in <span [attr.translate]="'no'">v0.9.45rc1</span>.</strong>&nbsp;<span [attr.translate]="'no'">FSB</span>'s built-in Background Agents have been superseded by <span [attr.translate]="'no'">OpenClaw</span> and Claude Routines, with remote control now handled by the Sync tab. The disclosures below are retained for users still running <span [attr.translate]="'no'">v0.9.44</span> or earlier; on current builds the relay server is only contacted when you pair a Sync session.</p>
-            <p i18n="@@privacy.section.bgAgents.body">If you opt into legacy Background Agents server sync or pair <span [attr.translate]="'no'">Remote Dashboard</span>, a relay server facilitates communication between your extension and the dashboard.</p>
+            <h2 data-depth-anchor="14" i18n="@@privacy.section.bgAgents.title">Background Agents and Server Sync</h2>
+            <p i18n="@@privacy.section.bgAgents.deprecated"><strong>Deprecated in <span [attr.translate]="'no'">v0.9.45rc1</span>.</strong>&nbsp;<span [attr.translate]="'no'">FSB</span>'s built-in Background Agents have been superseded by <span [attr.translate]="'no'">OpenClaw</span> and Claude Routines; remote control moved to the Sync tab, which was removed after <span [attr.translate]="'no'">v0.9.95</span>. The disclosures below are retained for users still running <span [attr.translate]="'no'">v0.9.44</span> or earlier. From <span [attr.translate]="'no'">v0.9.31</span> through <span [attr.translate]="'no'">v0.9.95</span>, the extension registered a hash key with the relay server once and connected to it at every browser start, whether or not you paired a Sync session; later builds never contact it.</p>
+            <p i18n="@@privacy.section.bgAgents.body">If you opted into legacy Background Agents server sync or paired <span [attr.translate]="'no'">Remote Dashboard</span> on <span [attr.translate]="'no'">v0.9.95</span> or earlier, a relay server facilitated communication between your extension and the dashboard.</p>
             <ul>
               <li i18n="@@privacy.section.bgAgents.li.1">The server stores: agent definitions (name, schedule, target URL), run metrics (token count, cost, duration, success/fail status), and session pairing tokens</li>
               <li i18n="@@privacy.section.bgAgents.li.2">Beyond that run metadata, the server persists nothing derived from the pages you visit. See the <a href="#relay-non-persistence">list under External Services</a> above</li>
               <li i18n="@@privacy.section.bgAgents.li.3">Authentication uses hash keys (generated locally) and session tokens that expire after 24 hours</li>
               <li i18n="@@privacy.section.bgAgents.li.4">One-time pairing tokens expire after 60 seconds and cannot be reused</li>
-              <li i18n="@@privacy.section.bgAgents.li.5">Server sync is disabled by default. You must explicitly enable it in Options</li>
+              <li i18n="@@privacy.section.bgAgents.li.5">Server sync was disabled by default and had to be explicitly enabled in Options; that setting did not govern the relay connection described above. Versions after <span [attr.translate]="'no'">v0.9.95</span> do not offer it</li>
             </ul>
 
             <!-- Memory System -->
-            <h2 data-depth-anchor="14" i18n="@@privacy.section.memory.title">Memory System</h2>
+            <h2 data-depth-anchor="15" i18n="@@privacy.section.memory.title">Memory System</h2>
             <p i18n="@@privacy.section.memory.body"><span [attr.translate]="'no'">FSB</span>'s memory system stores navigation patterns and site intelligence to improve automation over time.</p>
             <ul>
               <li i18n="@@privacy.section.memory.li.1">All memory data (semantic, episodic, procedural) is stored locally in <code [attr.translate]="'no'">chrome.storage.local</code></li>
@@ -201,7 +214,7 @@
             </ul>
 
             <!-- Session replay + screenshots (v0.9.91) -->
-            <h2 data-depth-anchor="15" i18n="@@privacy.section.sessionReplay.title">Session Replay and Screenshots</h2>
+            <h2 data-depth-anchor="16" i18n="@@privacy.section.sessionReplay.title">Session Replay and Screenshots</h2>
             <p i18n="@@privacy.section.sessionReplay.body">When an <span [attr.translate]="'no'">MCP</span> client drives <span [attr.translate]="'no'">FSB</span>, the extension records what the agent did so you can review or replay the run afterwards. These records stay on your device.</p>
             <ul>
               <li i18n="@@privacy.section.sessionReplay.li.1">Runs still in progress are held in <span [attr.translate]="'no'">Chrome</span>'s session storage so they survive the service worker being evicted; finished runs are written to <code [attr.translate]="'no'">chrome.storage.local</code> through the same history store your own automation runs use</li>
@@ -212,7 +225,7 @@
             </ul>
 
             <!-- Anonymous Usage Telemetry (v0.9.69 / Phase 275) -->
-            <h2 data-depth-anchor="16" id="telemetry-disclosure" i18n="@@PRIVACY_TELEMETRY_HEADING">Anonymous Usage Telemetry</h2>
+            <h2 data-depth-anchor="17" id="telemetry-disclosure" i18n="@@PRIVACY_TELEMETRY_HEADING">Anonymous Usage Telemetry</h2>
             <p i18n="@@PRIVACY_TELEMETRY_INTRO"><span [attr.translate]="'no'">FSB</span> v0.9.69 introduced opt-out anonymous usage telemetry to publish aggregate adoption numbers at <a routerLink="/stats">/stats</a> without accessing the pages you browse. The only location signal is a coarse label derived from your request <span [attr.translate]="'no'">IP</span> at ingest and published only in aggregate. See <a href="#telemetry-region">Region (city-level) metric</a> below. Telemetry is on by default but can be disabled with one toggle, and per-install data can be erased on request.</p>
 
             <h3 i18n="@@PRIVACY_TELEMETRY_COLLECT_HEADING">What we collect</h3>
@@ -261,7 +274,7 @@
             <p i18n="@@PRIVACY_TELEMETRY_AGGREGATED_TEXT">We publish aggregated metrics derived from this telemetry pipeline at <a routerLink="/stats">/stats</a>. Only counts and totals are shown; no per-install row is ever exposed.</p>
 
             <!-- Consent and Audit Controls -->
-            <h2 data-depth-anchor="17" id="legal-posture" i18n="@@PRIVACY_LEGAL_POSTURE_HEADING">Consent and Audit Controls</h2>
+            <h2 data-depth-anchor="18" id="legal-posture" i18n="@@PRIVACY_LEGAL_POSTURE_HEADING">Consent and Audit Controls</h2>
             <p i18n="@@PRIVACY_LEGAL_POSTURE_BODY"><span [attr.translate]="'no'">FSB</span>'s automation posture is opt-out: non-denylisted origins inherit a user-configurable global default that currently ships as Auto, while explicit per-origin policies can set an origin to Off, Ask, or Auto. Audit-log retention is local and bounded, with export and clear controls available from the Control Panel.</p>
             <ul>
               <li i18n="@@PRIVACY_LEGAL_POSTURE_CONSENT">The service denylist is still a hard block. Denied origins are non-enableable regardless of the global default or any stored per-origin policy.</li>
@@ -270,19 +283,19 @@
             </ul>
 
             <!-- Open Source -->
-            <h2 data-depth-anchor="18" i18n="@@privacy.section.openSource.title">Open Source</h2>
+            <h2 data-depth-anchor="19" i18n="@@privacy.section.openSource.title">Open Source</h2>
             <p i18n="@@privacy.section.openSource.body"><span [attr.translate]="'no'">FSB</span> is fully open source under the <span [attr.translate]="'no'">MIT</span> License. You can audit every line of code to verify these privacy claims. The source code is available on <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub</a>.</p>
 
             <!-- Changes -->
-            <h2 data-depth-anchor="19" i18n="@@privacy.section.changes.title">Changes to This Policy</h2>
+            <h2 data-depth-anchor="20" i18n="@@privacy.section.changes.title">Changes to This Policy</h2>
             <p i18n="@@privacy.section.changes.body">If this policy is updated, the changes will be reflected by the "Last updated" date at the top of this page. Significant changes will also be noted in the project's <span [attr.translate]="'no'">GitHub</span> release notes.</p>
 
             <!-- Contact -->
-            <h2 data-depth-anchor="20" i18n="@@privacy.contact.title">Contact</h2>
+            <h2 data-depth-anchor="21" i18n="@@privacy.contact.title">Contact</h2>
             <p i18n="@@privacy.contact.body">If you have questions about this privacy policy or <span [attr.translate]="'no'">FSB</span>'s data handling, please open an issue on <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub Issues</a>.</p>
 
             <!-- Policy History -->
-            <h2 data-depth-anchor="21" i18n="@@privacy.history.title">Policy History</h2>
+            <h2 data-depth-anchor="22" i18n="@@privacy.history.title">Policy History</h2>
             <p i18n="@@privacy.history.intro" class="policy-version-intro">Each entry below is a complete snapshot of the privacy policy as it stood on the date shown. Older versions are kept so you can audit what we promised at any point in time.</p>
 
             <app-privacy-history-archive />

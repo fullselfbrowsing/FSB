@@ -27,15 +27,8 @@
 }
 
 [data-theme="dark"] {
-  --bg-primary: #050505;
-  --bg-secondary: #050505;
-  --bg-tertiary: #121212;
-  --text-primary: var(--fsb-text-primary);
-  --text-secondary: var(--fsb-text-secondary);
-  --text-muted: var(--fsb-text-muted);
-  --border-color: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.14);
-  --shadow-sm: var(--fsb-shadow-sm);
+  /* Surfaces and hairlines come from the core's dark block (design-system/decisions/0017);
+     only the message tones are this page's own. */
   --system-bg: #1a1a1a;
   --system-border: rgba(255, 241, 232, 0.08);
   --ai-bg: rgba(8, 145, 178, 0.14);
@@ -71,7 +64,7 @@ body {
 [data-theme="dark"] .chat-messages-area,
 [data-theme="dark"] .chat-input-area,
 [data-theme="dark"] .author-footer {
-  background: #050505 !important;
+  background: var(--fsb-surface-base) !important;
 }
 
 /* Main Chat Container */
@@ -134,25 +127,25 @@ body {
 }
 
 .status-dot {
-  color: #10b981;
+  color: var(--fsb-success);
   font-size: 10px;
   text-shadow: 0 0 4px rgba(16, 185, 129, 0.3);
 }
 
 .status-dot.running {
-  color: #f59e0b;
+  color: var(--fsb-warning);
   text-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
   animation: pulse 2s infinite;
 }
 
 .status-dot.owned {
-  color: #f59e0b;
+  color: var(--fsb-warning);
   text-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
   animation: none;
 }
 
 .status-dot.error {
-  color: #ef4444;
+  color: var(--fsb-danger);
   text-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
 }
 
@@ -270,8 +263,8 @@ body {
 /* User Messages (Right-aligned) */
 .message.user {
   align-self: flex-end;
-  background: linear-gradient(135deg, var(--primary-color), #ff8c42);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color), var(--fsb-primary-tint));
+  color: var(--fsb-on-primary);
   border-bottom-right-radius: 6px;
   border-color: transparent;
   box-shadow: var(--fsb-shadow-accent);
@@ -309,7 +302,7 @@ body {
   align-self: stretch;
   background: var(--action-bg);
   color: var(--action-text);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--fsb-font-mono);
   font-size: 12px;
   border-radius: 12px;
   border-left: 3px solid var(--action-border);
@@ -392,7 +385,7 @@ body {
 
 /* Dark theme overrides for message bubbles */
 [data-theme="dark"] .message.user {
-  background: #e55a2b;
+  background: var(--fsb-primary-hover);
   box-shadow: 0 2px 8px rgba(255, 107, 53, 0.15);
 }
 
@@ -503,13 +496,13 @@ body {
 }
 
 .send-btn {
-  background: linear-gradient(135deg, var(--primary-color), #ff8c42);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color), var(--fsb-primary-tint));
+  color: var(--fsb-on-primary);
 }
 
 .send-btn:hover:not(:disabled) {
   transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 4px 12px var(--fsb-primary-glow-strong);
 }
 
 .send-btn:hover:not(:disabled) i {
@@ -554,30 +547,36 @@ body {
 
 .mic-btn:hover {
   color: var(--primary-color);
-  background: rgba(255, 107, 53, 0.12);
+  background: var(--fsb-primary-soft);
   transform: translateY(-1px) scale(1.03);
 }
 
 /* Recording state: solid red — clearly distinct from automation stop (light red) */
 .mic-btn.recording {
-  background: #dc2626;
+  background: var(--fsb-danger);
   color: white;
   animation: mic-pulse 1.5s infinite;
 }
 
 [data-theme="dark"] .mic-btn.recording {
-  background: #dc2626;
-  color: white;
+  background: var(--fsb-danger);
+  /* Dark ink keeps the icon readable on the softer dark red (design-system/decisions/0015). */
+  color: var(--fsb-text-inverse);
 }
 
 .mic-btn.transcribing {
   color: var(--primary-color);
-  background: rgba(255, 107, 53, 0.12);
+  background: var(--fsb-primary-soft);
 }
 
 .mic-btn.error {
-  color: #dc2626;
+  color: var(--fsb-danger);
   background: #fee2e2;
+}
+
+/* The light pink tint does not carry the softer dark red; dark mode uses the 14% wash (design-system/decisions/0015). */
+[data-theme="dark"] .mic-btn.error {
+  background: color-mix(in srgb, var(--fsb-danger) 14%, transparent);
 }
 
 @keyframes mic-pulse {
@@ -632,7 +631,7 @@ body {
 .send-btn:focus,
 .stop-btn:focus,
 .mic-btn:focus {
-  outline: 2px solid #ff6b35;
+  outline: 2px solid var(--fsb-primary);
   outline-offset: 2px;
 }
 
@@ -686,19 +685,19 @@ body {
 
 /* Partial result indicator */
 .message.partial-result {
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid var(--fsb-warning);
   background: #fffbeb;
 }
 
 [data-theme="dark"] .message.partial-result {
-  background: rgba(245, 158, 11, 0.1);
-  border-left-color: #d97706;
+  background: color-mix(in srgb, var(--fsb-warning) 10%, transparent);
+  border-left-color: var(--fsb-warning);
 }
 
 .partial-result-label {
   font-size: 11px;
   font-weight: 600;
-  color: #d97706;
+  color: var(--fsb-warning);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -719,7 +718,7 @@ body {
 .message.auto-collapsed { max-height: 24px; overflow: hidden; opacity: 0.5; transition: all 0.5s; cursor: pointer; }
 .message.auto-collapsed:hover { max-height: 200px; opacity: 1; }
 .message.collapsing { opacity: 0; max-height: 0; padding: 0; margin: 0; transition: all 0.3s; overflow: hidden; }
-.retry-btn { background: #ff6b35; color: white; border: none; border-radius: 16px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.retry-btn { background: var(--fsb-primary); color: var(--fsb-on-primary); border: none; border-radius: 16px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
 .retry-btn:hover { filter: brightness(1.1); }
 
 /* Action summary collapse group */
@@ -767,7 +766,7 @@ body {
 body[data-ui-state="running"] .status-indicator {
   border-color: color-mix(in srgb, var(--fsb-primary) 42%, var(--border-color) 58%);
   background: color-mix(in srgb, var(--fsb-primary-soft) 42%, var(--bg-secondary) 58%);
-  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.08), 0 10px 18px -16px rgba(255, 107, 53, 0.65);
+  box-shadow: 0 0 0 1px var(--fsb-primary-faint), 0 10px 18px -16px rgba(255, 107, 53, 0.65);
 }
 
 body[data-ui-state="running"] .status-text {
@@ -776,7 +775,7 @@ body[data-ui-state="running"] .status-text {
 
 body[data-ui-state="running"] .input-wrapper {
   border-color: color-mix(in srgb, var(--fsb-primary) 36%, var(--border-color) 64%);
-  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.08), 0 14px 28px -22px rgba(255, 107, 53, 0.55);
+  box-shadow: 0 0 0 1px var(--fsb-primary-faint), 0 14px 28px -22px rgba(255, 107, 53, 0.55);
 }
 
 body[data-ui-state="error"] .status-indicator {

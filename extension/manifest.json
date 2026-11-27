@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "default_locale": "en",
   "name": "__MSG_ext_name__",
-  "version": "0.9.95",
+  "version": "0.9.99",
   "minimum_chrome_version": "116",
   "description": "__MSG_ext_description__",
   "homepage_url": "https://full-selfbrowsing.com",
@@ -53,7 +53,10 @@
         "test-data/**/*",
         "utils/redactForLog.js",
         "utils/diagnostics-ring-buffer.js",
-        "offscreen/lattice-host.html"
+        "offscreen/lattice-host.html",
+        "ui/credential-sheet.html",
+        "assets/onboarding/fonts/poppins-100.ttf",
+        "assets/onboarding/fonts/poppins-900.ttf"
       ],
       "matches": [
         "<all_urls>"

@@ -350,7 +350,12 @@ function getPlatformConfigPath(platform) {
         return null;
     return resolved;
 }
-function getPlatformTargetCandidates(platformKey, platform) {
+/**
+ * Every config file a platform may read on this OS, in preference order.
+ * Install writes to the first detected one; uninstall's last-client check
+ * reads all of them.
+ */
+export function getPlatformTargetCandidates(platformKey, platform) {
     const configPath = getPlatformConfigPath(platform);
     if (!configPath)
         return [];

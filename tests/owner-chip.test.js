@@ -234,8 +234,10 @@ ok(/chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeIn
     && /async function syncActiveTabSurface[\s\S]*?_activeTabIdSnapshot\s*=\s*incomingTabId[\s\S]*?_hydrateDelegationForSelectedConversation\(\)/.test(sidepanelJsSrc),
   'Test 9i: tab activation uses the exact event tab and the unified sync refreshes delegation eligibility');
 
-ok(/\.status-dot\.owned\s*\{[^}]*color:\s*#f59e0b[^}]*animation:\s*none/s.test(popupCssSrc),
-  'Test 10a: popup ownership dot is orange and non-pulsing');
+// The dot reads the product warning token since the one-amber decision
+// (design-system/decisions/0014), so it follows that token in both themes.
+ok(/\.status-dot\.owned\s*\{[^}]*color:\s*var\(--fsb-warning\)[^}]*animation:\s*none/s.test(popupCssSrc),
+  'Test 10a: popup ownership dot is amber and non-pulsing');
 ok(!/\.status-dot\.owned\s*\{/.test(sidepanelCssSrc),
   'Test 10b: sidepanel has no decorative ownership tone');
 ok(/_setHeaderOwner\(label\)/.test(popupJsSrc)

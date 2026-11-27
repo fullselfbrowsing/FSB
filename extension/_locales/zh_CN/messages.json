@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API 配置"
   },
-  "panel_8d261a372f": {
-    "message": "同步"
-  },
   "panel_703390318b": {
     "message": "测试版"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "放弃"
-  },
-  "panel_49e49bb440": {
-    "message": "生成"
   },
   "panel_0e91610117": {
     "message": "刷新"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "阅读完整政策 →"
   },
-  "panel_04dfac3671": {
-    "message": "未连接"
-  },
-  "panel_acf2db1614": {
-    "message": "服务器同步"
-  },
-  "panel_609bbbdf07": {
-    "message": "哈希密钥"
-  },
-  "panel_534803768c": {
-    "message": "配对仪表盘"
-  },
-  "panel_9a177de63c": {
-    "message": "扫码配对"
-  },
-  "panel_43e3ece73f": {
-    "message": "剩余"
-  },
   "panel_c9b3c38247": {
     "message": "合计"
   },
@@ -984,36 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "关闭语音输入后，FSB 不再使用麦克风，但不会撤销 Chrome 已保存的权限。"
-  },
-  "panel_76e917ee87": {
-    "message": "将此扩展程序与 FSB 仪表盘配对，以便远程控制和保存结果"
-  },
-  "panel_c11de3bb2e": {
-    "message": "连接 FSB 服务器以保存结果并访问仪表盘"
-  },
-  "panel_097b5fa7f6": {
-    "message": "生成密钥，然后配对仪表盘，将此浏览器连到 FSB 服务器。"
-  },
-  "panel_75d0625c55": {
-    "message": "后台代理已经离开"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB 专注于一次到位的精确浏览器执行。定时和重复任务更适合专为此设计的工具："
-  },
-  "panel_5a694f4532": {
-    "message": "用于开源代理循环，以及"
-  },
-  "panel_6e34781c2f": {
-    "message": "用于托管的长时间自动化。选择适合你工作方式的那个。"
-  },
-  "panel_e76c360683": {
-    "message": "试用 OpenClaw"
-  },
-  "panel_1a58d9154d": {
-    "message": "试用 Claude Routines"
-  },
-  "panel_582ba53e9e": {
-    "message": "已在 v0.9.45rc1 停用 · 2026 年 4 月"
   },
   "panel_9f83a0b7bf": {
     "message": "从过往自动化会话中学到的长期记忆"
@@ -1555,8 +1501,8 @@
   "panel_d2286811e6": {
     "message": "连接 Claude Code 和 Cursor 等 MCP 客户端，然后用 doctor 命令验证"
   },
-  "panel_f3cb441c27": {
-    "message": "阅读 FSB 如何处理数据、存储和可选的服务器同步"
+  "panel_71b36c0b35": {
+    "message": "阅读 FSB 如何处理数据和存储"
   },
   "panel_476481e410": {
     "message": "报告缺陷、请求功能并跟踪开发进度"
@@ -1636,20 +1582,8 @@
   "panel_22965568d2": {
     "message": "已连接"
   },
-  "panel_ee172faa9c": {
-    "message": "无效密钥"
-  },
   "panel_031a8f0f65": {
     "message": "失败"
-  },
-  "panel_424a2551d3": {
-    "message": "已过期"
-  },
-  "panel_c7730178f4": {
-    "message": "生成新代码"
-  },
-  "panel_ac116124f7": {
-    "message": "无法生成配对码。请重试。"
   },
   "panel_d03fd96d28": {
     "message": "选择已加载的模型..."
@@ -1720,7 +1654,7 @@
     "message": "69 个 MCP 工具"
   },
   "entry_feat_tools_sub": {
-    "message": "来自你的编程代理"
+    "message": "来自你的代理"
   },
   "entry_get_started": {
     "message": "开始使用"
@@ -1744,7 +1678,7 @@
     "message": "推荐"
   },
   "entry_agent_desc": {
-    "message": "在 Claude Code、Cursor、VS Code、OpenClaw 等中把 FSB 用作 MCP 服务器。69 个工具，无需 API 密钥，浏览器里不用配置。"
+    "message": "通过 MCP 为 Grok Bot、Muse、Dots、OpenClaw、Hermes 或你的编程代理提供真正的浏览器。无需 API 密钥，浏览器里不用配置。"
   },
   "entry_in_browser": {
     "message": "在此浏览器中"
@@ -1800,11 +1734,17 @@
   "entry_mcp_3": {
     "message": "让你的代理去浏览。它会为你驱动 FSB 的 DOM 引擎。"
   },
-  "entry_claw_name": {
-    "message": "为你的 Claw 进行设置"
+  "entry_agents_card_name": {
+    "message": "在运行常驻代理？"
   },
-  "entry_claw_desc": {
-    "message": "在控制面板中引导安装 OpenClaw"
+  "entry_agents_card_desc": {
+    "message": "Grok Bot、Muse、Dots、OpenClaw 和 Hermes 也能通过 MCP 驱动 FSB。具体方法见代理页面。"
+  },
+  "entry_clawhub_lead": {
+    "message": "在用 OpenClaw 或 Hermes？最快的方式是"
+  },
+  "entry_clawhub_link": {
+    "message": "ClawHub 上的 FSB Skill"
   },
   "entry_prefer_key": {
     "message": "更想用自己的密钥？"
@@ -2192,6 +2132,87 @@
   },
   "entry_toast_copied": {
     "message": "已复制安装命令"
+  },
+  "entry_toast_panel": {
+    "message": "正在打开控制面板"
+  },
+  "entry_explore": {
+    "message": "探索 FSB"
+  },
+  "entry_panel_opened": {
+    "message": "控制面板已打开"
+  },
+  "entry_more_panel": {
+    "message": "关于 FSB 总有更多可发现的内容。一切都在控制面板里。"
+  },
+  "entry_connect_heading": {
+    "message": "连接 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_aria": {
+    "message": "$NAME$ API 密钥",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_lm_url_aria": {
+    "message": "LM Studio 服务器 URL"
+  },
+  "entry_cue_begin": {
+    "message": "开始"
+  },
+  "entry_nudge_path": {
+    "message": "选择一条路径以继续"
+  },
+  "entry_nudge_key": {
+    "message": "添加密钥，或跳到 MCP"
+  },
+  "entry_nudge_local": {
+    "message": "启动 LM Studio，或跳到 MCP"
+  },
+  "entry_stage_aria": {
+    "message": "FSB 初始设置。滑动或使用方向键在步骤之间切换。"
+  },
+  "entry_rail_aria": {
+    "message": "初始设置步骤"
+  },
+  "entry_rail_back": {
+    "message": "返回 $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "前往 $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_current": {
+    "message": "$STEP$，当前步骤",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_ahead": {
+    "message": "$STEP$，尚未到达",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
   },
   "entry_onboarding_tag": {
     "message": "初始设置"
@@ -3080,66 +3101,6 @@
   "copy_84e9814ece": {
     "message": "无法清除研究结果"
   },
-  "copy_491c2ddc8e": {
-    "message": "请先输入服务器 URL"
-  },
-  "copy_9526d57756": {
-    "message": "已生成并保存哈希密钥"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "无法生成哈希密钥"
-  },
-  "copy_52b3b70484": {
-    "message": "无法连接服务器：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "没有可复制的哈希密钥"
-  },
-  "copy_f0b64c63d8": {
-    "message": "已复制哈希密钥"
-  },
-  "copy_0cf23c4489": {
-    "message": "复制失败"
-  },
-  "copy_8cab3b4552": {
-    "message": "请输入服务器 URL 和哈希密钥"
-  },
-  "copy_271b7b0f3b": {
-    "message": "服务器连接成功"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "哈希密钥无效"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "无法连接服务器"
-  },
-  "copy_0ea446a05f": {
-    "message": "服务器未返回哈希密钥"
-  },
-  "copy_e5697f10b5": {
-    "message": "配对响应格式错误"
-  },
-  "copy_30fa7c27e5": {
-    "message": "无法生成配对码：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "无法注册哈希密钥：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "删除此记忆？"
   },
@@ -3188,9 +3149,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "远程控制已启用"
   },
   "copy_23a711ebd2": {
     "message": "没有模型匹配搜索"
@@ -3314,12 +3272,6 @@
   },
   "copy_f38984cf15": {
     "message": "正在发送匿名使用数据。点击以停止。"
-  },
-  "copy_81649d0543": {
-    "message": "你的服务器哈希密钥"
-  },
-  "copy_e4cdf160f5": {
-    "message": "复制哈希密钥"
   },
   "copy_8c16fe2070": {
     "message": "启用后，新记忆会由 AI 自动分析以获得更深入的见解"
@@ -4666,5 +4618,803 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB 使用你 1Password 中的登录信息登录。FSB 本身不存储任何密码。"
+  },
+  "panel_8b70975df7": {
+    "message": "启用后，FSB 会识别登录页面，并使用匹配的 1Password 登录信息登录。"
+  },
+  "panel_818962bda5": {
+    "message": "正在检查 1Password 连接..."
+  },
+  "panel_5c0a336c67": {
+    "message": "选择 FSB 可以读取的保险库。仅供 FSB 使用的保险库最安全。"
+  },
+  "panel_161c79f605": {
+    "message": "新登录信息保存到"
+  },
+  "panel_cc6d7a8340": {
+    "message": "不保存"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "保存保险库访问权限"
+  },
+  "panel_5ab21b8830": {
+    "message": "将旧的 FSB 保险库迁移到 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "输入旧 FSB 保险库的 PIN。已迁移到 1Password 的项目会从 FSB 中清除。"
+  },
+  "panel_3f6118f701": {
+    "message": "迁移到 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "删除旧保险库"
+  },
+  "panel_00f3328a04": {
+    "message": "FSB 可用的保险库中没有登录信息。请在 1Password 中添加或编辑登录信息。"
+  },
+  "panel_c6e98715b7": {
+    "message": "每次填写前经你批准后，FSB 会用你 1Password 中的信用卡填写结账表单。"
+  },
+  "panel_4875f94fbf": {
+    "message": "请在“密码”中连接 1Password 以使用你的卡片。"
+  },
+  "panel_b9675cca57": {
+    "message": "FSB 可用的保险库中没有信用卡。请在 1Password 中添加或编辑卡片。"
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password 已通过桌面应用连接（$ACCOUNT$）。",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password 已通过服务账户连接。"
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password 未连接。"
+  },
+  "panel_5848961ce6": {
+    "message": "请选择 FSB 可以使用的保险库以完成设置。"
+  },
+  "panel_216dcfd214": {
+    "message": "请输入你的 1Password 账户名称"
+  },
+  "panel_a94d6f85db": {
+    "message": "正在连接... 如有提示，请在 1Password 应用中批准 FSB。"
+  },
+  "panel_616c3a2010": {
+    "message": "1Password 已连接"
+  },
+  "panel_e520e3cf11": {
+    "message": "请至少选择一个保险库"
+  },
+  "panel_cc541e4c1e": {
+    "message": "保险库访问权限已保存"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password 已断开连接"
+  },
+  "panel_e95f94cbda": {
+    "message": "旧的 FSB 保险库中仍有 FSB 不再使用的项目。登录信息：$LOGINS$。卡片：$CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "已迁移到 1Password。登录信息：$LOGINS$。卡片：$CARDS$。",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "未迁移并保留在 FSB 中：$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "要删除旧的 FSB 保险库吗？所有未迁移到 1Password 的内容都将丢失。"
+  },
+  "panel_ed17465290": {
+    "message": "旧保险库已删除"
+  },
+  "panel_3d763a56b2": {
+    "message": "项目：$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "正在迁移..."
+  },
+  "panel_498fd066bf": {
+    "message": "无法连接 1Password：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "输入凭据以登录。FSB 可以将其保存到 1Password 以便下次使用。"
+  },
+  "copy_751ac3de88": {
+    "message": "输入凭据以登录。FSB 只使用一次，不会存储。"
+  },
+  "copy_264681c742": {
+    "message": "保存到 1Password"
+  },
+  "entry_vault_checking": {
+    "message": "正在检查 1Password"
+  },
+  "entry_vault_signing_1p": {
+    "message": "正在使用 1Password 登录"
+  },
+  "entry_vault_filled_1p": {
+    "message": "已从 1Password 填写"
+  },
+  "entry_vault_signing_typed": {
+    "message": "正在登录"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "由你输入 · 不会发送给 $CLIENT$",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "由你输入 · 不会发送给你的代理"
+  },
+  "entry_vault_filled_saved": {
+    "message": "已填写 · 已保存到 1Password"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "已填写 · 未保存"
+  },
+  "entry_vault_cancelled": {
+    "message": "已取消 · 未填写任何内容"
+  },
+  "entry_vault_page_changed": {
+    "message": "页面已变化 · 未填写任何内容"
+  },
+  "entry_vault_several": {
+    "message": "$COUNT$ 个登录信息匹配 · $CLIENT$ 会询问你",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "$COUNT$ 个登录信息匹配 · 你的代理会询问你",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "用户名"
+  },
+  "entry_vault_chip_password": {
+    "message": "密码"
+  },
+  "entry_vault_chip_code": {
+    "message": "验证码"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "登录"
+  },
+  "entry_vault_sheet_user": {
+    "message": "邮箱或用户名"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "隐藏密码"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "不保存 · 未设置新登录信息的保险库"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "已暂停"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· 点击继续输入"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "被页面部分遮挡"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "改用 1Password"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "在 1Password 中添加"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "请在 1Password 中保存此网站的登录信息，然后继续。"
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "改为在此输入"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "此网站仍未保存任何内容。"
+  },
+  "entry_vault_approve": {
+    "message": "在 1Password 中批准 FSB"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "正在等你"
+  },
+  "entry_vault_entering_code": {
+    "message": "正在输入验证码"
+  },
+  "entry_vault_one_time_code": {
+    "message": "一次性验证码"
+  },
+  "entry_vault_not_https": {
+    "message": "未填写 · 页面不是 https"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "未填写 · 银行卡需要 https"
+  },
+  "entry_vault_locked": {
+    "message": "1Password 已锁定"
+  },
+  "entry_vault_unlock": {
+    "message": "解锁后继续"
+  },
+  "entry_vault_unreachable": {
+    "message": "无法连接 1Password"
+  },
+  "entry_vault_filling_card": {
+    "message": "正在填写银行卡"
+  },
+  "entry_vault_card_filled": {
+    "message": "已填写银行卡 · 请核对后付款"
+  },
+  "entry_vault_chip_number": {
+    "message": "卡号"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "有效期"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "安全码"
+  },
+  "entry_vault_chip_name": {
+    "message": "持卡人"
+  },
+  "copy_e86c3bc142": {
+    "message": "哪个账号？"
+  },
+  "copy_02451a3272": {
+    "message": "以 $NAME$ 登录",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "改为手动输入"
+  },
+  "copy_bfd402b2f6": {
+    "message": "登录"
+  },
+  "copy_2a347f1933": {
+    "message": "邮箱或用户名"
+  },
+  "copy_50eb1b1291": {
+    "message": "已使用 1Password 登录"
+  },
+  "copy_edfed2d184": {
+    "message": "已登录 $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "已保存到 1Password"
+  },
+  "copy_22b3467c1b": {
+    "message": "未保存"
+  },
+  "copy_8a56b97150": {
+    "message": "已跳过登录"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB 会在不登录的情况下继续。"
+  },
+  "copy_735479c991": {
+    "message": "已在 $DOMAIN$ 填写银行卡",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$。请核对后付款。",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "你拒绝了填写银行卡"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "未从 1Password 读取任何内容。"
+  },
+  "copy_db8bc38f4b": {
+    "message": "填写银行卡已超时"
+  },
+  "copy_58723d2bab": {
+    "message": "填写你的银行卡？"
+  },
+  "copy_a2d285b352": {
+    "message": "拒绝"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "填写银行卡"
+  },
+  "copy_2a48c44dfa": {
+    "message": "未在 $DOMAIN$ 填写",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "页面不是 https。"
+  },
+  "copy_5decaf89b7": {
+    "message": "页面已变化，未填写任何内容"
+  },
+  "copy_b41f042ed0": {
+    "message": "标签页已转到其他网站。"
+  },
+  "copy_99955bb437": {
+    "message": "1Password 未连接"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB 暂时无法登录或填写银行卡。"
+  },
+  "copy_5cbafe67aa": {
+    "message": "打开保险库设置"
+  },
+  "copy_270e420dd3": {
+    "message": "此页面"
+  },
+  "panel_5d55c415e3": {
+    "message": "保险库"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB 使用你 1Password 中的项目登录并填写结账信息。FSB 本身不存储任何密码或银行卡。"
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB 使用你 1Password 中的银行卡填写结账表单。"
+  },
+  "panel_caf0111717": {
+    "message": "本地服务器"
+  },
+  "panel_101f4d9537": {
+    "message": "此浏览器"
+  },
+  "panel_87bdac40eb": {
+    "message": "FSB 扩展程序"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "访问权限"
+  },
+  "panel_22894e363f": {
+    "message": "FSB 可以读取的保险库"
+  },
+  "panel_5e05243ee1": {
+    "message": "仅供 FSB 使用的保险库最安全。"
+  },
+  "panel_07ce99bab0": {
+    "message": "登录规则"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "取自每个 1Password 项目"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "仅限登录信息中保存的网站。"
+  },
+  "panel_374082363f": {
+    "message": "绝不从 https 用到 http。"
+  },
+  "panel_059151ea45": {
+    "message": "填写银行卡"
+  },
+  "panel_42e70101ec": {
+    "message": "你的代理会先询问你"
+  },
+  "panel_949603eecc": {
+    "message": "通过 MCP 时在代理自己的应用中询问，自动驾驶时在侧边栏中询问。"
+  },
+  "panel_33e5a068d8": {
+    "message": "仅限 https 页面。"
+  },
+  "panel_e8cb2edbc4": {
+    "message": "代理能看到什么"
+  },
+  "panel_107fa062ba": {
+    "message": "通过 MCP 和自动驾驶"
+  },
+  "panel_c53616b513": {
+    "message": "标题、用户名、网站、后四位数字。"
+  },
+  "panel_ed87d52230": {
+    "message": "绝不会看到密码、验证码或卡号。"
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "项目"
+  },
+  "panel_f5b53d4968": {
+    "message": "连接之后"
+  },
+  "panel_543eb6e59b": {
+    "message": "登录信息"
+  },
+  "panel_a52fcbbc33": {
+    "message": "银行卡"
+  },
+  "panel_3304ef1777": {
+    "message": "搜索标题、用户名和网站"
+  },
+  "panel_5a80aae52c": {
+    "message": "只读。请在 1Password 中编辑登录信息。"
+  },
+  "panel_547ca35987": {
+    "message": "仅在填写时为标签页中的网站从 1Password 读取。"
+  },
+  "panel_2fdf0b746a": {
+    "message": "至少选择一个保险库后，登录信息和银行卡会显示在这里。"
+  },
+  "panel_10c5739b95": {
+    "message": "等待批准"
+  },
+  "panel_a424e33d90": {
+    "message": "已锁定"
+  },
+  "panel_5ad99230df": {
+    "message": "无法连接"
+  },
+  "panel_dce083a2c4": {
+    "message": "已拒绝"
+  },
+  "panel_67a926f700": {
+    "message": "未找到"
+  },
+  "panel_1d09faf925": {
+    "message": "需要更新"
+  },
+  "panel_53f15ea2f2": {
+    "message": "未配对"
+  },
+  "panel_a06130a5a2": {
+    "message": "请求过多"
+  },
+  "panel_9f760ab207": {
+    "message": "等你操作"
+  },
+  "panel_8985693566": {
+    "message": "尚未连接"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "正在连接 $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "已通过服务账号连接"
+  },
+  "panel_4435385a73": {
+    "message": "FSB 本地服务器未运行"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "未找到 1Password 应用"
+  },
+  "panel_9d094cbe0c": {
+    "message": "请更新本地服务器"
+  },
+  "panel_b0545ee348": {
+    "message": "重新配对"
+  },
+  "panel_a904382fc7": {
+    "message": "请放慢速度"
+  },
+  "panel_12e12023d2": {
+    "message": "无法连接到 1Password"
+  },
+  "panel_a5ae6c601d": {
+    "message": "请在 1Password 应用中批准 FSB。"
+  },
+  "panel_f83ab4c57f": {
+    "message": "选择 FSB 可以读取的保险库。"
+  },
+  "panel_b33cf191b9": {
+    "message": "通过终端设置。断开连接会删除已保存的令牌，因此会先询问你。"
+  },
+  "panel_8ba387915f": {
+    "message": "解锁 1Password 以继续。你的设置会保留。"
+  },
+  "panel_041a40019f": {
+    "message": "请安装 FSB 本地服务器，然后重试。"
+  },
+  "panel_40647b20fa": {
+    "message": "在你允许之前，FSB 无法读取任何内容。请重试，然后在 1Password 中允许 FSB。"
+  },
+  "panel_0233589be3": {
+    "message": "此 fsb-mcp-server 版本过旧，无法用于 1Password，或无法加载其 SDK。"
+  },
+  "panel_01ddad80a6": {
+    "message": "服务器正在运行，但不再信任此浏览器。重新配对即可解决。"
+  },
+  "panel_1c3eb3d073": {
+    "message": "短时间内请求过多。你的账号没有问题。请一分钟后重试。"
+  },
+  "panel_89857dc659": {
+    "message": "1Password 正在询问是否允许 FSB 使用它。FSB 最多等待 75 秒。"
+  },
+  "panel_979a9a05cd": {
+    "message": "桌面应用"
+  },
+  "panel_69ce0728e7": {
+    "message": "正在询问你"
+  },
+  "panel_14493f5f54": {
+    "message": "已锁定"
+  },
+  "panel_d7da083898": {
+    "message": "服务账号"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password，然后是 FSB 本地服务器，再到此浏览器"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password，然后是本地服务器（此浏览器无法连接）"
+  },
+  "panel_845f928640": {
+    "message": "个人"
+  },
+  "panel_535c99f759": {
+    "message": "仅 FSB"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "共享"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "你的个人保险库。全部 $COUNT$ 个项目都会对代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "与他人共享。全部 $COUNT$ 个项目都会对代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "此保险库中的全部 $COUNT$ 个项目都会对代理可用。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "整个网站"
+  },
+  "panel_b20197643c": {
+    "message": "精确域名"
+  },
+  "panel_8b8c047cc1": {
+    "message": "此网站有 $COUNT$ 个",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "一次性验证码"
+  },
+  "panel_c68b5649c4": {
+    "message": "卡上有账单地址"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "未保存账单地址"
+  },
+  "panel_fdee246866": {
+    "message": "按每批 10 个移动。1Password 确认后，每一批都会从 FSB 中删除。"
+  },
+  "panel_72fe828489": {
+    "message": "已移到 1Password。登录信息：$LOGINS$。银行卡：$CARDS$。旧保险库已删除。",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "中途停止：已移动 $MOVED$ 个，$KEPT$ 个保留在 FSB 中。",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "断开 1Password？FSB 会忘记其 1Password 设置。"
+  },
+  "panel_91fa9fd3cf": {
+    "message": "断开 1Password？FSB 会忘记其 1Password 设置，并删除已保存的服务账号令牌。重新连接需要再次使用终端。"
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "登录 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "更换账户"
+  },
+  "panel_61a5454aac": {
+    "message": "账户名称 — 显示在 1Password 侧边栏顶部"
+  },
+  "panel_24f92b0c67": {
+    "message": "使用 1Password 桌面应用。需要打开 Settings > Developer > Integrate with 1Password SDKs（如果未打开，FSB 会为你打开该页面），之后 1Password 会请你批准 FSB。"
+  },
+  "panel_0db703c375": {
+    "message": "安装 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "打开 1Password 设置"
+  },
+  "panel_af67e786b5": {
+    "message": "尚未选择保存用的保险库。请选择一个，以便 FSB 将新登录信息保存到 1Password。"
+  },
+  "panel_9f088dbebd": {
+    "message": "高级"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "将 FSB 限制在这些保险库"
+  },
+  "panel_104a4be90f": {
+    "message": "使用所有保险库"
+  },
+  "panel_65f5a87194": {
+    "message": "1Password 中的 Settings > Developer"
+  },
+  "panel_f287bb0de3": {
+    "message": "请在 1Password 中打开 Integrate with 1Password SDKs，然后回到这里。FSB 会持续检查 2 分钟。"
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs 仍未打开"
+  },
+  "panel_3facf5a8dc": {
+    "message": "使用的是受管理的设备？请联系你的管理员。"
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs 未打开"
+  },
+  "panel_e5dab5535e": {
+    "message": "请在 1Password 中打开 Integrate with 1Password SDKs，然后回到这里。"
+  },
+  "panel_55a8cd8239": {
+    "message": "已登录"
+  },
+  "panel_06e7541e0b": {
+    "message": "已登录 · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "闲置 10 分钟、锁定或本地服务器重启后，1Password 可能会再次请你批准 FSB。"
+  },
+  "panel_41a0e0aead": {
+    "message": "无法登录 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "请检查账户名称，然后重试。"
+  },
+  "panel_bf74b77b3d": {
+    "message": "请检查账户名称，然后重试。详细信息：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "请安装 1Password 应用并登录，然后重试。"
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password 账户：$ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "你的 1Password 账户中的所有保险库"
+  },
+  "panel_7a9e047a27": {
+    "message": "仅限在“高级”中打开的保险库"
+  },
+  "panel_fec6b9e93d": {
+    "message": "忘记已保存的登录"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "已在此浏览器中退出登录。本地服务器仍保留 1Password 登录，FSB 会在下次可以时将其删除。"
   }
 }

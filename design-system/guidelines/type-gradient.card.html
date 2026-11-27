@@ -1,0 +1,20 @@
+<!-- @dsCard group="Type" viewport="700x145" subtitle="background-clip on the accent gradient" name="Gradient text" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.stage{display:flex;align-items:center;justify-content:center;padding:26px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:var(--bg-elevated)}
+.hl{background:var(--primary-gradient);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+</style>
+</head>
+<body>
+<div class="stage"><p style="font-size:1.5rem;font-weight:800;color:var(--text-primary);margin:0">Better than all of them. <span class="hl">Without vision.</span></p></div>
+</body>
+</html>

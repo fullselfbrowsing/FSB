@@ -15,9 +15,9 @@
    * (open at :1-2, close at :185-200) and extension/utils/value-extractor.js
    * (the PURE, browser-API-free variant). Like value-extractor.js this module
    * OMITS any lazy chrome.* resolver -- it touches no browser API. It reads the
-   * vendored validator only through a typeof-guarded global accessor (the
-   * ws-client.js getFSBLZStringCodec pattern), so it loads cleanly under the
-   * Node test harness where the cfworker IIFE is pre-loaded via vm.
+   * vendored validator only through a typeof-guarded global accessor, so it
+   * loads cleanly under the Node test harness where the cfworker IIFE is
+   * pre-loaded via vm.
    *
    * Locked decisions implemented here (26-CONTEXT.md):
    *   - D-06 versioned closed top-level vocabulary; additionalProperties:false
@@ -175,7 +175,7 @@
     then: { required: ['csrf'] }
   };
 
-  // ---- Vendored-validator accessor (ws-client.js:98-99 pattern) -----------
+  // ---- Vendored-validator accessor ----------------------------------------
   //
   // typeof-guarded so the module loads where CfworkerJsonSchema is absent
   // (returns null -> validateRecipe maps to RECIPE_SCHEMA_INVALID). The SW

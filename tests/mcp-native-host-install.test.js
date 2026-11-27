@@ -21,6 +21,9 @@ const knownSections = new Set([
   'cli-routing',
   'cli-output',
   'doctor-browser-selection',
+  'ensure-transaction',
+  'browser-detection',
+  'production-ensure',
 ]);
 if (requestedSection && !knownSections.has(requestedSection)) {
   throw new Error(`unknown section: ${requestedSection}`);
@@ -38,6 +41,25 @@ const REGISTRY_HELPER_SHA256 = 'e'.repeat(64);
 const BUILD_ENTRY_SHA256 = 'b'.repeat(64);
 const TARBALL_SHA512 = `sha512-${Buffer.alloc(64, 7).toString('base64')}`;
 const MAX_PROCESS_OUTPUT_BYTES = 64 * 1024;
+// The exact receipt key set 0.11.5 accepts; any other key makes it read the
+// helper as invalid and refuse to repair or remove it.
+const EARLIER_RELEASE_RECEIPT_KEYS = Object.freeze([
+  'schema',
+  'platform',
+  'packageName',
+  'packageVersion',
+  'stableRoot',
+  'launcherPath',
+  'packageRoot',
+  'markerPath',
+  'origin',
+  'installToken',
+  'tarballIntegrity',
+  'artifactSha256',
+  'registryHelperPath',
+  'registryHelperSha256',
+  'marker',
+]);
 
 let passed = 0;
 
@@ -1202,6 +1224,30 @@ async function runRuntimeTransaction() {
       2,
       `${platformName} has no online retry or package-manager fallback`,
     );
+    deepEqual(
+      Object.keys(result.receipt).sort(),
+      [...EARLIER_RELEASE_RECEIPT_KEYS].sort(),
+      `${platformName} the receipt has exactly the keys earlier releases accept`,
+    );
+    check(
+      !harness.trace.some((entry) => entry.includes('provenance.json')),
+      `${platformName} a publish with no provenance writes no provenance record`,
+    );
+
+    const tagged = fakeRuntimeDependencies(layout);
+    const taggedResult = await runtime.publishNativeHostRuntime(layout, tagged.dependencies, { provenance: 'auto' });
+    equal(taggedResult.status, 'published', `${platformName} a publish with provenance succeeds`);
+    equal(Object.hasOwn(taggedResult.receipt, 'provenance'), false, `${platformName} provenance never enters the receipt`);
+    const provenanceWrite = tagged.trace.indexOf(`write:${platformPath(platformName).join(layout.stageRoot, 'provenance.json')}:600`);
+    check(
+      provenanceWrite >= 0 && provenanceWrite < tagged.trace.indexOf(`rename:${layout.stageRoot}:${layout.stableRoot}`),
+      `${platformName} the provenance record is staged with the tree before the final rename`,
+    );
+    equal(
+      runtime.nativeHostProvenanceContents(layout.installToken, 'auto'),
+      `${JSON.stringify({ schema: 1, installToken: layout.installToken, provenance: 'auto' })}\n`,
+      `${platformName} the provenance record ties the value to this publication's token`,
+    );
   }
 
   const windowsLayout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput('win32'));
@@ -2124,68 +2170,346 @@ async function runInstallTransaction() {
   }
 }
 
+const NATIVE_LOCATION = '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json';
+
+function nativeReceipt(status, overrides = {}) {
+  return Object.freeze({
+    status,
+    reason: status === 'installed' ? 'installed' : status === 'already-installed' ? 'exact' : status,
+    location: NATIVE_LOCATION,
+    origin: ORIGIN,
+    packageVersion: PACKAGE_VERSION,
+    ...overrides,
+  });
+}
+
+// Records every native operation the CLI calls, in order. `script` supplies
+// the results; each entry may be a value, a function of the request, or an
+// array consumed one call at a time.
+function recordingOperations(calls, script = {}) {
+  const next = (name, request, fallback) => {
+    const entry = script[name];
+    const value = Array.isArray(entry) ? entry.shift() : entry;
+    const resolved = typeof value === 'function' ? value(request) : value;
+    return resolved === undefined ? fallback : resolved;
+  };
+  return Object.freeze({
+    install: async (request) => {
+      calls.push(Object.freeze({ operation: 'install', request: { ...request } }));
+      return next('install', request, nativeReceipt('installed', {
+        origin: `chrome-extension://${request.extensionId || EXTENSION_ID}/`,
+      }));
+    },
+    uninstall: async (request = {}) => {
+      calls.push(Object.freeze({ operation: 'uninstall', request: { ...request } }));
+      return next('uninstall', request, nativeReceipt('removed', { reason: 'removed' }));
+    },
+    ensure: async (request) => {
+      calls.push(Object.freeze({ operation: 'ensure', request: ordinaryClone(request) }));
+      return next('ensure', request, Object.freeze({
+        outcome: 'installed',
+        version: PACKAGE_VERSION,
+        browsers: ['chrome'],
+        addedBrowsers: ['chrome'],
+        stableRoot: '/home/fsb/.fsb/native-host',
+      }));
+    },
+    uninstallAll: async (request = {}) => {
+      calls.push(Object.freeze({ operation: 'uninstallAll', request: { ...request } }));
+      return next('uninstallAll', request, Object.freeze({
+        outcome: 'removed',
+        removedBrowsers: ['chrome'],
+        provenance: 'auto',
+      }));
+    },
+    readOptOut: () => {
+      calls.push(Object.freeze({ operation: 'readOptOut' }));
+      return next('readOptOut', undefined, null);
+    },
+    writeOptOut: (reason) => {
+      calls.push(Object.freeze({ operation: 'writeOptOut', reason }));
+    },
+    clearOptOut: () => {
+      calls.push(Object.freeze({ operation: 'clearOptOut' }));
+    },
+  });
+}
+
+function operationNames(calls) {
+  return calls.map((call) => call.operation);
+}
+
+const INSTALL_ENSURE = Object.freeze({ mode: 'install', browsers: 'auto', provenance: 'auto' });
+const REFRESH_ENSURE = Object.freeze({ mode: 'refresh-only', browsers: 'auto', provenance: 'auto' });
+
+// Runs install.js in a child whose HOME is a temporary directory, so client
+// installs and uninstalls write real config files without touching the
+// user's. The native operations are recording fakes.
+const CLI_DRIVER = `
+const [href, scenarioJson] = process.argv.slice(1);
+const cli = await import(href);
+const scenario = JSON.parse(scenarioJson);
+const calls = [];
+const results = scenario.results || {};
+const pick = (name, fallback) => {
+  const entry = results[name];
+  const value = Array.isArray(entry) ? entry.shift() : entry;
+  return value === undefined ? fallback : value;
+};
+const ops = {
+  install: async (request) => { calls.push({ operation: 'install', request }); return pick('install', null); },
+  uninstall: async (request = {}) => { calls.push({ operation: 'uninstall', request }); return pick('uninstall', null); },
+  ensure: async (request) => {
+    calls.push({ operation: 'ensure', request });
+    if (results.ensureThrows) throw new Error('SENSITIVE_ENSURE_FAILURE');
+    return pick('ensure', null);
+  },
+  uninstallAll: async (request = {}) => {
+    calls.push({ operation: 'uninstallAll', request });
+    if (results.uninstallAllThrows) throw new Error('SENSITIVE_UNINSTALL_FAILURE');
+    return pick('uninstallAll', null);
+  },
+  readOptOut: () => { calls.push({ operation: 'readOptOut' }); return pick('readOptOut', null); },
+  writeOptOut: (reason) => { calls.push({ operation: 'writeOptOut', reason }); },
+  clearOptOut: () => { calls.push({ operation: 'clearOptOut' }); },
+};
+const stdout = [];
+const stderr = [];
+console.log = (...values) => stdout.push(values.join(' '));
+console.error = (...values) => stderr.push(values.join(' '));
+const run = scenario.command === 'uninstall' ? cli.runUninstall : cli.runInstall;
+await run(scenario.flags, ops);
+process.stdout.write(JSON.stringify({
+  calls,
+  stdout: stdout.join('\\n'),
+  stderr: stderr.join('\\n'),
+  exitCode: process.exitCode ?? 0,
+}));
+`;
+
+function DELEGATION_LOG_WITH_RUN(adapterId) {
+  return [
+    '{"ts":"2026-11-01T00:00:00.000Z","event":"daemon_shutdown","exitCode":0,"degraded":false}',
+    `{"ts":"2026-11-01T00:00:01.000Z","event":"run_started","delegationId":"abcdefgh12345678","adapterId":"${adapterId}"}`,
+    '',
+  ].join('\n');
+}
+
+function createCliHome() {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-cli-routing-')));
+  const home = path.join(root, 'home');
+  const bin = path.join(root, 'bin');
+  fs.mkdirSync(home, { recursive: true });
+  fs.mkdirSync(bin, { recursive: true });
+  return Object.freeze({
+    root,
+    home,
+    bin,
+    write(relativePath, contents) {
+      const target = path.join(home, relativePath);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, contents, 'utf8');
+      return target;
+    },
+    exists(relativePath) {
+      return fs.existsSync(path.join(home, relativePath));
+    },
+    read(relativePath) {
+      return fs.readFileSync(path.join(home, relativePath), 'utf8');
+    },
+    // A stand-in Claude Code CLI on PATH: `add` and `remove` succeed, and
+    // `get` answers as the scenario says.
+    fakeClaude(getAnswer) {
+      const script = [
+        '#!/bin/sh',
+        'if [ "$2" = "get" ]; then',
+        getAnswer === 'configured'
+          ? '  echo "fsb:"; exit 0'
+          : '  echo "No MCP server found with name: $3" >&2; exit 1',
+        'fi',
+        'exit 0',
+        '',
+      ].join('\n');
+      const target = path.join(bin, 'claude');
+      fs.writeFileSync(target, script, { mode: 0o755 });
+    },
+    cleanup() {
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  });
+}
+
+function runCliScenario(fixture, scenario) {
+  const { spawnSync } = require('node:child_process');
+  const environment = { ...process.env };
+  delete environment.npm_execpath;
+  for (const key of Object.keys(environment)) {
+    if (key.startsWith('FSB_') || key.startsWith('CLINE_') || key === 'CLAUDE_CONFIG_DIR') {
+      delete environment[key];
+    }
+  }
+  const result = spawnSync(process.execPath, [
+    '--input-type=module',
+    '-e',
+    CLI_DRIVER,
+    pathToFileURL(path.join(repositoryRoot, 'mcp', 'build', 'install.js')).href,
+    JSON.stringify(scenario),
+  ], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    env: {
+      ...environment,
+      HOME: fixture.home,
+      USERPROFILE: fixture.home,
+      APPDATA: path.join(fixture.root, 'appdata'),
+      LOCALAPPDATA: path.join(fixture.root, 'localappdata'),
+      // Only the scenario's stand-in claude is reachable.
+      PATH: fixture.bin,
+    },
+    shell: false,
+    timeout: 60_000,
+  });
+  if (result.status !== 0) {
+    throw new Error(`CLI driver failed (${result.status}): ${result.stderr}`);
+  }
+  return JSON.parse(result.stdout);
+}
+
+const ENSURE_INSTALLED = Object.freeze({
+  outcome: 'installed',
+  version: PACKAGE_VERSION,
+  browsers: ['chrome', 'edge'],
+  addedBrowsers: ['chrome', 'edge'],
+  stableRoot: '/home/fsb/.fsb/native-host',
+});
+const UNINSTALL_ALL_REMOVED = Object.freeze({
+  outcome: 'removed',
+  removedBrowsers: ['chrome', 'edge'],
+  provenance: 'auto',
+});
+const CODEX_WITH_FSB = '[mcp_servers.fsb]\ncommand = "npx"\nargs = ["-y", "fsb-mcp-server@latest"]\n';
+
 async function runCliRouting() {
   const cli = await importBuild('install.js');
   const platforms = await importBuild('platforms.js');
   const calls = [];
-  const operations = Object.freeze({
-    install: async (request) => {
-      calls.push(Object.freeze({ operation: 'install', request: { ...request } }));
-      const extensionId = request.extensionId || EXTENSION_ID;
-      return Object.freeze({
-        status: 'installed',
-        reason: 'installed',
-        location: '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
-        origin: `chrome-extension://${extensionId}/`,
-        packageVersion: PACKAGE_VERSION,
-      });
-    },
-    uninstall: async (request = {}) => {
-      calls.push(Object.freeze({ operation: 'uninstall', request: { ...request } }));
-      return Object.freeze({
-        status: 'removed',
-        reason: 'removed',
-        location: '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
-        origin: ORIGIN,
-        packageVersion: PACKAGE_VERSION,
-      });
-    },
-  });
+  const operations = recordingOperations(calls);
 
-  await captureCliAction(() => cli.runInstall({ 'native-host': true }, operations));
-  equal(calls.length, 1, 'exact native install calls the injected install operation once');
-  deepEqual(calls[0], { operation: 'install', request: {} }, 'default native install passes no extension override');
-
-  await captureCliAction(() => cli.runInstall({
-    'native-host': true,
-    'extension-id': DEVELOPMENT_EXTENSION_ID,
-  }, operations));
-  equal(calls.length, 2, 'development native install calls the injected install operation once');
-  deepEqual(
-    calls[1],
-    { operation: 'install', request: { extensionId: DEVELOPMENT_EXTENSION_ID } },
-    'development native install passes only the validated exact extension id',
-  );
-
-  await captureCliAction(() => cli.runUninstall({ 'native-host': true }, operations));
-  equal(calls.length, 3, 'exact native uninstall calls the injected uninstall operation once');
-  deepEqual(calls[2], { operation: 'uninstall', request: {} }, 'default native uninstall passes no browser override');
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runInstall({ 'native-host': true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'clearOptOut' }, { operation: 'install', request: {} }],
+      'exact native install clears the opt-out, then calls the injected install once with no extension override',
+    );
+  }
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runInstall({
+      'native-host': true,
+      'extension-id': DEVELOPMENT_EXTENSION_ID,
+    }, operations));
+    deepEqual(
+      calls.slice(before),
+      [
+        { operation: 'clearOptOut' },
+        { operation: 'install', request: { extensionId: DEVELOPMENT_EXTENSION_ID } },
+      ],
+      'development native install passes only the validated exact extension id',
+    );
+  }
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runUninstall({ 'native-host': true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [
+        { operation: 'readOptOut' },
+        { operation: 'writeOptOut', reason: 'uninstall-native-host' },
+        { operation: 'uninstallAll', request: {} },
+      ],
+      'native uninstall without --browser writes the opt-out first, then removes every registration',
+    );
+  }
 
   for (const browser of ['chrome', 'edge', 'brave', 'chromium']) {
     const installIndex = calls.length;
     await captureCliAction(() => cli.runInstall({ 'native-host': true, browser }, operations));
     deepEqual(
-      calls[installIndex],
-      { operation: 'install', request: { browser } },
+      calls.slice(installIndex),
+      [{ operation: 'clearOptOut' }, { operation: 'install', request: { browser } }],
       `${browser} install forwards the exact browser selector`,
     );
     const uninstallIndex = calls.length;
     await captureCliAction(() => cli.runUninstall({ 'native-host': true, browser }, operations));
     deepEqual(
-      calls[uninstallIndex],
-      { operation: 'uninstall', request: { browser } },
-      `${browser} uninstall forwards the exact browser selector`,
+      calls.slice(uninstallIndex),
+      [{ operation: 'uninstall', request: { browser } }],
+      `${browser} uninstall removes only that browser's registration and writes no opt-out`,
     );
+  }
+
+  // A removal refused before it changed anything withdraws the opt-out it
+  // wrote, so the helper it kept goes on updating at server start.
+  {
+    const optOutCalls = (script) => {
+      const local = [];
+      return { local, operations: recordingOperations(local, script) };
+    };
+    const REFUSED = Object.freeze({ outcome: 'refused', reason: 'daemon-busy', removedBrowsers: [] });
+    {
+      const { local, operations: refusing } = optOutCalls({ uninstallAll: REFUSED });
+      const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true }, refusing));
+      deepEqual(
+        local.map((call) => call.operation),
+        ['readOptOut', 'writeOptOut', 'uninstallAll', 'clearOptOut'],
+        'a refused uninstall --native-host withdraws the opt-out it wrote',
+      );
+      equal(result.exitCode, 1, 'the refused uninstall still exits nonzero');
+      check(result.stderr.includes('Native messaging host was not changed: daemon-busy'), 'the refusal is reported as before');
+    }
+    {
+      const { local, operations: refusing } = optOutCalls({
+        uninstallAll: REFUSED,
+        readOptOut: Object.freeze({ at: 1, reason: 'install-no-native-host' }),
+      });
+      await captureCliAction(() => cli.runUninstall({ 'native-host': true }, refusing));
+      check(!operationNames(local).includes('clearOptOut'), 'an opt-out that was there before the uninstall stays');
+    }
+    {
+      const { local, operations: partial } = optOutCalls({
+        uninstallAll: Object.freeze({ outcome: 'refused', reason: 'lock-lost', removedBrowsers: ['chrome'] }),
+      });
+      const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true }, partial));
+      check(!operationNames(local).includes('clearOptOut'), 'a partial removal keeps the opt-out');
+      check(result.stderr.includes('only partly removed: lock-lost'), 'the partial removal says so');
+    }
+    {
+      const { local, operations: throwing } = optOutCalls({
+        uninstallAll: () => { throw new Error('SENSITIVE'); },
+      });
+      const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true }, throwing));
+      check(!operationNames(local).includes('clearOptOut'), 'an uninstall that failed unexpectedly keeps the opt-out');
+      equal(result.exitCode, 1);
+      check(!result.stderr.includes('SENSITIVE'), 'the failure detail is not printed');
+    }
+  }
+
+  // A per-browser uninstall that removed the registration but stopped after
+  // it says so, worded like the uninstall-all case.
+  {
+    const local = [];
+    const partial = recordingOperations(local, {
+      uninstall: nativeReceipt('partial', { reason: 'lock-lost' }),
+    });
+    const result = await captureCliAction(() => cli.runUninstall({ 'native-host': true, browser: 'edge' }, partial));
+    equal(result.exitCode, 1, 'a partial per-browser uninstall exits nonzero');
+    check(result.stderr.includes('Native messaging host was only partly removed: lock-lost'), 'the partial per-browser uninstall names its stop');
+    check(result.stderr.includes('Removed registrations: Edge'), 'and the browser whose registration went');
+    check(!result.stderr.includes('was not changed'), 'it never claims nothing changed');
   }
 
   {
@@ -2196,7 +2520,7 @@ async function runCliRouting() {
       'extension-id': DEVELOPMENT_EXTENSION_ID,
     }, operations));
     deepEqual(
-      calls[index],
+      calls[index + 1],
       {
         operation: 'install',
         request: { browser: 'edge', extensionId: DEVELOPMENT_EXTENSION_ID },
@@ -2221,6 +2545,14 @@ async function runCliRouting() {
     { 'native-host': true, list: true },
     { 'native-host': true, 'dry-run': true },
     { 'native-host': true, unknown: true },
+    { 'native-host': true, quiet: true },
+    { 'native-host': true, 'no-native-host': true },
+    { 'native-host': true, ensure: 'yes' },
+    { 'native-host': true, ensure: true, quiet: 'yes' },
+    { 'native-host': true, ensure: true, browser: 'chrome' },
+    { 'native-host': true, ensure: true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+    { 'native-host': true, ensure: true, 'dry-run': true },
+    { 'native-host': true, ensure: true, codex: true },
   ];
   for (const flags of invalidInstallFlags) {
     const before = calls.length;
@@ -2245,6 +2577,7 @@ async function runCliRouting() {
     { 'native-host': true, list: true },
     { 'native-host': true, 'dry-run': true },
     { 'native-host': true, unknown: true },
+    { 'native-host': true, ensure: true },
   ];
   for (const flags of invalidUninstallFlags) {
     const before = calls.length;
@@ -2259,9 +2592,17 @@ async function runCliRouting() {
 
   for (const key of Object.keys(platforms.PLATFORMS)) {
     const before = calls.length;
-    await captureCliAction(() => cli.runInstall({ [key]: true, 'dry-run': true }, operations));
+    const preview = await captureCliAction(() => cli.runInstall({ [key]: true, 'dry-run': true }, operations));
     await captureCliAction(() => cli.runUninstall({ [key]: true, 'dry-run': true }, operations));
-    equal(calls.length, before, `${key} legacy install/uninstall never calls native operations`);
+    equal(calls.length, before, `${key} dry-run install/uninstall never calls native operations`);
+    const instructionsOnly = platforms.PLATFORMS[key].installMode === 'instructions';
+    equal(
+      preview.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)"),
+      !instructionsOnly,
+      instructionsOnly
+        ? `${key} prints setup steps only, so its dry run previews no helper step`
+        : `${key} dry run previews the helper step`,
+    );
 
     const mixedInstall = await captureCliAction(() => cli.runInstall({
       'native-host': true,
@@ -2276,24 +2617,514 @@ async function runCliRouting() {
     equal(calls.length, before, `${key} mixed native/client syntax performs zero native mutation`);
   }
 
-  const beforeOrdinary = calls.length;
-  await captureCliAction(() => cli.runInstall({}, operations));
-  await captureCliAction(() => cli.runUninstall({}, operations));
-  await captureCliAction(() => cli.runInstall({ list: true }, operations));
-  await captureCliAction(() => cli.runInstall({ all: true, 'dry-run': true }, operations));
-  await captureCliAction(() => cli.runUninstall({ all: true, 'dry-run': true }, operations));
-  equal(calls.length, beforeOrdinary, 'ordinary/list/all routes never call native operations');
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runUninstall({}, operations));
+    await captureCliAction(() => cli.runInstall({ list: true }, operations));
+    await captureCliAction(() => cli.runInstall({ all: true, 'dry-run': true }, operations));
+    await captureCliAction(() => cli.runUninstall({ all: true, 'dry-run': true }, operations));
+    await captureCliAction(() => cli.runInstall({ windsurf: true }, operations));
+    await captureCliAction(() => cli.runInstall({ jetbrains: true, chatgpt: true }, operations));
+    await captureCliAction(() => cli.runUninstall({ warp: true }, operations));
+    equal(
+      calls.length,
+      before,
+      'bare uninstall, --list, dry runs, unknown flags and instructions-only runs never call native operations',
+    );
+  }
   equal(Object.keys(platforms.PLATFORMS).length, 21, 'native host does not change the 21-client platform registry');
+
+  // A bare install sets up the helper once, then prints the usage.
+  {
+    const before = calls.length;
+    const bare = await captureCliAction(() => cli.runInstall({}, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'clearOptOut' }, { operation: 'ensure', request: INSTALL_ENSURE }],
+      'bare install clears the opt-out and runs exactly one install-mode ensure',
+    );
+    equal(bare.exitCode, 0, 'bare install exits cleanly');
+    check(
+      bare.stdout.indexOf("Installed FSB's local helper (native messaging host) for Chrome")
+        < bare.stdout.indexOf('Usage: fsb-mcp-server install --<platform>'),
+      'bare install reports the helper before printing the usage',
+    );
+  }
+  {
+    const before = calls.length;
+    await captureCliAction(() => cli.runInstall({ 'extension-id': DEVELOPMENT_EXTENSION_ID }, operations));
+    deepEqual(
+      calls.slice(before),
+      [
+        { operation: 'clearOptOut' },
+        { operation: 'ensure', request: { ...INSTALL_ENSURE, extensionId: DEVELOPMENT_EXTENSION_ID } },
+      ],
+      'bare install passes --extension-id through to ensure',
+    );
+  }
+  for (const invalidId of ['abcdefghijklmnop', DEVELOPMENT_EXTENSION_ID.toUpperCase(), true]) {
+    const before = calls.length;
+    const result = await captureCliAction(() => cli.runInstall({ 'extension-id': invalidId }, operations));
+    equal(calls.length, before, 'an invalid --extension-id reaches no native operation');
+    equal(result.exitCode, 0, 'an invalid --extension-id is a warning, not a failed install');
+    check(result.stderr.includes('--extension-id must be the 32 lowercase a-p characters'),
+      'an invalid --extension-id says what a valid one looks like');
+  }
+  {
+    const before = calls.length;
+    const preview = await captureCliAction(() => cli.runInstall({ 'dry-run': true }, operations));
+    equal(calls.length, before, 'bare install --dry-run calls no native operation');
+    check(preview.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)")
+      && preview.stdout.includes('Would install or refresh it'),
+    'bare install --dry-run previews the helper step');
+    check(preview.stdout.includes('Usage: fsb-mcp-server install --<platform>'), 'bare install --dry-run still prints the usage');
+  }
+  {
+    const before = calls.length;
+    const skipped = await captureCliAction(() => cli.runInstall({ 'no-native-host': true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'writeOptOut', reason: 'install-no-native-host' }],
+      'bare install --no-native-host writes the opt-out and runs no ensure',
+    );
+    check(skipped.stdout.includes('--no-native-host was given'), 'bare install --no-native-host says the helper was skipped');
+  }
+  {
+    const before = calls.length;
+    const preview = await captureCliAction(() => cli.runInstall({ 'no-native-host': true, 'dry-run': true }, operations));
+    equal(calls.length, before, 'install --no-native-host --dry-run writes no opt-out');
+    check(preview.stdout.includes('Would skip it and pause its automatic refresh'), 'the dry run says the helper would be skipped');
+  }
+  {
+    const failing = recordingOperations([], {
+      ensure: Object.freeze({
+        outcome: 'refused',
+        reason: 'foreign-state',
+        browsers: [],
+        addedBrowsers: [],
+        stableRoot: '/home/fsb/.fsb/native-host',
+      }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({}, failing));
+    equal(result.exitCode, 0, 'a refused helper during bare install is a warning only');
+    check(result.stderr.includes("FSB's local helper (native messaging host) was not changed: foreign-state"),
+      'a refused helper is reported with its stable reason on stderr');
+    check(result.stdout.includes('Usage: fsb-mcp-server install --<platform>'), 'the usage still follows a refused helper');
+  }
+
+  // The background refresh a stdio server starts.
+  {
+    const before = calls.length;
+    const quiet = await captureCliAction(() => cli.runInstall({ 'native-host': true, ensure: true, quiet: true }, operations));
+    deepEqual(
+      calls.slice(before),
+      [{ operation: 'ensure', request: REFRESH_ENSURE }],
+      'install --native-host --ensure --quiet runs exactly one refresh-only ensure',
+    );
+    equal(quiet.stdout, '', 'the quiet refresh writes nothing to stdout');
+    equal(quiet.stderr, '', 'the quiet refresh writes nothing to stderr');
+    equal(quiet.exitCode, 0, 'the quiet refresh exits 0');
+  }
+  for (const [label, script] of [
+    ['refused', { ensure: Object.freeze({ outcome: 'refused', reason: 'split-state', browsers: [], addedBrowsers: [], stableRoot: '' }) }],
+    ['throwing', { ensure: () => { throw new Error('SENSITIVE_REFRESH_FAILURE'); } }],
+  ]) {
+    const quiet = await captureCliAction(() => cli.runInstall(
+      { 'native-host': true, ensure: true, quiet: true },
+      recordingOperations([], script),
+    ));
+    equal(`${quiet.stdout}${quiet.stderr}`, '', `a ${label} quiet refresh stays silent`);
+    equal(quiet.exitCode, 0, `a ${label} quiet refresh still exits 0`);
+  }
+  {
+    const loud = await captureCliAction(() => cli.runInstall(
+      { 'native-host': true, ensure: true },
+      recordingOperations([], { ensure: Object.freeze({ outcome: 'skipped-absent', reason: 'absent', browsers: [], addedBrowsers: [], stableRoot: '' }) }),
+    ));
+    equal(loud.stdout, "○ FSB's local helper (native messaging host) was not changed: absent\n",
+      'without --quiet the refresh prints one result line');
+    equal(loud.exitCode, 0, 'without --quiet the refresh still exits 0');
+  }
+
+  // The explicit repair path refreshes an older helper instead of refusing.
+  {
+    const repairCalls = [];
+    const repair = recordingOperations(repairCalls, {
+      install: [
+        nativeReceipt('refused', { reason: 'version-mismatch', packageVersion: '0.0.1' }),
+        nativeReceipt('already-installed'),
+      ],
+      ensure: Object.freeze({
+        outcome: 'refreshed',
+        version: PACKAGE_VERSION,
+        browsers: ['chrome'],
+        addedBrowsers: [],
+        stableRoot: '/home/fsb/.fsb/native-host',
+      }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({ 'native-host': true }, repair));
+    deepEqual(
+      operationNames(repairCalls),
+      ['clearOptOut', 'install', 'ensure', 'install'],
+      'an older owned helper is refreshed between two explicit installs',
+    );
+    deepEqual(
+      repairCalls[2].request,
+      { mode: 'install', browsers: ['chrome'], provenance: 'explicit' },
+      'the repair refresh targets the requested browser with explicit provenance',
+    );
+    equal(result.exitCode, 0, 'refreshing an older helper exits cleanly');
+    equal(
+      result.stdout,
+      `Native messaging host updated from 0.0.1 to ${PACKAGE_VERSION}.\nExpected location: ${NATIVE_LOCATION}\nAllowed origin: ${ORIGIN}\n`,
+      'the repair reports the old and new versions with the factual location and origin',
+    );
+  }
+  {
+    const repairCalls = [];
+    const repair = recordingOperations(repairCalls, {
+      install: [
+        nativeReceipt('refused', {
+          reason: 'version-mismatch',
+          packageVersion: '0.0.1',
+          origin: `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`,
+        }),
+        nativeReceipt('installed', { origin: `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/` }),
+      ],
+      ensure: Object.freeze({ outcome: 'refreshed', version: PACKAGE_VERSION, browsers: ['chrome', 'edge'], addedBrowsers: ['edge'], stableRoot: '' }),
+    });
+    await captureCliAction(() => cli.runInstall(
+      { 'native-host': true, browser: 'edge', 'extension-id': DEVELOPMENT_EXTENSION_ID },
+      repair,
+    ));
+    deepEqual(
+      repairCalls[2].request,
+      { mode: 'install', browsers: ['edge'], extensionId: DEVELOPMENT_EXTENSION_ID, provenance: 'explicit' },
+      'the repair refresh keeps the browser and extension id the user named',
+    );
+  }
+  {
+    const repairCalls = [];
+    const newer = recordingOperations(repairCalls, {
+      install: nativeReceipt('refused', { reason: 'version-mismatch', packageVersion: '999.0.0' }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({ 'native-host': true }, newer));
+    deepEqual(operationNames(repairCalls), ['clearOptOut', 'install'], 'a newer helper is never refreshed by an older package');
+    equal(result.exitCode, 1, 'a newer helper still refuses');
+    check(result.stderr.includes('not changed: version-mismatch'), 'a newer helper reports the stable version-mismatch reason');
+  }
+  {
+    const repairCalls = [];
+    const busy = recordingOperations(repairCalls, {
+      install: nativeReceipt('refused', { reason: 'version-mismatch', packageVersion: '0.0.1' }),
+      ensure: Object.freeze({ outcome: 'deferred', reason: 'daemon-busy', version: '0.0.1', browsers: ['chrome'], addedBrowsers: [], stableRoot: '' }),
+    });
+    const result = await captureCliAction(() => cli.runInstall({ 'native-host': true }, busy));
+    deepEqual(operationNames(repairCalls), ['clearOptOut', 'install', 'ensure'], 'a deferred repair does not install again');
+    equal(result.exitCode, 1, 'a deferred repair exits nonzero');
+    check(result.stderr.includes('not changed: daemon-busy'), 'a deferred repair names the busy local service');
+  }
+
+  if (process.platform === 'win32') {
+    console.log('  SKIP: client install and uninstall routing in a temporary home runs on macOS and Linux');
+    return;
+  }
+
+  // Client install and uninstall in a temporary home.
+  const fixture = createCliHome();
+  try {
+    fixture.write('.codex/config.toml', 'model = "gpt-5.4"\n');
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'clearOptOut' }, { operation: 'ensure', request: INSTALL_ENSURE }],
+        'install --codex clears the opt-out and runs exactly one install-mode ensure',
+      );
+      check(result.stdout.indexOf('Installed to Codex CLI') !== -1
+        && result.stdout.indexOf('Installed to Codex CLI')
+          < result.stdout.indexOf("Installed FSB's local helper (native messaging host) for Chrome, Edge"),
+      'install --codex writes the client config before reporting the helper');
+      equal(result.exitCode, 0, 'install --codex exits cleanly');
+      check(fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), 'install --codex writes the codex entry');
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      deepEqual(
+        result.calls[1],
+        { operation: 'ensure', request: { ...INSTALL_ENSURE, extensionId: DEVELOPMENT_EXTENSION_ID } },
+        'install --codex --extension-id passes the id through to ensure',
+      );
+    }
+    for (const [label, results, reason] of [
+      ['refused', { ensure: { outcome: 'refused', reason: 'foreign-state', browsers: [], addedBrowsers: [], stableRoot: '' } }, 'foreign-state'],
+      ['unavailable', { ensure: { outcome: 'unavailable', reason: 'unavailable', browsers: [], addedBrowsers: [], stableRoot: '' } }, 'unavailable'],
+      ['throwing', { ensureThrows: true }, 'unavailable'],
+      ['malformed', { ensure: { outcome: 'installed', browsers: 'SENSITIVE', reason: 'SENSITIVE VALUE' } }, null],
+    ]) {
+      const result = runCliScenario(fixture, { command: 'install', flags: { codex: true }, results });
+      equal(result.exitCode, 0, `a ${label} helper never changes the exit code of a successful client install`);
+      equal(result.calls.filter((call) => call.operation === 'ensure').length, 1, `a ${label} helper is attempted exactly once`);
+      check(!`${result.stdout}${result.stderr}`.includes('SENSITIVE'), `a ${label} helper result never echoes unbounded text`);
+      if (reason) {
+        check(result.stderr.includes(`was not changed: ${reason}`), `a ${label} helper is a warning with its stable reason`);
+        check(result.stderr.includes('doctor'), `a ${label} helper warning points at doctor`);
+      }
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true },
+        results: { ensure: { outcome: 'current', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '' } },
+      });
+      check(result.stdout.includes("FSB's local helper (native messaging host) is already installed for Chrome"),
+        'a current helper is reported as already installed');
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { codex: true, 'no-native-host': true },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'writeOptOut', reason: 'install-no-native-host' }],
+        'install --codex --no-native-host writes the opt-out and never runs ensure',
+      );
+    }
+    {
+      const before = fixture.read('.codex/config.toml');
+      const result = runCliScenario(fixture, { command: 'install', flags: { codex: true, 'dry-run': true } });
+      deepEqual(result.calls, [], 'install --codex --dry-run calls no native operation');
+      check(result.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)"), 'install --codex --dry-run previews the helper');
+      equal(fixture.read('.codex/config.toml'), before, 'install --codex --dry-run writes no config');
+    }
+    {
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { all: true },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      equal(result.calls.filter((call) => call.operation === 'ensure').length, 1, 'install --all runs exactly one ensure');
+      check(result.stdout.indexOf('platforms') < result.stdout.indexOf("Installed FSB's local helper"),
+        'install --all reports the helper after its client summary');
+    }
+    {
+      fixture.fakeClaude('missing');
+      const result = runCliScenario(fixture, {
+        command: 'install',
+        flags: { 'claude-code': true },
+        results: { ensure: ENSURE_INSTALLED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'clearOptOut' }, { operation: 'ensure', request: INSTALL_ENSURE }],
+        'install --claude-code runs exactly one ensure after the CLI add',
+      );
+      check(result.stdout.includes('Added to Claude Code'), 'install --claude-code still uses the Claude Code CLI');
+    }
+
+    // Uninstall: the last client removes an auto helper.
+    fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+    {
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'uninstallAll', request: { onlyProvenance: 'auto' } }],
+        'uninstalling the last client removes only an auto helper, with no opt-out',
+      );
+      check(result.stdout.includes("Removed FSB's local helper (native messaging host) from Chrome, Edge"),
+        'the last-client uninstall reports the removed registrations');
+      check(result.stdout.includes('Not checked, because they are set up by hand: JetBrains, ChatGPT, Claude.ai, Warp'),
+        'the last-client uninstall lists the instructions-only clients it cannot check');
+      equal(result.exitCode, 0, 'the last-client uninstall exits cleanly');
+    }
+    fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+    {
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: { outcome: 'kept', reason: 'explicit-provenance', removedBrowsers: [], provenance: 'explicit' } },
+      });
+      check(result.stdout.includes("Kept FSB's local helper (native messaging host): install --native-host set it up"),
+        'an explicit helper is kept and the reason is printed');
+    }
+    for (const [label, results, expectedOutput, stream] of [
+      ['absent', { uninstallAll: { outcome: 'absent', reason: 'absent', removedBrowsers: [] } }, null, null],
+      ['refused', { uninstallAll: { outcome: 'refused', reason: 'daemon-busy', removedBrowsers: [] } }, 'was not removed: daemon-busy', 'stderr'],
+      ['unfinished', { uninstallAll: { outcome: 'refused', reason: 'boundary-changed', removedBrowsers: ['chrome'] } },
+        'was only partly removed: boundary-changed. Removed registrations: Chrome.', 'stderr'],
+      ['throwing', { uninstallAllThrows: true }, 'was not removed: unavailable', 'stderr'],
+    ]) {
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      const result = runCliScenario(fixture, { command: 'uninstall', flags: { codex: true }, results });
+      equal(result.exitCode, 0, `an ${label} helper never changes the uninstall exit code`);
+      if (expectedOutput) {
+        check(result[stream].includes(expectedOutput), `an ${label} helper removal is reported on ${stream}`);
+      } else {
+        check(!`${result.stdout}${result.stderr}`.includes('local helper'), `an ${label} helper adds no output`);
+      }
+      check(!`${result.stdout}${result.stderr}`.includes('SENSITIVE'), `an ${label} helper result never echoes error text`);
+    }
+
+    // Uninstall: anything still using FSB keeps the helper.
+    const keptScenarios = [
+      ['another client config names FSB', () => fixture.write('.cursor/mcp.json', JSON.stringify({ mcpServers: { fsb: { command: 'npx' } } })), 'FSB is still configured in Cursor'],
+      ['another client config cannot be parsed', () => fixture.write('.cursor/mcp.json', '{ not json'), 'Cursor (config could not be read)'],
+      ['Claude Code names FSB at user scope', () => fixture.write('.claude.json', JSON.stringify({ mcpServers: { fsb: {} } })), 'FSB is still configured in Claude Code'],
+      ['Claude Code names FSB in one project', () => fixture.write('.claude.json', JSON.stringify({ projects: { '/work/a': { mcpServers: {} }, '/work/b': { mcpServers: { fsb: {} } } } })), 'FSB is still configured in Claude Code'],
+      ['Claude Code config cannot be parsed', () => fixture.write('.claude.json', '{'), 'Claude Code (config could not be read)'],
+      ['the Claude Code CLI still lists FSB', () => fixture.fakeClaude('configured'), 'FSB is still configured in Claude Code'],
+      ['the extension ran a Claude Code delegation', () => fixture.write('.fsb/agent-runtime/delegation-events.jsonl', DELEGATION_LOG_WITH_RUN('claude-code')), 'the browser extension has run delegated agents through it (claude-code)'],
+      ['a run survives only in the rotated log', () => fixture.write('.fsb/agent-runtime/delegation-events.1.jsonl', DELEGATION_LOG_WITH_RUN('grok')), 'the browser extension has run delegated agents through it (grok)'],
+    ];
+    for (const [label, arrange, reason] of keptScenarios) {
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.fakeClaude('missing');
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      fixture.write('.fsb/native-host/owner.json', '{}');
+      arrange();
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [], `the helper is kept when ${label}`);
+      check(result.stdout.includes(`FSB's local helper (native messaging host) was not removed: `)
+        && result.stdout.includes(reason), `uninstall says why the helper stays when ${label}`);
+      check(result.stdout.includes('uninstall --native-host'), `uninstall names the explicit removal when ${label}`);
+      check(!fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), `the codex entry is still removed when ${label}`);
+    }
+    // Only a delegated run counts: a Grok connection test leaves a profile
+    // directory, and every stdio server writes its bridge log beside the
+    // delegation log, but neither keeps the helper.
+    for (const [label, arrange] of [
+      ['a Grok profile left by a connection test', () => fixture.write('.fsb/agent-providers/grok/grok-home/config.toml', '')],
+      ['a bridge log and a shutdown record', () => {
+        fixture.write('.fsb/agent-runtime/bridge-events.jsonl', '{"event":"extension_connected"}\n');
+        fixture.write('.fsb/agent-runtime/delegation-events.jsonl', '{"ts":"2026-11-01T00:00:00.000Z","event":"daemon_shutdown","exitCode":0,"degraded":false}\n');
+      }],
+    ]) {
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.fakeClaude('missing');
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      arrange();
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [{ operation: 'uninstallAll', request: { onlyProvenance: 'auto' } }],
+        `${label} does not keep the helper`);
+    }
+    {
+      // No helper installed: the reasons it would have been kept are not
+      // reported as if one were.
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      fixture.write('.cursor/mcp.json', JSON.stringify({ mcpServers: { fsb: { command: 'npx' } } }));
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [], 'a kept reason without a helper calls no native operation');
+      check(!`${result.stdout}${result.stderr}`.includes('local helper'), 'no helper means no helper line at all');
+      fs.rmSync(path.join(fixture.home, '.cursor'), { recursive: true, force: true });
+    }
+    {
+      const fs = require('node:fs');
+      for (const leftover of ['.cursor', '.claude.json', '.fsb']) {
+        fs.rmSync(path.join(fixture.home, leftover), { recursive: true, force: true });
+      }
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      fixture.write('.claude.json', JSON.stringify({ mcpServers: { other: {} }, projects: { '/work/a': { mcpServers: { other: {} } } } }));
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { codex: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(result.calls, [{ operation: 'uninstallAll', request: { onlyProvenance: 'auto' } }],
+        'a Claude Code config without FSB does not keep the helper');
+    }
+
+    // --all writes the opt-out first and skips the client scan.
+    {
+      fixture.write('.cursor/mcp.json', '{ not json');
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { all: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(
+        result.calls,
+        [
+          { operation: 'writeOptOut', reason: 'uninstall-all' },
+          { operation: 'uninstallAll', request: { onlyProvenance: 'auto' } },
+        ],
+        'uninstall --all writes the opt-out before removing an auto helper',
+      );
+    }
+    {
+      fixture.write('.fsb/native-host/owner.json', '{}');
+      fixture.write('.fsb/agent-runtime/delegation-events.jsonl', DELEGATION_LOG_WITH_RUN('grok'));
+      const result = runCliScenario(fixture, {
+        command: 'uninstall',
+        flags: { all: true },
+        results: { uninstallAll: UNINSTALL_ALL_REMOVED },
+      });
+      deepEqual(
+        result.calls,
+        [{ operation: 'writeOptOut', reason: 'uninstall-all' }],
+        'uninstall --all still pauses the refresh but keeps a helper the extension delegates through',
+      );
+      check(result.stdout.includes('has run delegated agents through it'), 'uninstall --all says why the helper stays');
+    }
+    {
+      fixture.write('.codex/config.toml', CODEX_WITH_FSB);
+      const result = runCliScenario(fixture, { command: 'uninstall', flags: { codex: true, 'dry-run': true } });
+      deepEqual(result.calls, [], 'uninstall --codex --dry-run calls no native operation');
+      check(result.stdout.includes("[DRY RUN] FSB's local helper (native messaging host)"), 'uninstall --codex --dry-run previews the helper decision');
+      check(fixture.read('.codex/config.toml').includes('[mcp_servers.fsb]'), 'uninstall --codex --dry-run removes nothing');
+    }
+  } finally {
+    fixture.cleanup();
+  }
 }
 
 async function runCliOutput() {
   const cli = await importBuild('install.js');
   const location = '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json';
 
-  function operationsWith(installResult, uninstallResult = null) {
+  function operationsWith(installResult, uninstallResult = null, extra = {}) {
     return Object.freeze({
       install: async () => Object.freeze(installResult),
       uninstall: async () => Object.freeze(uninstallResult || installResult),
+      ensure: async () => extra.ensure,
+      uninstallAll: async () => extra.uninstallAll,
+      readOptOut: () => null,
+      writeOptOut: () => undefined,
+      clearOptOut: () => undefined,
     });
   }
 
@@ -2332,8 +3163,31 @@ async function runCliOutput() {
     'already-installed native result remains factual',
   );
 
+  // A replacement that stopped after removing the old helper, or part of it,
+  // says so instead of claiming nothing changed.
+  const partlyReplaced = await captureCliAction(() => cli.runInstall(
+    { 'native-host': true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+    operationsWith({
+      status: 'refused',
+      reason: 'replacement-incomplete',
+      location,
+      origin: `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(partlyReplaced.exitCode, 1, 'an incomplete replacement exits nonzero');
+  equal(partlyReplaced.stdout, '', 'an incomplete replacement prints nothing optimistic');
+  equal(
+    partlyReplaced.stderr,
+    'Native messaging host was only partly replaced: the old helper was removed in whole or in part,'
+      + ' and the new one is not installed.\n'
+      + `Expected location: ${location}\n`
+      + 'Run the same install command again, or npx -y fsb-mcp-server@latest doctor for repair details.\n',
+    'an incomplete replacement says the old helper is gone and how to finish',
+  );
+
   const removed = await captureCliAction(() => cli.runUninstall(
-    { 'native-host': true },
+    { 'native-host': true, browser: 'chrome' },
     operationsWith(null, {
       status: 'removed',
       reason: 'removed',
@@ -2349,8 +3203,41 @@ async function runCliOutput() {
     'removed native result reports one exact host removal and location',
   );
 
+  const oneOfTwo = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true, browser: 'edge' },
+    operationsWith(null, {
+      status: 'removed',
+      reason: 'registration-removed',
+      location,
+      origin: ORIGIN,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(
+    oneOfTwo.stdout,
+    `Native messaging host removed.\nRemoved: 1\nExpected location: ${location}\n`
+      + "Only the Edge registration was removed; FSB's local helper (native messaging host) stays installed for the other browsers.\n",
+    'removing one of several registrations says the helper stays for the other browsers',
+  );
+  const otherBrowser = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true, browser: 'brave' },
+    operationsWith(null, {
+      status: 'not-installed',
+      reason: 'absent',
+      location,
+      origin: ORIGIN,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(
+    otherBrowser.stdout,
+    `Native messaging host is not installed.\nRemoved: 0\nExpected location: ${location}\n`
+      + "Brave has no registration; FSB's local helper (native messaging host) is still installed for other browsers.\n",
+    'a browser without a registration says the helper is still installed elsewhere',
+  );
+
   const notInstalled = await captureCliAction(() => cli.runUninstall(
-    { 'native-host': true },
+    { 'native-host': true, browser: 'chrome' },
     operationsWith(null, {
       status: 'not-installed',
       reason: 'absent',
@@ -2428,19 +3315,181 @@ async function runCliOutput() {
   check(!`${inherited.stdout}${inherited.stderr}`.includes(sensitive), 'prototype-backed receipt fields never reach output');
   check(inherited.stderr.includes('not changed: unavailable'), 'prototype-backed native receipt collapses to unavailable');
 
-  const thrown = await captureCliAction(() => cli.runUninstall(
+  const throwingOperations = Object.freeze({
+    install: async () => { throw new Error(sensitive); },
+    uninstall: async () => { throw new Error(sensitive); },
+    ensure: async () => { throw new Error(sensitive); },
+    uninstallAll: async () => { throw new Error(sensitive); },
+    readOptOut: () => { throw new Error(sensitive); },
+    writeOptOut: () => { throw new Error(sensitive); },
+    clearOptOut: () => { throw new Error(sensitive); },
+  });
+  for (const [label, flags] of [
+    ['all-browser', { 'native-host': true }],
+    ['single-browser', { 'native-host': true, browser: 'chrome' }],
+  ]) {
+    const thrown = await captureCliAction(() => cli.runUninstall(flags, throwingOperations));
+    equal(thrown.exitCode, 1, `${label} native adapter exception becomes a refusal without throwing`);
+    check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), `${label} native adapter exception text is never serialized`);
+    check(thrown.stderr.includes('not changed: unavailable'), `${label} native adapter exception collapses to unavailable`);
+    check(thrown.stderr.includes('Run npx -y fsb-mcp-server@latest doctor for repair details.'), `${label} native adapter exception retains exact doctor guidance`);
+  }
+  {
+    const thrown = await captureCliAction(() => cli.runInstall({ 'native-host': true }, throwingOperations));
+    equal(thrown.exitCode, 1, 'a throwing explicit install becomes a refusal without throwing');
+    check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), 'a throwing explicit install never serializes error text');
+  }
+
+  // uninstall --native-host without --browser reports the uninstall-all result.
+  const platformModule = await importBuild('native-host-install/platform.js');
+  const helperRoot = ['darwin', 'linux', 'win32'].includes(process.platform)
+    ? platformModule.resolveNativeHostPlatformLayout({
+      platform: process.platform,
+      homeDirectory: require('node:os').homedir(),
+      ...(process.platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
+    }).stableRoot
+    : 'Unavailable';
+  const removedAll = await captureCliAction(() => cli.runUninstall(
     { 'native-host': true },
-    Object.freeze({
-      install: async () => { throw new Error(sensitive); },
-      uninstall: async () => { throw new Error(sensitive); },
+    operationsWith(null, null, {
+      uninstallAll: { outcome: 'removed', removedBrowsers: ['edge', 'chrome'], provenance: 'explicit' },
     }),
   ));
-  equal(thrown.exitCode, 1, 'native adapter exception becomes a refusal without throwing');
-  check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), 'native adapter exception text is never serialized');
-  check(thrown.stderr.includes('not changed: unavailable'), 'native adapter exception collapses to unavailable');
-  check(thrown.stderr.includes('Run npx -y fsb-mcp-server@latest doctor for repair details.'), 'native adapter exception retains exact doctor guidance');
+  equal(removedAll.exitCode, 0, 'uninstall-all removal exits cleanly');
+  equal(
+    removedAll.stdout,
+    `Native messaging host removed.\nRemoved registrations: Chrome, Edge\nExpected location: ${helperRoot}\n`,
+    'uninstall-all removal names each removed registration in browser order and the helper location',
+  );
+  const absentAll = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true },
+    operationsWith(null, null, { uninstallAll: { outcome: 'absent', reason: 'absent', removedBrowsers: [] } }),
+  ));
+  equal(absentAll.exitCode, 0, 'uninstall-all with nothing installed exits cleanly');
+  equal(
+    absentAll.stdout,
+    `Native messaging host is not installed.\nRemoved registrations: none\nExpected location: ${helperRoot}\n`,
+    'uninstall-all with nothing installed reports zero removals',
+  );
+  for (const [reason, expected] of [
+    ['split-state', 'split-state'],
+    // Retryable: a browser was starting the helper, or another run took the lock over.
+    ['wake-in-progress', 'wake-in-progress'],
+    ['wake-lock-failed', 'wake-lock-failed'],
+    ['lock-lost', 'lock-lost'],
+    [sensitive, 'unavailable'],
+  ]) {
+    const refusedAll = await captureCliAction(() => cli.runUninstall(
+      { 'native-host': true },
+      operationsWith(null, null, {
+        uninstallAll: { outcome: 'refused', reason, removedBrowsers: [sensitive], provenance: sensitive },
+      }),
+    ));
+    equal(refusedAll.exitCode, 1, `uninstall-all refusal (${expected}) exits nonzero`);
+    equal(
+      refusedAll.stderr,
+      `Native messaging host was not changed: ${expected}\nExpected location: ${helperRoot}\nRun npx -y fsb-mcp-server@latest doctor for repair details.\n`,
+      `uninstall-all refusal (${expected}) prints only the stable reason, location and doctor guidance`,
+    );
+  }
+  {
+    // A removal that stopped after some registrations were already gone says
+    // which, instead of claiming nothing changed.
+    const partial = await captureCliAction(() => cli.runUninstall(
+      { 'native-host': true },
+      operationsWith(null, null, {
+        uninstallAll: { outcome: 'refused', reason: 'boundary-changed', removedBrowsers: ['edge', 'chrome', sensitive] },
+      }),
+    ));
+    equal(partial.exitCode, 1, 'a partial uninstall-all exits nonzero');
+    equal(partial.stdout, '', 'a partial uninstall-all prints nothing optimistic');
+    equal(
+      partial.stderr,
+      'Native messaging host was only partly removed: boundary-changed\nRemoved registrations: Chrome, Edge\n'
+        + `Expected location: ${helperRoot}\nRun npx -y fsb-mcp-server@latest doctor for repair details.\n`,
+      'a partial uninstall-all names the registrations it removed before it stopped',
+    );
+  }
+  {
+    const tainted = await captureCliAction(() => cli.runUninstall(
+      { 'native-host': true },
+      operationsWith(null, null, {
+        uninstallAll: { outcome: 'removed', removedBrowsers: ['chrome', sensitive], extra: sensitive },
+      }),
+    ));
+    check(!tainted.stdout.includes(sensitive), 'uninstall-all output keeps only known browser names');
+  }
 
-  for (const result of [installed, alreadyInstalled, removed, notInstalled]) {
+  // The one line client install prints for the helper.
+  const helper = "FSB's local helper (native messaging host)";
+  for (const [label, ensure, stream, line] of [
+    ['installed', { outcome: 'installed', version: PACKAGE_VERSION, browsers: ['edge', 'chrome'], addedBrowsers: ['chrome', 'edge'], stableRoot: '' },
+      'stdout', `\u2713 Installed ${helper} for Chrome, Edge`],
+    ['refreshed', { outcome: 'refreshed', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stdout', `\u2713 Updated ${helper} to ${PACKAGE_VERSION} for Chrome`],
+    ['registered', { outcome: 'registered', version: PACKAGE_VERSION, browsers: ['chrome', 'brave'], addedBrowsers: ['brave'], stableRoot: '' },
+      'stdout', `\u2713 Registered ${helper} for Brave`],
+    ['current', { outcome: 'current', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stdout', `\u25CB ${helper} is already installed for Chrome`],
+    ['newer', { outcome: 'current', reason: 'installed-newer', version: '999.0.0', browsers: ['chromium'], addedBrowsers: [], stableRoot: '' },
+      'stdout', `\u25CB ${helper} is already installed for Chromium (a newer version than this package)`],
+    ['deferred', { outcome: 'deferred', reason: 'locked', browsers: [], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not updated: locked. Run the same install command again.`],
+    ['deferred busy', { outcome: 'deferred', reason: 'daemon-busy', version: '0.0.1', browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not updated: daemon-busy. FSB retries this the next time an MCP client starts it, or run the same install command again once no delegated run is active.`],
+    ['deferred backoff', { outcome: 'deferred', reason: 'backoff', version: '0.0.1', browsers: ['chrome'], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not updated: backoff. FSB retries this the next time an MCP client starts it, or run the same install command again later.`],
+    ['refused', { outcome: 'refused', reason: 'registry-shadow', browsers: [], addedBrowsers: [], stableRoot: '' },
+      'stderr', `\u26A0 ${helper} was not changed: registry-shadow. Run npx -y fsb-mcp-server@latest doctor for details.`],
+    ['unknown', { outcome: sensitive, reason: sensitive },
+      'stderr', `\u26A0 ${helper} was not changed: unavailable. Run npx -y fsb-mcp-server@latest doctor for details.`],
+    ['missing', undefined,
+      'stderr', `\u26A0 ${helper} was not changed: unavailable. Run npx -y fsb-mcp-server@latest doctor for details.`],
+  ]) {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, { ensure })));
+    equal(result.exitCode, 0, `a ${label} helper result never changes the install exit code`);
+    equal(result[stream].split('\n')[0], line, `a ${label} helper result prints its one fixed line on ${stream}`);
+  }
+  // A browser whose registration failed beside the ones that worked is a
+  // warning of its own, after the success line.
+  for (const [label, ensure, line] of [
+    ['installed', {
+      outcome: 'installed', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: ['chrome'], stableRoot: '',
+      failedBrowsers: ['edge'], failedReason: 'registration-publish-failed',
+    }, `\u2713 Installed ${helper} for Chrome`],
+    ['current', {
+      outcome: 'current', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: [], stableRoot: '',
+      failedBrowsers: ['brave', 'edge'], failedReason: 'lock-lost',
+    }, `\u25CB ${helper} is already installed for Chrome`],
+  ]) {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, { ensure })));
+    equal(result.exitCode, 0, `a failed extra registration on a ${label} helper never changes the exit code`);
+    equal(result.stdout.split('\n')[0], line, `a ${label} helper with a failed extra registration still prints its success line`);
+    equal(
+      result.stderr.split('\n')[0],
+      `\u26A0 ${helper} was not registered for ${ensure.failedBrowsers.includes('brave') ? 'Edge, Brave' : 'Edge'}: ${ensure.failedReason}. Run the same install command again.`,
+      `a ${label} helper names the browsers whose registration failed on stderr`,
+    );
+  }
+  {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, {
+      ensure: {
+        outcome: 'installed', version: PACKAGE_VERSION, browsers: ['chrome'], addedBrowsers: ['chrome'], stableRoot: '',
+        failedBrowsers: [sensitive], failedReason: sensitive,
+      },
+    })));
+    equal(result.stderr, '', 'failed registrations naming no known browser print no warning');
+    check(!result.stdout.includes(sensitive), 'failed-registration fields never reach the output unchecked');
+  }
+  {
+    const result = await captureCliAction(() => cli.runInstall({}, operationsWith(null, null, {
+      ensure: { outcome: 'refreshed', version: `${sensitive}`, browsers: ['chrome', sensitive], addedBrowsers: [sensitive], stableRoot: sensitive },
+    })));
+    check(!`${result.stdout}${result.stderr}`.includes(sensitive), 'tainted ensure fields never reach terminal output');
+    equal(result.stdout.split('\n')[0], `\u2713 Updated ${helper} for Chrome`, 'an unparseable version is left out of the helper line');
+  }
+
+  for (const result of [installed, alreadyInstalled, removed, notInstalled, removedAll, absentAll]) {
     const output = `${result.stdout}${result.stderr}`.toLowerCase();
     for (const optimistic of ['paired', 'provider', 'delegation', 'agent started']) {
       check(!output.includes(optimistic), `successful native output never claims ${optimistic}`);
@@ -2452,6 +3501,78 @@ async function runCliOutput() {
   check(!/case 'serve':[\s\S]*runInstall\(/u.test(beforeInstallCase), 'serve router never calls installer code');
   check(!/case 'doctor':[\s\S]*runInstall\(/u.test(beforeInstallCase), 'doctor router never calls installer code');
   check(/let command = 'stdio'/u.test(indexSource), 'no-argument startup remains the stdio server route');
+
+  // The background refresh is started only by the stdio server, after the
+  // transport connects and before the bridge does.
+  const stdioSource = indexSource.slice(
+    indexSource.indexOf('async function runStdioServer()'),
+    indexSource.indexOf('async function runHttpMode('),
+  );
+  const connectAt = stdioSource.indexOf('await runtime.server.connect(transport);');
+  const refreshAt = stdioSource.indexOf('startNativeHostAutoRefresh({ entryPath: fileURLToPath(import.meta.url) });');
+  const bridgeAt = stdioSource.indexOf('await runtime.bridge.connect();');
+  check(connectAt !== -1 && refreshAt > connectAt && bridgeAt > refreshAt,
+    'the stdio server starts the helper refresh after the MCP transport connects and before the bridge');
+  check(/setImmediate\(\(\) => \{\s*startNativeHostAutoRefresh\(/u.test(stdioSource),
+    'the helper refresh waits for the next event-loop turn, behind any initialize request already on stdin');
+  equal((indexSource.match(/startNativeHostAutoRefresh\(/gu) || []).length, 1,
+    'nothing but the stdio server starts the helper refresh');
+
+  const installedEntry = path.join(path.sep, 'opt', 'npm', '_npx', 'a1b2', 'node_modules', 'fsb-mcp-server', 'build', 'index.js');
+  const spawned = [];
+  const fakeSpawn = (command, args, options) => {
+    const child = { events: [], unrefCalls: 0 };
+    spawned.push({ command, args, options, child });
+    return {
+      on(event, listener) { child.events.push([event, typeof listener]); return this; },
+      unref() { child.unrefCalls += 1; return this; },
+    };
+  };
+  equal(
+    cli.startNativeHostAutoRefresh({ entryPath: installedEntry, environment: {}, execPath: '/usr/bin/node', spawnChild: fakeSpawn }),
+    true,
+    'a server running from node_modules starts the helper refresh',
+  );
+  deepEqual(
+    { command: spawned[0].command, args: spawned[0].args, options: spawned[0].options },
+    {
+      command: '/usr/bin/node',
+      args: [installedEntry, 'install', '--native-host', '--ensure', '--quiet'],
+      options: { detached: true, stdio: 'ignore', windowsHide: true },
+    },
+    'the refresh runs this build as a detached, silent, hidden install --native-host --ensure --quiet',
+  );
+  deepEqual(spawned[0].child.events, [['error', 'function']], 'the refresh child has an error listener, so a spawn failure cannot crash the server');
+  equal(spawned[0].child.unrefCalls, 1, 'the refresh child is unreferenced, so it never holds the server open');
+  equal(
+    cli.startNativeHostAutoRefresh({
+      entryPath: path.join(path.sep, 'repo', 'node_modules', '.pnpm', 'fsb-mcp-server@1.0.0', 'node_modules', 'fsb-mcp-server', 'build', 'index.js'),
+      environment: {},
+      spawnChild: fakeSpawn,
+    }),
+    true,
+    'a package inside a nested node_modules layout also refreshes',
+  );
+  for (const [label, entryPath, environment] of [
+    ['FSB_NATIVE_HOST_AUTO=0', installedEntry, { FSB_NATIVE_HOST_AUTO: '0' }],
+    ['a source checkout', path.join(path.sep, 'work', 'fsb', 'mcp', 'build', 'index.js'), {}],
+    ['the helper\'s own staged copy', path.join(path.sep, 'home', 'u', '.fsb', 'native-host', 'runtime', 'package', 'build', 'index.js'), {}],
+    ['a relative entry path', path.join('node_modules', 'fsb-mcp-server', 'build', 'index.js'), {}],
+  ]) {
+    const before = spawned.length;
+    equal(cli.startNativeHostAutoRefresh({ entryPath, environment, spawnChild: fakeSpawn }), false,
+      `the helper refresh is skipped for ${label}`);
+    equal(spawned.length, before, `nothing is spawned for ${label}`);
+  }
+  equal(
+    cli.startNativeHostAutoRefresh({
+      entryPath: installedEntry,
+      environment: { FSB_NATIVE_HOST_AUTO: '1' },
+      spawnChild: () => { throw new Error(sensitive); },
+    }),
+    false,
+    'a spawn that throws is swallowed and reported as not started',
+  );
 }
 
 async function runDoctorBrowserSelection() {
@@ -2497,6 +3618,2563 @@ async function runDoctorBrowserSelection() {
   );
 }
 
+const ENSURE_BROWSERS = Object.freeze(['chrome', 'edge', 'brave', 'chromium']);
+
+function hexToken(value) {
+  return value.toString(16).padStart(32, '0');
+}
+
+function manifestText(launcherPath, extensionId = EXTENSION_ID) {
+  return `${JSON.stringify(expectedManifest(launcherPath, extensionId))}\n`;
+}
+
+function fakeEnsureHarness(modules, platformName, options = {}) {
+  const trace = [];
+  const invokingVersion = options.invokingVersion || PACKAGE_VERSION;
+  const input = { ...runtimeLayoutInput(platformName), packageVersion: invokingVersion };
+  const layouts = Object.fromEntries(ENSURE_BROWSERS.map((browser) => [
+    browser,
+    modules.platform.resolveNativeHostPlatformLayout({
+      platform: platformName,
+      browser,
+      homeDirectory: input.homeDirectory,
+      localAppData: input.localAppData,
+    }),
+  ]));
+  const runtimeLayout = modules.runtimeLayout.resolveNativeHostRuntimeLayout(input);
+  const inspectionLayout = Object.freeze({
+    platform: runtimeLayout.platform,
+    stableRoot: runtimeLayout.stableRoot,
+    markerPath: runtimeLayout.markerPath,
+    launcherPath: runtimeLayout.launcherPath,
+    packageRoot: runtimeLayout.packageRoot,
+    packageEntryPath: runtimeLayout.packageEntryPath,
+    integrityReceiptPath: runtimeLayout.integrityReceiptPath,
+    registryHelperPath: runtimeLayout.registryHelperPath,
+  });
+  const windowsManifestPath = platformName === 'win32' ? layouts.chrome.manifestPath : null;
+  let tokenCounter = 0x100;
+  let publishCount = 0;
+  let clock = options.now ?? 1_000_000;
+  let optOut = options.optOut || null;
+  let stamp = options.stamp || null;
+  let stopRequest = null;
+  let lockHeld = Boolean(options.lockHeld);
+  let daemonOnline = Boolean(options.daemonOnline);
+  let healthOverride;
+  let rewrites = 0;
+  const published = [];
+
+  function makeTree(fields = {}) {
+    const extensionId = fields.extensionId || EXTENSION_ID;
+    const marker = expectedMarker(platformName, {
+      origin: `chrome-extension://${extensionId}/`,
+      packageVersion: fields.version || PACKAGE_VERSION,
+      installToken: fields.token || INSTALL_TOKEN,
+    });
+    const receipt = Object.freeze(runtimeReceipt(runtimeLayout, marker));
+    return {
+      state: fields.state || 'exact',
+      reason: fields.reason || (fields.state === 'invalid' ? 'launcher-integrity' : 'exact'),
+      marker,
+      receipt,
+      provenance: fields.provenance,
+      manifest: null,
+      label: fields.label || 'installed',
+    };
+  }
+
+  let stable = options.installed ? makeTree(options.installed) : null;
+  const siblings = new Map();
+  for (const [name, entry] of options.siblings || []) {
+    siblings.set(name, { tree: entry.tree ? makeTree(entry.tree) : makeTree(), ageMs: entry.ageMs ?? 0 });
+  }
+  const files = new Map();
+  const registry = new Map();
+  const registeredExtensionId = options.installed?.extensionId || EXTENSION_ID;
+
+  function register(browser, extensionId = registeredExtensionId) {
+    const text = manifestText(runtimeLayout.launcherPath, extensionId);
+    if (platformName === 'win32') {
+      if (stable) stable.manifest = text;
+      registry.set(`user/32|${layouts[browser].registration.key}`, Object.freeze({
+        status: 'value',
+        type: 'REG_SZ',
+        value: windowsManifestPath,
+      }));
+    } else {
+      files.set(layouts[browser].manifestPath, Object.freeze({
+        status: 'file',
+        path: layouts[browser].manifestPath,
+        realPath: layouts[browser].manifestPath,
+        contents: text,
+      }));
+    }
+  }
+  for (const browser of options.registered || []) register(browser);
+  for (const [browser, contents] of options.foreignManifests || []) {
+    if (platformName === 'win32') {
+      registry.set(`user/32|${layouts[browser].registration.key}`, Object.freeze({
+        status: 'value',
+        type: 'REG_SZ',
+        value: 'C:\\foreign\\manifest.json',
+      }));
+    } else {
+      files.set(layouts[browser].manifestPath, Object.freeze({
+        status: 'file',
+        path: layouts[browser].manifestPath,
+        realPath: layouts[browser].manifestPath,
+        contents,
+      }));
+    }
+  }
+
+  // Browsers whose own registration write fails: the manifest file on macOS
+  // and Linux, the registry value on Windows, where the manifest is shared.
+  const failingRegistrationWrites = new Set((options.failRegistrationWrites || []).map((browser) => (
+    platformName === 'win32' ? layouts[browser].registration.key : layouts[browser].manifestPath
+  )));
+  // Windows browsers whose emptied registry key cannot be deleted once their
+  // registry value is gone.
+  const failingKeyCleanups = new Set(platformName === 'win32'
+    ? (options.failKeyCleanups || []).map((browser) => layouts[browser].registration.key)
+    : []);
+  const platformDependencies = {
+    files: {
+      inspectFile: async (pathname) => {
+        trace.push(`file:read:${pathname}`);
+        if (windowsManifestPath && pathname === windowsManifestPath) {
+          if (!stable || !stable.manifest) return Object.freeze({ status: 'absent' });
+          return Object.freeze({
+            status: 'file', path: pathname, realPath: pathname, contents: stable.manifest,
+          });
+        }
+        return files.get(pathname) || Object.freeze({ status: 'absent' });
+      },
+      writePrivateFileAtomic: async (pathname, contents) => {
+        trace.push(`file:write:${pathname}`);
+        if (platformName !== 'win32' && failingRegistrationWrites.has(pathname)) throw new Error('sensitive:EACCES');
+        if (windowsManifestPath && pathname === windowsManifestPath) {
+          if (!stable || stable.manifest) throw new Error('sensitive:EEXIST');
+          stable.manifest = contents;
+          return;
+        }
+        if (files.has(pathname)) throw new Error('sensitive:EEXIST');
+        files.set(pathname, Object.freeze({ status: 'file', path: pathname, realPath: pathname, contents }));
+      },
+      removeFile: async (pathname) => {
+        trace.push(`file:delete:${pathname}`);
+        files.delete(pathname);
+      },
+    },
+    registry: {
+      readDefault: async (view, key) => registry.get(`${view}|${key}`) || Object.freeze({ status: 'absent' }),
+      writeDefault: async (view, key, value) => {
+        trace.push(`registry:write:${view}:${key}`);
+        if (platformName === 'win32' && failingRegistrationWrites.has(key)) throw new Error('sensitive:EACCES');
+        registry.set(`${view}|${key}`, Object.freeze({ status: 'value', ...value }));
+      },
+      deleteDefault: async (view, key) => {
+        trace.push(`registry:delete:${view}:${key}`);
+        registry.delete(`${view}|${key}`);
+      },
+      inspectKey: async (view, key) => (registry.has(`${view}|${key}`)
+        ? Object.freeze({ status: 'exact-default-only' })
+        : Object.freeze({ status: 'empty' })),
+      deleteEmptyKey: async (view, key) => {
+        trace.push(`registry:key-delete:${view}:${key}`);
+        if (failingKeyCleanups.has(key)) throw new Error('sensitive:EACCES');
+      },
+    },
+  };
+  const registrations = Object.freeze(Object.fromEntries(ENSURE_BROWSERS.map((browser) => [
+    browser,
+    modules.platform.createNativeHostPlatformAdapter(layouts[browser], platformDependencies),
+  ])));
+
+  function markerFact(tree) {
+    return Object.freeze({
+      status: 'file',
+      path: runtimeLayout.markerPath,
+      realPath: runtimeLayout.markerPath,
+      contents: JSON.stringify(tree.marker),
+    });
+  }
+  const runtime = Object.freeze({
+    layout: inspectionLayout,
+    inspectRuntime: async () => {
+      trace.push('runtime:inspect');
+      if (!stable) {
+        return Object.freeze({
+          state: 'absent', reason: 'absent', markerFact: Object.freeze({ status: 'absent' }),
+          marker: null, receipt: null,
+        });
+      }
+      if (stable.state === 'foreign') {
+        return Object.freeze({
+          state: 'foreign', reason: 'runtime-root-not-owned',
+          markerFact: Object.freeze({ status: 'unavailable' }), marker: null, receipt: null,
+        });
+      }
+      return Object.freeze({
+        state: stable.state,
+        reason: stable.reason,
+        markerFact: markerFact(stable),
+        marker: Object.freeze({ ...stable.marker }),
+        receipt: stable.receipt,
+        ...(stable.provenance ? { provenance: stable.provenance } : {}),
+      });
+    },
+    recheckExactRuntime: async (receipt) => {
+      trace.push('runtime:recheck');
+      // failRecheck: the runtime changed under the lock after the inspection.
+      if (options.failRecheck) return false;
+      return Boolean(stable && stable.state === 'exact' && stable.receipt === receipt);
+    },
+    removeExactRuntime: async (receipt) => {
+      trace.push('runtime:remove');
+      if (options.failRuntimeRemove) throw new Error('sensitive:EBUSY');
+      if (!stable || stable.receipt !== receipt) throw new Error('sensitive:runtime-changed');
+      stable = null;
+    },
+  });
+
+  // What a browser asking the native host to start the service would do: a
+  // fresh wake lock in the tree makes it wait, otherwise it starts a serve
+  // process from whatever tree is in place.
+  function browserWake() {
+    if (stable && stable.wakeLock) {
+      trace.push('browser:wake-refused');
+      return;
+    }
+    trace.push('browser:wake-started');
+    daemonOnline = true;
+    healthOverride = { version: stable ? stable.receipt.packageVersion : null, stopRequests: true };
+  }
+
+  const state = Object.freeze({
+    holdWakeLock: async (token) => {
+      trace.push('wake:hold');
+      if (options.wakeLockThrows) throw new Error('sensitive:wake');
+      if (options.wakeLockBusy || !stable) return null;
+      stable.wakeLock = token;
+      return Object.freeze({
+        stopRefreshing: async () => {
+          trace.push('wake:stop-refreshing');
+        },
+        release: async () => {
+          trace.push('wake:release');
+          if (stable && stable.wakeLock === token) delete stable.wakeLock;
+        },
+      });
+    },
+    acquireLock: async (waitMs) => {
+      trace.push(`lock:acquire:${waitMs}`);
+      if (lockHeld) return null;
+      lockHeld = true;
+      const token = hexToken(tokenCounter += 1);
+      return Object.freeze({
+        token,
+        staleTokens: Object.freeze([...(options.staleTokens || [])]),
+        lost: () => false,
+        held: async () => !(typeof options.loseLock === 'function' && options.loseLock(trace, token)),
+        release: async () => {
+          trace.push('lock:release');
+          lockHeld = false;
+        },
+      });
+    },
+    readOptOut: async () => optOut,
+    clearOptOut: async () => {
+      trace.push('optout:clear');
+      optOut = null;
+    },
+    readStamp: async () => stamp,
+    writeStamp: async (value) => {
+      trace.push(`stamp:write:${value.failures}`);
+      stamp = value;
+    },
+    writeStopRequest: async (token, reason) => {
+      trace.push(`stop:write:${reason}`);
+      stopRequest = { token, reason };
+    },
+    removeStopRequest: async (token) => {
+      trace.push('stop:remove');
+      if (stopRequest?.token === token) stopRequest = null;
+    },
+    stableRootPresent: async () => Boolean(stable),
+    listSiblings: async () => Object.freeze([...siblings].map(([name, entry]) => {
+      const separator = name.indexOf('-');
+      return Object.freeze({
+        kind: name.slice(0, separator),
+        token: name.slice(separator + 1),
+        ageMs: entry.ageMs,
+      });
+    })),
+    moveStableToSibling: async (kind, token) => {
+      if (options.browserWakeBeforeMove) browserWake();
+      trace.push(`move:stable->${kind}`);
+      if (options.failMove === `stable->${kind}`) throw new Error('sensitive:EBUSY');
+      if (!stable || siblings.has(`${kind}-${token}`)) throw new Error('sensitive:move');
+      siblings.set(`${kind}-${token}`, { tree: stable, ageMs: 0 });
+      stable = null;
+    },
+    moveSiblingToStable: async (kind, token) => {
+      trace.push(`move:${kind}->stable`);
+      if (options.failMove === `${kind}->stable`) throw new Error('sensitive:EBUSY');
+      const entry = siblings.get(`${kind}-${token}`);
+      if (!entry || stable) throw new Error('sensitive:move');
+      stable = entry.tree;
+      siblings.delete(`${kind}-${token}`);
+      if (options.rewakeAfterSwap && kind === 'next') {
+        trace.push('browser:old-tree-serve-running');
+        daemonOnline = true;
+        healthOverride = options.rewakeAfterSwap.health;
+      }
+      if (typeof options.afterMoveToStable === 'function') {
+        options.afterMoveToStable({ kind, files, registry, layouts });
+      }
+    },
+    removeSibling: async (kind, token) => {
+      trace.push(`remove:${kind}`);
+      siblings.delete(`${kind}-${token}`);
+    },
+  });
+
+  const daemon = Object.freeze({
+    isOnline: async () => {
+      trace.push('daemon:online');
+      return daemonOnline;
+    },
+    waitForOffline: async (timeoutMs) => {
+      trace.push(`daemon:wait:${timeoutMs}`);
+      const health = healthOverride !== undefined ? healthOverride : options.health;
+      const honors = healthOverride !== undefined ? Boolean(health && health.stopRequests) : options.daemonHonorsStop;
+      if (honors && stopRequest) daemonOnline = false;
+      return !daemonOnline;
+    },
+    identifyListener: async () => {
+      trace.push('daemon:identify');
+      if (!daemonOnline) return Object.freeze({ status: 'none' });
+      return Object.freeze(options.listener || { status: 'stable-root', pid: 4242 });
+    },
+    // By default the listener reports what a daemon from before stop requests
+    // reports while idle.
+    readHealth: async () => {
+      trace.push('daemon:health');
+      if (!daemonOnline) return null;
+      const health = healthOverride !== undefined ? healthOverride : options.health;
+      if (health === null) return null;
+      return Object.freeze({
+        version: '0.9.0',
+        stopRequests: false,
+        sessions: 0,
+        queuedMutationTools: false,
+        ...(health || {}),
+      });
+    },
+    hasChildProcesses: async (pid) => {
+      trace.push(`daemon:children:${pid}`);
+      return options.children === undefined ? false : options.children;
+    },
+    terminate: async (pid) => {
+      trace.push(`daemon:terminate:${pid}`);
+      if (options.terminateWorks === false) return false;
+      daemonOnline = false;
+      healthOverride = undefined;
+      return true;
+    },
+  });
+
+  const dependencies = Object.freeze({
+    platform: platformName,
+    stableRoot: runtimeLayout.stableRoot,
+    packageVersion: invokingVersion,
+    nodePath: input.nodePath,
+    runtime,
+    registrations,
+    state,
+    daemon,
+    timing: Object.freeze({ lockWaitMs: 1234, offlineTimeoutMs: 50 }),
+    detectBrowsers: async (extensionId) => {
+      trace.push(`detect:${extensionId}`);
+      if (options.detectThrows) throw new Error('sensitive:detect');
+      if (typeof options.detected === 'function') return options.detected(extensionId);
+      return options.detected ?? ['chrome'];
+    },
+    pinnedNodePresent: async () => options.nodePresent !== false,
+    createPublisher: async (publisherOptions) => {
+      trace.push(`publisher:${publisherOptions.destination}`);
+      if (options.publisherThrows) throw new Error('sensitive:publisher');
+      const layout = modules.runtimeLayout.resolveNativeHostRuntimeLayout({
+        ...input,
+        extensionId: publisherOptions.extensionId,
+        installToken: publisherOptions.installToken,
+      });
+      return Object.freeze({
+        layout,
+        inspectRuntime: runtime.inspectRuntime,
+        publishRuntime: async () => {
+          trace.push(`publish:${publisherOptions.destination}`);
+          publishCount += 1;
+          if (options.publishGate) await options.publishGate;
+          if (options.publishResult) return Object.freeze(options.publishResult);
+          const tree = makeTree({
+            version: invokingVersion,
+            extensionId: publisherOptions.extensionId,
+            token: publisherOptions.installToken,
+            provenance: publisherOptions.provenance,
+            label: 'published',
+          });
+          if (publisherOptions.windowsManifest) tree.manifest = publisherOptions.windowsManifest;
+          published.push(Object.freeze({ options: publisherOptions, tree }));
+          if (publisherOptions.destination === 'next') {
+            siblings.set(`next-${publisherOptions.installToken}`, { tree, ageMs: 0 });
+          } else {
+            if (stable) return Object.freeze({ status: 'refused', reason: 'stable-root-not-absent', receipt: null });
+            stable = tree;
+          }
+          return Object.freeze({
+            status: 'published',
+            reason: 'published',
+            receipt: tree.receipt,
+            trace: Object.freeze({ pack: Object.freeze({}), install: Object.freeze({}) }),
+          });
+        },
+        recheckPublicationBoundary: async (receipt) => Boolean(
+          stable && stable.state === 'exact' && stable.receipt === receipt,
+        ),
+        recheckExactRuntime: runtime.recheckExactRuntime,
+        removeExactRuntime: runtime.removeExactRuntime,
+      });
+    },
+    rewriteProvenance: async (receipt, provenance) => {
+      trace.push(`provenance:${provenance}`);
+      if (!stable || stable.receipt !== receipt) return false;
+      stable.provenance = provenance;
+      rewrites += 1;
+      return true;
+    },
+    now: () => clock,
+  });
+
+  return {
+    dependencies,
+    trace,
+    layouts,
+    runtimeLayout,
+    files,
+    registry,
+    published,
+    siblings,
+    stable: () => stable,
+    stamp: () => stamp,
+    optOut: () => optOut,
+    stopRequest: () => stopRequest,
+    wakeLockInStable: () => (stable && stable.wakeLock) || null,
+    browserWake,
+    publishCount: () => publishCount,
+    rewrites: () => rewrites,
+    advance: (milliseconds) => { clock += milliseconds; },
+    setOnline: (value) => { daemonOnline = value; },
+    holdLock: (value) => { lockHeld = value; },
+    register,
+    registeredBrowsers: () => ENSURE_BROWSERS.filter((browser) => (
+      platformName === 'win32'
+        ? registry.has(`user/32|${layouts[browser].registration.key}`)
+        : files.has(layouts[browser].manifestPath)
+    )),
+  };
+}
+
+function ensureMutations(trace) {
+  return trace.filter((entry) => (
+    entry.startsWith('file:write:')
+    || entry.startsWith('file:delete:')
+    || entry.startsWith('registry:write:')
+    || entry.startsWith('registry:delete:')
+    || entry.startsWith('registry:key-delete:')
+    || entry.startsWith('publish:')
+    || entry.startsWith('move:')
+    || entry.startsWith('remove:')
+    || entry === 'runtime:remove'
+    || entry.startsWith('stop:write')
+    || entry.startsWith('daemon:terminate')
+    || entry.startsWith('provenance:')
+  ));
+}
+
+function traceOrder(trace, entries, message) {
+  const positions = entries.map((entry) => trace.findIndex((candidate) => (
+    typeof entry === 'string' ? candidate === entry : entry.test(candidate)
+  )));
+  check(
+    positions.every((position) => position >= 0)
+      && positions.every((position, index) => index === 0 || position > positions[index - 1]),
+    message,
+  );
+}
+
+const REFRESH_ONLY = Object.freeze({ mode: 'refresh-only', browsers: 'auto', provenance: 'auto' });
+
+async function runEnsureTransaction() {
+  const installer = await importBuild('native-host-install/index.js');
+  const modules = {
+    platform: await importBuild('native-host-install/platform.js'),
+    runtimeLayout: await importBuild('native-host/runtime-layout.js'),
+  };
+
+  equal(installer.compareNativeHostVersions('0.11.5', '0.12.0'), -1, 'versions compare numerically by part');
+  equal(installer.compareNativeHostVersions('0.12.0-rc.1', '0.12.0'), -1, 'a prerelease sorts before its release');
+  equal(installer.compareNativeHostVersions('1.10.0', '1.9.9'), 1, 'minor parts compare as numbers, not text');
+  equal(installer.compareNativeHostVersions('1.0.0', '1.0.0'), 0, 'equal versions compare equal');
+  equal(installer.compareNativeHostVersions('1.0', '1.0.0'), null, 'an unparsable version never compares');
+
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      const harness = fakeEnsureHarness(modules, platformName);
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'skipped-absent', `${platformName} automatic refresh never installs a missing helper`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} skipped-absent performs zero mutation`);
+      check(!harness.trace.some((entry) => entry.startsWith('lock:')), `${platformName} skipped-absent never takes the lock`);
+      equal(result.stableRoot, harness.runtimeLayout.stableRoot, `${platformName} ensure results name the stable root`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        optOut: { at: 1, reason: 'uninstall --native-host' },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'skipped-opt-out', `${platformName} the opt-out marker stops automatic refreshes`);
+      deepEqual(harness.trace, [], `${platformName} an opted-out refresh reads nothing else`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        detected: ['chrome', 'edge'],
+        optOut: { at: 1, reason: 'install --no-native-host' },
+      });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'auto' },
+        harness.dependencies,
+      );
+      equal(result.outcome, 'installed', `${platformName} an install-mode ensure creates a missing helper`);
+      deepEqual(result.browsers, ['chrome', 'edge'], `${platformName} install registers every browser that has the extension`);
+      deepEqual(result.addedBrowsers, ['chrome', 'edge'], `${platformName} install reports the added browsers`);
+      deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} both registrations exist`);
+      equal(harness.stable().provenance, 'auto', `${platformName} the receipt records automatic provenance`);
+      equal(harness.optOut(), null, `${platformName} any install clears the opt-out marker`);
+      equal(harness.stamp().failures, 0, `${platformName} a successful publish writes a clean stamp`);
+      deepEqual(harness.stamp().browsers, ['chrome', 'edge'], `${platformName} the stamp is keyed on the browser set`);
+      if (platformName === 'win32') {
+        equal(
+          harness.trace.filter((entry) => entry.startsWith('file:write:')).length,
+          1,
+          'Windows writes the shared manifest once and only a registry value for the second browser',
+        );
+      }
+      const again = await installer.ensureNativeHost(REFRESH_ONLY, {
+        ...harness.dependencies,
+        detectBrowsers: async () => ['chrome', 'edge'],
+      });
+      equal(again.outcome, 'current', `${platformName} a second ensure finds the helper current`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, { detected: [] });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'explicit' },
+        harness.dependencies,
+      );
+      deepEqual(result.browsers, ['chrome'], `${platformName} install falls back to Chrome when no profile has the extension`);
+      equal(harness.stable().provenance, 'explicit', `${platformName} explicit provenance is recorded`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        detected: ['chrome', 'edge'],
+        failRegistrationWrites: ['edge'],
+      });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'auto' },
+        harness.dependencies,
+      );
+      equal(result.outcome, 'installed', `${platformName} a failed second registration still leaves the first installed`);
+      deepEqual(result.browsers, ['chrome'], `${platformName} the result names only the browser that was registered`);
+      deepEqual(result.failedBrowsers, ['edge'], `${platformName} the result names the browser whose registration failed`);
+      equal(result.failedReason, 'registration-publish-failed', `${platformName} the result carries why it failed`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} only Chrome is registered`);
+      check(!JSON.stringify(result).includes('sensitive'), `${platformName} the failure carries no raw error text`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        detected: ['chrome', 'edge'],
+        failRegistrationWrites: ['edge'],
+      });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'auto' },
+        harness.dependencies,
+      );
+      equal(result.outcome, 'current', `${platformName} a current helper whose only addition failed stays current`);
+      deepEqual(result.addedBrowsers, [], `${platformName} the failed addition is not reported as added`);
+      deepEqual(result.failedBrowsers, ['edge'], `${platformName} the failed addition is reported`);
+      equal(result.failedReason, 'registration-publish-failed', `${platformName} the failed addition carries its reason`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        detected: ['chrome'],
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'current', `${platformName} an exact current helper is current`);
+      equal(result.version, PACKAGE_VERSION, `${platformName} current reports the installed version`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} a current helper performs zero mutation`);
+      check(!harness.trace.some((entry) => entry.startsWith('lock:')), `${platformName} the cheap current path never takes the lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        detected: ['chrome', 'edge'],
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'current', `${platformName} an automatic refresh never registers a newly detected browser`);
+      deepEqual(result.addedBrowsers, [], `${platformName} an automatic refresh reports no added browser`);
+      deepEqual(result.browsers, ['chrome'], `${platformName} an automatic refresh reports only the existing registration`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the new browser stays unregistered after a refresh`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} a refresh that only sees a new browser performs zero mutation`);
+      check(!harness.trace.some((entry) => entry.startsWith('lock:')), `${platformName} a refresh that only sees a new browser never takes the lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        detected: ['chrome', 'edge'],
+      });
+      const result = await installer.ensureNativeHost(
+        { mode: 'install', browsers: 'auto', provenance: 'auto' },
+        harness.dependencies,
+      );
+      equal(result.outcome, 'registered', `${platformName} install registers a browser with the extension but no registration`);
+      deepEqual(result.addedBrowsers, ['edge'], `${platformName} registration reports only the added browser`);
+      deepEqual(result.browsers, ['chrome', 'edge'], `${platformName} registration reports every registered browser`);
+      equal(harness.publishCount(), 0, `${platformName} adding a registration never republishes the runtime`);
+      if (platformName === 'win32') {
+        check(
+          harness.trace.every((entry) => !entry.startsWith('file:write:')),
+          'Windows adds a browser with only its registry value',
+        );
+        check(
+          harness.trace.some((entry) => entry === `registry:write:user/32:${harness.layouts.edge.registration.key}`),
+          'Windows writes the Edge canonical value',
+        );
+      } else {
+        equal(
+          harness.files.get(harness.layouts.edge.manifestPath).contents,
+          manifestText(harness.runtimeLayout.launcherPath),
+          `${platformName} the added manifest names the same launcher and origin`,
+        );
+      }
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0', extensionId: DEVELOPMENT_EXTENSION_ID, provenance: 'auto' },
+        registered: ['chrome'],
+        detected: ['chrome'],
+        daemonOnline: true,
+        listener: { status: 'stable-root', pid: 4242 },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} an exact older helper is refreshed`);
+      equal(result.version, PACKAGE_VERSION, `${platformName} the refresh reports the new version`);
+      equal(harness.stable().receipt.packageVersion, PACKAGE_VERSION, `${platformName} the stable root now holds the new runtime`);
+      equal(
+        harness.stable().marker.origin,
+        `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`,
+        `${platformName} the refresh keeps the marker's extension id instead of the store default`,
+      );
+      equal(harness.published[0].options.destination, 'next', `${platformName} the refresh publishes beside the live root`);
+      equal(harness.stable().provenance, 'auto', `${platformName} the refresh keeps automatic provenance`);
+      traceOrder(harness.trace, [
+        'publish:next',
+        'stop:write:refresh',
+        'daemon:identify',
+        'daemon:terminate:4242',
+        'move:stable->retired',
+        'move:next->stable',
+        'remove:retired',
+        'stop:remove',
+      ], `${platformName} refresh runs publish, stop, legacy fallback, swap, verify, delete, unstop in order`);
+      equal(harness.siblings.size, 0, `${platformName} a refresh leaves no sibling directories`);
+      equal(harness.stopRequest(), null, `${platformName} the stop request is removed afterwards`);
+      if (platformName === 'win32') {
+        equal(
+          harness.stable().manifest,
+          manifestText(harness.runtimeLayout.launcherPath, DEVELOPMENT_EXTENSION_ID),
+          'Windows carries the shared manifest into the replacement tree',
+        );
+      }
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        listener: { status: 'other' },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} a port held by another program does not block the swap`);
+      check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} another program on the port is never signalled`);
+      check(!harness.trace.some((entry) => entry.startsWith('daemon:wait')), `${platformName} another program on the port is not waited for`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        listener: { status: 'unknown' },
+      });
+      const before = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'deferred', `${platformName} an unidentified listener that stays up defers the refresh`);
+      equal(result.reason, 'daemon-unidentified', `${platformName} the deferral names the unidentified daemon`);
+      equal(harness.stable(), before, `${platformName} a deferred refresh leaves the old runtime serving`);
+      equal(harness.siblings.size, 0, `${platformName} a deferred refresh deletes its unused replacement`);
+      equal(harness.stopRequest(), null, `${platformName} a deferred refresh withdraws its stop request`);
+      check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} an unidentified listener is never signalled`);
+      equal(harness.stamp().failures, 1, `${platformName} a deferred refresh records a failure for backoff`);
+      check(harness.stamp().nextAttemptAt > 1_000_000, `${platformName} the backoff schedules the next attempt later`);
+
+      const backoff = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(backoff.outcome, 'deferred', `${platformName} a refresh inside the backoff window waits`);
+      equal(backoff.reason, 'backoff', `${platformName} the backoff deferral is explicit`);
+      equal(harness.publishCount(), 1, `${platformName} the backoff window performs no publish`);
+
+      harness.advance(60 * 60_000);
+      harness.setOnline(false);
+      const retried = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(retried.outcome, 'refreshed', `${platformName} the refresh is retried after the backoff`);
+      equal(harness.stamp().failures, 0, `${platformName} success clears the failure count`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        lockHeld: true,
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'deferred', `${platformName} a live lock holder defers the automatic refresh`);
+      equal(result.reason, 'locked', `${platformName} the lock deferral is explicit`);
+      check(harness.trace.includes('lock:acquire:0'), `${platformName} the automatic refresh never waits for the lock`);
+      equal(harness.publishCount(), 0, `${platformName} the loser of the lock publishes nothing`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        nodePresent: false,
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} a helper whose pinned interpreter is gone is refreshed`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '99.0.0' },
+        registered: ['chrome'],
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'current', `${platformName} a newer installed helper is never downgraded`);
+      equal(result.reason, 'installed-newer', `${platformName} the newer helper is reported`);
+      equal(harness.publishCount(), 0, `${platformName} a newer helper is never republished`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { state: 'invalid', reason: 'launcher-integrity', extensionId: DEVELOPMENT_EXTENSION_ID },
+        registered: ['chrome'],
+      });
+      const original = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} a launcher-only integrity failure is rebuilt`);
+      traceOrder(harness.trace, [
+        'stop:write:refresh',
+        'move:stable->quarantine',
+        'publish:stable',
+        'remove:quarantine',
+        'stop:remove',
+      ], `${platformName} the suspect tree is quarantined before the rebuild publishes`);
+      check(harness.stable() !== original && harness.stable().state === 'exact', `${platformName} the rebuilt runtime is exact`);
+      equal(
+        harness.stable().marker.origin,
+        `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`,
+        `${platformName} the rebuild keeps the marker's extension id`,
+      );
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { state: 'invalid', reason: 'launcher-integrity' },
+        registered: ['chrome'],
+        publishResult: { status: 'refused', reason: 'pack-failed', receipt: null },
+      });
+      const original = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} a failed rebuild is refused`);
+      equal(result.reason, 'pack-failed', `${platformName} the failed rebuild keeps the publish reason`);
+      equal(harness.stable(), original, `${platformName} a failed rebuild puts the quarantined tree back`);
+      equal(harness.siblings.size, 0, `${platformName} a failed rebuild leaves no quarantine behind`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { state: 'invalid', reason: 'runtime-metadata-invalid' },
+        registered: ['chrome'],
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} any other invalid runtime is never touched`);
+      equal(result.reason, 'invalid-state', `${platformName} invalid state is reported`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} an invalid runtime causes zero mutation`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        publishResult: { status: 'refused', reason: 'pack-failed', receipt: null },
+      });
+      const original = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} a failed refresh publish is refused`);
+      equal(harness.stable(), original, `${platformName} a failed refresh publish leaves the old runtime`);
+      check(!harness.trace.some((entry) => entry.startsWith('stop:write')), `${platformName} a failed publish never asks the daemon to stop`);
+      equal(harness.stamp().failures, 1, `${platformName} a failed publish backs off`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        failMove: 'next->stable',
+      });
+      const original = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'deferred', `${platformName} a failed swap rename defers the refresh`);
+      equal(result.reason, 'swap-failed', `${platformName} the swap failure is explicit`);
+      equal(harness.stable(), original, `${platformName} a failed swap renames the old runtime back`);
+      equal(harness.siblings.size, 0, `${platformName} a failed swap leaves no siblings`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        afterMoveToStable: ({ kind, files, registry, layouts }) => {
+          if (kind !== 'next') return;
+          files.delete(layouts.chrome.manifestPath);
+          registry.delete(`user/32|${layouts.chrome.registration.key}`);
+        },
+      });
+      const original = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} a registration that changes during the swap fails verification`);
+      equal(result.reason, 'boundary-changed', `${platformName} the failed verification is reported`);
+      equal(harness.stable(), original, `${platformName} a failed verification swaps the old runtime back`);
+      equal(harness.siblings.size, 0, `${platformName} a failed verification deletes the replacement`);
+    }
+  }
+
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.12.0' },
+      invokingVersion: '1.0.0',
+      registered: ['chrome'],
+      daemonOnline: true,
+      health: { version: '0.12.0', stopRequests: true },
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'deferred', 'a busy daemon that understands stop requests defers the refresh');
+    equal(result.reason, 'daemon-busy', 'the busy daemon is reported');
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), 'a stop-aware daemon is never signalled');
+    check(harness.trace.includes('daemon:wait:50'), 'a stop-aware daemon gets the configured wait');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.12.0' },
+      invokingVersion: '1.0.0',
+      registered: ['chrome'],
+      daemonOnline: true,
+      daemonHonorsStop: true,
+      health: { version: '0.12.0', stopRequests: true },
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'refreshed', 'a stop-aware daemon that drains lets the refresh swap');
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), 'a draining daemon is never signalled');
+  }
+  for (const platformName of ['linux', 'win32']) {
+    // The receipt's version says nothing about the process that is running: a
+    // helper built before a release bump records an older version but its
+    // daemon already watches for stop requests.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      daemonOnline: true,
+      daemonHonorsStop: true,
+      health: { version: '0.9.0', stopRequests: true },
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'refreshed', `${platformName} a daemon that reports stop requests is asked, whatever the receipt version`);
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} a daemon that reports stop requests is never signalled`);
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:children')), `${platformName} a stop-aware daemon needs no busy heuristic`);
+  }
+  for (const [label, overrides] of [
+    ['an open MCP session', { health: { sessions: 1 } }],
+    ['a running mutation', { health: { queuedMutationTools: true } }],
+    ['an unreported session count', { health: { sessions: null } }],
+    ['a child process', { children: true }],
+    ['an unreadable child list', { children: null }],
+  ]) {
+    for (const platformName of ['darwin', 'win32']) {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        ...overrides,
+      });
+      const before = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'deferred', `${platformName} an older daemon with ${label} defers the refresh`);
+      equal(result.reason, 'daemon-busy', `${platformName} the older daemon with ${label} is reported busy`);
+      check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} an older daemon with ${label} is never signalled`);
+      equal(harness.stable(), before, `${platformName} the busy older daemon keeps its runtime`);
+      equal(harness.stamp().failures, 1, `${platformName} the busy older daemon backs the refresh off`);
+    }
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      daemonOnline: true,
+      health: null,
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'deferred', 'a stable-root daemon with no usable /health defers the refresh');
+    equal(result.reason, 'daemon-busy', 'the silent daemon is reported busy');
+    check(harness.trace.includes('daemon:wait:50'), 'a silent daemon is only waited for');
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), 'a silent daemon is never signalled');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      daemonOnline: true,
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'refreshed', 'Windows refreshes over an idle older daemon');
+    traceOrder(harness.trace, [
+      'daemon:identify',
+      'daemon:health',
+      'daemon:children:4242',
+      'daemon:terminate:4242',
+    ], 'an older daemon is signalled only after its health and children prove it idle');
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        browserWakeBeforeMove: true,
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} the refresh completes while holding the wake lock`);
+      traceOrder(harness.trace, [
+        'publish:next',
+        'wake:hold',
+        'stop:write:refresh',
+        'daemon:terminate:4242',
+        'wake:stop-refreshing',
+        'browser:wake-refused',
+        'move:stable->retired',
+        'move:next->stable',
+        'remove:retired',
+      ], `${platformName} the wake lock is taken before the stop request and held until the old tree moves`);
+      check(!harness.trace.includes('browser:wake-started'), `${platformName} no browser starts a serve process from the tree being replaced`);
+      equal(harness.wakeLockInStable(), null, `${platformName} the new tree carries no wake lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        wakeLockBusy: true,
+      });
+      const before = harness.stable();
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'deferred', `${platformName} a wake in progress defers the refresh`);
+      equal(result.reason, 'wake-in-progress', `${platformName} the deferral names the wake in progress`);
+      check(!harness.trace.some((entry) => entry.startsWith('stop:write')), `${platformName} no stop request is written without the wake lock`);
+      equal(harness.stable(), before, `${platformName} the old runtime keeps serving`);
+      equal(harness.siblings.size, 0, `${platformName} the unused replacement is deleted`);
+      equal(harness.stamp().failures, 1, `${platformName} the deferral backs off`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        daemonOnline: true,
+        listener: { status: 'unknown' },
+      });
+      await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(harness.wakeLockInStable(), null, `${platformName} a deferred refresh releases the wake lock it took`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        failMove: 'next->stable',
+      });
+      await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(harness.wakeLockInStable(), null, `${platformName} a swap rolled back releases the wake lock in the restored tree`);
+    }
+    {
+      // A serve process started from the old tree in the moment before the
+      // lock was seen ignores the first request; after the swap it is found
+      // by the version it reports and asked again.
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        rewakeAfterSwap: { health: { version: '0.9.0', stopRequests: true } },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} the refresh completes with a stray old-tree serve`);
+      const afterSwap = harness.trace.slice(harness.trace.indexOf('browser:old-tree-serve-running'));
+      traceOrder(afterSwap, [
+        'daemon:health',
+        'stop:write:refresh',
+        'daemon:wait:50',
+        'remove:retired',
+        'stop:remove',
+      ], `${platformName} the stray old-tree serve gets a fresh stop request before the old tree is deleted`);
+      equal(harness.trace.filter((entry) => entry === 'stop:write:refresh').length, 2, `${platformName} the stray serve is asked with a second, later request`);
+      equal(harness.siblings.size, 0, `${platformName} the old tree is deleted once the stray serve has gone`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        rewakeAfterSwap: { health: { version: '0.9.0', stopRequests: false, sessions: 1 } },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} the new tree stays in place beside a busy stray serve`);
+      equal(harness.stable().receipt.packageVersion, PACKAGE_VERSION, `${platformName} the stable root holds the new runtime`);
+      check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} a busy stray serve is never signalled`);
+      check([...harness.siblings.keys()].some((name) => name.startsWith('retired-')), `${platformName} the old tree is kept while the stray serve may still run from it`);
+      check(harness.stopRequest() !== null, `${platformName} the fresh stop request stays for the stray serve`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { version: '0.9.0' },
+        registered: ['chrome'],
+        rewakeAfterSwap: { health: { version: PACKAGE_VERSION, stopRequests: true } },
+      });
+      const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(result.outcome, 'refreshed', `${platformName} a serve already running the new tree is left alone`);
+      equal(harness.trace.filter((entry) => entry === 'stop:write:refresh').length, 1, `${platformName} a serve from the new tree gets no second request`);
+      equal(harness.siblings.size, 0, `${platformName} the old tree is deleted when the running serve is the new one`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome'],
+        daemonOnline: true,
+      });
+      const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+      equal(result.outcome, 'removed', `${platformName} uninstall-all removes the helper under the wake lock`);
+      traceOrder(harness.trace, [
+        'wake:hold',
+        'stop:write:uninstall',
+        /^(?:file:delete:|registry:delete:)/u,
+        'wake:stop-refreshing',
+        'runtime:remove',
+      ], `${platformName} uninstall-all keeps browsers from restarting the service until the runtime is gone`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome'],
+        wakeLockBusy: true,
+      });
+      const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} a wake in progress refuses uninstall-all`);
+      equal(result.reason, 'wake-in-progress', `${platformName} the refusal names the wake in progress`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} nothing is removed without the wake lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        daemonOnline: true,
+        children: true,
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.status, 'refused', `${platformName} a busy service refuses the last per-browser uninstall`);
+      equal(harness.wakeLockInStable(), null, `${platformName} the refused uninstall releases the wake lock`);
+      check(harness.trace.indexOf('wake:hold') < harness.trace.indexOf('stop:write:uninstall'), `${platformName} the last per-browser uninstall takes the wake lock first`);
+    }
+  }
+  {
+    // The lock is re-read before every move: a holder that lost it between
+    // its two renames stops, and the next holder completes the swap.
+    const firstToken = hexToken(0x101);
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      loseLock: (trace, token) => token === firstToken && trace.includes('move:stable->retired'),
+    });
+    const lost = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(lost.outcome, 'deferred', 'a refresh that loses its lock mid-swap stops');
+    equal(lost.reason, 'lock-lost', 'the stop names the lost lock');
+    check(!harness.trace.includes('move:next->stable'), 'a holder without the lock never makes the second rename');
+    check(!harness.trace.some((entry) => entry.startsWith('remove:')), 'a holder without the lock deletes nothing');
+    equal(harness.stable(), null, 'the stable root is mid-swap when the holder stops');
+    deepEqual(
+      [...harness.siblings.keys()].sort(),
+      [`next-${firstToken}`, `retired-${firstToken}`],
+      'the tokened directories are left for the next holder',
+    );
+    const recovered = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(recovered.outcome, 'current', 'the next run completes the interrupted swap');
+    equal(harness.stable().receipt.packageVersion, PACKAGE_VERSION, 'the completed swap holds the new runtime');
+    equal(harness.siblings.size, 0, 'the next run deletes the retired tree');
+  }
+  {
+    const firstToken = hexToken(0x101);
+    const harness = fakeEnsureHarness(modules, 'darwin', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      loseLock: (trace, token) => token === firstToken && trace.includes('stop:write:refresh'),
+    });
+    const before = harness.stable();
+    const lost = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(lost.reason, 'lock-lost', 'a refresh that loses its lock before the swap stops');
+    equal(harness.stable(), before, 'the old runtime stays in place');
+    check(!harness.trace.some((entry) => entry.startsWith('move:')), 'nothing is moved without the lock');
+    check(harness.siblings.has(`next-${firstToken}`), 'the unused replacement is left for the next holder to delete');
+  }
+  {
+    const firstToken = hexToken(0x101);
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      loseLock: (trace, token) => token === firstToken && trace.some((entry) => entry.startsWith('registry:delete:')),
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', 'uninstall-all that loses its lock stops');
+    equal(result.reason, 'lock-lost', 'the refusal names the lost lock');
+    check(!harness.trace.includes('runtime:remove'), 'the runtime is never removed without the lock');
+    deepEqual(result.removedBrowsers, ['chrome'], 'only the registration removed before the loss is reported');
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome', 'edge'],
+        failRuntimeRemove: true,
+      });
+      const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+      equal(result.outcome, 'refused', `${platformName} uninstall-all whose runtime cannot be removed is refused`);
+      equal(result.reason, 'runtime-remove-failed', `${platformName} the refusal names the runtime removal`);
+      deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} the removed registrations are put back`);
+      deepEqual(result.removedBrowsers, [], `${platformName} no registration is reported removed once restored`);
+      check(harness.stable() !== null, `${platformName} the runtime is still installed`);
+      const current = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+      equal(current.outcome, 'current', `${platformName} the restored helper is consistent, not split`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        failRuntimeRemove: true,
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.reason, 'runtime-remove-failed', `${platformName} the last per-browser uninstall reports the runtime removal`);
+      equal(result.status, 'refused', `${platformName} with the registration put back, nothing changed`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the last registration is put back`);
+    }
+    {
+      // The lock is lost after the last registration went: it cannot be put
+      // back without the lock, so the result says the removal was partial.
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        loseLock: (trace) => trace.some((entry) => entry.startsWith('file:delete:') || entry.startsWith('registry:delete:')),
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.status, 'partial', `${platformName} a last per-browser uninstall that loses its lock after the removal is partial`);
+      equal(result.reason, 'lock-lost', `${platformName} the partial removal names the lost lock`);
+      deepEqual(harness.registeredBrowsers(), [], `${platformName} the registration is gone`);
+      check(harness.stable() !== null, `${platformName} the runtime is not removed without the lock`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        failRecheck: true,
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.status, 'partial', `${platformName} a runtime that changed after the last registration went is a partial removal`);
+      equal(result.reason, 'boundary-changed', `${platformName} the partial removal names the changed runtime`);
+      deepEqual(harness.registeredBrowsers(), [], `${platformName} the registration is gone`);
+      check(!harness.trace.includes('runtime:remove'), `${platformName} a changed runtime is never removed`);
+    }
+    {
+      // An exact runtime left with no registration at all is repaired by the
+      // explicit install instead of being refused as split state.
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: [],
+      });
+      const result = await installer.installNativeHostBrowser({}, harness.dependencies);
+      equal(result.status, 'installed', `${platformName} the explicit install re-registers an unregistered exact runtime`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} Chrome is registered again`);
+      equal(harness.publishCount(), 0, `${platformName} the runtime in place is reused`);
+    }
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'darwin', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      daemonOnline: true,
+      terminateWorks: false,
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'deferred', 'an older daemon that cannot be stopped defers the refresh');
+    equal(result.reason, 'daemon-busy', 'the unstoppable daemon is reported as busy');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+    });
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const gated = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      publishGate: gate,
+    });
+    const first = installer.ensureNativeHost(REFRESH_ONLY, gated.dependencies);
+    const second = installer.ensureNativeHost(REFRESH_ONLY, gated.dependencies);
+    await new Promise((resolve) => setImmediate(resolve));
+    release();
+    const outcomes = (await Promise.all([first, second])).map((result) => result.outcome).sort();
+    deepEqual(outcomes, ['current', 'refreshed'], 'two ensures in one process serialize to one refresh and one current');
+    equal(gated.publishCount(), 1, 'two concurrent ensures publish exactly once');
+    equal(gated.siblings.size, 0, 'two concurrent ensures leave no sibling directories');
+    void harness;
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: {},
+      registered: ['chrome'],
+    });
+    const result = await installer.ensureNativeHost(
+      { mode: 'install', extensionId: DEVELOPMENT_EXTENSION_ID, provenance: 'explicit' },
+      harness.dependencies,
+    );
+    equal(result.outcome, 'refused', 'an install for a different extension id than the marker is refused');
+    equal(result.reason, 'ownership-mismatch', 'the extension id mismatch is reported');
+    equal(ensureMutations(harness.trace).length, 0, 'an extension id mismatch causes zero mutation');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome'],
+    });
+    const result = await installer.ensureNativeHost(
+      { mode: 'install', browsers: 'auto', provenance: 'explicit' },
+      harness.dependencies,
+    );
+    equal(result.outcome, 'current', 'an explicit install of a current automatic helper stays current');
+    equal(harness.stable().provenance, 'explicit', 'an explicit install promotes automatic provenance');
+    const automatic = await installer.ensureNativeHost(
+      { mode: 'install', browsers: 'auto', provenance: 'auto' },
+      harness.dependencies,
+    );
+    equal(automatic.outcome, 'current', 'an automatic install of an explicit helper stays current');
+    equal(harness.stable().provenance, 'explicit', 'an automatic install never demotes explicit provenance');
+    equal(harness.rewrites(), 1, 'provenance is rewritten exactly once');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+      foreignManifests: [['edge', '{"foreign":"edge"}\n']],
+      detected: ['chrome', 'edge'],
+    });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'refreshed', 'a foreign registration in another browser does not block a refresh');
+    equal(
+      harness.files.get(harness.layouts.edge.manifestPath).contents,
+      '{"foreign":"edge"}\n',
+      'a foreign registration is preserved byte for byte',
+    );
+    deepEqual(result.addedBrowsers, [], 'a browser with a foreign registration is never registered over');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', { installed: { state: 'foreign' } });
+    const result = await installer.ensureNativeHost(
+      { mode: 'install', provenance: 'explicit' },
+      harness.dependencies,
+    );
+    equal(result.outcome, 'refused', 'a foreign stable root is refused');
+    equal(result.reason, 'foreign-state', 'the foreign refusal is stable');
+    equal(ensureMutations(harness.trace).length, 0, 'a foreign stable root causes zero mutation');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {});
+    harness.register('chrome');
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'refused', 'a registration without a runtime is a quiet refusal');
+    equal(result.reason, 'split-state', 'the orphan registration is a split state');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: {},
+      registered: ['chrome'],
+      detected: ['chrome'],
+    });
+    harness.siblings.set(`stage-${hexToken(7)}`, { tree: null, ageMs: 1000 });
+    harness.siblings.set(`stage-${hexToken(8)}`, { tree: null, ageMs: 11 * 60_000 });
+    harness.siblings.set(`next-${hexToken(9)}`, { tree: null, ageMs: 0 });
+    harness.siblings.set(`remove-${hexToken(10)}`, { tree: null, ageMs: 0 });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'current', 'leftovers do not change the outcome for a current helper');
+    deepEqual(
+      [...harness.siblings.keys()],
+      [`stage-${hexToken(7)}`],
+      'leftover next, remove and old stage directories are deleted; a young unowned stage is kept',
+    );
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      registered: [],
+      staleTokens: [hexToken(7)],
+    });
+    harness.siblings.set(`stage-${hexToken(7)}`, { tree: null, ageMs: 1000 });
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    equal(result.outcome, 'skipped-absent', 'a publish killed mid-way still reads as absent');
+    equal(harness.siblings.size, 0, 'the stage of a dead lock holder is deleted at once');
+  }
+  for (const fixture of [
+    { label: 'retired and next', siblings: ['retired', 'next'], expected: 'published' },
+    { label: 'retired only', siblings: ['retired'], expected: 'retired' },
+    { label: 'quarantine only', siblings: ['quarantine'], expected: 'quarantine' },
+  ]) {
+    const harness = fakeEnsureHarness(modules, 'linux', {});
+    const token = hexToken(0x55);
+    for (const kind of fixture.siblings) {
+      harness.siblings.set(`${kind}-${token}`, {
+        tree: null,
+        ageMs: 0,
+      });
+    }
+    for (const kind of fixture.siblings) {
+      harness.siblings.get(`${kind}-${token}`).tree = {
+        state: 'exact',
+        reason: 'exact',
+        marker: expectedMarker('linux'),
+        receipt: runtimeReceipt(harness.runtimeLayout, expectedMarker('linux')),
+        manifest: null,
+        label: kind === 'next' ? 'published' : kind,
+      };
+    }
+    harness.register('chrome');
+    const result = await installer.ensureNativeHost(REFRESH_ONLY, harness.dependencies);
+    check(harness.stable() !== null, `recovery restores a stable root left missing with ${fixture.label}`);
+    equal(harness.stable().label, fixture.expected, `recovery with ${fixture.label} picks the right tree`);
+    equal(harness.siblings.size, 0, `recovery with ${fixture.label} leaves no siblings`);
+    equal(result.outcome, 'current', `recovery with ${fixture.label} leaves a current helper`);
+  }
+
+  for (const invalid of [
+    { mode: 'everything', provenance: 'auto' },
+    { mode: 'install', provenance: 'implicit' },
+    { mode: 'install', provenance: 'auto', browsers: ['firefox'] },
+    { mode: 'install', provenance: 'auto', browsers: [] },
+    { mode: 'install', provenance: 'auto', browsers: ['chrome', 'chrome'] },
+    { mode: 'install', provenance: 'auto', extensionId: 'q'.repeat(32) },
+    { mode: 'install', provenance: 'auto', extra: true },
+  ]) {
+    const harness = fakeEnsureHarness(modules, 'linux');
+    const result = await installer.ensureNativeHost(invalid, harness.dependencies);
+    equal(result.reason, 'invalid-request', 'a malformed ensure request is refused');
+    equal(harness.trace.length, 0, 'a malformed ensure request causes zero inspection');
+  }
+
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome', 'edge'],
+      });
+      const edge = await installer.uninstallNativeHostBrowser({ browser: 'edge' }, harness.dependencies);
+      equal(edge.status, 'removed', `${platformName} one browser's registration is removed`);
+      equal(edge.reason, 'registration-removed', `${platformName} the runtime stays while another browser uses it`);
+      deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the other browser keeps its registration`);
+      check(harness.stable() !== null, `${platformName} the runtime is kept for the remaining browser`);
+      check(!harness.trace.some((entry) => entry.startsWith('stop:write')), `${platformName} removing one of two registrations never stops the daemon`);
+      if (platformName === 'win32') {
+        check(harness.stable().manifest !== null, 'Windows keeps the shared manifest while a browser still uses it');
+        check(
+          harness.trace.some((entry) => entry === `registry:key-delete:user/32:${harness.layouts.edge.registration.key}`),
+          'Windows removes the emptied Edge key',
+        );
+      }
+      const mark = harness.trace.length;
+      const chrome = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(chrome.status, 'removed', `${platformName} the last registration is removed`);
+      equal(chrome.reason, 'removed', `${platformName} the runtime goes with the last registration`);
+      equal(harness.stable(), null, `${platformName} the runtime is removed`);
+      traceOrder(harness.trace.slice(mark), [
+        'stop:write:uninstall',
+        /^(?:file:delete:|registry:delete:)/u,
+        'runtime:remove',
+        'stop:remove',
+      ], `${platformName} the last uninstall stops the daemon before mutating`);
+      const again = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(again.status, 'not-installed', `${platformName} per-browser uninstall is idempotent`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: {},
+        registered: ['chrome'],
+        foreignManifests: [['edge', '{"foreign":"edge"}\n']],
+      });
+      const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+      equal(result.status, 'refused', `${platformName} a foreign registration in another browser refuses uninstall`);
+      equal(result.reason, 'split-state', `${platformName} the foreign registration refusal is stable`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} the refused uninstall mutates nothing`);
+    }
+    {
+      const harness = fakeEnsureHarness(modules, platformName, {
+        installed: { provenance: 'auto' },
+        registered: ['chrome', 'brave'],
+      });
+      const result = await installer.uninstallAllNativeHost({ onlyProvenance: 'auto' }, harness.dependencies);
+      equal(result.outcome, 'removed', `${platformName} uninstall-all removes an automatic helper`);
+      deepEqual(result.removedBrowsers, ['chrome', 'brave'], `${platformName} uninstall-all reports every removed browser`);
+      equal(result.provenance, 'auto', `${platformName} uninstall-all reports the provenance`);
+      equal(harness.stable(), null, `${platformName} uninstall-all removes the runtime`);
+      deepEqual(harness.registeredBrowsers(), [], `${platformName} uninstall-all removes every registration`);
+      const again = await installer.uninstallAllNativeHost({}, harness.dependencies);
+      equal(again.outcome, 'absent', `${platformName} uninstall-all is idempotent`);
+    }
+  }
+  for (const provenance of ['explicit', undefined]) {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: provenance ? { provenance } : {},
+      registered: ['chrome'],
+    });
+    const result = await installer.uninstallAllNativeHost({ onlyProvenance: 'auto' }, harness.dependencies);
+    equal(result.outcome, 'kept', `an ${provenance ? 'explicit' : 'older unmarked'} helper is kept when only automatic ones may go`);
+    equal(result.provenance, 'explicit', 'a receipt without provenance counts as explicit');
+    equal(ensureMutations(harness.trace).length, 0, 'a kept helper is not touched');
+    const forced = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(forced.outcome, 'removed', 'uninstall-all without a provenance filter removes it');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.12.0', provenance: 'auto' },
+      invokingVersion: '1.0.0',
+      registered: ['chrome'],
+      daemonOnline: true,
+      health: { version: '0.12.0', stopRequests: true },
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', 'a busy daemon refuses uninstall-all');
+    equal(result.reason, 'daemon-busy', 'the busy daemon is reported');
+    deepEqual(harness.registeredBrowsers(), ['chrome'], 'a busy daemon keeps every registration');
+    check(harness.stable() !== null, 'a busy daemon keeps the runtime');
+    equal(harness.stopRequest(), null, 'the refused uninstall withdraws its stop request');
+  }
+  for (const platformName of ['linux', 'win32']) {
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { version: '0.9.0', provenance: 'auto' },
+      registered: ['chrome'],
+      daemonOnline: true,
+      children: true,
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', `${platformName} an older daemon running a delegated agent refuses uninstall-all`);
+    equal(result.reason, 'daemon-busy', `${platformName} the busy older daemon is reported`);
+    check(!harness.trace.some((entry) => entry.startsWith('daemon:terminate')), `${platformName} a busy older daemon is never signalled by uninstall`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} a busy older daemon keeps every registration`);
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: {},
+      registered: ['chrome'],
+    });
+    const result = await installer.installNativeHostBrowser({ browser: 'edge', extensionId: EXTENSION_ID }, harness.dependencies);
+    equal(result.status, 'installed', `${platformName} an explicit install adds a second browser beside a current helper`);
+    equal(result.location, harness.layouts.edge.manifestPath, `${platformName} the added install names the browser's location`);
+    deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} both browsers are registered`);
+    equal(harness.publishCount(), 0, `${platformName} the second browser shares the runtime`);
+    const repeat = await installer.installNativeHostBrowser({ browser: 'edge' }, harness.dependencies);
+    equal(repeat.status, 'already-installed', `${platformName} the added browser is idempotent`);
+  }
+  const DEVELOPMENT_ORIGIN = `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`;
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // install set the helper up for the Web Store ID while only an unpacked
+    // build is present; that build's repair command names its own ID.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      detected: () => [],
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'installed', `${platformName} an explicit install replaces an automatic helper no installed extension uses`);
+    equal(result.origin, DEVELOPMENT_ORIGIN, `${platformName} the replacement serves the extension the install names`);
+    equal(harness.stable().marker.origin, DEVELOPMENT_ORIGIN, `${platformName} the replacement runtime is bound to that extension`);
+    equal(harness.stable().provenance, 'explicit', `${platformName} the replacement records that it was installed by name`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the old helper's registrations go with it`);
+    check(harness.trace.includes(`detect:${EXTENSION_ID}`), `${platformName} the replacement first looks for the extension the old helper served`);
+    traceOrder(harness.trace, [
+      'wake:hold',
+      'stop:write:uninstall',
+      /^(?:file:delete:|registry:delete:)/u,
+      'runtime:remove',
+      'publish:stable',
+    ], `${platformName} the old helper is removed under the wake lock before the new one is published`);
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome'],
+      detected: (extensionId) => (extensionId === EXTENSION_ID ? ['chrome'] : []),
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'an automatic helper an installed extension still uses is not replaced');
+    equal(result.reason, 'ownership-mismatch', 'the helper in use is reported as owned by another extension');
+    equal(ensureMutations(harness.trace).length, 0, 'the helper in use is left untouched');
+    equal(harness.stable().marker.origin, ORIGIN, 'the helper in use keeps its extension');
+  }
+  for (const [label, options] of [
+    ['a helper installed by name', { installed: { provenance: 'explicit' }, detected: () => [] }],
+    ['an older unmarked helper', { installed: {}, detected: () => [] }],
+    ['a newer automatic helper', { installed: { provenance: 'auto', version: '99.0.0' }, detected: () => [] }],
+    ['an automatic helper whose extension cannot be looked for', { installed: { provenance: 'auto' }, detectThrows: true }],
+  ]) {
+    const harness = fakeEnsureHarness(modules, 'linux', { registered: ['chrome'], ...options });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.reason, 'ownership-mismatch', `${label} is not replaced for another extension`);
+    equal(ensureMutations(harness.trace).length, 0, `${label} is left untouched`);
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // An unpacked build never gets the folder detection looks for, so an
+    // automatic helper serving one would always look unused.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { provenance: 'auto', extensionId: DEVELOPMENT_EXTENSION_ID },
+      registered: ['chrome'],
+      detected: () => [],
+    });
+    const result = await installer.installNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+    equal(result.status, 'refused', `${platformName} an automatic helper for an unpacked build is not replaced`);
+    equal(result.reason, 'ownership-mismatch', `${platformName} the unpacked build's helper is reported as owned by another extension`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the unpacked build's helper is left untouched`);
+    check(!harness.trace.some((entry) => entry.startsWith('detect:')), `${platformName} detection, which cannot see an unpacked build, is not consulted`);
+    equal(harness.stable().marker.origin, DEVELOPMENT_ORIGIN, `${platformName} the unpacked build keeps its helper`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the unpacked build keeps its registration`);
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0', provenance: 'auto' },
+      registered: ['chrome'],
+      detected: () => [],
+      daemonOnline: true,
+      children: true,
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'a busy service refuses the replacement');
+    equal(result.reason, 'daemon-busy', 'the busy service is reported');
+    deepEqual(harness.registeredBrowsers(), ['chrome'], 'a refused replacement keeps every registration');
+    equal(harness.stable().marker.origin, ORIGIN, 'a refused replacement keeps the old helper');
+    equal(harness.publishCount(), 0, 'a refused replacement publishes nothing');
+    equal(harness.stopRequest(), null, 'the refused replacement withdraws its stop request');
+  }
+  const replaceFor = async (platformName, options) => {
+    const harness = fakeEnsureHarness(modules, platformName, {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      detected: () => [],
+      ...options,
+    });
+    const result = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    return { harness, result };
+  };
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    {
+      // The publisher is made before anything is removed.
+      const { harness, result } = await replaceFor(platformName, { publisherThrows: true });
+      equal(result.reason, 'unavailable', `${platformName} a replacement whose publisher cannot be made is refused`);
+      equal(ensureMutations(harness.trace).length, 0, `${platformName} a replacement without a publisher changes nothing`);
+      deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} a replacement without a publisher keeps every registration`);
+      equal(harness.stable().marker.origin, ORIGIN, `${platformName} a replacement without a publisher keeps the old helper`);
+      check(!harness.trace.includes('wake:hold'), `${platformName} a replacement without a publisher never stops the old helper`);
+    }
+    {
+      const { harness, result } = await replaceFor(platformName, {
+        loseLock: (trace) => trace.some((entry) => /^(?:file:delete:|registry:delete:)/u.test(entry)),
+      });
+      equal(result.status, 'refused', `${platformName} a replacement that loses its lock mid-removal is refused`);
+      equal(result.reason, 'replacement-incomplete', `${platformName} a replacement that removed a registration says so`);
+      equal(harness.registeredBrowsers().length, 1, `${platformName} the registration removed before the lock was lost stays removed`);
+      equal(harness.publishCount(), 0, `${platformName} a replacement that lost its lock publishes nothing`);
+    }
+    {
+      const { harness, result } = await replaceFor(platformName, {
+        publishResult: { status: 'refused', reason: 'pack-failed', receipt: null },
+      });
+      equal(result.status, 'refused', `${platformName} a replacement whose publish fails is refused`);
+      equal(result.reason, 'replacement-incomplete', `${platformName} a publish failure after the removal says the old helper is gone`);
+      equal(harness.stable(), null, `${platformName} the removed helper is not reported as kept`);
+      deepEqual(harness.registeredBrowsers(), [], `${platformName} the old helper's registrations went with it`);
+    }
+    {
+      const { harness, result } = await replaceFor(platformName, { failRuntimeRemove: true });
+      equal(result.reason, 'runtime-remove-failed', `${platformName} a replacement whose registrations all came back reports the removal failure`);
+      deepEqual(harness.registeredBrowsers(), ['chrome', 'edge'], `${platformName} the failed runtime removal restores every registration`);
+      equal(harness.stable().marker.origin, ORIGIN, `${platformName} the failed runtime removal keeps the old helper`);
+      equal(harness.publishCount(), 0, `${platformName} the failed runtime removal publishes nothing`);
+    }
+  }
+  {
+    // On Windows a registry value goes first and its emptied key after it, so
+    // a key cleanup that fails still leaves that browser unregistered.
+    const { harness, result } = await replaceFor('win32', { failKeyCleanups: ['chrome'] });
+    equal(result.status, 'refused', 'win32 a replacement whose first key cleanup fails is refused');
+    equal(result.reason, 'replacement-incomplete', 'win32 a registry value removed before its key cleanup failed counts as removed');
+    deepEqual(harness.registeredBrowsers(), ['edge'], 'win32 the browser whose value was removed stays unregistered');
+    equal(harness.publishCount(), 0, 'win32 a replacement stopped by a key cleanup publishes nothing');
+    equal(harness.stable().marker.origin, ORIGIN, 'win32 a replacement stopped by a key cleanup keeps the old helper');
+    const rerun = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(rerun.status, 'installed', 'win32 running the same install again finishes the replacement');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      failKeyCleanups: ['chrome'],
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', 'win32 uninstall-all whose first key cleanup fails is refused');
+    equal(result.reason, 'registry-key-cleanup-failed', 'win32 uninstall-all reports the failed key cleanup');
+    deepEqual(result.removedBrowsers, ['chrome'], 'win32 uninstall-all lists the browser whose value it already removed');
+    deepEqual(harness.registeredBrowsers(), ['edge'], 'win32 uninstall-all stops before the next browser');
+  }
+  {
+    // The same key cleanup failure in a per-browser uninstall: the value is
+    // gone, so the result is partial, not "not changed".
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      failKeyCleanups: ['chrome'],
+    });
+    const result = await installer.uninstallNativeHostBrowser({ browser: 'chrome' }, harness.dependencies);
+    equal(result.status, 'partial', 'win32 a per-browser uninstall whose key cleanup fails is partial');
+    equal(result.reason, 'registry-key-cleanup-failed', 'win32 the partial removal names the key cleanup');
+    deepEqual(harness.registeredBrowsers(), ['edge'], 'win32 Chrome is unregistered and Edge keeps its registration');
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const harness = fakeEnsureHarness(modules, platformName, {});
+    harness.register('chrome');
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', `${platformName} uninstall-all refuses a registration whose runtime is gone`);
+    equal(result.reason, 'split-state', `${platformName} the leftover registration is a split state, as install reports it`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the refused uninstall-all leaves the registration`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the refused uninstall-all changes nothing`);
+    const client = await installer.uninstallAllNativeHost({ onlyProvenance: 'auto' }, harness.dependencies);
+    equal(client.outcome, 'absent', `${platformName} a client uninstall has no helper of its own to remove`);
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const harness = fakeEnsureHarness(modules, platformName, {
+      foreignManifests: [['edge', '{"foreign":"edge"}\n']],
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'absent', `${platformName} uninstall-all with only a registration this package does not own reports nothing installed`);
+    deepEqual(harness.registeredBrowsers(), ['edge'], `${platformName} the registration this package does not own is left in place`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the foreign registration causes zero mutation`);
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // With the marker gone, a registration is read against the Web Store ID,
+    // so FSB's own registration for an unpacked build first reads as foreign.
+    const harness = fakeEnsureHarness(modules, platformName, {});
+    harness.register('chrome', DEVELOPMENT_EXTENSION_ID);
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', `${platformName} uninstall-all refuses FSB's own registration for another extension whose runtime is gone`);
+    equal(result.reason, 'split-state', `${platformName} that leftover registration is a split state too`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the refused uninstall-all leaves that registration`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the refused uninstall-all for another extension changes nothing`);
+    const client = await installer.uninstallAllNativeHost({ onlyProvenance: 'auto' }, harness.dependencies);
+    equal(client.outcome, 'absent', `${platformName} a client uninstall stays quiet about that registration`);
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    // Naming another extension does not make another program's manifest FSB's.
+    const harness = fakeEnsureHarness(modules, platformName, {
+      foreignManifests: [['edge', manifestText(
+        platformName === 'win32' ? 'C:\\Program Files\\Other\\launcher.exe' : '/opt/other/launcher',
+        DEVELOPMENT_EXTENSION_ID,
+      )]],
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'absent', `${platformName} a manifest for another program that names an extension is not counted`);
+    deepEqual(harness.registeredBrowsers(), ['edge'], `${platformName} that manifest is left in place`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} that manifest causes zero mutation`);
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: { version: '0.9.0' },
+      registered: ['chrome'],
+    });
+    const result = await installer.installNativeHostBrowser({ browser: 'edge' }, harness.dependencies);
+    equal(result.status, 'refused', 'a second browser is not added beside an older helper');
+    equal(result.reason, 'version-mismatch', 'the older helper refusal matches the single-browser install');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      foreignManifests: [['edge', '{"foreign":"edge-registration"}\n']],
+    });
+    const result = await installer.installNativeHostBrowser({}, harness.dependencies);
+    equal(result.status, 'refused', 'a foreign registration in another browser still refuses install');
+    equal(result.reason, 'split-state', 'the foreign registration refusal is a split state');
+    equal(harness.publishCount(), 0, 'the refused install publishes nothing');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'darwin', {});
+    const result = await installer.installNativeHostBrowser({ extensionId: EXTENSION_ID }, harness.dependencies);
+    equal(result.status, 'installed', 'an explicit install with nothing present runs the original install');
+    equal(harness.stable().provenance, 'explicit', 'an explicit single-browser install records explicit provenance');
+    const already = await installer.installNativeHostBrowser({ extensionId: EXTENSION_ID }, harness.dependencies);
+    equal(already.status, 'already-installed', 'a repeated explicit install reports already installed');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'linux', {
+      installed: {},
+      registered: ['chrome'],
+    });
+    const result = await installer.addNativeHostRegistration('brave', harness.dependencies);
+    equal(result.outcome, 'registered', 'addNativeHostRegistration registers one browser');
+    deepEqual(result.addedBrowsers, ['brave'], 'addNativeHostRegistration reports the browser');
+    const refused = await installer.addNativeHostRegistration('chromium', {
+      ...harness.dependencies,
+    });
+    equal(refused.outcome, 'registered', 'addNativeHostRegistration works for each browser');
+  }
+}
+
+async function runBrowserDetection() {
+  const platform = await importBuild('native-host-install/platform.js');
+  function fakeTree(directories) {
+    const set = new Set(directories);
+    return {
+      listDirectory: async (pathname) => {
+        const prefix = pathname.endsWith('/') || pathname.endsWith('\\') ? pathname : `${pathname}${pathname.includes('\\') ? '\\' : '/'}`;
+        const names = new Set();
+        for (const directory of set) {
+          if (directory.startsWith(prefix)) names.add(directory.slice(prefix.length).split(/[\\/]/u)[0]);
+        }
+        return set.has(pathname) ? [...names] : null;
+      },
+      isDirectory: async (pathname) => set.has(pathname),
+    };
+  }
+  {
+    const home = '/Users/fsb';
+    const chrome = `${home}/Library/Application Support/Google/Chrome`;
+    const edge = `${home}/Library/Application Support/Microsoft Edge`;
+    const brave = `${home}/Library/Application Support/BraveSoftware/Brave-Browser`;
+    const files = fakeTree([
+      chrome,
+      `${chrome}/Default`,
+      `${chrome}/Default/Extensions`,
+      edge,
+      `${edge}/Profile 3`,
+      `${edge}/Profile 3/Extensions`,
+      `${edge}/Profile 3/Extensions/${EXTENSION_ID}`,
+      brave,
+      `${brave}/Default`,
+      `${brave}/Default/Extensions/${DEVELOPMENT_EXTENSION_ID}`,
+    ]);
+    deepEqual(
+      await platform.detectFsbBrowsers({ platform: 'darwin', homeDirectory: home, extensionId: EXTENSION_ID }, files),
+      ['edge'],
+      'macOS detection counts a browser only when a profile holds the extension',
+    );
+    deepEqual(
+      await platform.detectFsbBrowsers({ platform: 'darwin', homeDirectory: home, extensionId: DEVELOPMENT_EXTENSION_ID }, files),
+      ['brave'],
+      'detection follows the requested extension id',
+    );
+  }
+  {
+    const home = '/home/fsb';
+    const files = fakeTree([
+      `${home}/.config/chromium`,
+      `${home}/.config/chromium/Default`,
+      `${home}/.config/chromium/Default/Extensions/${EXTENSION_ID}`,
+      `${home}/.config/google-chrome`,
+      `${home}/.config/google-chrome/.hidden`,
+      `${home}/.config/google-chrome/.hidden/Extensions/${EXTENSION_ID}`,
+    ]);
+    deepEqual(
+      await platform.detectFsbBrowsers({ platform: 'linux', homeDirectory: home, extensionId: EXTENSION_ID }, files),
+      ['chromium'],
+      'Linux detection reads per-user profile roots and skips hidden entries',
+    );
+  }
+  {
+    const local = 'C:\\Users\\fsb\\AppData\\Local';
+    const files = fakeTree([
+      `${local}\\Google\\Chrome\\User Data`,
+      `${local}\\Google\\Chrome\\User Data\\Default`,
+      `${local}\\Google\\Chrome\\User Data\\Default\\Extensions\\${EXTENSION_ID}`,
+      `${local}\\Microsoft\\Edge\\User Data`,
+      `${local}\\Microsoft\\Edge\\User Data\\Default`,
+      `${local}\\Microsoft\\Edge\\User Data\\Default\\Extensions\\${EXTENSION_ID}`,
+    ]);
+    deepEqual(
+      await platform.detectFsbBrowsers({
+        platform: 'win32',
+        homeDirectory: 'C:\\Users\\fsb',
+        localAppData: local,
+        extensionId: EXTENSION_ID,
+      }, files),
+      ['chrome', 'edge'],
+      'Windows detection reads only per-user profile roots under LOCALAPPDATA',
+    );
+  }
+  deepEqual(
+    await platform.detectFsbBrowsers(
+      { platform: 'linux', homeDirectory: '/home/fsb', extensionId: EXTENSION_ID },
+      { listDirectory: async () => { throw new Error('EACCES'); }, isDirectory: async () => true },
+    ),
+    [],
+    'unreadable profile roots count as not installed',
+  );
+  deepEqual(
+    platform.nativeHostBrowsersFromEnvironment({ FSB_NATIVE_HOST_BROWSERS: 'chrome,edge' }),
+    null,
+    'the browser override is ignored outside test mode',
+  );
+  deepEqual(
+    platform.nativeHostBrowsersFromEnvironment({
+      FSB_NATIVE_HOST_TEST_MODE: '1',
+      FSB_NATIVE_HOST_BROWSERS: 'edge, firefox,chrome,edge',
+    }),
+    ['edge', 'chrome'],
+    'the test-mode browser override keeps known browsers once each',
+  );
+}
+
+// Runs production operations in a child process whose HOME is a temporary
+// directory, with the local-service probes replaced, so nothing here can
+// reach the real home, the real browsers or a real daemon port.
+const PRODUCTION_DRIVER = `
+const [href, stepsJson] = process.argv.slice(1);
+const production = await import(href);
+const ops = production.createProductionNativeHostCliOperations({
+  timing: { lockWaitMs: 3000, offlineTimeoutMs: 100 },
+  daemon: {
+    isOnline: async () => false,
+    waitForOffline: async () => true,
+    identifyListener: async () => ({ status: 'none' }),
+    readHealth: async () => null,
+    hasChildProcesses: async () => null,
+    terminate: async () => false,
+  },
+});
+const results = [];
+for (const step of JSON.parse(stepsJson)) {
+  if (step.op === 'ensure') results.push(await ops.ensure(step.request));
+  else if (step.op === 'install') results.push(await ops.install(step.request));
+  else if (step.op === 'uninstall') results.push(await ops.uninstall(step.request));
+  else if (step.op === 'uninstallAll') results.push(await ops.uninstallAll(step.request));
+  else if (step.op === 'writeOptOut') { ops.writeOptOut(step.reason); results.push(ops.readOptOut()); }
+  else if (step.op === 'clearOptOut') { ops.clearOptOut(); results.push(ops.readOptOut()); }
+  else if (step.op === 'readOptOut') results.push(ops.readOptOut());
+}
+process.stdout.write(JSON.stringify(results));
+`;
+
+function productionDriverEnvironment(home, browsers) {
+  const environment = { ...process.env };
+  delete environment.npm_execpath;
+  for (const key of Object.keys(environment)) {
+    if (key.startsWith('FSB_')) delete environment[key];
+  }
+  return {
+    ...environment,
+    HOME: home,
+    USERPROFILE: home,
+    FSB_NATIVE_HOST_TEST_MODE: '1',
+    FSB_NATIVE_HOST_BROWSERS: browsers,
+  };
+}
+
+function productionDriverArgs(steps) {
+  return [
+    '--input-type=module',
+    '-e',
+    PRODUCTION_DRIVER,
+    pathToFileURL(path.join(repositoryRoot, 'mcp', 'build', 'native-host-production.js')).href,
+    JSON.stringify(steps),
+  ];
+}
+
+function runProductionSteps(home, steps, browsers = 'chrome,edge') {
+  const { spawnSync } = require('node:child_process');
+  const result = spawnSync(process.execPath, productionDriverArgs(steps), {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    env: productionDriverEnvironment(home, browsers),
+    shell: false,
+    timeout: 240_000,
+  });
+  if (result.status !== 0) {
+    throw new Error(`production driver failed (${result.status}): ${result.stderr}`);
+  }
+  return JSON.parse(result.stdout);
+}
+
+function startProductionSteps(home, steps, browsers = 'chrome,edge') {
+  const { spawn } = require('node:child_process');
+  // Its own process group, so a test can kill the driver together with the
+  // package-manager children its publish starts.
+  const child = spawn(process.execPath, productionDriverArgs(steps), {
+    cwd: repositoryRoot,
+    env: productionDriverEnvironment(home, browsers),
+    shell: false,
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const done = new Promise((resolve) => {
+    child.once('close', (status, signal) => resolve({ status, signal, stdout, stderr }));
+  });
+  return { child, done };
+}
+
+async function runProductionEnsure() {
+  if (process.platform === 'win32') {
+    console.log('  SKIP: the temporary-home production run covers macOS and Linux');
+    return;
+  }
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-native-ensure-')));
+  const home = path.join(root, 'home');
+  fs.mkdirSync(home, { recursive: true });
+  const fsbRoot = path.join(home, '.fsb');
+  const stableRoot = path.join(fsbRoot, 'native-host');
+  const receiptPath = path.join(stableRoot, 'install-receipt.json');
+  const provenancePath = path.join(stableRoot, 'provenance.json');
+  const markerPath = path.join(stableRoot, 'owner.json');
+  const manifestName = `${HOST_NAME}.json`;
+  const manifestPath = (browser) => (process.platform === 'darwin'
+    ? path.join(home, 'Library', 'Application Support', ...({
+      chrome: ['Google', 'Chrome'],
+      edge: ['Microsoft Edge'],
+    })[browser], 'NativeMessagingHosts', manifestName)
+    : path.join(home, '.config', ({
+      chrome: 'google-chrome',
+      edge: 'microsoft-edge',
+    })[browser], 'NativeMessagingHosts', manifestName));
+  const siblings = () => (fs.existsSync(fsbRoot)
+    ? fs.readdirSync(fsbRoot).filter((name) => /^native-host\.(?:stage|next|retired|quarantine|remove)-/u.test(name))
+    : []);
+  const lowerVersion = () => {
+    const marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'));
+    const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+    marker.packageVersion = '0.0.1';
+    receipt.packageVersion = '0.0.1';
+    receipt.marker = { ...marker };
+    fs.writeFileSync(markerPath, `${JSON.stringify(marker)}\n`);
+    fs.writeFileSync(receiptPath, `${JSON.stringify(receipt)}\n`);
+  };
+  const ensureRefresh = { op: 'ensure', request: { mode: 'refresh-only', browsers: 'auto', provenance: 'auto' } };
+  try {
+    {
+      const [result] = runProductionSteps(home, [ensureRefresh]);
+      equal(result.outcome, 'skipped-absent', 'production refresh-only never installs into an empty home');
+      check(!fs.existsSync(stableRoot), 'production refresh-only creates no helper');
+      check(!fs.existsSync(`${stableRoot}.lock`), 'production refresh-only takes no lock when nothing is installed');
+    }
+    {
+      const [installed, current] = runProductionSteps(home, [
+        {
+          op: 'ensure',
+          request: {
+            mode: 'install',
+            browsers: 'auto',
+            extensionId: DEVELOPMENT_EXTENSION_ID,
+            provenance: 'auto',
+          },
+        },
+        ensureRefresh,
+      ]);
+      equal(installed.outcome, 'installed', 'production install-mode ensure installs the helper');
+      deepEqual(installed.browsers, ['chrome', 'edge'], 'production install registers each test-mode browser');
+      check(fs.existsSync(manifestPath('chrome')) && fs.existsSync(manifestPath('edge')), 'production install writes both manifests');
+      const writtenReceipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+      deepEqual(
+        Object.keys(writtenReceipt).sort(),
+        [...EARLIER_RELEASE_RECEIPT_KEYS].sort(),
+        'the receipt keeps exactly the keys earlier releases require, so they can still repair and remove the helper',
+      );
+      deepEqual(
+        JSON.parse(fs.readFileSync(provenancePath, 'utf8')),
+        { schema: 1, installToken: writtenReceipt.installToken, provenance: 'auto' },
+        'production records automatic provenance beside the receipt, tied to the install token',
+      );
+      check(fs.existsSync(path.join(fsbRoot, 'native-host-ensure.json')), 'production install writes the ensure stamp');
+      equal(current.outcome, 'current', 'a second production ensure finds the helper current');
+      check(!fs.existsSync(`${stableRoot}.lock`), 'production ensure releases its lock');
+      deepEqual(siblings(), [], 'production install leaves no sibling directories');
+      // macOS's default volume ignores letter case, so a HOME spelled another
+      // way than its folder on disk is the same home and finds the same helper.
+      const respelled = path.join(root, 'HOME');
+      if (process.platform === 'darwin' && fs.existsSync(respelled) && fs.realpathSync.native(respelled) === home) {
+        const [again] = runProductionSteps(respelled, [ensureRefresh]);
+        equal(again.outcome, 'current', 'a HOME spelled in another letter case finds the same current helper');
+      } else {
+        console.log('  SKIP: a HOME spelled in another letter case needs a case-insensitive volume');
+      }
+    }
+    {
+      lowerVersion();
+      const [refreshed] = runProductionSteps(home, [ensureRefresh]);
+      equal(refreshed.outcome, 'refreshed', 'production refresh-only replaces an older exact helper');
+      const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+      equal(receipt.packageVersion, PACKAGE_VERSION, 'the refreshed receipt carries the running version');
+      equal(receipt.origin, `chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`, 'a development extension id survives refresh');
+      equal(Object.hasOwn(receipt, 'provenance'), false, 'the refreshed receipt carries no provenance key');
+      deepEqual(
+        JSON.parse(fs.readFileSync(provenancePath, 'utf8')),
+        { schema: 1, installToken: receipt.installToken, provenance: 'auto' },
+        'refresh keeps automatic provenance for the new publication',
+      );
+      deepEqual(
+        JSON.parse(fs.readFileSync(manifestPath('chrome'), 'utf8')).allowed_origins,
+        [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`],
+        'the Chrome manifest still allows only the development origin',
+      );
+      deepEqual(siblings(), [], 'production refresh leaves no sibling directories');
+      check(!fs.existsSync(`${stableRoot}.stop-requested`), 'production refresh removes its stop request');
+      check(!fs.existsSync(`${stableRoot}.lock`), 'production refresh releases its lock');
+      check(!fs.existsSync(path.join(stableRoot, 'wake.lock')), 'the refreshed tree carries no wake lock');
+    }
+    {
+      lowerVersion();
+      const first = startProductionSteps(home, [ensureRefresh]);
+      const second = startProductionSteps(home, [ensureRefresh]);
+      const outcomes = (await Promise.all([first.done, second.done])).map((run) => {
+        if (run.status !== 0) throw new Error(`concurrent driver failed: ${run.stderr}`);
+        return JSON.parse(run.stdout)[0].outcome;
+      });
+      equal(outcomes.filter((outcome) => outcome === 'refreshed').length, 1, 'two concurrent production ensures publish exactly once');
+      check(
+        outcomes.every((outcome) => ['refreshed', 'deferred', 'current'].includes(outcome)),
+        'the other concurrent ensure defers or finds the helper current',
+      );
+      deepEqual(siblings(), [], 'concurrent ensures leave no orphan directories');
+    }
+    {
+      lowerVersion();
+      const victim = startProductionSteps(home, [ensureRefresh]);
+      const deadline = Date.now() + 120_000;
+      while (Date.now() < deadline && siblings().length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      check(siblings().length > 0, 'the publish under test created its stage');
+      // A package-manager child that outlived its parent could recreate the
+      // stage after cleanup, so the whole publishing group goes at once.
+      process.kill(-victim.child.pid, 'SIGKILL');
+      const killed = await victim.done;
+      equal(killed.signal, 'SIGKILL', 'the publishing child was killed mid-way');
+      check(fs.existsSync(`${stableRoot}.lock`), 'the killed publisher left its lock behind');
+      const [recovered] = runProductionSteps(home, [ensureRefresh]);
+      equal(recovered.outcome, 'refreshed', 'the next ensure breaks the dead lock and refreshes');
+      deepEqual(siblings(), [], 'the next ensure deletes what the killed publisher left');
+      check(!fs.existsSync(`${stableRoot}.lock`), 'the recovered ensure releases its lock');
+    }
+    {
+      // A live holder whose heartbeat only looks old, as after a laptop
+      // sleep, keeps its lock: the automatic refresh leaves at once and a
+      // waiting caller gives up long before it would take a silent lock over.
+      lowerVersion();
+      const lockPath = `${stableRoot}.lock`;
+      const longAgo = Date.now() - 10 * 60_000;
+      const record = `${JSON.stringify({
+        version: 1,
+        pid: process.pid,
+        token: hexToken(0x5150),
+        startedAt: longAgo,
+        heartbeatAt: longAgo,
+      })}\n`;
+      fs.writeFileSync(lockPath, record, { mode: 0o600 });
+      const [automatic, waiting] = runProductionSteps(home, [
+        ensureRefresh,
+        { op: 'ensure', request: { mode: 'install', browsers: 'auto', provenance: 'auto' } },
+      ]);
+      equal(automatic.outcome, 'deferred', 'the automatic refresh defers to a live holder with an old heartbeat');
+      equal(automatic.reason, 'locked', 'the deferral names the held lock');
+      equal(waiting.outcome, 'deferred', 'a waiting install does not take over a live holder within its wait');
+      equal(fs.readFileSync(lockPath, 'utf8'), record, 'the live holder\'s lock is left exactly as it was');
+      deepEqual(siblings(), [], 'nothing is published beside a tree another holder owns');
+      fs.unlinkSync(lockPath);
+      const [restored] = runProductionSteps(home, [ensureRefresh]);
+      equal(restored.outcome, 'refreshed', 'the refresh proceeds once the holder has gone');
+    }
+    {
+      const [edge, optOut, skipped, cleared] = runProductionSteps(home, [
+        { op: 'uninstall', request: { browser: 'edge' } },
+        { op: 'writeOptOut', reason: 'uninstall --native-host' },
+        ensureRefresh,
+        { op: 'clearOptOut' },
+      ], 'chrome');
+      equal(edge.status, 'removed', 'production per-browser uninstall removes Edge');
+      equal(edge.reason, 'registration-removed', 'production per-browser uninstall keeps the runtime for Chrome');
+      check(!fs.existsSync(manifestPath('edge')), 'the Edge manifest is gone');
+      check(fs.existsSync(manifestPath('chrome')) && fs.existsSync(stableRoot), 'Chrome keeps its manifest and the runtime');
+      equal(optOut.reason, 'uninstall --native-host', 'the opt-out marker round-trips its reason');
+      equal(skipped.outcome, 'skipped-opt-out', 'production refresh honors the opt-out marker');
+      equal(cleared, null, 'clearing the opt-out removes the marker');
+    }
+    {
+      // A helper from a build that kept provenance inside the receipt, with
+      // no separate record, is still read as automatic.
+      const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+      fs.writeFileSync(receiptPath, `${JSON.stringify({ ...receipt, provenance: 'auto' })}\n`);
+      fs.unlinkSync(provenancePath);
+      const [removed] = runProductionSteps(home, [
+        { op: 'uninstallAll', request: { onlyProvenance: 'auto' } },
+      ], 'chrome');
+      equal(removed.outcome, 'removed', 'production uninstall-all removes an automatic helper');
+      deepEqual(removed.removedBrowsers, ['chrome'], 'production uninstall-all reports Chrome');
+      check(!fs.existsSync(stableRoot) && !fs.existsSync(manifestPath('chrome')), 'nothing of the helper is left');
+      deepEqual(siblings(), [], 'production uninstall-all leaves no sibling directories');
+    }
+    {
+      const [installed, kept, removed] = runProductionSteps(home, [
+        { op: 'install', request: {} },
+        { op: 'uninstallAll', request: { onlyProvenance: 'auto' } },
+        { op: 'uninstallAll', request: {} },
+      ], 'chrome');
+      equal(installed.status, 'installed', 'production explicit install still installs');
+      equal(kept.outcome, 'kept', 'an explicit helper survives an automatic-only uninstall');
+      equal(kept.provenance, 'explicit', 'the explicit helper reports its provenance');
+      equal(removed.outcome, 'removed', 'uninstall-all without a filter removes the explicit helper');
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+
+  const production = await importBuild('native-host-production.js');
+  {
+    // The real port and listener probes, pointed at a port this test owns.
+    // Nothing here is ever signalled.
+    const net = require('node:net');
+    const server = net.createServer();
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address();
+    const probeHome = require('node:fs').realpathSync(require('node:os').tmpdir());
+    const probes = production.createProductionNativeHostDaemonStopAdapter({
+      homeDirectory: probeHome,
+      environment: {
+        PATH: process.env.PATH,
+        FSB_NATIVE_HOST_TEST_MODE: '1',
+        FSB_NATIVE_HOST_TEST_SERVICE_PORT: String(port),
+      },
+    });
+    check(await probes.isOnline(), 'the port probe sees a listening test port');
+    const listener = await probes.identifyListener();
+    check(
+      listener.status === 'other' || listener.status === 'unknown',
+      'a listener that is not the stable-root serve is never identified as it',
+    );
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      equal(listener.status, 'other', 'the listener lookup finds this test process and rules it out');
+    }
+    equal(await probes.waitForOffline(0), false, 'a listening port is not offline');
+    await new Promise((resolve) => server.close(resolve));
+    check(!await probes.isOnline(), 'the port probe sees the closed test port as offline');
+    equal(await probes.waitForOffline(100), true, 'waiting for a closed port returns at once');
+    deepEqual(await probes.identifyListener(), { status: 'none' }, 'a closed port has no listener');
+  }
+  if (process.platform === 'darwin' || process.platform === 'linux') {
+    // A stand-in for an older daemon: a process this test starts from a
+    // temporary stable root's serve path, so only it can match.
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const net = require('node:net');
+    const { spawn } = require('node:child_process');
+    const fakeRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-native-legacy-')));
+    const fakeHome = path.join(fakeRoot, 'home');
+    const buildIndex = path.join(fakeHome, '.fsb', 'native-host', 'runtime', 'package', 'build', 'index.js');
+    fs.mkdirSync(path.dirname(buildIndex), { recursive: true });
+    fs.writeFileSync(buildIndex, [
+      "const { spawn } = require('node:child_process');",
+      'let child = null;',
+      "const server = require('node:http').createServer((req, res) => {",
+      "  if (req.url === '/health') {",
+      "    res.setHeader('content-type', 'application/json');",
+      "    res.end(JSON.stringify({ ok: true, service: 'fsb-mcp-server', version: '0.11.5', nativeHostProtocol: 1, serveReady: true, sessions: 0, queuedMutationTools: false }));",
+      '    return;',
+      '  }',
+      "  if (req.url === '/child') {",
+      "    child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+      "    child.once('spawn', () => res.end('ok'));",
+      '    return;',
+      '  }',
+      "  if (req.url === '/child-stop') {",
+      "    child.once('exit', () => { child = null; res.end('ok'); });",
+      "    child.kill('SIGKILL');",
+      '    return;',
+      '  }',
+      '  res.statusCode = 404;',
+      '  res.end();',
+      '});',
+      "server.listen(Number(process.env.FSB_TEST_PORT), '127.0.0.1', () => process.stdout.write('ready\\n'));",
+      "process.on('SIGTERM', () => { if (child) child.kill('SIGKILL'); server.close(() => process.exit(0)); });",
+      '',
+    ].join('\n'));
+    const portProbe = net.createServer();
+    await new Promise((resolve) => portProbe.listen(0, '127.0.0.1', resolve));
+    const { port } = portProbe.address();
+    await new Promise((resolve) => portProbe.close(resolve));
+    const daemon = spawn(process.execPath, [buildIndex, 'serve', '--port', String(port)], {
+      env: { PATH: process.env.PATH, FSB_TEST_PORT: String(port) },
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const exited = new Promise((resolve) => daemon.once('exit', (code, signal) => resolve({ code, signal })));
+    try {
+      await new Promise((resolve, reject) => {
+        daemon.stdout.once('data', resolve);
+        daemon.once('error', reject);
+      });
+      const probes = production.createProductionNativeHostDaemonStopAdapter({
+        homeDirectory: fakeHome,
+        environment: {
+          PATH: process.env.PATH,
+          FSB_NATIVE_HOST_TEST_MODE: '1',
+          FSB_NATIVE_HOST_TEST_SERVICE_PORT: String(port),
+        },
+      });
+      const listener = await probes.identifyListener();
+      equal(listener.status, 'stable-root', 'a serve started from the stable root is identified by its command line');
+      equal(listener.pid, daemon.pid, 'the identified pid is the listening serve process');
+      deepEqual(
+        await probes.readHealth(),
+        { version: '0.11.5', stopRequests: false, sessions: 0, queuedMutationTools: false },
+        'the older serve reports its version and idle state on /health, without stop requests',
+      );
+      equal(await probes.hasChildProcesses(listener.pid), false, 'an idle older serve has no child process');
+      const fetchPath = (pathname) => new Promise((resolve, reject) => {
+        require('node:http').get({ host: '127.0.0.1', port, path: pathname, agent: false }, (response) => {
+          response.resume();
+          response.once('end', resolve);
+        }).once('error', reject);
+      });
+      await fetchPath('/child');
+      equal(await probes.hasChildProcesses(listener.pid), true, 'a child process of the serve is seen');
+      await fetchPath('/child-stop');
+      equal(await probes.hasChildProcesses(listener.pid), false, 'the finished child is no longer seen');
+      check(await probes.terminate(listener.pid), 'the confirmed stable-root serve is sent a terminate signal');
+      equal(await probes.waitForOffline(5000), true, 'the terminated serve releases the port');
+      equal((await exited).code, 0, 'the serve ran its own graceful shutdown');
+    } finally {
+      if (daemon.exitCode === null && daemon.signalCode === null) daemon.kill('SIGKILL');
+      fs.rmSync(fakeRoot, { recursive: true, force: true });
+    }
+  }
+  deepEqual(
+    production.serviceHealthFromDocument({ version: '0.12.0', stopRequests: 1, sessions: 2, queuedMutationTools: true }),
+    { version: '0.12.0', stopRequests: true, sessions: 2, queuedMutationTools: true },
+    'a health report with the stop-request flag is read as stop-aware',
+  );
+  deepEqual(
+    production.serviceHealthFromDocument({ version: 'x', stopRequests: '1', sessions: -1, queuedMutationTools: 'no' }),
+    { version: null, stopRequests: false, sessions: null, queuedMutationTools: null },
+    'anything but the exact flag and well-formed counts reads as unknown',
+  );
+  equal(production.serviceHealthFromDocument(null), null, 'no health document is no report');
+  check(
+    production.isStableRootServeCommand(
+      'linux',
+      ['/usr/bin/node', '/home/fsb/.fsb/native-host/runtime/package/build/index.js', 'serve', '--port', '7226'],
+      '/home/fsb/.fsb/native-host',
+    ),
+    'a stable-root serve argv is recognized',
+  );
+  check(
+    !production.isStableRootServeCommand(
+      'linux',
+      ['/usr/bin/node', '/home/fsb/project/mcp/build/index.js', 'serve'],
+      '/home/fsb/.fsb/native-host',
+    ),
+    'a serve from any other checkout is never the stable-root daemon',
+  );
+  check(
+    !production.isStableRootServeCommand(
+      'darwin',
+      '/opt/homebrew/bin/node /Users/fsb/.fsb/native-host/runtime/package/build/index.js stdio',
+      '/Users/fsb/.fsb/native-host',
+    ),
+    'a stable-root process that is not serve is never targeted',
+  );
+  check(
+    production.isStableRootServeCommand(
+      'darwin',
+      '/opt/homebrew/bin/node /Users/fsb/.fsb/native-host/runtime/package/build/index.js serve --host 127.0.0.1 --port 7226',
+      '/Users/fsb/.fsb/native-host',
+    ),
+    'a macOS ps command line for the stable-root serve is recognized',
+  );
+  check(
+    production.isStableRootServeCommand(
+      'win32',
+      '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\fsb\\AppData\\Local\\FSB\\NativeMessagingHost\\runtime\\package\\build\\index.js" serve --port 7226',
+      'C:\\Users\\fsb\\AppData\\Local\\FSB\\NativeMessagingHost',
+    ),
+    'a quoted Windows command line for the stable-root serve is recognized',
+  );
+}
+
+async function runWakeLockCompatibility() {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const production = await importBuild('native-host-production.js');
+  const daemon = await importBuild('native-host/daemon.js');
+  const nativePlatform = await importBuild('native-host/platform.js');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-native-wake-')));
+  const stableRoot = path.join(root, 'native-host');
+  const lockPath = path.join(stableRoot, 'wake.lock');
+  fs.mkdirSync(stableRoot, { recursive: true });
+  const token = hexToken(0xabc);
+  try {
+    const hold = await production.holdNativeHostWakeLock(stableRoot, token);
+    check(hold !== null, 'the wake lock is taken in an idle stable root');
+    const ownerText = fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8');
+    const owner = JSON.parse(ownerText);
+    deepEqual(Object.keys(owner), ['schema', 'token', 'createdAt'], 'the lock owner uses the native host\'s exact fields and order');
+    equal(owner.schema, 1, 'the lock owner schema is the native host\'s');
+    equal(owner.token, token, 'the lock owner names this holder');
+    check(Buffer.byteLength(ownerText, 'utf8') <= 256, 'the lock owner fits the native host\'s size cap');
+
+    // The native host's own wake, against the real lock directory: while the
+    // lock is fresh it never spawns serve and gives up waiting for health.
+    let clock = Date.now();
+    let spawned = 0;
+    const base = nativePlatform.createNativeHostDaemonDependencies({ PATH: process.env.PATH }, { startLeasePort: 1 });
+    const dependencies = Object.freeze({
+      ...base,
+      now: () => clock,
+      wait: async (milliseconds) => { clock += milliseconds; },
+      requestHealth: async () => { throw new Error('offline'); },
+      acquireStartLease: async () => Object.freeze({ release: async () => undefined }),
+      spawn: () => {
+        spawned += 1;
+        throw new Error('spawn must not run');
+      },
+    });
+    const runtime = Object.freeze({
+      stableRuntimeRoot: stableRoot,
+      absoluteNode: process.execPath,
+      absoluteStableBuildIndex: path.join(stableRoot, 'runtime', 'package', 'build', 'index.js'),
+    });
+    const woken = await daemon.wakeServeDaemon({ runtime, dependencies });
+    deepEqual(woken, { outcome: 'failed', reason: 'wake_lock_timeout' }, 'a browser wake waits on the held lock instead of starting serve');
+    equal(spawned, 0, 'no serve process is started while the lock is held');
+
+    await hold.stopRefreshing();
+    check(fs.existsSync(lockPath), 'stopping the refresh leaves the lock in place');
+    await hold.release();
+    check(!fs.existsSync(lockPath), 'releasing removes this holder\'s lock');
+
+    fs.mkdirSync(lockPath);
+    fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({
+      schema: 1,
+      token: hexToken(0xdead),
+      createdAt: Date.now() - 60_000,
+    }));
+    const recovered = await production.holdNativeHostWakeLock(stableRoot, token);
+    check(recovered !== null, 'a lock left by a wake that died is cleared');
+    equal(JSON.parse(fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8')).token, token, 'the cleared lock is replaced by this holder\'s');
+    await recovered.release();
+
+    fs.mkdirSync(lockPath);
+    fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({
+      schema: 1,
+      token: hexToken(0xbeef),
+      createdAt: Date.now(),
+    }));
+    const foreign = await production.holdNativeHostWakeLock(stableRoot, hexToken(0xabd));
+    check(foreign === null, 'a live wake keeps its lock past the wait');
+    equal(JSON.parse(fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8')).token, hexToken(0xbeef), 'a live wake\'s lock is never touched');
+    // The pending and quarantine directories sit beside wake.lock, inside the stable root.
+    deepEqual(
+      fs.readdirSync(stableRoot),
+      ['wake.lock'],
+      'no pending or quarantined lock directory is left beside the lock',
+    );
+
+    // A lock left by a wake that died, which cannot be moved aside (here an
+    // immutable directory), is waited for and given up on at the deadline.
+    if (process.platform === 'darwin') {
+      const { execFileSync } = require('node:child_process');
+      fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({
+        schema: 1,
+        token: hexToken(0xbeef),
+        createdAt: 1,
+      }));
+      execFileSync('/usr/bin/chflags', ['uchg', lockPath]);
+      try {
+        // A wait that never returns would otherwise hang the suite without a word.
+        const stuck = await Promise.race([
+          production.holdNativeHostWakeLock(stableRoot, hexToken(0xabe)),
+          new Promise((resolve) => {
+            const timer = setTimeout(() => resolve('timed-out'), 30_000);
+            timer.unref?.();
+          }),
+        ]);
+        equal(stuck, null, 'a dead wake\'s lock that cannot be moved aside is given up on at the deadline');
+        equal(JSON.parse(fs.readFileSync(path.join(lockPath, 'owner.json'), 'utf8')).token, hexToken(0xbeef), 'a wake lock that cannot be moved aside is left as it was');
+        deepEqual(
+          fs.readdirSync(stableRoot),
+          ['wake.lock'],
+          'no pending or quarantined lock directory is left beside a lock that cannot be moved aside',
+        );
+      } finally {
+        execFileSync('/usr/bin/chflags', ['nouchg', lockPath]);
+      }
+    } else {
+      console.log('  SKIP: an immutable lock directory needs chflags, which only macOS has without root');
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// The stable-root lock itself, against a real directory. A lock this process
+// cannot read is held, never spun on and never broken, and a release never
+// races its own heartbeat into leaving the lock behind.
+async function runStableRootLock() {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const production = await importBuild('native-host-production.js');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-native-lock-')));
+  const stableRoot = path.join(root, 'native-host');
+  const lockPath = `${stableRoot}.lock`;
+  // A run that never returns would otherwise hang the suite without a word.
+  const within = (promise, milliseconds) => Promise.race([
+    promise,
+    new Promise((resolve) => {
+      const timer = setTimeout(() => resolve('timed-out'), milliseconds);
+      timer.unref?.();
+    }),
+  ]);
+  try {
+    fs.mkdirSync(lockPath);
+    let startedAt = Date.now();
+    const automatic = await within(production.acquireNativeHostStableRootLock(stableRoot, 0), 5000);
+    equal(automatic, null, 'a caller that does not wait gets no lease while the lock cannot be read');
+    check(Date.now() - startedAt < 1000, 'a caller that does not wait leaves an unreadable lock at once');
+    startedAt = Date.now();
+    const waiting = await within(production.acquireNativeHostStableRootLock(stableRoot, 300), 5000);
+    const waited = Date.now() - startedAt;
+    equal(waiting, null, 'a waiting caller gets no lease while the lock cannot be read');
+    check(waited >= 300 && waited < 5000, 'a waiting caller gives up on an unreadable lock at its deadline');
+    check(fs.statSync(lockPath).isDirectory(), 'an unreadable lock is never broken');
+    deepEqual(
+      fs.readdirSync(root).filter((name) => name !== 'native-host.lock'),
+      [],
+      'no temporary lock file is left beside an unreadable lock',
+    );
+    fs.rmdirSync(lockPath);
+
+    // A dead holder's lock that cannot be moved aside, here an immutable file,
+    // is waited for like a live holder's and given up on at the deadline.
+    if (process.platform === 'darwin') {
+      const { execFileSync, spawnSync } = require('node:child_process');
+      const exitedPid = spawnSync(process.execPath, ['-e', '']).pid;
+      const deadRecord = `${JSON.stringify({
+        version: 1,
+        pid: exitedPid,
+        token: hexToken(0xdead),
+        startedAt: 1,
+        heartbeatAt: 1,
+      })}\n`;
+      fs.writeFileSync(lockPath, deadRecord, { mode: 0o600 });
+      execFileSync('/usr/bin/chflags', ['uchg', lockPath]);
+      try {
+        startedAt = Date.now();
+        const stuck = await within(production.acquireNativeHostStableRootLock(stableRoot, 300), 5000);
+        const stuckFor = Date.now() - startedAt;
+        equal(stuck, null, 'a dead holder\'s lock that cannot be moved aside gives no lease');
+        check(stuckFor >= 300 && stuckFor < 5000, 'a lock that cannot be moved aside is given up on at the deadline');
+        equal(fs.readFileSync(lockPath, 'utf8'), deadRecord, 'a stable-root lock that cannot be moved aside is left as it was');
+        deepEqual(
+          fs.readdirSync(root).filter((name) => name !== 'native-host.lock'),
+          [],
+          'no temporary lock file is left beside a lock that cannot be moved aside',
+        );
+      } finally {
+        execFileSync('/usr/bin/chflags', ['nouchg', lockPath]);
+        fs.rmSync(lockPath, { force: true });
+      }
+    } else {
+      console.log('  SKIP: an immutable lock file needs chflags, which only macOS has without root');
+    }
+
+    // A heartbeat every millisecond is nearly always writing when release
+    // runs, so a release that does not wait for it would leave the lock.
+    // A heartbeat that lands after release returns brings the lock back a
+    // moment later, and the next round then finds it held; both count.
+    let leftBehind = 0;
+    for (let round = 0; round < 200; round += 1) {
+      const lease = await production.acquireNativeHostStableRootLock(stableRoot, 100, 1);
+      if (lease) {
+        await new Promise((resolve) => setTimeout(resolve, round % 4));
+        await lease.release();
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      if (!lease || fs.existsSync(lockPath)) {
+        leftBehind += 1;
+        fs.rmSync(lockPath, { force: true });
+      }
+    }
+    equal(leftBehind, 0, 'a release never lets an in-flight heartbeat put the lock back');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
@@ -2521,6 +6199,22 @@ async function main() {
   if (!requestedSection || requestedSection === 'doctor-browser-selection') {
     console.log('\n=== Native doctor browser selection ===');
     await runDoctorBrowserSelection();
+  }
+  if (!requestedSection || requestedSection === 'ensure-transaction') {
+    console.log('\n=== Ensure, refresh, per-browser registration and uninstall-all ===');
+    await runEnsureTransaction();
+  }
+  if (!requestedSection || requestedSection === 'browser-detection') {
+    console.log('\n=== Browser detection ===');
+    await runBrowserDetection();
+  }
+  if (!requestedSection || requestedSection === 'production-ensure') {
+    console.log('\n=== Production ensure in a temporary home ===');
+    await runProductionEnsure();
+    console.log('\n=== Wake lock shared with the native host ===');
+    await runWakeLockCompatibility();
+    console.log('\n=== Stable-root lock ===');
+    await runStableRootLock();
   }
   console.log(`\nNative host install tests: ${passed} passed, 0 failed`);
 }

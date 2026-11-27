@@ -88,39 +88,6 @@
   font-size: 1.32rem;
 }
 
-.fsb-row {
-  align-items: baseline;
-  display: inline-flex;
-  font-family: 'Poppins', system-ui, sans-serif;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.fsb-f {
-  font-weight: 100;
-}
-
-.fsb-f::before {
-  content: 'F';
-}
-
-.fsb-s {
-  font-weight: 900;
-}
-
-.fsb-s::before {
-  content: 'S';
-}
-
-.fsb-b {
-  display: inline-block;
-  fill: currentColor;
-  height: 0.74em;
-  margin-left: 0.01em;
-  vertical-align: baseline;
-  width: auto;
-}
-
 .nav-links {
   align-items: center;
   display: flex;
@@ -211,7 +178,7 @@
   border-radius: 999px;
   color: #ccced2;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   gap: 8px;
@@ -314,7 +281,7 @@
 .ps-cmdbar code {
   color: #e9eaec;
   flex: 1;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   min-width: 0;
   overflow: hidden;
@@ -361,7 +328,7 @@
   border-radius: 7px;
   color: #b4b6ba;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 600;
   gap: 7px;
@@ -434,7 +401,7 @@
 }
 
 .ps-flabel {
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.56rem;
   letter-spacing: 0.04em;
   margin-left: auto;
@@ -465,7 +432,7 @@
   align-items: center;
   border-radius: 999px;
   display: inline-flex;
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 5px;
   font-weight: 700;
   gap: 4px;
@@ -527,7 +494,7 @@
 }
 
 .ps-mini-ul {
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 4px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -623,7 +590,7 @@
 
 .ps-pkt {
   color: #9cc2ff;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 7px;
   font-weight: 700;
   letter-spacing: 0.22em;
@@ -838,7 +805,7 @@
 .ps-side-label,
 .ps-toc-label {
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -910,7 +877,7 @@
   border: 1px solid var(--border-color);
   border-radius: 5px;
   color: var(--primary);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.86em;
   padding: 1px 6px;
   white-space: nowrap;
@@ -918,7 +885,7 @@
 
 .ps-kicker {
   color: var(--primary);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -976,7 +943,7 @@
   background: var(--bg-elevated);
   color: var(--text-muted);
   display: flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 700;
   gap: 8px;
@@ -1170,7 +1137,7 @@
 
 .ps-code-name {
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
@@ -1182,7 +1149,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
   gap: 7px;
@@ -1208,7 +1175,7 @@
 
 .ps-code code {
   color: #cdced2;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.79rem;
   line-height: 1.75;
   white-space: pre;
@@ -1481,7 +1448,7 @@
 }
 
 .version-tag {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.4em;
 }
 

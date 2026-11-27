@@ -1,0 +1,26 @@
+<!-- @dsCard group="Motion" viewport="700x170" subtitle="150 / 250 / 400ms, all eased" name="Transitions" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.t{padding:16px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card)}
+.tr{height:8px;background:var(--bg-elevated);border-radius:4px;overflow:hidden;margin-bottom:12px}
+.bar{height:100%;width:26%;background:var(--primary-gradient);border-radius:4px;animation:run 3s ease-in-out infinite alternate}
+@keyframes run{to{width:100%}}
+.t b{display:block;font-size:.78rem;color:var(--text-primary)}
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="t"><div class="tr"><div class="bar"></div></div><b>fast</b><span class="var">--transition-fast</span><div class="lbl">150ms ease</div></div><div class="t"><div class="tr"><div class="bar"></div></div><b>base</b><span class="var">--transition-base</span><div class="lbl">250ms ease</div></div><div class="t"><div class="tr"><div class="bar"></div></div><b>slow</b><span class="var">--transition-slow</span><div class="lbl">400ms ease</div></div>
+</div>
+</body>
+</html>

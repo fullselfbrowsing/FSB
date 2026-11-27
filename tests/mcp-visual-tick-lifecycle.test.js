@@ -193,6 +193,8 @@ async function caseA() {
   check(capturedStatusBroadcasts.length === 1, 'A.11 sendSessionStatus broadcast fired once');
   check(capturedStatusBroadcasts[0] && capturedStatusBroadcasts[0].tabId === 42, 'A.12 broadcast went to tabId 42');
   check(capturedStatusBroadcasts[0] && capturedStatusBroadcasts[0].statusData && capturedStatusBroadcasts[0].statusData.clientLabel === 'Claude', 'A.13 broadcast carries clientLabel=Claude');
+  // The status pill shows the agent id on hover, for when two agents share a client.
+  check(capturedStatusBroadcasts[0] && capturedStatusBroadcasts[0].statusData && capturedStatusBroadcasts[0].statusData.agentId === 'agent_abc', 'A.14 broadcast carries the caller agentId for the pill hover row');
 }
 
 async function caseB() {

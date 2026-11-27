@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { fileURLToPath } from 'node:url';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createRuntime } from './runtime.js';
 import {
@@ -17,13 +18,19 @@ import {
   FSB_EXTENSION_BRIDGE_URL,
   FSB_MCP_VERSION,
 } from './version.js';
-import { getSetupSections, runInstall, runUninstall } from './install.js';
+import {
+  getSetupSections,
+  runInstall,
+  runUninstall,
+  startNativeHostAutoRefresh,
+} from './install.js';
 import {
   createProductionNativeHostCliOperations,
   inspectProductionNativeHost,
 } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
 import { shutdownWhenStdinEnds } from './stdin-shutdown.js';
+import { ONEPASSWORD_HELP, runOnePasswordCommand } from './onepassword/cli.js';
 import {
   FSB_EXT_PROTOCOL,
   formatPairingCode,
@@ -129,6 +136,7 @@ Usage:
   fsb-mcp-server uninstall           Remove FSB from an MCP client config
   fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <id>] Install the selected browser native messaging host
   fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>] Remove the selected browser native messaging host
+${ONEPASSWORD_HELP}
 
 Options:
   --host <host>       HTTP listen host for \`serve\` (default: ${DEFAULT_HTTP_HOST})
@@ -393,9 +401,22 @@ function printSetup(): void {
 }
 
 async function runStdioServer(): Promise<void> {
-  const runtime = createRuntime();
+  // A stdio server lives only as long as its MCP client, so it gives way to
+  // the long-lived local service on DEFAULT_HTTP_PORT: it joins that
+  // service's hub as a relay, and hands the hub port over when asked.
+  const runtime = createRuntime({
+    bridge: new WebSocketBridge({ daemonHealthPort: DEFAULT_HTTP_PORT }),
+  });
   const transport = new StdioServerTransport();
   await runtime.server.connect(transport);
+
+  // Keep an installed local helper current. The check runs in a detached
+  // process that writes nothing to this server's stdio, and it starts on the
+  // next turn of the event loop so an initialize request already waiting on
+  // stdin is answered first.
+  setImmediate(() => {
+    startNativeHostAutoRefresh({ entryPath: fileURLToPath(import.meta.url) });
+  });
 
   try {
     await runtime.bridge.connect();
@@ -589,6 +610,10 @@ async function main(): Promise<void> {
       return;
     case 'uninstall':
       await runUninstall(flags, productionNativeHostCliOperations);
+      return;
+    case 'onepassword':
+    case '1password':
+      await runOnePasswordCommand(flags);
       return;
     default:
       throw new Error(`Unknown command: ${command}`);

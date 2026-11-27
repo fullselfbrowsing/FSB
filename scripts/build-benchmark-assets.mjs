@@ -65,6 +65,9 @@ const MONO_ADVANCE = 0.6;
 // extension/assets/onboarding/fonts/poppins-100.ttf and poppins-900.ttf with fontTools
 // (SVGPathPen through a y-flip), in font units (1000 per em, baseline at y = 0).
 // B is the hand-drawn path every FSB wordmark on the site uses (viewBox -3 -3 78 103).
+// The geometry here mirrors showcase/angular/src/styles/fsb-wordmark.css: a B 0.74em tall
+// after a 0.01em gap, with the letters on raw advances like the site's highlight copies.
+// tests/fsb-wordmark-parity.test.js holds GLYPH_B and the 0.74 scale to that sheet.
 const GLYPH_F = { advance: 469, d: 'M429 -704V-686H105V-361H399V-343H105V0H85V-704Z' };
 const GLYPH_S = {
   advance: 625,

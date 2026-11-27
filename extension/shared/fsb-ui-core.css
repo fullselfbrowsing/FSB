@@ -7,14 +7,24 @@
 :root {
   --fsb-primary: #ff6b35;
   --fsb-primary-hover: #e55a2b;
+  --fsb-primary-tint: #ff8c42;
+  --fsb-on-primary: #ffffff;
+  /* Brand-orange transparencies: four steps (design-system/decisions/0018). */
+  --fsb-primary-faint: rgba(255, 107, 53, 0.08);
   --fsb-primary-soft: rgba(255, 107, 53, 0.12);
-  --fsb-primary-soft-strong: rgba(255, 107, 53, 0.18);
   --fsb-primary-glow: rgba(255, 107, 53, 0.24);
+  --fsb-primary-glow-strong: rgba(255, 107, 53, 0.4);
 
+  /* One red, one green, one amber (design-system/decisions/0014); softer in
+     dark mode (0015). */
   --fsb-success: #10b981;
-  --fsb-warning: #f59e0b;
+  --fsb-warning: #d97706;
   --fsb-danger: #dc2626;
   --fsb-info: #0891b2;
+
+  /* The login prompt's amber text pair, kept by decision 0014. Not for new code. */
+  --fsb-amber-400: #fbbf24;
+  --fsb-amber-800: #92400e;
 
   --fsb-gray-50: #faf8f6;
   --fsb-gray-100: #f5f1ed;
@@ -63,6 +73,20 @@
   --fsb-space-8: 32px;
   --fsb-space-12: 48px;
 
+  /* Stacking layers, lowest first (design-system/decisions/0013). */
+  --fsb-z-dropdown: 50;
+  --fsb-z-menu: 60;
+  --fsb-z-sticky: 100;
+  --fsb-z-drawer-scrim: 150;
+  --fsb-z-drawer: 200;
+  --fsb-z-overlay: 1000;
+  --fsb-z-toast: 1100;
+  --fsb-z-modal: 2000;
+  --fsb-z-top: 9999;
+
+  /* Technical text: the platform monospace stack (design-system/decisions/0012). */
+  --fsb-font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+
   --fsb-focus-ring: 0 0 0 3px rgba(255, 107, 53, 0.14);
 
   /* Compatibility aliases for existing surfaces */
@@ -72,8 +96,8 @@
   --primary-glow: var(--fsb-primary-glow);
 
   --primary-color: var(--fsb-primary);
-  --primary-color-dark: #ff8c42;
-  --primary-light: rgba(255, 107, 53, 0.10);
+  --primary-color-dark: var(--fsb-primary-tint);
+  --primary-light: var(--fsb-primary-soft);
 
   --success-color: var(--fsb-success);
   --warning-color: var(--fsb-warning);
@@ -113,22 +137,30 @@
   --space-lg: var(--fsb-space-6);
   --space-xl: var(--fsb-space-8);
   --space-2xl: var(--fsb-space-12);
+
+  --font-mono: var(--fsb-font-mono);
 }
 
 [data-theme="dark"] {
-  --fsb-surface-base: #141110;
-  --fsb-surface-muted: #1d1816;
-  --fsb-surface-muted-2: #26201d;
-  --fsb-surface-elevated: #1a1513;
-  --fsb-surface-ink: #0d0a09;
+  --fsb-surface-base: #050505;
+  --fsb-surface-muted: #121212;
+  --fsb-surface-muted-2: #141414;
+  --fsb-surface-elevated: #0d0d0d;
+  --fsb-surface-ink: #000000;
 
   --fsb-text-primary: #f6efe9;
   --fsb-text-secondary: #d2c1b4;
   --fsb-text-muted: #a99283;
   --fsb-text-inverse: #141110;
 
-  --fsb-border-subtle: rgba(255, 241, 232, 0.10);
-  --fsb-border-strong: rgba(255, 241, 232, 0.18);
+  /* Softer status colours read better on near-black (design-system/decisions/0015). */
+  --fsb-success: #81c784;
+  --fsb-warning: #e6b844;
+  --fsb-danger: #e57373;
+  --fsb-info: #4dd0e1;
+
+  --fsb-border-subtle: rgba(255, 255, 255, 0.08);
+  --fsb-border-strong: rgba(255, 255, 255, 0.14);
   --fsb-border-accent: rgba(255, 140, 66, 0.28);
 
   --fsb-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28);
@@ -136,7 +168,7 @@
   --fsb-shadow-md: 0 18px 40px rgba(0, 0, 0, 0.38);
   --fsb-shadow-accent: 0 12px 30px rgba(255, 107, 53, 0.22);
 
-  --bg-nav: rgba(20, 17, 16, 0.72);
+  --bg-nav: rgba(5, 5, 5, 0.72);
 }
 
 html {
@@ -150,7 +182,7 @@ body {
 }
 
 ::selection {
-  background: var(--fsb-primary-soft-strong);
+  background: var(--fsb-primary-soft);
   color: inherit;
 }
 
@@ -172,7 +204,7 @@ body {
 
 [data-theme="dark"] :is(.chat-header, .sidepanel-header) {
   background:
-    linear-gradient(180deg, rgba(29, 24, 22, 0.92), rgba(26, 21, 19, 0.88)),
+    linear-gradient(180deg, rgba(13, 13, 13, 0.92), rgba(5, 5, 5, 0.88)),
     var(--bg-primary);
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
 }

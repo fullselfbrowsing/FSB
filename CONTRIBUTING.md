@@ -26,6 +26,10 @@ npm run test:mcp-smoke
 
 4. Link the related Issue and describe what you tested in the pull request.
 
+## Design Changes
+
+Anything people see follows [DESIGN.md](DESIGN.md) and the design system in [design-system/](design-system/README.md): the palettes, tokens, type, motion, icons and copy rules, plus one page per surface. Run `npm run test:design` (part of `npm test`) before opening a pull request that changes a stylesheet, a token or the design docs. If a change alters a rule that several surfaces follow, update the matching page and add a decision record in `design-system/decisions/`.
+
 ## Security
 
 Do not report security vulnerabilities in public Issues or pull requests. Contact a maintainer privately through GitHub so that responsible disclosure can be arranged.

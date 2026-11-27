@@ -111,7 +111,10 @@ async function importHelper() {
 
 async function withFixture(action) {
   const createdRoot = mkdtempSync(path.join(os.tmpdir(), 'fsb-registry-helper-'));
-  const packageRoot = realpathSync(createdRoot);
+  // The native realpath, which the helper checks the root against. The JS
+  // realpathSync keeps Windows 8.3 names such as the CI runner's RUNNER~1,
+  // and the helper then refuses the root as moved.
+  const packageRoot = realpathSync.native(createdRoot);
   try {
     const artifacts = writeArtifactSet(packageRoot);
     await action({ packageRoot, artifacts });
@@ -412,6 +415,125 @@ async function testTamperAndHostileEnvironment(helper) {
   }
 }
 
+// A stateful stand-in for the registry helper executable: it answers the
+// closed numeric protocol for each browser's key family from an in-memory
+// HKCU, so the real adapter and the real Windows platform adapter can be
+// exercised together on any operating system.
+function statefulRegistryProcess(initial = {}) {
+  const keys = new Map();
+  for (const [offset, entry] of Object.entries(initial)) keys.set(Number(offset), { ...entry });
+  const operations = [];
+  return {
+    operations,
+    keys,
+    run: async (invocation) => {
+      const operation = Number(invocation.argv[1]);
+      operations.push(operation);
+      const base = operation % 10;
+      const offset = operation - base;
+      const entry = keys.get(offset) || { exists: false, value32: null, value64: null };
+      let stdout;
+      if (base === 1 || base === 2) {
+        const value = base === 1 ? entry.value32 : entry.value64;
+        stdout = value === null ? response(operation, 1) : response(operation, 2, 1, value);
+      } else if (base === 3) {
+        stdout = response(operation, !entry.exists ? 1 : entry.value32 === null ? 3 : 4);
+      } else if (base === 4) {
+        const stdin = Buffer.from(invocation.stdin);
+        const length = stdin.readUInt32LE(12);
+        keys.set(offset, { ...entry, exists: true, value32: stdin.subarray(16, 16 + length).toString('utf8') });
+        stdout = response(operation, 6);
+      } else if (base === 5) {
+        keys.set(offset, { ...entry, value32: null });
+        stdout = response(operation, 6);
+      } else {
+        keys.set(offset, { ...entry, exists: false });
+        stdout = response(operation, 6);
+      }
+      return { status: 0, stdout, stderr: '', networkRequests: 0 };
+    },
+  };
+}
+
+async function testMultiBrowserRegistrationThroughHelper(helper, platform) {
+  await withFixture(async ({ packageRoot }) => {
+    const registryProcess = statefulRegistryProcess({ 30: { exists: true, value32: null, value64: 'C:\\shadow.json' } });
+    const registry = helper.createNativeHostRegistryHelperAdapter({
+      packageRoot,
+      packageVersion: PACKAGE_VERSION,
+      architecture: 'x64',
+      process: registryProcess,
+    });
+    const files = new Map();
+    const fileWrites = [];
+    const fileAdapter = {
+      inspectFile: async (pathname) => files.get(pathname) || { status: 'absent' },
+      writePrivateFileAtomic: async (pathname, contents) => {
+        fileWrites.push(pathname);
+        if (files.has(pathname)) throw new Error('EEXIST');
+        files.set(pathname, { status: 'file', path: pathname, realPath: pathname, contents });
+      },
+      removeFile: async (pathname) => { files.delete(pathname); },
+    };
+    const adapters = Object.fromEntries(Object.keys(HOST_KEYS).map((browser) => {
+      const layout = platform.resolveNativeHostPlatformLayout({
+        platform: 'win32',
+        browser,
+        homeDirectory: 'C:\\Users\\fsb',
+        localAppData: 'C:\\Users\\fsb\\AppData\\Local',
+      });
+      return [browser, platform.createNativeHostPlatformAdapter(layout, { files: fileAdapter, registry })];
+    }));
+    const manifestPath = adapters.chrome.layout.manifestPath;
+    const manifest = `${JSON.stringify({ name: 'io.github.fullselfbrowsing.fsb_native_host' })}\n`;
+    assert.equal(
+      new Set(Object.values(adapters).map((adapter) => adapter.layout.manifestPath)).size,
+      1,
+      'every Windows browser shares the manifest inside the stable root',
+    );
+
+    await adapters.chrome.publishRegistration(manifest);
+    assert.deepEqual(fileWrites, [manifestPath]);
+    assert.equal(registryProcess.keys.get(0).value32, manifestPath);
+    pass('the first Windows browser writes the shared manifest and its own canonical value');
+
+    const beforeEdge = registryProcess.operations.length;
+    await adapters.edge.publishBrowserRegistration(manifest);
+    assert.deepEqual(fileWrites, [manifestPath], 'a second browser rewrote the shared manifest');
+    assert.equal(registryProcess.keys.get(10).value32, manifestPath);
+    assert.deepEqual(
+      registryProcess.operations.slice(beforeEdge).filter((operation) => operation % 10 === 4),
+      [14],
+      'the second browser wrote outside its own key family',
+    );
+    pass('a second Windows browser adds only its own registry value');
+
+    const beforeBrave = registryProcess.operations.length;
+    await assert.rejects(
+      adapters.brave.publishBrowserRegistration(`${JSON.stringify({ name: 'different' })}\n`),
+      /FSBNH_INSTALL_PLATFORM/,
+    );
+    assert.equal(registryProcess.operations.slice(beforeBrave).includes(24), false);
+    pass('a browser is never pointed at a shared manifest with different contents');
+
+    const beforeChromium = registryProcess.operations.length;
+    await assert.rejects(adapters.chromium.publishBrowserRegistration(manifest), /FSBNH_INSTALL_PLATFORM/);
+    assert.equal(registryProcess.operations.slice(beforeChromium).includes(34), false);
+    pass('a 64-bit shadow value blocks adding that browser');
+
+    await adapters.edge.removeCanonicalRegistration();
+    assert.equal(registryProcess.keys.get(10).value32, null);
+    assert.equal(registryProcess.keys.get(0).value32, manifestPath);
+    assert.equal(files.has(manifestPath), true);
+    assert.deepEqual(await adapters.edge.inspectCanonicalKey(), { status: 'empty' });
+    await adapters.edge.deleteCanonicalKeyIfEmpty();
+    assert.deepEqual(await adapters.edge.inspectCanonicalKey(), { status: 'absent' });
+    const chromeFacts = await adapters.chrome.readRegistrationFacts();
+    assert.deepEqual(chromeFacts.registry32, { status: 'value', type: 'REG_SZ', value: manifestPath });
+    pass('removing one Windows browser leaves the shared manifest and the other browser intact');
+  });
+}
+
 async function main() {
   const helper = await importHelper();
   const platform = await import(`${pathToFileURL(path.join(
@@ -425,6 +547,7 @@ async function main() {
   await testMalformedShadowBlocksMutation(helper, platform);
   await testProcessFailuresAreContentFree(helper);
   await testTamperAndHostileEnvironment(helper);
+  await testMultiBrowserRegistrationThroughHelper(helper, platform);
   console.log(`mcp-native-host-registry-helper: ${passed} assertions passed`);
 }
 

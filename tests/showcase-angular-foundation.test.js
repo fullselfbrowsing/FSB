@@ -53,8 +53,6 @@ const homeComponentSource = readIfPresent('showcase/angular/src/app/pages/home/h
 const homeStyleSource = readIfPresent('showcase/angular/src/app/pages/home/home-page.component.scss');
 const aboutComponentSource = readIfPresent('showcase/angular/src/app/pages/about/about-page.component.ts');
 const aboutStyleSource = readIfPresent('showcase/angular/src/app/pages/about/about-page.component.scss');
-const dashboardComponentSource = readIfPresent('showcase/angular/src/app/pages/dashboard/dashboard-page.component.ts');
-const dashboardStyleSource = readIfPresent('showcase/angular/src/app/pages/dashboard/dashboard-page.component.scss');
 const privacyComponentSource = readIfPresent('showcase/angular/src/app/pages/privacy/privacy-page.component.ts');
 const privacyStyleSource = readIfPresent('showcase/angular/src/app/pages/privacy/privacy-page.component.scss');
 const supportComponentSource = readIfPresent('showcase/angular/src/app/pages/support/support-page.component.ts');
@@ -176,7 +174,6 @@ assert(
 assert(
   /path:\s*''/.test(routeSource) &&
     /path:\s*'about'/.test(routeSource) &&
-    /path:\s*'dashboard'/.test(routeSource) &&
     /path:\s*'privacy'/.test(routeSource) &&
     /path:\s*'support'/.test(routeSource) &&
     /path:\s*'\*\*'/.test(routeSource),
@@ -221,8 +218,8 @@ assert(
 );
 
 assert(
-  /<div class="nav-links">[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/dashboard"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource) &&
-    /<div class="nav-mobile"[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/dashboard"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource),
+  /<div class="nav-links">[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource) &&
+    /<div class="nav-mobile"[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource),
   'shell template preserves canonical desktop and mobile routerLink contracts'
 );
 
@@ -263,14 +260,13 @@ assert(
 );
 
 assert(
-  !/(about-hero|dash-preview|faq-section|privacy-page)/.test(globalStylesSource),
+  !/(about-hero|faq-section|privacy-page)/.test(globalStylesSource),
   'global styles avoid page-specific selector leakage'
 );
 
 assert(
   /styleUrl:\s*'\.\/home-page\.component\.scss'/.test(homeComponentSource) &&
     /styleUrl:\s*'\.\/about-page\.component\.scss'/.test(aboutComponentSource) &&
-    /styleUrl:\s*'\.\/dashboard-page\.component\.scss'/.test(dashboardComponentSource) &&
     /styleUrl:\s*'\.\/privacy-page\.component\.scss'/.test(privacyComponentSource) &&
     /styleUrl:\s*'\.\/support-page\.component\.scss'/.test(supportComponentSource),
   'all canonical route components wire component-scoped styleUrl files'
@@ -279,7 +275,6 @@ assert(
 assert(
   /\.hero\b/.test(homeStyleSource) &&
     /\.about-hero\b/.test(aboutStyleSource) &&
-    /\.dash-preview\b/.test(dashboardStyleSource) &&
     /\.privacy-page\b/.test(privacyStyleSource) &&
     /\.faq-section\b/.test(supportStyleSource),
   'route-specific SCSS files preserve core page visual selector anchors'

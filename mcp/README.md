@@ -36,7 +36,17 @@ It also supports trigger watchers, visible client-owned visual sessions, capabil
 
 Use this package when you want your AI client to drive the browser directly while still using FSB's DOM analysis, selector handling, visual overlay, action verification, session logging, memory, and vault boundaries.
 
-> **PhantomStream (engineering milestone 0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
+### What's New In v0.95.0
+
+- `install --<client>`, `install --all`, and a bare `install` now register FSB's native messaging host in each browser that has FSB installed, or in Chrome when none does, so a separate `install --native-host` is no longer needed. A helper problem is printed as a warning without failing the client install, and `--dry-run` previews the step.
+- `--no-native-host` writes only the client config and pauses the automatic refresh until a later `install` without the flag.
+- When an MCP client starts the server, a detached process refreshes an already registered helper that is older than the package. It never registers a helper from nothing, and `FSB_NATIVE_HOST_AUTO=0` turns it off.
+- A refresh publishes the new helper beside the old one and swaps them only after the local agent service has stopped while idle. It holds the native host's wake lock throughout, so the browser cannot start the old copy in between.
+- The long-lived local agent service owns hub port 7225. A stdio server joins it as a relay, or hands the port over once nothing is in flight.
+- Uninstalling FSB from its last client removes a helper that `install` set up, unless the extension has run a delegated agent through it. After `uninstall --all` or `uninstall --native-host`, the helper stays off until the next `install`.
+- One helper can serve several browsers, and `uninstall --native-host --browser <name>` removes only that browser's registration.
+- The hub answers the extension's 1Password requests, so logins and cards come from the user's 1Password, and `fsb-mcp-server onepassword` configures the connection from a terminal. See [1Password for logins and cards](#1password-for-logins-and-cards).
+- **Compatibility:** `fsb-mcp-server` 0.95.0 requires FSB extension 0.9.99 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.5
 
@@ -48,7 +58,6 @@ Use this package when you want your AI client to drive the browser directly whil
 - `install --antigravity` replaces `install --windsurf` and writes `~/.gemini/config/mcp_config.json`, falling back to `~/.gemini/antigravity/mcp_config.json` on older Antigravity releases. An empty config file is treated as an empty config.
 - Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
 - Grok Build is verified against the `grok-acp-v1` integration contract instead of one exact version (see [Grok Build as the extension's AI provider](#grok-build-as-the-extensions-ai-provider)). Rerun the native-host installation after updating so the staged runtime gets the new checks.
-- **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.95 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.2
 
@@ -114,7 +123,7 @@ This is the FSB v0.9.60 milestone release. The headline change is the new multi-
 - Route-aware tool dispatch and centralized parameter mapping.
 - Layered diagnostics through `doctor` and `status --watch`.
 - Persistent visual session glow across content script reinjection.
-- Secure vault tools that avoid sending raw secrets over the bridge.
+- 1Password-backed login and card tools that never return secrets to the MCP client.
 - One-command installer coverage for 21 platforms.
 
 Background-agent MCP tools were retired with the extension's background-agent sunset. The last tool left in that module, `back`, duplicated `go_back` and has been removed.
@@ -215,9 +224,41 @@ npx -y fsb-mcp-server@latest uninstall --cursor
 
 `install --list` shows all supported platform flags and whether the target config was detected.
 
+Installing into a client also sets up FSB's local helper, described in [Native Messaging Host](#native-messaging-host) below. Add `--no-native-host` to write only the client config.
+
 ### Native Messaging Host
 
-The native messaging host targets one browser per owned runtime. Chrome is the default, so existing commands and Chrome registrations continue to work:
+The native messaging host, `io.github.fullselfbrowsing.fsb_native_host`, is FSB's local helper. It lets the extension start the local agent service that delegated Claude Code and Grok Build runs use. The extension cannot install it. The helper's files live in `~/.fsb/native-host` on macOS and Linux and in `%LOCALAPPDATA%\FSB\NativeMessagingHost` on Windows.
+
+**`install` sets it up.** `install --<client>`, `install --all`, and a bare `install` with no client flag set up the helper after the client configs are written. A bare `install` then prints the usage.
+
+- The helper is registered in each supported browser (Chrome, Edge, Brave, Chromium) whose user profile has FSB installed, or in Chrome when FSB is found in none of them.
+- Each registration names one permitted extension origin: the published Chrome Web Store ID unless you pass `--extension-id`.
+- A helper that is already current is left alone, so running `install` again reports it as already installed.
+- A helper problem never fails the client install. It is printed as a warning, and `doctor` reports it. A step that only had to wait, for example while a delegated run was active, is retried by the next server start or by running the same install command again; anything else is repaired with `install --native-host`.
+- `--dry-run` previews the helper step together with the config writes.
+- `--no-native-host` skips the helper and stops the automatic refresh described below. A later `install` without the flag turns both back on.
+
+**FSB's server keeps it current.** When an MCP client starts a published `fsb-mcp-server`, for example through `npx -y fsb-mcp-server@latest`, the server checks the helper in a detached background process that writes nothing to the client's stdio.
+
+- It refreshes a registered helper that is older than the running package, or whose pinned Node.js no longer exists, and keeps the extension ID that helper was registered with.
+- The local agent service is stopped only while it is idle, and it starts from the refreshed copy the next time it is needed. A service from an earlier version cannot report that it is idle, so it is stopped only when it has no open MCP session, no running tool call and no child process, such as a delegated agent. On Windows that stop ends the process at once.
+- It never registers a helper you have not installed. After `--no-native-host`, `uninstall --native-host`, or `uninstall --all`, it does nothing until you next run `install`.
+- A helper it cannot verify as its own is never changed, and `doctor` reports it.
+- A server started from a source checkout never touches the installed helper.
+- Set `FSB_NATIVE_HOST_AUTO=0` in the client's MCP server environment to turn the check off.
+
+**`uninstall` removes it when nothing needs it.** `uninstall --<client>` also removes the helper when all of these hold:
+
+- the helper was set up by `install` rather than `install --native-host`;
+- no other FSB client config can be found;
+- the browser extension has never run a delegated agent, such as Claude Code or Grok Build, through it. The local agent service records every delegated run in `~/.fsb/agent-runtime/delegation-events.jsonl`; a connection test or sign-in is not a run.
+
+Otherwise the helper stays, and the command prints why along with the `uninstall --native-host` command that removes it anyway. A client config that cannot be read counts as still using FSB, and clients that only print setup instructions cannot be checked. `uninstall --all` removes every client entry, stops the automatic refresh, and removes the helper when it was set up by `install` and the extension has not run a delegated agent through it. Removing FSB in a client's own settings, or by editing its config by hand, is invisible to FSB, so the helper stays until you remove it.
+
+`uninstall --native-host` removes the helper however it was installed, including one installed by an earlier version, and stops the automatic refresh until you next run `install`.
+
+**`install --native-host` installs and repairs it explicitly.** Without `--browser` it uses Chrome, so existing commands and Chrome registrations continue to work. Without `--browser`, `uninstall --native-host` removes every registration along with the helper's files:
 
 ```bash
 npx -y fsb-mcp-server@latest install --native-host
@@ -236,7 +277,39 @@ npx -y fsb-mcp-server@latest uninstall --native-host --browser edge
 
 Extension IDs are browser-installation-specific. Omitted `--extension-id` uses the published Chrome Web Store ID, `badgafnfchcihdfnjneklogedcdkmjfk`. For Edge, Brave, Chromium, or an unpacked build, copy the 32-character lowercase ID shown on that browser's extensions page and pass it with `--extension-id`.
 
-The browser selector controls the user-scoped native-messaging registration location. To switch browsers, uninstall the browser target reported by `doctor` first; cross-target install and uninstall requests refuse without changing either registration.
+A helper serves one extension ID. When `install` set it up for the Web Store ID and no browser profile has the Web Store build, for example while only an unpacked build is installed, `install --native-host --extension-id <extension-id>` replaces it with one for that ID. A helper `install` set up for any other ID is kept, because an unpacked build cannot be detected and may still use it. That helper, one you installed with `install --native-host`, one an installed extension still uses, and one newer than the running package are refused instead; remove it with `uninstall --native-host` first. If a replacement stops after removing the old helper, or some of its registrations, it says the helper was only partly replaced; run the same command again to finish.
+
+`--browser` selects one browser's user-scoped native-messaging registration. One helper can be registered in several browsers with the same extension ID. `uninstall --native-host --browser <name>` removes only that browser's registration, and the helper's files go with its last registration. To add a browser where you have since installed FSB, run `install` again.
+
+### 1Password for logins and cards
+
+FSB keeps no passwords or cards of its own. `fill_credential`, `use_payment_method`, and their list tools read the user's 1Password. This server signs in to 1Password with the [1Password JavaScript SDK](https://www.npmjs.com/package/@1password/sdk) and hands values to the extension over the paired loopback bridge; the extension fills the page. The 1Password connection lives in this server, so the extension has to reach it over the paired bridge. When it cannot, the Vault page shows the command that installs the local helper.
+
+**Log in from the extension.** Open the FSB control panel, choose **Vault**, and press **Log in to 1Password**. The button does not skip 1Password's own steps; it walks you through them:
+
+1. **The 1Password desktop app**, installed and signed in. When it is missing, the Vault page links to the download.
+2. **Settings > Developer > Integrate with 1Password SDKs** in the 1Password app. FSB opens that pane for you (`onepassword://settings/developers`) and continues once the setting is on. On a managed device, your administrator may have to allow it.
+3. **Your account name**, if FSB asks for it: the name at the top of the 1Password sidebar, such as `my.1password.com`.
+4. **Your approval** in the 1Password app. 1Password asks again after 10 idle minutes, after the app locks, and after this server restarts.
+
+After you approve, the Vault page lists the logins and cards FSB can use: titles, usernames, and sites, and for cards the brand, last 4 digits, cardholder name, and expiry. It is read-only; add, edit, and delete items in 1Password.
+
+**Which vaults FSB reads.** By default, every vault the account can see, except transfer vaults and vault types the SDK does not support. To narrow it to some vaults, choose them under **Advanced** on the Vault page, or run `npx fsb-mcp-server onepassword --allow <id,id>`; **Use all vaults** there, or `--all-vaults`, goes back to every vault. "Save to 1Password" writes new logins to your Personal vault unless you choose another save vault. If 1Password reports no Personal vault, the Vault page asks you to pick one; `--save-vault <id>` sets it from a terminal. FSB offers "Save to 1Password" only while it has a save vault it can read.
+
+**Headless: a service account, from the terminal only.** For a machine where nobody is at the 1Password app, create a 1Password service account with read access to the vaults FSB should use, then:
+
+```bash
+npx fsb-mcp-server onepassword --service-account   # token is read hidden, or from OP_SERVICE_ACCOUNT_TOKEN
+npx fsb-mcp-server onepassword --vaults            # list vault ids
+npx fsb-mcp-server onepassword --allow <vaultId>   # limit FSB to that vault
+npx fsb-mcp-server onepassword --all-vaults        # or: let FSB use every vault it can see again
+npx fsb-mcp-server onepassword --save-vault <vaultId>   # optional: where "Save to 1Password" writes
+npx fsb-mcp-server onepassword                     # show the current setup
+```
+
+Service accounts cannot read Personal vaults, so set `--save-vault` if you want "Save to 1Password". The Vault page does not set up service accounts, but it shows one set up this way as connected and offers Disconnect.
+
+Settings live in `~/.fsb/onepassword.json` (owner-only). A service-account token is stored there and never sent to the extension. `--desktop <account>` sets up the desktop app from the CLI, and `--reset` forgets everything. Logins are released only for a site one of their saved websites matches, following the item's 1Password autofill setting, and a website saved as `https://` is never matched by a plain-`http://` page. Cards fill only on `https` pages and only while the tab stays on the site it was on. Over MCP, FSB shows no card prompt of its own, so the agent asks the user before calling `use_payment_method`. In autopilot, card fills need **Enable Saved Payment Methods** turned on in the Vault page, and FSB asks in the side panel before each one.
 
 ### Grok Build as the extension's AI provider
 
@@ -248,7 +321,7 @@ The private profile stays under `~/.fsb/agent-providers/grok/`. Upgrading the in
 
 If the CLI refuses its strict sandbox, FSB reports `sandbox_unavailable` rather than a version error. For example, a Docker socket symlink can prevent Grok from constructing its sandbox. Resolve the reported environment problem before retrying; FSB does not switch to a weaker sandbox automatically.
 
-The native helper stages its own package runtime. Updating an extension or source checkout does not update that installed copy. After a fixed package is published, rerun the native-host installation command above with the same browser and extension ID, then restart the local FSB service and retry the connection test. Before publication, `@latest` still installs the previously published runtime.
+The native helper stages its own copy of the package. Updating the extension or a source checkout does not update it. When an MCP client next starts a newer published `fsb-mcp-server`, the server refreshes that copy in the background, as described under [Native Messaging Host](#native-messaging-host). To refresh it by hand, rerun `install --native-host` with the same browser and extension ID, then retry the connection test. Before publication, `@latest` still installs the previously published runtime.
 
 Maintainers can build the MCP package and run `node scripts/check-grok-compatibility.mjs --binary /absolute/path/to/grok` from the repository root. It uses a disposable unauthenticated profile, prints a bounded JSON verdict, and makes no inference requests. The weekly/manual **Grok CLI compatibility** workflow runs the same check against the official stable CLI on macOS and Linux.
 
@@ -613,12 +686,12 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 
 | Tool | Purpose |
 |------|---------|
-| `list_credentials` | List saved credential metadata without passwords. |
-| `fill_credential` | Fill a login form with an unlocked saved credential. |
-| `list_payment_methods` | List saved payment metadata without full card data. |
-| `use_payment_method` | Fill checkout data after user confirmation. |
+| `list_credentials` | List the 1Password logins FSB may use: id, title, site domains, username. |
+| `fill_credential` | Fill username, password, and one-time code from the 1Password login saved for the tab's site. With none saved, FSB asks the user to type one on the page. |
+| `list_payment_methods` | List 1Password credit cards: id, title, brand, last 4, cardholder name, expiry. |
+| `use_payment_method` | Fill a checkout form with a 1Password card on an `https` page. FSB shows no prompt of its own, so ask the user first. |
 
-Vault responses expose metadata only. Passwords, full card numbers, and CVV values are resolved inside the extension and are not returned to the MCP client.
+These tools read the user's 1Password once it is connected, usually with **Log in to 1Password** on the extension's Vault page (see [1Password](#1password-for-logins-and-cards)). Responses expose metadata only. Passwords, one-time codes, full card numbers, and CVV values go from 1Password to this server to the extension to the page, and are never returned to the MCP client.
 
 ### Tool Count Contract
 
@@ -649,7 +722,14 @@ graph TD
     B --- Surface
 ```
 
-Multiple MCP clients can connect at once. The first server instance becomes the hub on port 7225; later instances become relay clients. If the hub exits, a relay can promote to hub.
+Multiple MCP clients can connect at once. One server instance is the hub on port 7225 and the others are relay clients. If the hub exits, a relay promotes itself to hub.
+
+When the local agent service (`fsb-mcp-server serve`, which the browser starts through the native messaging host) is running, it is the preferred hub, because it outlives the MCP clients that come and go:
+
+- A stdio server checks `http://127.0.0.1:7226/health` before binding 7225. If the service reports ready, the stdio server joins as a relay.
+- If a stdio server already holds 7225, the service joins as a relay and asks it to hand the port over. The request is signed with the bridge pairing secret in `~/.fsb/bridge-auth.json`, and the hub also checks that the service's own `/health` names the asking relay.
+- The stdio hub hands over only while nothing is in flight. It closes its listening socket so the service can bind, finishes anything that arrived in the meantime, and then closes the extension and relay sockets. The extension reconnects to the service and the relays follow, so none of them competes with the service for the port.
+- A hub from an earlier version ignores the request and keeps the port.
 
 The server also exposes live resources:
 
@@ -701,9 +781,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.5`) because it is published independently from the extension release (`0.9.95`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
+The MCP package has its own version (`0.95.0`) because it is published independently from the extension release (`0.9.99`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.5 requires extension 0.9.95 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
+Compatibility for this release: MCP 0.95.0 requires extension 0.9.99 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -717,14 +797,14 @@ Contract-sensitive changes should be covered by tests before publishing:
 - trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
 - terminal task-outcome contract: `mcp:task-status`, agent/ownership context, serialized lifecycle ordering, and `fail_task` acknowledgement semantics
 
-### Releasing 0.11.5
+### Releasing 0.95.0
 
-This 0.11.5 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
+This 0.95.0 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
 
 To publish:
 
 - Preferred: merge the versioned release into `main`; the npm workflow builds the Windows native-host artifacts, verifies the packed payload, publishes to npm, and creates the release automatically.
-- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v0.11.5 && git push origin mcp-v0.11.5`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
+- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v0.95.0 && git push origin mcp-v0.95.0`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
 - Manual MCP fallback: from the release commit, run `cd mcp && npm publish --tag latest` only after confirming `npm whoami`, `npm --prefix mcp run build`, and the MCP smoke/parity/schema gates all pass.
 
 Use the release workflow for normal releases so the native-host packaging and integrity checks run before publication.

@@ -7,8 +7,7 @@
  *   - buildOverlayState threads agentIdShort (6 hex chars) when statusData.agentId
  *     is provided, sourced via formatAgentIdForDisplay (NEVER sliced locally).
  *   - buildOverlayState yields agentIdShort = null (or absent) when no agentId.
- *   - Badge combine helper renders 'clientLabel / agentIdShort' when both present,
- *     either alone when only one is set, and '' when neither.
+ *   - The status pill reads agentIdShort for its hover row.
  *
  * Run: node tests/badge-agent-id.test.js
  */
@@ -84,36 +83,6 @@ ok(overlayStateSrc.indexOf('formatAgentIdForDisplay') >= 0,
 ok(overlayStateSrc.indexOf('agentIdShort') >= 0,
   'Test 3b: overlay-state.js threads agentIdShort field');
 
-console.log('\n--- visual-feedback combine helper: clientLabel / agentIdShort ---');
-
-// Test 4: pure combine helper exposed for testability.
-// We require a small extracted helper module so the renderer logic is testable
-// without a DOM. The helper lives at extension/content/badge-combine.js and is
-// referenced from visual-feedback.js's badge update block.
-const badgeCombine = require('../extension/content/badge-combine.js');
-
-ok(typeof badgeCombine.combineBadgeText === 'function',
-  'Test 4a: extension/content/badge-combine.js exports combineBadgeText');
-
-ok(badgeCombine.combineBadgeText('Claude', 'agent_a3f1ab') === 'Claude / agent_a3f1ab',
-  'Test 4b: combineBadgeText("Claude", "agent_a3f1ab") === "Claude / agent_a3f1ab"');
-
-ok(badgeCombine.combineBadgeText('Claude', '') === 'Claude',
-  'Test 4c: combineBadgeText("Claude", "") === "Claude"');
-
-ok(badgeCombine.combineBadgeText('', 'agent_a3f1ab') === 'agent_a3f1ab',
-  'Test 4d: combineBadgeText("", "agent_a3f1ab") === "agent_a3f1ab"');
-
-ok(badgeCombine.combineBadgeText('', '') === '',
-  'Test 4e: combineBadgeText("", "") === ""');
-
-ok(badgeCombine.combineBadgeText(null, null) === '',
-  'Test 4f: combineBadgeText(null, null) === ""');
-
-// Whitespace normalisation: trim incoming.
-ok(badgeCombine.combineBadgeText('  Claude  ', '  agent_a3f1ab  ') === 'Claude / agent_a3f1ab',
-  'Test 4g: combineBadgeText trims whitespace on both inputs');
-
 console.log('\n--- visual-feedback.js consumes agentIdShort ---');
 
 const vfSrc = fs.readFileSync(
@@ -122,8 +91,10 @@ const vfSrc = fs.readFileSync(
 );
 ok(vfSrc.indexOf('agentIdShort') >= 0,
   'Test 5a: visual-feedback.js reads overlayState.agentIdShort');
-ok(vfSrc.indexOf('combineBadgeText') >= 0 || vfSrc.indexOf("' / '") >= 0,
-  'Test 5b: visual-feedback.js uses combineBadgeText helper or " / " join');
+// The status pill names the client on its top line and keeps the agent id for
+// its hover row, for when two agents share a client.
+ok(vfSrc.indexOf("this._setText('.pl-who', v.agentId)") >= 0,
+  'Test 5b: the status pill shows the agent id in its hover row');
 
 console.log('\n=== badge-agent-id results: ' + passed + ' passed, ' + failed + ' failed ===');
 if (failed > 0) process.exit(1);

@@ -1,13 +1,13 @@
-<!-- generated 2026-11-15 by build-crawler-files.mjs; edit llms.source.md -->
+<!-- generated 2026-11-27 by build-crawler-files.mjs; edit llms.source.md -->
 # FSB (Full Self-Browsing)
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 60 browser actions, a 69-tool MCP surface, 130+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.95 (extension) with fsb-mcp-server 0.11.5 (npm).
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 60 browser actions, a 69-tool MCP surface, 130+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.99 (extension) with fsb-mcp-server 0.95.0 (npm).
 
 License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 
 FSB also works as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Antigravity, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and keep the calling agent in the loop. The MCP surface includes trigger watchers (`trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`) for reactive DOM monitoring, real local file uploads (`upload_file`) and synthetic dropzone support (`drop_file`), and a 128-app native capability catalog where `search_capabilities` finds verified first-party API actions and `invoke_capability` runs them against the user's logged-in sessions with readiness labels such as `t1-ready`, `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending`, plus audit records.
 
-The vault boundary is explicit: credentials and payment methods resolve inside the encrypted Chrome extension store through tools such as `fill_credential` and `use_payment_method`; raw passwords, card numbers, and secrets do not cross the MCP bridge. One-command install: `npx -y fsb-mcp-server@latest install --claude-code` (also `--claude-desktop`, `--cursor`, `--vscode`, `--antigravity`, `--codex`, `--all`).
+The vault boundary is explicit: logins and cards come from the user's own 1Password through tools such as `fill_credential` and `use_payment_method`; FSB's local server passes raw passwords, one-time codes, card numbers, and CVVs only to the extension over the paired loopback bridge, and they never reach the MCP client or the model. One-command install: `npx -y fsb-mcp-server@latest install --claude-code` (also `--claude-desktop`, `--cursor`, `--vscode`, `--antigravity`, `--codex`, `--all`).
 
 OpenClaw and Hermes users get a dedicated FSB skill at `skills/fsb/` in the FSB repo. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste, and offers consent-gated install for any other detected MCP hosts. Hermes users can print the canonical config block with `node skills/fsb/scripts/print-hermes-yaml.mjs`.
 
@@ -42,7 +42,7 @@ The About page embeds the public 33-second FSB trailer (uploaded September 6, 20
 - [Privacy](https://full-selfbrowsing.com/privacy): How FSB handles your data -- API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry for aggregate public stats only, automation runs locally in your browser.
 - [Lattice](https://full-selfbrowsing.com/lattice): Capability runtime SDK for multimodal AI applications -- typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.
 - [Concierge](https://full-selfbrowsing.com/concierge): Safe action layer for agent-ready web applications -- typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.
-- [PhantomStream](https://full-selfbrowsing.com/phantom-stream): DOM-native live browser mirroring -- one style-inlined snapshot, then MutationObserver diffs instead of pixels. Powers the FSB remote dashboard live preview.
+- [PhantomStream](https://full-selfbrowsing.com/phantom-stream): DOM-native live browser mirroring -- one style-inlined snapshot, then MutationObserver diffs instead of pixels.
 - [Prometheus](https://full-selfbrowsing.com/prometheus): The autonomous browser build behind FSB -- native control spine, stdio MCP bridge, multi-agent tab ownership, runtime sidebar, and DOM-native supervision.
 - [Site Maps](https://full-selfbrowsing.com/sitemaps): Community site maps hub (under development) -- contribute well-tested site schemas that can become built-in browser knowledge.
 - [Legal](https://full-selfbrowsing.com/legal): Public non-indexed legal reference for automation posture, consent model, audit-log retention, and service-denylist rationale. It is intentionally excluded from sitemap and indexed SEO surfaces.

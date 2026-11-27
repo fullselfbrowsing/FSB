@@ -1,4 +1,4 @@
-# FSB v0.9.95 Full Self Browsing
+# FSB v0.9.99 Full Self Browsing
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.95-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.99-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
 [![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25-FF6B35?style=for-the-badge)](#benchmark)
@@ -65,7 +65,7 @@ FSB: [AI-reviewed result (277/300)](https://github.com/fullselfbrowsing/FSB/blob
 
 FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.95 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.99 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 
@@ -95,6 +95,8 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 
 Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
 
+The install also registers FSB's local helper in each browser where FSB is installed. The helper is the native messaging host the extension uses to start its local agent service for delegated Claude Code and Grok Build runs, and FSB's server keeps it current when it starts. Add `--no-native-host` to skip it. Uninstalling the last client removes a helper that `install` set up, unless the extension has run delegated agents through it, and `uninstall --native-host` removes it outright. See [Native Messaging Host](./mcp/README.md#native-messaging-host).
+
 **Then install the browser side** (the MCP bridge talks to the extension):
 
 1. Get **FSB** from the [Chrome Web Store](https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk).
@@ -118,7 +120,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Searches a 128-app capability catalog and invokes verified signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
-- Includes secure credential and payment vault flows for supervised autofill.
+- Signs in and fills checkout forms with logins, one-time codes, and cards from the user's 1Password, without exposing them to the model.
 - Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Antigravity, Cline, and other MCP clients can drive the browser.
 
 Background agents were removed in v0.9.45rc1. When the extension updates, it deletes the saved agent definitions and alarms they left behind. For scheduled or recurring work, use [OpenClaw](https://github.com/openclaw/openclaw) or [Claude Routines](https://www.anthropic.com/claude/routines).
@@ -144,13 +146,12 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, direct JavaScript, and real file uploads. |
 | Capability catalog | Searches the 128-app catalog and invokes verified signed, audited, denylist-gated T1/T1b first-party API capabilities through `search_capabilities` and `invoke_capability`. Catalog-tail hits remain learn-pending, discovery-pending, or guarded fail-closed until proven. Sensitive origins are flagged, while denylisted origins remain blocked. |
 | Verification | Checks post-action state, loading behavior, DOM stability, and stuck-action repetition. |
-| UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, vault, and sync controls. |
+| UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, and 1Password connection. |
 | Model support | Hosted providers, OpenRouter routing, LM Studio local models, custom endpoints, and live model discovery. |
 | Output rendering | Markdown, sanitized HTML, Mermaid diagrams, Chart.js charts, and task progress messages. |
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
-| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, capability signature/audit gates, origin denylisting, upload-path denylisting, and restricted-tab recovery messaging. |
+| Security | Encrypted keys, 1Password-backed credential fills, redaction helpers, DOMPurify, capability signature/audit gates, origin denylisting, upload-path denylisting, and restricted-tab recovery messaging. |
 | Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
-| DOM live preview | PhantomStream-backed capture, renderer, protocol, media mirroring, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
 The core design goal is to keep the browser as the source of truth. The model receives structured page context, makes a tool decision, and the extension verifies what changed before moving to the next step.
 
@@ -162,7 +163,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 **`upload_file`: real file input uploads.** MCP clients and FSB autopilot can now call `upload_file(selector, file_path, tab_id?)` to set an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
 
-**PhantomStream 0.2.1 media mirroring.** Dashboard DOM live preview now consumes the published PhantomStream media side channel in reference mode, so progressive `<video>` and `<audio>` nodes can mirror alongside DOM snapshots. Adaptive HLS/DASH discovery remains deferred because it would require a new `webRequest` permission; MCP tool schemas, pairing, auth, and dashboard ownership behavior are unchanged.
+**Live Dashboard retired.** The showcase Live Dashboard is gone, along with pairing, the extension's always-on relay connection to full-selfbrowsing.com, DOM live preview, and remote control from the web. v0.9.95 is the last version that has them; an update removes the hash key and relay settings they left behind. [PhantomStream](https://full-selfbrowsing.com/phantom-stream) continues as a standalone open-source library. MCP tool schemas and the local bridge are unchanged.
 
 **Engineering milestone 0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
 
@@ -179,8 +180,8 @@ Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its o
 | [`extension/`](./extension/README.md) | Chrome extension package. Load this directory as an unpacked MV3 extension. |
 | [`mcp/`](./mcp/README.md) | npm package `fsb-mcp-server`, the local MCP bridge for external AI clients. |
 | [`skills/fsb/`](./skills/fsb/SKILL.md) | OpenClaw + Hermes skill: doctor + stdio/YAML printers + consent gated install for multiple hosts. |
-| [`showcase/`](./showcase/README.md) | Marketing and dashboard site for full-selfbrowsing.com. Angular 20 static prerender + Express relay. |
-| `showcase/server/` | Node/Express deploy backend for pairing, PhantomStream-compatible relay, auth, and dashboard data. |
+| [`showcase/`](./showcase/README.md) | Marketing site for full-selfbrowsing.com. Angular 20 static prerender + Express server. |
+| `showcase/server/` | Node/Express deploy backend that serves the site, telemetry ingest, public stats, and the hosted Jev gateway. |
 | `server-py/` | Legacy Python/FastAPI-style backend prototype retained for reference. |
 | `tests/` | Node tests for extension modules, MCP contracts, bridge behavior, and regression coverage. |
 | `scripts/` | Repo maintenance and validation scripts. |
@@ -217,9 +218,6 @@ Top level deploy and validation files:
 
 #### API Configuration
 <img src="extension/assets/screenshots/api-configuration.png" alt="API configuration panel with provider selection and key entry" width="100%" />
-
-#### Passwords Manager
-<img src="extension/assets/screenshots/passwords-manager.png" alt="Passwords manager for storing site credentials used during automation" width="100%" />
 
 #### Memory and Site Explorer
 <img src="extension/assets/screenshots/memory-site-explorer.png" alt="Memory viewer and site explorer showing crawled site structure" width="100%" />
@@ -281,6 +279,14 @@ For an unpacked build, record the ID on `chrome://extensions/`. A different inst
 
 If a site uses heavy client rendering, custom canvas controls, or unusual shadow DOM, start by asking FSB to read the page and identify available controls. That gives the model a better first snapshot and makes failures easier to debug.
 
+### Connect 1Password (Optional)
+
+FSB has no password vault of its own. To let it sign in and fill checkouts from your 1Password, open the control panel's **Vault** page and press **Log in to 1Password**. This needs the 1Password desktop app and the FSB local server (`fsb-mcp-server`), which holds the 1Password connection.
+
+One button does not remove 1Password's own steps. 1Password needs its **Settings > Developer > Integrate with 1Password SDKs** setting turned on (FSB opens that pane for you), possibly your account name, and your approval. It asks for that approval again after 10 idle minutes, after the app locks, and after the local server restarts.
+
+FSB reads all of your vaults by default; you can limit it to some under **Advanced** on the Vault page. Logins you choose to save go to your Personal vault unless you pick another one. Passwords, one-time codes, and card numbers are typed into the page and never reach the model. For a headless machine, set up a 1Password service account from the terminal instead; see [1Password for logins and cards](mcp/README.md#1password-for-logins-and-cards).
+
 ### Quick Troubleshooting
 
 | Problem | Check |
@@ -292,6 +298,7 @@ If a site uses heavy client rendering, custom canvas controls, or unusual shadow
 | Typed text does not stick | Prefer `type_text` over JavaScript value assignment on controlled inputs. |
 | MCP tools are missing | Restart the host client and run `npx -y fsb-mcp-server@latest doctor`. |
 | MCP tools time out | Check `status --watch`, active tab readiness, and whether another task is queued. |
+| 1Password does not connect | Unlock the 1Password app, check **Settings > Developer > Integrate with 1Password SDKs**, then press **Log in to 1Password** on the Vault page again. |
 
 Most failures are recoverable by inspecting the current page, refreshing selectors, or restarting the local MCP bridge. Reinstalling the MCP config should be the last step, not the first.
 
@@ -439,11 +446,11 @@ graph TB
 ### Main Runtime Pieces
 
 - **Background worker** (`extension/background.js`): owns sessions, model calls, tool execution, MCP routing, and storage orchestration.
-- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, stream DOM state through the PhantomStream capture adapter, wait for stable state, and render visual feedback.
+- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, wait for stable state, and render visual feedback.
 - **AI layer** (`extension/ai/`): universal OpenAI-compatible request engine, provider settings, model discovery, tool definitions, transcripts, and action history.
 - **Memory** (`extension/lib/memory/`): stores episodic, semantic, and procedural records, then retrieves relevant prior context for later tasks.
 - **Visualization** (`extension/lib/visualization/`): D3/site graph views for guide and memory exploration.
-- **Vault** (`extension/config/secure-config.js` plus UI flows): encrypts API keys and saved user data in Chrome storage.
+- **Secrets** (`extension/config/secure-config.js`, `extension/utils/onepassword-client.js`, `mcp/src/onepassword/`): encrypts API keys in Chrome storage; logins and cards come from the user's 1Password through the local MCP server.
 - **MCP package** (`mcp/`): TypeScript server that translates MCP calls into extension bridge messages.
 
 ### Automation Flow
@@ -457,7 +464,7 @@ graph TB
 
 ### State And Data Flow
 
-FSB stores configuration and runtime data in Chrome storage. API keys and saved sensitive values go through the secure configuration layer. Session logs, analytics, and memory records are kept locally unless a user explicitly enables server sync or uses the showcase dashboard pairing flow.
+FSB stores configuration and runtime data in Chrome storage. API keys and saved sensitive values go through the secure configuration layer. Session logs, analytics, and memory records are kept locally.
 
 During a task, the background worker owns the session state and talks to three main collaborators:
 
@@ -483,7 +490,7 @@ The MCP server exposes a curated public surface around that registry plus direct
 | Developer / UAT | 1 | `capture_screenshot` |
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |
-| Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
+| Vault (1Password) | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
 
 Read-only tools bypass the mutation queue where safe. `capture_screenshot` is semantically read-only but remains serialized because it consumes Chromium's exclusive debugger resource. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
 
@@ -581,7 +588,7 @@ Memory and site maps are especially useful for:
 ## Security And Safety
 
 - API keys are encrypted with AES-GCM and stored in Chrome storage.
-- Credential and payment vault flows avoid sending raw secrets over the MCP bridge.
+- Logins and cards resolve from 1Password inside FSB; passwords, one-time codes, and card data are never returned to MCP clients.
 - Rendered chat output is sanitized with DOMPurify.
 - Automation is scoped to the active session tab where possible.
 - Logs can be reviewed or disabled for sensitive use cases.
@@ -595,14 +602,14 @@ Use separate API keys for development and production, rotate keys regularly, res
 - The extension can interact with the active page, tabs, and debugger-backed coordinate tools because those permissions are declared in the MV3 manifest.
 - `upload_file` requires an absolute local path, blocks known sensitive path patterns, and records audit metadata without persisting the disk path.
 - Capability invokes allow every non-denied origin under Auto and run through denylist, mutation, signature, and audit gates. Only verified T1/T1b capabilities execute directly; guarded or catalog-tail capabilities return typed pending/fallback responses. Sensitive origins are flagged for review; network-capture discovery on sensitive origins still requires extra confirmation.
-- Saved credentials and payment methods require explicit user configuration and unlock flows.
+- Logins and cards come from the user's own 1Password, connected explicitly from the control panel's Vault page or with `fsb-mcp-server onepassword`; FSB keeps none of its own.
 - Automation should be treated like a fast assistant operating your browser, not like an unattended production worker.
 
 ### Data Handling
 
 Provider calls receive the page/task context needed to complete the requested automation. That can include visible page text, form labels, selectors, and user-supplied task instructions. Avoid running automation on sensitive pages unless you are comfortable sending that task context to the selected model provider.
 
-FSB does not require a hosted FSB account for local extension use. The showcase backend and dashboard pairing server are separate from normal local extension operation.
+FSB does not require a hosted FSB account for local extension use. The showcase backend is separate from normal local extension operation.
 
 ---
 

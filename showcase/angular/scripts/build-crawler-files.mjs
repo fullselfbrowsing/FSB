@@ -33,9 +33,8 @@ const HOST = 'https://full-selfbrowsing.com';
 const TRAILER_VIDEO = JSON.parse(readFileSync(
   join(ANGULAR_ROOT, 'src', 'app', 'core', 'seo', 'trailer-video.json'), 'utf8'
 ));
-// PRE-03 locked, /dashboard excluded. changefreq/priority hint relative importance
-// to crawlers; lastmod is the date the route's content last changed (see
-// sitemap-lastmod.mjs).
+// changefreq/priority hint relative importance to crawlers; lastmod is the date
+// the route's content last changed (see sitemap-lastmod.mjs).
 const ROUTES = [
   { path: '/',               changefreq: 'weekly',  priority: '1.0' },
   { path: '/about',          changefreq: 'weekly',  priority: '0.9' },

@@ -1,0 +1,28 @@
+<!-- @dsCard group="Colors" viewport="700x190" subtitle="Warm ramp for extension and dashboard" name="Surfaces — product" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sw{border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden;background:var(--bg-card)}
+.fill{height:62px}
+.m{padding:9px 11px;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:2px}
+.m b{font-size:.76rem;color:var(--text-primary);font-weight:600}
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="sw"><div class="fill" style="background:#fffdfb"></div><div class="m"><b>Base</b><span class="var">--fsb-surface-base</span><span class="lbl">#fffdfb</span></div></div>
+<div class="sw"><div class="fill" style="background:#f8f4ef"></div><div class="m"><b>Muted</b><span class="var">--fsb-surface-muted</span><span class="lbl">#f8f4ef</span></div></div>
+<div class="sw"><div class="fill" style="background:#f1ebe4"></div><div class="m"><b>Muted 2</b><span class="var">--fsb-surface-muted-2</span><span class="lbl">#f1ebe4</span></div></div>
+<div class="sw"><div class="fill" style="background:#201917"></div><div class="m"><b>Ink</b><span class="var">--fsb-surface-ink</span><span class="lbl">#201917</span></div></div>
+</div>
+</body>
+</html>

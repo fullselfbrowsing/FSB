@@ -1249,7 +1249,6 @@ async function _findLatestSnapshot(sessionId) {
  * @param {Map} options.activeSessions - Map of sessionId -> session object
  * @param {Function} options.persistSession - (sessionId, session) => Promise<void>
  * @param {Function} options.sendSessionStatus - (tabId, statusData) => Promise<void>
- * @param {Function} options.broadcastDashboardProgress - (session) => void
  * @param {Function} options.endSessionOverlays - (session, reason) => Promise<void>
  * @param {Function} options.startKeepAlive - () => void
  * @param {Function|null} options.executeCDPToolDirect - CDP handler callback
@@ -1445,7 +1444,6 @@ async function runAgentIteration(sessionId, options) {
   var activeSessions = options.activeSessions;
   var persist = options.persistSession;
   var sendStatus = options.sendSessionStatus;
-  var broadcastDashboardProgress = options.broadcastDashboardProgress;
   var endSessionOverlays = options.endSessionOverlays;
   var cleanupSession = options.cleanupSession;
   var executeCDPToolDirect = options.executeCDPToolDirect;
@@ -1881,11 +1879,6 @@ async function runAgentIteration(sessionId, options) {
     }
   }
 
-  // e. Broadcast dashboard progress
-  if (typeof broadcastDashboardProgress === 'function') {
-    broadcastDashboardProgress(session);
-  }
-
   try {
     // f. Get provider settings from cached session config
     var providerKey = session.providerConfig.providerKey;
@@ -2135,11 +2128,6 @@ async function runAgentIteration(sessionId, options) {
         } catch (_e) { /* swallow - fire-and-forget per D-02 */ }
       }
       await finalizeSession(sessionId, session, terminalOutcome);
-
-      // Broadcast completion
-      if (typeof broadcastDashboardProgress === 'function') {
-        broadcastDashboardProgress(session);
-      }
 
       // Do NOT schedule next iteration -- AI decided to stop
       return;
@@ -2674,7 +2662,9 @@ async function runAgentIteration(sessionId, options) {
             cdpHandler: executeCDPToolDirect
               ? function(verb, params, tabId) { return executeCDPToolDirect({ tool: verb, params: params }, tabId); }
               : null,
-            dataHandler: handleDataTool
+            dataHandler: handleDataTool,
+            // Side-panel rows a tool posts (1Password outcomes) name their session.
+            sessionId: sessionId
           });
         } finally {
           if (spawnIntentToken && spawnProvenance
@@ -2822,7 +2812,7 @@ async function runAgentIteration(sessionId, options) {
       }
     }
 
-    // m2. Update session progress fields for dashboard broadcast (PROG-03)
+    // m2. Update session progress fields
     session.currentTool = toolResults.length > 0 ? toolResults[toolResults.length - 1].name : null;
     if (!session.lastAiReasoning) session.lastAiReasoning = null; // Reset if not set by report_progress
 
@@ -2976,16 +2966,12 @@ async function runAgentIteration(sessionId, options) {
       }
     }
 
-    // o2. Broadcast updated progress to dashboard (includes cost from session.totalCost)
+    // o2. Refresh the page overlay with the post-iteration phase and detail
     var postIterationPhase = lastNonProgressToolCall ? 'acting' : 'thinking';
     var postIterationDetail = lastNonProgressToolCall
       ? describeToolCall(lastNonProgressToolCall.name, lastNonProgressToolCall.args)
       : session.lastAiReasoning;
     await refreshCanonicalOverlay(postIterationPhase, postIterationDetail);
-
-    if (typeof broadcastDashboardProgress === 'function') {
-      broadcastDashboardProgress(session);
-    }
 
     // o. Persist session state after every iteration (per SAFE-04, D-09)
     await persist(sessionId, session);

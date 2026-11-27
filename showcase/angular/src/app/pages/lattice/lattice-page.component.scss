@@ -39,11 +39,11 @@
 .lat-eyebrow {
   align-items: center;
   background: rgba(232, 238, 252, 0.06);
-  border: 1px solid rgba(232, 238, 252, 0.14);
+  border: 1px solid var(--lat-line);
   border-radius: 999px;
   color: #c7d2e8;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   gap: 8px;
@@ -134,20 +134,20 @@
 .lat-btn-light {
   background: #f5f8ff;
   border: 1px solid #f5f8ff;
-  color: #0b1220;
+  color: var(--navy);
 }
 
 .lat-btn-light:hover {
   background: #fff;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
-  color: #0b1220;
+  color: var(--navy);
   transform: translateY(-2px);
 }
 
 .lat-btn-ghost {
   background: rgba(232, 238, 252, 0.05);
   border: 1px solid rgba(232, 238, 252, 0.18);
-  color: #e8eefc;
+  color: var(--node);
 }
 
 .lat-btn-ghost:hover {
@@ -170,7 +170,7 @@
   border-radius: 7px;
   color: #aebbd6;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 600;
   gap: 7px;
@@ -274,7 +274,7 @@
 .lat-cmd code {
   color: #e6edf3;
   display: block;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.84rem;
   overflow-x: auto;
   white-space: nowrap;
@@ -393,7 +393,7 @@
 
 .lat-cbname {
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
@@ -405,7 +405,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
   gap: 7px;
@@ -432,7 +432,7 @@
 
 .lat-codecard code {
   color: #c9d4e6;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   line-height: 1.7;
   white-space: pre;
@@ -504,7 +504,7 @@
 
 .lat-mod-path {
   color: var(--primary);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   word-break: break-all;
 }
@@ -519,7 +519,7 @@
   align-items: center;
   border-radius: 6px;
   display: inline-flex;
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 700;
   padding: 3px 9px;
@@ -626,7 +626,7 @@
   align-items: center;
   color: #5eead4;
   display: inline-flex;
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 700;
   gap: 6px;
@@ -663,7 +663,7 @@
 
 .lat-rrow .v {
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   text-align: right;
   word-break: break-all;
@@ -688,7 +688,7 @@
 
 .lat-cli code {
   color: #c9d4e6;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.85;
   white-space: pre;
@@ -911,39 +911,6 @@
   font-size: 1.32rem;
 }
 
-.fsb-row {
-  align-items: baseline;
-  display: inline-flex;
-  font-family: 'Poppins', system-ui, sans-serif;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.fsb-f {
-  font-weight: 100;
-}
-
-.fsb-f::before {
-  content: 'F';
-}
-
-.fsb-s {
-  font-weight: 900;
-}
-
-.fsb-s::before {
-  content: 'S';
-}
-
-.fsb-b {
-  display: inline-block;
-  fill: currentColor;
-  height: 0.74em;
-  margin-left: 0.01em;
-  vertical-align: baseline;
-  width: auto;
-}
-
 .footer-links {
   display: flex;
   flex-wrap: wrap;
@@ -999,7 +966,7 @@
 }
 
 .version-tag {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.4em;
 }
 

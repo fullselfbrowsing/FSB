@@ -27,7 +27,7 @@
  *   - Storage key prefix mcpVisualSession: does NOT collide with v0.9.36's single
  *     storage key 'fsbMcpVisualSessions' (background.js line 2098, map shape).
  *   - Alarm name prefix mcpVisualDeath: does NOT collide with 'fsb-mcp-bridge-reconnect'
- *     (MCP_RECONNECT_ALARM) or 'fsb-domstream-watchdog'.
+ *     (MCP_RECONNECT_ALARM).
  *
  * Defense in depth:
  *   - Phase 255 (mcp/src/tools/manual.ts) rejects bad client labels with
@@ -217,6 +217,7 @@
     return {
       sessionToken: 'lifecycle:' + String(entry.tabId),
       clientLabel: entry.client,
+      agentId: typeof entry.agentId === 'string' ? entry.agentId : '',
       tabId: Number(entry.tabId),
       task: entry.visualReason || 'FSB Automating',
       detail: '',

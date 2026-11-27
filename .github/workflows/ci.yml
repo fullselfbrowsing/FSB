@@ -121,6 +121,22 @@ jobs:
             mcp/native-host/bin/win32-arm64/fsb-native-host.exe
             mcp/native-host/bin/win32-arm64/fsb-native-host-registry.exe
             mcp/native-host/windows-artifacts.json
+      # The install, refresh and uninstall transactions and the registry
+      # helper adapter, run on Windows itself with their dependencies
+      # injected. Git Bash puts cp on PATH for the build script.
+      - name: Build the MCP package for the Windows transaction tests
+        shell: bash
+        run: npm --prefix mcp run build
+      - name: Native-host registration on Windows
+        run: node tests/mcp-native-host-install.test.js --section platform-and-registration
+      - name: Native-host install and uninstall transactions on Windows
+        run: node tests/mcp-native-host-install.test.js --section install-transaction
+      - name: Native-host ensure, refresh and uninstall-all transactions on Windows
+        run: node tests/mcp-native-host-install.test.js --section ensure-transaction
+      - name: Native-host wake lock on Windows
+        run: node tests/mcp-native-host-install.test.js --section production-ensure
+      - name: Registry helper adapter on Windows
+        run: node tests/mcp-native-host-registry-helper.test.js
 
   runtime-payload:
     name: native runtime payload (${{ matrix.os }})

@@ -42,18 +42,23 @@ const knownSections = new Set([
 ]);
 
 const bundledProductionDependencies = Object.freeze([
+  '@1password/sdk',
   '@modelcontextprotocol/sdk',
   'smol-toml',
   'strip-json-comments',
+  'tldts',
   'ws',
   'yaml',
   'zod',
 ]);
 
 const exactProductionDependencies = Object.freeze({
+  // 1Password SDK: the FSB server's credential broker (mcp/src/onepassword).
+  '@1password/sdk': '0.5.0',
   '@modelcontextprotocol/sdk': '1.29.0',
   'smol-toml': '1.6.1',
   'strip-json-comments': '5.0.3',
+  tldts: '7.6.2',
   ws: '8.19.0',
   yaml: '2.8.3',
   zod: '3.25.76',

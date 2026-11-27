@@ -91,9 +91,6 @@
       if (current === source.shown) writeKeyed(el, source.key, source.english, source.subs, attr);
     });
   }
-  function writeActions(el, count) {
-    writeKeyed(el, 'entry_actions', 'Actions: $COUNT$', { count: count });
-  }
 
   var chromeRoots = [];
   function ownedText(current, key, english) {
@@ -105,18 +102,13 @@
     if (!root || typeof root.querySelector !== 'function') return;
     var locale = globalThis.fsbUiLocale;
     if (locale && typeof locale.current === 'function' && typeof root.setAttribute === 'function') root.setAttribute('lang', locale.current());
-    var title = root.querySelector('.fsb-title');
-    if (title && ownedText(title.textContent, 'entry_automating', 'FSB Automating')) title.textContent = ov('entry_automating', 'FSB Automating');
     var crawlTitle = root.querySelector('.fsb-crawl-title');
     if (crawlTitle && ownedText(crawlTitle.textContent, 'entry_crawl_title', 'FSB Crawling')) crawlTitle.textContent = ov('entry_crawl_title', 'FSB Crawling');
-    var stop = root.querySelector('.fsb-stop');
+    var stop = root.querySelector('.pl-stop');
     if (stop && ownedText(stop.getAttribute('aria-label'), 'entry_stop', 'Stop')) stop.setAttribute('aria-label', ov('entry_stop', 'Stop'));
-    var step = root.querySelector('.fsb-step-number');
-    if (step && !rewriteLabel(step) && ownedText(step.textContent, 'entry_planning', 'Planning')) step.textContent = ov('entry_planning', 'Planning');
-    var detail = root.querySelector('.fsb-step-text');
-    if (detail && !rewriteLabel(detail) && ownedText(detail.textContent, 'entry_initializing', 'Initializing...')) detail.textContent = ov('entry_initializing', 'Initializing...');
-    if (typeof root.querySelectorAll === 'function') Array.prototype.forEach.call(root.querySelectorAll('.fsb-log-line'), rewriteLabel);
-    ['.fsb-eta', '.fsb-crawl-domain', '.fsb-crawl-pages', '.fsb-replay-speed', '.badge-watching', '.badge-fired'].forEach(function (selector) {
+    // The pill's status line; the outgoing copy behind it is only ever animating out.
+    rewriteLabel(root.querySelector('.pl-in'));
+    ['.fsb-crawl-domain', '.fsb-crawl-pages', '.fsb-replay-speed', '.badge-watching', '.badge-fired'].forEach(function (selector) {
       rewriteKeyed(root.querySelector(selector));
     });
     if (root.getAttribute && ownedText(root.getAttribute('aria-label'), 'entry_replay_controls', 'Replay controls')) {
@@ -358,13 +350,23 @@
   }
 
   /**
-   * ProgressOverlay - Floating progress indicator using Shadow DOM
+   * ProgressOverlay - the compact status pill in the top-right corner.
    *
-   * Uses Shadow DOM for complete style isolation from host page.
-   * Shows task name, step number, step text, and progress bar.
-   * Positioned in top-right corner with maximum z-index.
-   * Promoted to the browser's top layer via Popover API for guaranteed
-   * rendering above all page content (including complex apps like Google Docs).
+   * While FSB works it reads on two lines: the wordmark, the agent name and the
+   * elapsed time on top, the status underneath. Between calls it folds to the
+   * top line. A third row opens for a capability call, a blocked site, or the
+   * agent id on hover. It never grows wider than PILL_MAX_W, and every size is
+   * written in px so the browser can ease between shapes.
+   *
+   * The pill also plays the toolbar icon's current motion (sweep, orbit, ring
+   * or breathe). The service worker sends that motion with its start time and
+   * the pill works out its place in the cycle from the wall clock, so the icon
+   * and the pill move together.
+   *
+   * Shadow DOM keeps the page's styles out. The host is promoted to the top
+   * layer through the Popover API and never takes pointer events. Only the Stop
+   * button does, so a click the agent sends to that corner still reaches the
+   * page; hover is found by comparing the pointer with the pill's rectangle.
    */
   // Phase 229-01: minimum interval (ms) between visible status-text writes.
   // Rapid bursts of update() inside this window coalesce to the latest payload.
@@ -375,30 +377,330 @@
   // Bypassed for the first write of a session and for `lifecycle === 'final'`.
   const MIN_DISPLAY_DURATION_MS = 1200;
 
+  const PILL_MAX_W = 248;
+  // The toolbar icon's four motions and their periods in ms (utils/action-icon.js).
+  // The service worker picks the winner (breathe, then ring, then orbit or sweep).
+  const PILL_FORMS = Object.freeze({ sweep: 1200, orbit: 4000, ring: 1600, breathe: 2400 });
+  // Spawn: the seed drops in, stretches into the top line, then opens the status.
+  const PILL_SPAWN_BEATS = Object.freeze([240, 560]);
+  // Exit, the spawn run backwards: fold the status, draw back to the seed, lift
+  // away. The pill is removed at the last beat.
+  const PILL_EXIT_BEATS = Object.freeze([300, 760, 1080]);
+  const PILL_FOLD_AFTER_MS = 2600;
+  const PILL_WATCH_FOLD_MS = 4000;
+  const PILL_FINAL_HOLD_MS = 3000;
+  const PILL_TONES = Object.freeze(['thinking', 'acting', 'watching', 'calling', 'guarded', 'waiting', 'done', 'error', 'partial', 'stopped']);
+  const PILL_ENDED = Object.freeze({ done: true, error: true, partial: true, stopped: true });
+  const PILL_ACTING_PHASES = Object.freeze({ acting: true, writing: true, switching_tab: true });
+  const PILL_STATUS_FONT = "500 12.5px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  // The platform monospace stack (design-system/decisions/0012). A shadow root
+  // ignores font-face rules, so the pill uses fonts the system already has.
+  const PILL_MONO = "'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace";
+
+  // The wordmark as outlines: F from Poppins ExtraLight, S from Poppins Black
+  // (both SIL Open Font License 1.1) and B the brand path. Drawn rather than set
+  // in a font because a font-face rule inside a shadow root is ignored. Units
+  // are 1/1000 em at 17px; the viewBox puts the baseline where the set text
+  // sits in the 36px row.
+  const PILL_WORDMARK_SVG = '<svg class="pl-wm" viewBox="0 -806 1591 1000" aria-hidden="true">' +
+    '<path d="M444 -702V-664H127V-371H404V-333H127V0H82V-702Z"></path>' +
+    '<path d="M489 -227H725Q730 -166 779 -166Q797 -166 809.5 -174.5Q822 -183 822 -201Q822 -226 795 -241.5Q768 -257 711 -277Q643 -301 598.5 -324Q554 -347 522 -391Q490 -435 491 -504Q491 -573 526.5 -621.5Q562 -670 623.5 -695Q685 -720 762 -720Q892 -720 968.5 -660Q1045 -600 1049 -491H810Q809 -521 795 -534Q781 -547 761 -547Q747 -547 738 -537.5Q729 -528 729 -511Q729 -487 755.5 -471.5Q782 -456 840 -434Q907 -409 950.5 -386Q994 -363 1026 -322Q1058 -281 1058 -219Q1058 -154 1026 -102.5Q994 -51 933 -22Q872 7 788 7Q661 7 578.5 -52.5Q496 -112 489 -227Z"></path>' +
+    '<path d="M1095.8 -660.2L1359.9 -660.2C1478.7 -660.2 1557.9 -594.2 1557.9 -488.5C1557.9 -409.3 1505.1 -356.5 1425.9 -336.7C1518.3 -323.5 1571.1 -264.1 1571.1 -171.7C1571.1 -66 1491.9 0 1359.9 0L1095.8 0Z"></path>' +
+    '</svg>';
+
+  const PILL_CSS = `
+      :host { all: initial; }
+      *, *::before, *::after { box-sizing: border-box; }
+
+      @keyframes plPop { from { opacity: 0; transform: translateY(-16px) scale(0.3); filter: blur(6px); } }
+      @keyframes plInA { from { opacity: 0; transform: scale(1.1); filter: blur(4px); } }
+      @keyframes plInB { from { opacity: 0; transform: scale(1.1); filter: blur(4px); } }
+      @keyframes plOutA { from { opacity: 1; transform: none; filter: none; } to { opacity: 0; transform: scale(0.9); filter: blur(4px); } }
+      @keyframes plOutB { from { opacity: 1; transform: none; filter: none; } to { opacity: 0; transform: scale(0.9); filter: blur(4px); } }
+
+      /* Shape changes are one morph: slow in, quick through the middle, a small
+         overshoot, then settle. Content leaves before a shape shrinks and arrives
+         after it starts to grow. */
+      .pl-host {
+        position: absolute; top: 0; right: 0;
+        --c1: #ff8c00; --ring: rgba(255, 140, 0, 0.3);
+        --morph: cubic-bezier(0.5, 0, 0.15, 1.22);
+        transform-origin: calc(100% - 28px) 0;
+        transition: width 0.52s var(--morph), height 0.52s var(--morph), opacity 0.26s ease-in, transform 0.3s cubic-bezier(0.5, 0, 0.9, 0.5), filter 0.26s ease-in;
+        animation: plPop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+      }
+      .pl-host.shrink {
+        transition-duration: 0.42s, 0.42s, 0.26s, 0.3s, 0.26s;
+        transition-timing-function: cubic-bezier(0.5, 0, 0.2, 1), cubic-bezier(0.5, 0, 0.2, 1), ease-in, cubic-bezier(0.5, 0, 0.9, 0.5), ease-in;
+        transition-delay: 0.08s, 0.08s, 0s, 0s, 0s;
+      }
+      .pl-host.acting { --c1: #ff7a00; --ring: rgba(255, 140, 0, 0.42); }
+      .pl-host.watching { --c1: #ffa500; --ring: rgba(255, 140, 0, 0.3); }
+      .pl-host.calling { --c1: #a78bfa; --ring: rgba(139, 92, 246, 0.45); }
+      .pl-host.guarded, .pl-host.partial { --c1: #f5a524; --ring: rgba(245, 165, 36, 0.65); }
+      .pl-host.done { --c1: #34d399; --ring: rgba(52, 211, 153, 0.55); }
+      .pl-host.error { --c1: #f87171; --ring: rgba(248, 113, 113, 0.55); }
+      .pl-host.waiting, .pl-host.stopped { --c1: #94a3b8; --ring: rgba(255, 255, 255, 0.22); }
+      .pl-host.gone { opacity: 0; transform: translateY(-16px) scale(0.3); filter: blur(6px); }
+
+      .pl-body {
+        position: relative; display: flex; flex-direction: column; align-items: stretch;
+        width: 100%; height: 100%; margin: 0; padding: 0; border-radius: 18px; overflow: hidden;
+        background: #000000; color: #f1f5f9; text-align: left;
+        font: 500 12.5px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--ring);
+        transition: box-shadow 0.4s ease;
+      }
+      .pl-row { flex: none; display: flex; align-items: center; height: 36px; padding: 0 14px 0 12px; white-space: nowrap; }
+      .pl-mark { flex: none; display: block; width: 32px; height: 17px; color: #ffffff; }
+      .pl-wm { display: block; width: 27.05px; height: 17px; overflow: visible; fill: currentColor; }
+      .pl-host.waiting .pl-mark { opacity: 0.5; }
+      .pl-div { flex: none; width: 1px; height: 14px; margin: 0 10px; background: rgba(255, 255, 255, 0.16); }
+      /* The top line slides out from behind the right cap as the seed stretches,
+         and tucks back in first on the way out. */
+      .pl-div, .pl-time, .pl-ok, .pl-stop { transition: opacity 0.3s ease 0.14s, transform 0.5s var(--morph) 0.08s; }
+      .pl-time { transition-delay: 0.24s, 0.16s; }
+      .pl-host.seed .pl-div, .pl-host.seed .pl-agent, .pl-host.seed .pl-time, .pl-host.seed .pl-ok, .pl-host.seed .pl-stop {
+        opacity: 0; transform: translateX(10px); transition: opacity 0.14s ease, transform 0.2s ease;
+      }
+      .pl-agent {
+        flex: none; height: 36px; overflow: hidden;
+        font: 400 9.6px/36px ${PILL_MONO}; letter-spacing: 0.16em; text-transform: uppercase; color: #94a3b8; white-space: nowrap;
+        transition: width 0.52s var(--morph), opacity 0.3s ease 0.14s, transform 0.5s var(--morph) 0.08s;
+      }
+      .pl-name { display: block; transform-origin: left center; }
+      .pl-name.a { animation: plInA 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
+      .pl-name.b { animation: plInB 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
+      .pl-host.anon .pl-div, .pl-host.anon .pl-agent { display: none; }
+      .pl-gap { flex: 1 1 10px; min-width: 10px; }
+      .pl-ok { display: none; flex: none; width: 12px; height: 12px; margin-right: 8px; fill: none; stroke: #34d399; stroke-width: 1.8px; stroke-linecap: round; stroke-linejoin: round; }
+      .pl-host.done .pl-ok { display: block; }
+      .pl-time { flex: none; font: 400 10.5px/1 ${PILL_MONO}; letter-spacing: 0.04em; color: #94a3b8; white-space: nowrap; }
+      .pl-stop {
+        display: none; flex: none; align-items: center; justify-content: center;
+        width: 36px; height: 36px; margin: 0 -12px 0 2px; padding: 0; border: 0; border-radius: 50%;
+        background: none; color: #ffffff; font: inherit; cursor: pointer; pointer-events: auto;
+      }
+      .pl-host.stoppable .pl-stop { display: flex; }
+      .pl-stop span { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(255, 255, 255, 0.14); transition: background 0.15s ease; }
+      .pl-stop:hover span { background: rgba(255, 255, 255, 0.26); }
+      .pl-stop:focus-visible { outline: 2px solid #ffb45c; outline-offset: -4px; }
+      .pl-stop svg { width: 10px; height: 10px; fill: currentColor; }
+
+      /* The status takes a line of its own under the name, and wraps once before
+         the pill gets any wider. */
+      .pl-text { position: relative; flex: none; display: block; margin-top: -5px; padding: 0 14px 10px 12px; transition: opacity 0.3s ease 0.14s, transform 0.5s var(--morph) 0.08s; }
+      .pl-in, .pl-out { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 17px; overflow-wrap: anywhere; transform-origin: left top; }
+      .pl-out { position: absolute; left: 12px; top: 0; right: 14px; opacity: 0; }
+      .pl-in.a { animation: plInA 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
+      .pl-in.b { animation: plInB 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
+      .pl-out.a { animation: plOutA 0.3s ease; }
+      .pl-out.b { animation: plOutB 0.3s ease; }
+      .pl-host.waiting .pl-in, .pl-host.waiting .pl-out { color: #94a3b8; }
+      .pl-count { display: none; flex: none; font: 400 10.5px/17px ${PILL_MONO}; letter-spacing: 0.04em; color: #ffb45c; white-space: nowrap; }
+      .pl-text.split { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+      .pl-text.split .pl-in { display: block; flex: 1 1 auto; min-width: 0; white-space: nowrap; text-overflow: ellipsis; }
+      .pl-text.split .pl-count { display: block; }
+      .pl-host.head .pl-text, .pl-host.seed .pl-text { opacity: 0; transform: translateY(-6px); transition: opacity 0.14s ease, transform 0.2s ease; }
+
+      /* The third row: a capability call, a blocked site, or the agent id. */
+      .pl-more { flex: none; display: block; margin-top: -6px; padding: 0 14px 0 12px; opacity: 0; transform: translateY(-6px); transition: opacity 0.14s ease, transform 0.2s ease; }
+      .pl-host.more .pl-more { opacity: 1; transform: none; transition: opacity 0.3s ease 0.14s, transform 0.5s var(--morph) 0.08s; }
+      .pl-meta { display: none; align-items: center; gap: 10px; height: 26px; padding-bottom: 8px; font: 400 10px/1 ${PILL_MONO}; letter-spacing: 0.18em; text-transform: uppercase; color: #94a3b8; white-space: nowrap; }
+      .pl-host.k-who .pl-meta, .pl-host.k-cap .pl-meta { display: flex; }
+      .pl-tick { flex: none; width: 24px; height: 1.5px; border-radius: 2px; background: var(--c1); }
+      .pl-slug { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 9.5px; letter-spacing: 0; text-transform: none; color: #cbd5e1; }
+      .pl-tag { flex: none; letter-spacing: 0.1em; color: #34d399; }
+      .pl-tag.guarded { color: #f5a524; }
+      .pl-host.k-cap .pl-tick, .pl-host.k-cap .pl-who, .pl-host.k-who .pl-slug, .pl-host.k-who .pl-tag { display: none; }
+      .pl-note { display: none; height: 44px; overflow: hidden; font: 400 11.5px/17px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #f5cf8f; }
+      .pl-host.k-guard .pl-note { display: block; }
+
+      /* The toolbar icon's four motions, carried onto the pill and driven from
+         one clock by script: sweep on the track, orbit and ring on the border,
+         breathe on the wordmark. */
+      .pl-track { position: absolute; left: 12px; right: 14px; bottom: 4px; height: 2px; border-radius: 1px; overflow: hidden; background: rgba(255, 255, 255, 0.1); opacity: 0; transition: opacity 0.3s ease; }
+      .pl-host.track .pl-track { opacity: 1; }
+      .pl-fill { display: block; width: 38%; height: 100%; border-radius: 1px; background: linear-gradient(90deg, #ff8c00, #ff6600); }
+      .pl-host.det .pl-fill { width: 100%; transform-origin: 0 50%; transition: transform 0.3s ease-out; }
+      .pl-host.done .pl-fill, .pl-host.error .pl-fill, .pl-host.partial .pl-fill, .pl-host.stopped .pl-fill { width: 100%; transform: none !important; }
+      .pl-host.done .pl-fill { background: #34d399; }
+      .pl-host.error .pl-fill { background: #f87171; }
+      .pl-host.partial .pl-fill { background: #f5a524; }
+      .pl-host.stopped .pl-fill { background: #94a3b8; }
+      .pl-ring { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; filter: drop-shadow(0 0 3px var(--c1)); }
+      .pl-bead { fill: none; stroke: #ff7a00; stroke-width: 1.5px; stroke-linecap: round; opacity: 0; transition: opacity 0.3s ease; }
+      .pl-cap { fill: none; stroke: #8b5cf6; stroke-width: 2px; opacity: 0; }
+      .pl-ping { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 18px; pointer-events: none; }
+
+      /* Reduced motion: no transitions and no keyframes. Shapes and colours
+         still change, and the motions hold still. */
+      @media (prefers-reduced-motion: reduce) {
+        .pl-host, .pl-host.shrink { animation: none; transition: none; }
+        .pl-body, .pl-div, .pl-agent, .pl-time, .pl-ok, .pl-stop, .pl-stop span, .pl-text, .pl-more, .pl-host.more .pl-more, .pl-track, .pl-host.det .pl-fill, .pl-bead { transition: none; }
+        .pl-in.a, .pl-in.b, .pl-out.a, .pl-out.b, .pl-name.a, .pl-name.b { animation: none; }
+      }
+    `;
+
+  function pillMarkup(stopLabel) {
+    return '' +
+      '<div class="pl-body">' +
+        '<div class="pl-row">' +
+          '<span class="pl-mark" translate="no">' + PILL_WORDMARK_SVG + '</span>' +
+          '<span class="pl-div"></span>' +
+          '<span class="pl-agent" translate="no"><span class="pl-name b"></span></span>' +
+          '<span class="pl-gap"></span>' +
+          '<svg class="pl-ok" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.4 L5 8.8 L9.6 3.6"></path></svg>' +
+          '<span class="pl-time">0:00</span>' +
+          '<button type="button" class="pl-stop" aria-label="' + stopLabel + '"><span><svg viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5"></rect></svg></span></button>' +
+        '</div>' +
+        '<div class="pl-text"><span class="pl-out" aria-hidden="true"></span><span class="pl-in"></span><span class="pl-count"></span></div>' +
+        '<div class="pl-more">' +
+          '<div class="pl-meta"><span class="pl-tick"></span><span class="pl-who" translate="no"></span><span class="pl-slug" translate="no"></span><span class="pl-tag"></span></div>' +
+          '<div class="pl-note"></div>' +
+        '</div>' +
+        '<div class="pl-track"><span class="pl-fill"></span></div>' +
+      '</div>' +
+      '<span class="pl-ping"></span>' +
+      '<svg class="pl-ring" aria-hidden="true">' +
+        '<rect class="pl-bead" x="0" y="0" width="100%" height="100%" rx="18"></rect>' +
+        '<rect class="pl-cap" x="0" y="0" width="100%" height="100%" rx="18"></rect>' +
+      '</svg>';
+  }
+
+  // cubic-bezier(x1, y1, x2, y2) at x, solved by bisection.
+  function pillBezier(x1, y1, x2, y2, x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    var lo = 0;
+    var hi = 1;
+    var t = x;
+    for (var i = 0; i < 20; i++) {
+      t = (lo + hi) / 2;
+      var u = 1 - t;
+      if (3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t < x) lo = t; else hi = t;
+    }
+    var v = 1 - t;
+    return 3 * v * v * t * y1 + 3 * v * t * t * y2 + t * t * t;
+  }
+
+  // One frame of a motion at cycle position p (0..1), with the icon's numbers:
+  // sweep travels -120% to 320% of the fill's width, ease-in-out; ring alpha goes
+  // 0.9 to 0.35 over 70% of the cycle and back, with the ping spreading as it
+  // fades; breathe peaks at half the cycle.
+  function pillMotionFrame(form, p) {
+    var m = { sweepX: 0, ring: 0, ping: 0, travel: 0, peak: 0 };
+    if (form === 'sweep') {
+      m.sweepX = -120 + 440 * pillBezier(0.42, 0, 0.58, 1, p);
+    } else if (form === 'ring') {
+      if (p < 0.7) {
+        var o = pillBezier(0, 0, 0.58, 1, p / 0.7);
+        m.ring = 0.9 - 0.55 * o;
+        m.ping = 0.55 * (1 - o);
+        m.travel = o;
+      } else {
+        m.ring = 0.35 + 0.55 * pillBezier(0, 0, 0.58, 1, (p - 0.7) / 0.3);
+      }
+    } else if (form === 'breathe') {
+      m.peak = p < 0.5
+        ? pillBezier(0.42, 0, 0.58, 1, p / 0.5)
+        : 1 - pillBezier(0.42, 0, 0.58, 1, (p - 0.5) / 0.5);
+    }
+    return m;
+  }
+
+  function pillReducedMotion() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Width of a status line in the pill's own text style, plus the design's 6px.
+  var pillMeasureContext = null;
+  function pillTextWidth(text) {
+    if (!text) return 0;
+    try {
+      if (pillMeasureContext === null) {
+        var canvas = document.createElement('canvas');
+        pillMeasureContext = (canvas && typeof canvas.getContext === 'function' && canvas.getContext('2d')) || false;
+      }
+      if (pillMeasureContext) {
+        pillMeasureContext.font = PILL_STATUS_FONT;
+        return Math.ceil(pillMeasureContext.measureText(text).width) + 6;
+      }
+    } catch (e) {
+      pillMeasureContext = false;
+    }
+    return Math.ceil(text.length * 6.8) + 6;
+  }
+
+  // The name, the timer and the count are set in a monospace font, so their widths
+  // follow from the character count. The per-character widths were measured for
+  // Space Mono (0.612em); the platform fonts are no wider (Monaco 0.606em).
+  function pillMonoWidth(text, perChar) {
+    return text ? Math.ceil(text.length * perChar) : 0;
+  }
+
+  function pillSetStyle(el, cache, key, prop, value) {
+    if (cache[key] === value) return;
+    cache[key] = value;
+    el.style[prop] = value;
+  }
+
   class ProgressOverlay {
     constructor() {
       this.host = null;
       this.shadow = null;
-      this.container = null;
+      this.container = null;             // the .pl-host element inside the shadow root
       this._startTime = null;
       this._timerRAF = null;
       this._frozen = false;
-      this._autoHideTimer = null;
-      this._autoDestroyTimer = null;
+      this._autoHideTimer = null;        // the hold after a final state
+      this._autoDestroyTimer = null;     // the last exit beat
       // Phase 229-01 cadence/stability fields:
       this._pendingDisplay = null;       // latest queued text payload
       this._textDebounceTimer = null;    // setTimeout handle
       this._lastTextWriteAt = 0;         // performance.now() of last visible text write
       this._lastVisiblePercent = 0;      // monotonic clamp floor
-      this._lastActionCount = null;      // last written actionCount (batching gate)
-      this._logBuffer = [];              // rolling scrollback of previously-flushed detail strings, capped at 3
+      this._inTopLayer = false;
+      this._reduced = false;
+      this._stage = 2;                   // spawn: 0 seed, 1 top line, 2 full
+      this._leaving = 0;                 // exit: 1 folding, 2 seed, 3 gone
+      this._beats = [];
+      this._foldTimer = null;
+      this._folded = false;
+      this._foldDelay = PILL_FOLD_AFTER_MS;
+      this._actionInFlight = false;
+      this._peek = false;
+      this._motion = null;               // { form, startedAt } from the toolbar icon
+      this._shownEnglish = null;         // the English of the status line now showing
+      this._lastDetail = null;
+      this._flip = 0;
+      this._nameFlip = 0;
+      this._lastArea = 0;
+      this._styledArea = 0;              // the area the browser last drew; shrinking is measured from it
+      this._styledAreaRAF = null;        // the next frame, which moves _styledArea forward
+      this._paint = null;                // element refs and last painted values for the motion loop
+      this._onPointerMove = null;
+      this._onPointerLeave = null;
+      this._view = this._freshView();
+    }
+
+    _freshView() {
+      return {
+        phaseTone: 'thinking', tone: 'thinking', name: '', agentId: '', time: '0:00',
+        count: '', percent: null, stop: false, kind: null, lastKind: 'who',
+        measuredText: null, statusW: 0
+      };
     }
 
     /**
      * Phase 229-01 (OVERLAY-01): debounced status-text writer.
      * Coalesces bursts of text changes inside PROGRESS_TEXT_DEBOUNCE_MS to the
      * latest payload. Bypasses the debounce when isFinal === true so the
-     * v0.9.26 completion freeze (green-flash, Done pill) renders without delay.
+     * completion state renders without delay.
      */
     _scheduleTextWrite(wantsText, isFinal) {
       if (!this.container) return;
@@ -435,28 +737,35 @@
     }
 
     /**
-     * Phase 229-01: flush the latest pending text payload to the DOM.
+     * Phase 229-01: flush the latest pending text payload to the DOM. A new
+     * line comes forward while the old one falls back behind it.
      */
     _flushPendingText() {
       if (!this.container || !this._pendingDisplay) return;
       var p = this._pendingDisplay;
-      var taskEl = this.container.querySelector('.fsb-task');
-      var summaryEl = this.container.querySelector('.fsb-summary');
-      var stepTextEl = this.container.querySelector('.fsb-step-text');
-      var stepNumberEl = this.container.querySelector('.fsb-step-number');
-      if (taskEl) taskEl.textContent = p.title;
-      if (summaryEl) summaryEl.textContent = p.subtitle;
-      writeLabel(stepTextEl, p.detail);
-      writeLabel(stepNumberEl, p.stepNumberLabel);
-      // Scrollback log: push the outgoing detail text (about to be replaced)
-      // into the rolling buffer, deduped against consecutive repeats, capped
-      // at 3 entries (current + 2 "previous" lines rendered in update()).
-      if (p.detail && this._logBuffer[this._logBuffer.length - 1] !== p.detail) {
-        this._logBuffer.push(p.detail);
-        if (this._logBuffer.length > 3) this._logBuffer.shift();
-      }
-      this._lastTextWriteAt = performance.now();
       this._pendingDisplay = null;
+      this._lastTextWriteAt = performance.now();
+      var inEl = this.container.querySelector('.pl-in');
+      var outEl = this.container.querySelector('.pl-out');
+      var english = p.detail || '';
+      if (english !== this._shownEnglish) {
+        if (outEl) outEl.textContent = inEl ? inEl.textContent : '';
+        writeLabel(inEl, english);
+        this._shownEnglish = english;
+        this._flip = 1 - this._flip;
+        var side = this._flip ? 'a' : 'b';
+        [inEl, outEl].forEach(function (el) {
+          if (!el) return;
+          el.classList.toggle('a', side === 'a');
+          el.classList.toggle('b', side === 'b');
+        });
+      }
+      var countEl = this.container.querySelector('.pl-count');
+      if (countEl && countEl.textContent !== (p.count || '')) countEl.textContent = p.count || '';
+      this._view.count = p.count || '';
+      this._folded = false;
+      this._armFold();
+      this._render();
     }
 
     /**
@@ -470,31 +779,31 @@
       return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
     }
 
+    _setTime(text) {
+      var lengthChanged = text.length !== this._view.time.length;
+      this._view.time = text;
+      var timeEl = this.container ? this.container.querySelector('.pl-time') : null;
+      if (timeEl) timeEl.textContent = text;
+      if (lengthChanged) this._render();
+    }
+
     /**
-     * Start the rAF-driven elapsed timer loop (D-05).
-     * Updates .fsb-phase with M:SS elapsed time every frame.
+     * One requestAnimationFrame loop for the pill's lifetime: it ticks the
+     * elapsed time and paints the icon's motion.
      */
     _startTimerLoop() {
       if (this._timerRAF !== null) return;
       var self = this;
       function tick() {
-        if (self._frozen || !self._startTime || !self.container) {
-          self._timerRAF = null;  // clear stale handle on early exit
-          return;
-        }
-        var elapsed = performance.now() - self._startTime;
-        var phaseEl = self.container.querySelector('.fsb-phase');
-        if (phaseEl) {
-          phaseEl.textContent = self._formatElapsed(elapsed);
-        }
+        self._timerRAF = null;
+        if (!self.container) return;
+        self._tick();
+        if (self._frozen) return;
         self._timerRAF = requestAnimationFrame(tick);
       }
-      self._timerRAF = requestAnimationFrame(tick);
+      this._timerRAF = requestAnimationFrame(tick);
     }
 
-    /**
-     * Stop the rAF timer loop and clean up the animation frame.
-     */
     _stopTimerLoop() {
       if (this._timerRAF !== null) {
         cancelAnimationFrame(this._timerRAF);
@@ -502,8 +811,252 @@
       }
     }
 
+    _tick() {
+      if (this._startTime && !this._frozen) {
+        var time = this._formatElapsed(performance.now() - this._startTime);
+        if (time !== this._view.time) this._setTime(time);
+      }
+      // A language change redraws the status in place, so measure it again.
+      var inEl = this.container.querySelector('.pl-in');
+      if (inEl && inEl.textContent !== this._view.measuredText) this._render();
+      this._paintMotion(Date.now());
+    }
+
+    _paintMotion(now) {
+      var c = this.container;
+      if (!c) return;
+      var q = this._paint;
+      if (!q || q.root !== c) {
+        q = this._paint = {
+          root: c,
+          mark: c.querySelector('.pl-mark'),
+          fill: c.querySelector('.pl-fill'),
+          bead: c.querySelector('.pl-bead'),
+          cap: c.querySelector('.pl-cap'),
+          ping: c.querySelector('.pl-ping'),
+          last: {}
+        };
+      }
+      if (!q.mark || !q.fill || !q.bead || !q.cap || !q.ping) return;
+      var v = this._view;
+      var ended = !!PILL_ENDED[v.tone];
+      var still = ended || v.tone === 'waiting';
+      var form = !still && this._motion && PILL_FORMS[this._motion.form] ? this._motion.form : null;
+      // Reduced motion holds every form at its first frame, the orbit's bead included.
+      var p = 0;
+      if (form && !this._reduced) {
+        var period = PILL_FORMS[form];
+        var into = (now - this._motion.startedAt) % period;
+        p = (into < 0 ? into + period : into) / period;
+      }
+      var m = this._reduced
+        ? { sweepX: 0, ring: 0.9, ping: 0, travel: 0, peak: -1 }
+        : pillMotionFrame(form, p);
+
+      var sweep = form === 'sweep' && v.percent === null;
+      c.classList.toggle('track', ended || v.percent !== null || sweep);
+      if (sweep) {
+        pillSetStyle(q.fill, q.last, 'fill', 'transform', 'translateX(' + m.sweepX.toFixed(1) + '%)');
+      } else if (q.last.fill && q.last.fill.indexOf('translateX') === 0) {
+        pillSetStyle(q.fill, q.last, 'fill', 'transform', v.percent !== null ? 'scaleX(' + (v.percent / 100) + ')' : '');
+      }
+
+      var orbit = form === 'orbit';
+      pillSetStyle(q.bead, q.last, 'bead', 'opacity', orbit ? '1' : '0');
+      if (orbit) {
+        var w = c.clientWidth || this._lastW || 0;
+        var h = c.clientHeight || this._lastH || 0;
+        var perimeter = 2 * (w + h) - 144 + 2 * Math.PI * 18;
+        pillSetStyle(q.bead, q.last, 'beadDash', 'strokeDasharray', (0.12 * perimeter).toFixed(1) + ' ' + (0.88 * perimeter).toFixed(1));
+        // Starts at top centre, like the icon's bead.
+        pillSetStyle(q.bead, q.last, 'beadOffset', 'strokeDashoffset', (-(p * perimeter + (w - 36) / 2)).toFixed(1));
+      }
+
+      var ring = form === 'ring';
+      pillSetStyle(q.cap, q.last, 'cap', 'opacity', ring ? m.ring.toFixed(3) : '0');
+      // On the page the ping can spread outward, as the icon's design intended.
+      pillSetStyle(q.ping, q.last, 'ping', 'boxShadow', ring && m.ping > 0
+        ? '0 0 0 ' + (8 * m.travel).toFixed(1) + 'px rgba(139, 92, 246, ' + m.ping.toFixed(3) + ')'
+        : 'none');
+
+      var breathe = form === 'breathe' && m.peak >= 0;
+      pillSetStyle(q.mark, q.last, 'markOpacity', 'opacity', breathe ? (0.45 + 0.55 * m.peak).toFixed(3) : '');
+      pillSetStyle(q.mark, q.last, 'markFilter', 'filter', breathe
+        ? 'drop-shadow(0 0 ' + (6 * m.peak).toFixed(2) + 'px rgba(255, 140, 0, ' + (0.95 * m.peak).toFixed(2) + '))'
+        : '');
+    }
+
     /**
-     * Create the overlay in Shadow DOM if not already created
+     * Work out the pill's shape from its state and write it as explicit px, so
+     * width and height ease instead of jumping.
+     */
+    _render() {
+      var c = this.container;
+      if (!c) return;
+      var v = this._view;
+      var ended = !!PILL_ENDED[v.tone];
+      var leaving = this._leaving > 0;
+      var peek = this._peek && !ended && !leaving && !!v.agentId;
+      var kind = leaving ? null : (v.kind || (peek ? 'who' : null));
+      if (kind) v.lastKind = kind;
+
+      var inEl = c.querySelector('.pl-in');
+      var statusText = inEl ? inEl.textContent : '';
+      if (statusText !== v.measuredText) {
+        v.measuredText = statusText;
+        v.statusW = pillTextWidth(statusText);
+      }
+      var nameW = pillMonoWidth(v.name, 7.3);
+      var timeW = pillMonoWidth(v.time, 6.75) + 1;
+      var headW = 12 + 32 + (v.name ? 21 + nameW : 0) + 10 + (v.tone === 'done' ? 20 : 0) + timeW + (v.stop ? 26 : 0) + 14;
+      var lines = 1;
+      var lineW;
+      if (v.count) {
+        var countW = pillMonoWidth(v.count, 6.75) + 1;
+        lineW = Math.min(PILL_MAX_W, Math.max(headW, v.statusW + 10 + countW + 26));
+      } else {
+        lines = v.statusW > PILL_MAX_W - 30 ? 2 : 1;
+        lineW = Math.min(PILL_MAX_W, Math.max(headW, v.statusW + 26));
+      }
+      // A capability call and a blocked site take the full width.
+      var fullW = kind === 'cap' || kind === 'guard' ? PILL_MAX_W : lineW;
+      var fullH = 41 + lines * 17 + (kind === 'guard' ? 38 : kind ? 20 : 0);
+      // Three shapes to morph between: the seed (wordmark only), the top line, and the full pill.
+      var seed = this._stage === 0 || this._leaving >= 2;
+      var head = !seed && (this._stage === 1 || this._leaving === 1 || ((this._folded || !statusText) && !kind));
+      var w = seed ? 56 : head ? headW : fullW;
+      var h = seed || head ? 36 : fullH;
+      var area = w * h;
+      // update() can render more than once before the next frame, and the browser
+      // takes the transition timing from the style it lands on then. Measure the
+      // direction from the shape the last frame drew, so a repeat render with the
+      // same shape cannot undo the shrink timing.
+      if (this._styledAreaRAF === null) {
+        this._styledArea = this._lastArea;
+        var self = this;
+        this._styledAreaRAF = requestAnimationFrame(function () { self._styledAreaRAF = null; });
+      }
+      var shrinking = area < this._styledArea - 1;
+      this._lastArea = area;
+      this._lastW = w;
+      this._lastH = h;
+
+      PILL_TONES.forEach(function (tone) { c.classList.toggle(tone, tone === v.tone); });
+      c.classList.toggle('seed', seed);
+      c.classList.toggle('head', head);
+      c.classList.toggle('more', !seed && !head && !!kind);
+      c.classList.toggle('shrink', shrinking);
+      c.classList.toggle('gone', this._leaving >= 3);
+      c.classList.toggle('anon', !v.name);
+      c.classList.toggle('stoppable', v.stop);
+      c.classList.toggle('det', v.percent !== null && !ended);
+      ['who', 'cap', 'guard'].forEach(function (k) { c.classList.toggle('k-' + k, v.lastKind === k); });
+      var textEl = c.querySelector('.pl-text');
+      if (textEl) textEl.classList.toggle('split', !!v.count);
+      var agentEl = c.querySelector('.pl-agent');
+      if (agentEl) agentEl.style.width = nameW + 'px';
+      c.style.width = w + 'px';
+      c.style.height = h + 'px';
+    }
+
+    _beat(delay, fn) {
+      var self = this;
+      var handle = setTimeout(function () {
+        self._beats = self._beats.filter(function (b) { return b !== handle; });
+        if (self.container) fn();
+      }, delay);
+      this._beats.push(handle);
+    }
+
+    _clearBeats() {
+      this._beats.forEach(function (handle) { clearTimeout(handle); });
+      this._beats = [];
+    }
+
+    _clearFold() {
+      if (this._foldTimer !== null) {
+        clearTimeout(this._foldTimer);
+        this._foldTimer = null;
+      }
+    }
+
+    // Fold the status away once the action has ended and the line has been read.
+    // A blocked site, a capability call in flight, an ended run and a session
+    // waiting for news all stay open.
+    _armFold() {
+      this._clearFold();
+      var v = this._view;
+      if (!this.container || this._folded || this._frozen || this._leaving) return;
+      if (v.tone === 'guarded' || v.tone === 'waiting' || PILL_ENDED[v.tone]) return;
+      if (this._actionInFlight) return;
+      if (this._motion && this._motion.form === 'ring') return;
+      var self = this;
+      this._foldTimer = setTimeout(function () {
+        self._foldTimer = null;
+        if (!self.container) return;
+        self._folded = true;
+        self._render();
+      }, this._foldDelay);
+    }
+
+    _setName(name) {
+      this._view.name = name;
+      var nameEl = this.container ? this.container.querySelector('.pl-name') : null;
+      if (!nameEl) return;
+      nameEl.textContent = name;
+      this._nameFlip = 1 - this._nameFlip;
+      nameEl.classList.toggle('a', this._nameFlip === 1);
+      nameEl.classList.toggle('b', this._nameFlip === 0);
+    }
+
+    _effectiveTone() {
+      var v = this._view;
+      return v.phaseTone === 'thinking' && this._actionInFlight ? 'acting' : v.phaseTone;
+    }
+
+    _setText(selector, text) {
+      var el = this.container ? this.container.querySelector(selector) : null;
+      if (el && el.textContent !== text) el.textContent = text;
+      return el;
+    }
+
+    _trackPointer(on) {
+      if (on && !this._onPointerMove) {
+        var self = this;
+        this._onPointerMove = function (event) { self._pointerAt(event.clientX, event.clientY); };
+        this._onPointerLeave = function () { self._pointerAt(-1, -1); };
+        try {
+          window.addEventListener('pointermove', this._onPointerMove, { capture: true, passive: true });
+          // Not capture: on the way down it would also hear every page element the pointer
+          // leaves. Without it, <html> only hears the pointer leaving the page.
+          document.documentElement.addEventListener('mouseleave', this._onPointerLeave);
+        } catch (e) { /* hover is optional */ }
+      } else if (!on && this._onPointerMove) {
+        try {
+          window.removeEventListener('pointermove', this._onPointerMove, { capture: true });
+          document.documentElement.removeEventListener('mouseleave', this._onPointerLeave);
+        } catch (e) { /* ignore */ }
+        this._onPointerMove = null;
+        this._onPointerLeave = null;
+      }
+    }
+
+    _pointerAt(x, y) {
+      var c = this.container;
+      if (!c) return;
+      var inside = false;
+      if (x >= 0 && typeof c.getBoundingClientRect === 'function') {
+        var r = c.getBoundingClientRect();
+        inside = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      }
+      if (inside === this._peek) return;
+      this._peek = inside;
+      if (this._view.agentId) this._render();
+    }
+
+    /**
+     * Create the pill in Shadow DOM if not already created. It starts as the
+     * seed and opens in two beats.
      */
     create() {
       if (this.host) return; // Already created
@@ -530,415 +1083,20 @@
 
       // Create shadow root for complete style isolation
       this.shadow = this.host.attachShadow({ mode: 'open' });
-
-      // Inject styles (completely isolated from host page)
       const style = document.createElement('style');
-      style.textContent = `
-      :host {
-        display: block !important;
-      }
-
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        font: inherit;
-        color: inherit;
-      }
-
-      .fsb-overlay {
-        width: min(320px, calc(100vw - 32px));
-        max-width: 320px;
-        background: #000000;
-        color: #ffffff;
-        padding: 14px 18px;
-        border-radius: 10px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        font-size: 13px;
-        line-height: 1.4;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 140, 0, 0.3);
-        pointer-events: none;
-        opacity: 1;
-        transition: opacity 0.2s ease-out;
-        contain: layout paint;
-      }
-
-      .fsb-overlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-
-      .fsb-overlay.capability {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.38);
-      }
-
-      .fsb-overlay.guarded {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(245, 165, 36, 0.45);
-      }
-
-      .fsb-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 10px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      }
-
-      .fsb-logo {
-        width: 20px;
-        height: 20px;
-        border-radius: 4px;
-        object-fit: contain;
-      }
-
-      .fsb-title {
-        font-weight: 600;
-        color: #ffffff;
-        font-size: 13px;
-      }
-
-      .fsb-client-badge {
-        display: none;
-        margin-left: auto;
-        padding: 2px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(255, 255, 255, 0.88);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        white-space: nowrap;
-      }
-
-      .fsb-stop {
-        margin-left: 8px;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.06);
-        color: rgba(255, 255, 255, 0.75);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 10px;
-        cursor: pointer;
-        flex-shrink: 0;
-        pointer-events: auto;
-        transition: background 0.15s ease;
-      }
-
-      .fsb-stop:hover {
-        background: rgba(255, 255, 255, 0.14);
-      }
-
-      .fsb-stop.hidden {
-        display: none;
-      }
-
-      .fsb-task {
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 12px;
-        margin-bottom: 8px;
-        line-height: 1.5;
-        overflow-wrap: anywhere;
-      }
-
-      .fsb-summary {
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 11px;
-        margin-bottom: 6px;
-        font-style: italic;
-      }
-
-      .fsb-summary:empty {
-        display: none;
-      }
-
-      .fsb-chip {
-        display: none;
-        align-items: center;
-        gap: 7px;
-        background: rgba(255, 255, 255, 0.06);
-        border-radius: 7px;
-        padding: 7px 9px;
-        margin-bottom: 9px;
-        font-size: 11px;
-      }
-
-      .fsb-chip.show {
-        display: flex;
-      }
-
-      .fsb-chip-lock {
-        opacity: 0.55;
-        font-size: 11px;
-        flex-shrink: 0;
-      }
-
-      .fsb-chip-txt {
-        flex: 1;
-        color: rgba(255, 255, 255, 0.82);
-        font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
-        font-size: 10.5px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .fsb-chip-rdy {
-        flex-shrink: 0;
-        font-size: 9.5px;
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        padding: 2px 6px;
-        border-radius: 4px;
-        white-space: nowrap;
-      }
-
-      .fsb-chip-rdy.ready {
-        background: rgba(52, 211, 153, 0.18);
-        color: #34D399;
-      }
-
-      .fsb-chip-rdy.guarded {
-        background: rgba(245, 165, 36, 0.2);
-        color: #f5b942;
-      }
-
-      .fsb-note {
-        display: none;
-        align-items: flex-start;
-        gap: 6px;
-        background: rgba(245, 165, 36, 0.1);
-        border: 1px solid rgba(245, 165, 36, 0.25);
-        border-radius: 7px;
-        padding: 7px 9px;
-        margin-bottom: 9px;
-        font-size: 11px;
-        color: #f5cf8f;
-        line-height: 1.4;
-      }
-
-      .fsb-note.show {
-        display: flex;
-      }
-
-      .fsb-note-icon {
-        margin-top: 1px;
-        flex-shrink: 0;
-      }
-
-      .fsb-step {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        margin-bottom: 10px;
-      }
-
-      .fsb-step-number {
-        background: rgba(255, 140, 0, 0.2);
-        color: #FF8C00;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 600;
-        flex-shrink: 0;
-      }
-
-      .fsb-step-number.calling {
-        background: rgba(139, 92, 246, 0.22);
-        color: #b79dfb;
-      }
-
-      .fsb-step-number.guarded {
-        background: rgba(245, 165, 36, 0.22);
-        color: #f5b942;
-      }
-
-      .fsb-step-text {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 12px;
-        flex: 1;
-        line-height: 1.45;
-        overflow-wrap: anywhere;
-      }
-
-      .fsb-log {
-        max-height: 14px;
-        overflow: hidden;
-        transition: max-height 0.22s ease;
-        margin-bottom: 2px;
-        cursor: default;
-      }
-
-      .fsb-log:hover {
-        max-height: 52px;
-      }
-
-      .fsb-log-line {
-        font-size: 10.5px;
-        color: rgba(255, 255, 255, 0.34);
-        line-height: 1.35;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .fsb-log-line:empty {
-        display: none;
-      }
-
-      .fsb-meta {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-
-      .fsb-phase,
-      .fsb-eta {
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 11px;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
-
-      .fsb-progress-bar {
-        height: 4px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 2px;
-        overflow: hidden;
-        position: relative;
-      }
-
-      .fsb-progress-bar.hidden {
-        display: none;
-      }
-
-      .fsb-progress-bar.indeterminate .fsb-progress-fill {
-        width: 38%;
-        transform-origin: center center;
-        animation: fsbProgressSweep 1.2s ease-in-out infinite;
-      }
-
-      .fsb-progress-fill {
-        height: 100%;
-        width: 100%;
-        background: linear-gradient(90deg, #FF8C00, #FF6600);
-        border-radius: 2px;
-        transform-origin: left center;
-        transform: scaleX(0);
-        transition: transform 0.3s ease-out;
-        will-change: transform;
-      }
-
-      .fsb-progress-fill.complete {
-        background: #34D399;
-        transform: scaleX(1) !important;
-      }
-
-      .fsb-progress-fill.guarded {
-        background: #f5a524;
-        animation: none;
-      }
-
-      @keyframes fsbProgressSweep {
-        0% { transform: translateX(-120%); }
-        100% { transform: translateX(320%); }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .fsb-overlay,
-        .fsb-progress-fill {
-          transition: none;
-        }
-        .fsb-progress-fill.complete {
-          transition: none;
-        }
-        .fsb-progress-bar.indeterminate .fsb-progress-fill {
-          animation: none;
-          transform: none;
-          width: 45%;
-        }
-        /* Phase 229-02 (OVERLAY-06): strict text-surface no-animation. */
-        .fsb-task,
-        .fsb-summary,
-        .fsb-step-text,
-        .fsb-step-number,
-        .fsb-eta,
-        .fsb-chip-txt,
-        .fsb-chip-rdy,
-        .fsb-note,
-        .fsb-log-line {
-          transition: none !important;
-          animation: none !important;
-        }
-        /* .fsb-progress-fill.complete background change is a single state,
-           not an animation -- preserved as the only celebratory cue. */
-        /* Hover-driven max-height reveal is itself a motion-gated disclosure --
-           show the (max 2-line) scrollback permanently instead under reduced motion. */
-        .fsb-log,
-        .fsb-log:hover {
-          transition: none !important;
-          max-height: 52px;
-        }
-      }
-    `;
-
+      style.textContent = PILL_CSS;
       this.shadow.appendChild(style);
 
-      // Create overlay container
       this.container = document.createElement('div');
-      this.container.className = 'fsb-overlay';
-      this.container.innerHTML = `
-      <div class="fsb-header">
-        <img class="fsb-logo" src="" alt="FSB">
-        <span class="fsb-title">${ov('entry_automating', 'FSB Automating')}</span>
-        <span class="fsb-client-badge"></span>
-        <button type="button" class="fsb-stop hidden" aria-label="${ov('entry_stop', 'Stop')}">&#9632;</button>
-      </div>
-      <div class="fsb-task">-</div>
-      <div class="fsb-summary"></div>
-      <div class="fsb-chip">
-        <span class="fsb-chip-lock">&#128274;</span>
-        <span class="fsb-chip-txt"></span>
-        <span class="fsb-chip-rdy"></span>
-      </div>
-      <div class="fsb-note">
-        <span class="fsb-note-icon">&#9888;</span>
-        <span class="fsb-note-text"></span>
-      </div>
-      <div class="fsb-step">
-        <span class="fsb-step-number">${ov('entry_planning', 'Planning')}</span>
-        <span class="fsb-step-text">${ov('entry_initializing', 'Initializing...')}</span>
-      </div>
-      <div class="fsb-log">
-        <div class="fsb-log-line"></div>
-        <div class="fsb-log-line"></div>
-      </div>
-      <div class="fsb-meta">
-        <span class="fsb-phase"></span>
-        <span class="fsb-eta"></span>
-      </div>
-      <div class="fsb-progress-bar">
-        <div class="fsb-progress-fill"></div>
-      </div>
-    `;
-
-      // Set logo image src using chrome.runtime.getURL for web_accessible_resources
-      const logoImg = this.container.querySelector('.fsb-logo');
-      logoImg.src = chrome.runtime.getURL('assets/icon48.png');
+      this.container.className = 'pl-host thinking seed anon';
+      this.container.innerHTML = pillMarkup(ov('entry_stop', 'Stop'));
 
       // Stop button: attached once here (not in update()) to avoid re-attaching
       // listeners on every session-status tick. Reuses the extension's existing
-      // stopAutomation mechanism verbatim -- see the "Stop control" section of
-      // the implementation plan for why this doesn't attempt per-invoke cancellation.
-      const stopBtn = this.container.querySelector('.fsb-stop');
+      // stopAutomation mechanism verbatim.
+      const stopBtn = this.container.querySelector('.pl-stop');
       if (stopBtn) {
+        writeKeyed(stopBtn, 'entry_stop', 'Stop', null, 'aria-label');
         stopBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           try {
@@ -952,6 +1110,19 @@
       this.shadow.appendChild(this.container);
       watchChrome(this.container);
 
+      this._reduced = pillReducedMotion();
+      this._stage = this._reduced ? 2 : 0;
+      this._leaving = 0;
+      if (FSB.iconMotion) this.setMotion(FSB.iconMotion);
+      this._render();
+      if (!this._reduced) {
+        var self = this;
+        this._beat(PILL_SPAWN_BEATS[0], function () { self._stage = 1; self._render(); });
+        this._beat(PILL_SPAWN_BEATS[1], function () { self._stage = 2; self._render(); });
+      }
+      this._trackPointer(true);
+      this._startTimerLoop();
+
       // Promote to top layer via Popover API for guaranteed rendering above all page content.
       // This bypasses stacking context issues on complex sites like Google Docs.
       // Falls back to z-index approach if Popover API is unavailable.
@@ -963,15 +1134,30 @@
     }
 
     /**
-     * Update overlay content
-     * @param {Object} data - Update data
-     * @param {string} data.taskName - Task description
-     * @param {number} data.stepNumber - Current step number
-     * @param {string} data.stepText - Step description
-     * @param {number} data.progress - Progress percentage (0-100)
+     * Update the pill from an overlay state.
+     * Accepts the normalized state from buildOverlayState, or the legacy shape
+     * { taskName, stepText, progress, phase } from the action path.
      */
     update(state) {
       if (!this.container) return;
+
+      // A trigger watch that stops only drops the watching tone. Anything else
+      // that clears the session goes through dismiss().
+      if (state && state.lifecycle === 'cleared') {
+        if (!this._frozen && this._view.phaseTone === 'watching') {
+          this._view.phaseTone = 'thinking';
+          this._view.tone = this._effectiveTone();
+          this._render();
+        }
+        return;
+      }
+
+      // A new call while the pill is leaving morphs it straight back. A trigger pulse is
+      // not a call: it only relabels a pill that is up, so a leaving pill keeps leaving.
+      if (this._leaving) {
+        if (state && state.mode === 'trigger-watch') return;
+        if (!state || !state.lifecycle || state.lifecycle === 'running') this._revive();
+      }
 
       // Once frozen (lifecycle=final received), ignore further updates
       // to prevent post-completion status messages from altering the display
@@ -980,7 +1166,7 @@
       // Phase 229-02 (OVERLAY-05 first-sentence guard): legacy state.stepText
       // bypasses the upstream sanitization pipeline in overlay-state.js. Route
       // it through sanitizeActionText(firstSentence(...)) so multi-sentence /
-      // raw-tool-call strings cannot leak directly into .fsb-step-text.
+      // raw-tool-call strings cannot leak directly into the status line.
       var legacyUtils = window.FSBOverlayStateUtils;
       var overlayState = state && state.display ? state : {
         lifecycle: 'running',
@@ -1015,15 +1201,13 @@
             }
       };
 
-      // Timer lifecycle (D-04, D-05)
-      // Start elapsed timer on first update call (first sessionStatus)
-      if (!this._startTime && overlayState.lifecycle !== 'cleared') {
+      // Timer lifecycle (D-04, D-05): the elapsed time starts on the first update.
+      if (!this._startTime) {
         this._startTime = performance.now();
         this._frozen = false;
         // Phase 229-01 (OVERLAY-03): reset monotonic floor for new session.
         this._lastVisiblePercent = 0;
-        var phaseEl = this.container.querySelector('.fsb-phase');
-        if (phaseEl) phaseEl.textContent = '0:00';  // seed before first rAF fires
+        this._setTime('0:00');
         this._startTimerLoop();
       }
 
@@ -1033,81 +1217,67 @@
         : (overlayState.phase || 'Working');
       var display = overlayState.display || {};
       var progress = overlayState.progress || { mode: 'indeterminate', label: phaseLabel };
-      // Phase 243 plan 03 (UI-01): badge displays "<clientLabel> / <agentIdShort>"
-      // when both are present (just clientLabel if only that; just agentIdShort if
-      // only that; hidden if neither). agentIdShort is produced upstream in
-      // overlay-state.js via formatAgentIdForDisplay (agent-registry.js:184) --
-      // never sliced locally. The combine logic is extracted into the pure
-      // FSBBadgeCombine helper so the rule is unit-testable without a DOM.
-      var clientLabel = overlayState.clientLabel ? String(overlayState.clientLabel).trim() : '';
-      var agentIdShort = overlayState.agentIdShort ? String(overlayState.agentIdShort).trim() : '';
-      var combined = (window.FSBBadgeCombine && typeof window.FSBBadgeCombine.combineBadgeText === 'function')
-        ? window.FSBBadgeCombine.combineBadgeText(clientLabel, agentIdShort)
-        : (clientLabel && agentIdShort ? clientLabel + ' / ' + agentIdShort : (clientLabel || agentIdShort));
-      var clientBadgeEl = this.container.querySelector('.fsb-client-badge');
-
-      if (clientBadgeEl) {
-        clientBadgeEl.textContent = combined;
-        clientBadgeEl.style.display = combined ? 'inline-flex' : 'none';
-      }
-
-      // Capability-call visual treatment: violet "calling" mode + amber
-      // "guarded" fail-closed state for invoke_capability calls, distinct
-      // from ordinary DOM-action phases. All reads are defensive against
-      // `capability`/`guarded`/`stoppable` being absent (the common case for
-      // every non-capability session), so this block is fully inert there.
+      var v = this._view;
+      var isFinal = overlayState.lifecycle === 'final';
+      var result = overlayState.result;
       var isGuarded = !!overlayState.guarded;
       var isCalling = overlayState.phase === 'calling';
+      var isTriggerWatch = overlayState.phase === 'trigger-watch' || overlayState.mode === 'trigger-watch';
+
+      var previousTone = v.tone;
+      v.phaseTone = isFinal
+        ? (result === 'error' ? 'error' : result === 'partial' ? 'partial' : result === 'stopped' ? 'stopped' : 'done')
+        : isGuarded ? 'guarded'
+        : overlayState.reconnecting ? 'waiting'
+        : isCalling ? 'calling'
+        : isTriggerWatch ? 'watching'
+        : PILL_ACTING_PHASES[overlayState.phase] ? 'acting'
+        : 'thinking';
+      v.tone = this._effectiveTone();
+
+      // Who is driving: the MCP client's label, left out for FSB's own autopilot.
+      // The agent id is kept for the hover row.
+      var clientLabel = overlayState.clientLabel ? String(overlayState.clientLabel).trim() : '';
+      var name = /^(fsb\s*)?autopilot$/i.test(clientLabel) ? '' : clientLabel;
+      if (name !== v.name) this._setName(name);
+      v.agentId = overlayState.agentIdShort ? String(overlayState.agentIdShort).trim() : '';
+      this._setText('.pl-who', v.agentId);
+      v.stop = !!overlayState.stoppable && !isFinal;
+
+      // The third row opens for something the status line cannot carry.
       var capability = overlayState.capability || null;
-      this.container.classList.toggle('guarded', isGuarded);
-      this.container.classList.toggle('capability', !isGuarded && isCalling);
-
-      var chipEl = this.container.querySelector('.fsb-chip');
-      if (chipEl) {
-        chipEl.classList.toggle('show', !!(capability && capability.chipText));
-        if (capability) {
-          var chipTxtEl = this.container.querySelector('.fsb-chip-txt');
-          var chipRdyEl = this.container.querySelector('.fsb-chip-rdy');
-          if (chipTxtEl) chipTxtEl.textContent = capability.chipText || '';
-          if (chipRdyEl) {
-            chipRdyEl.textContent = capability.readinessLabel || '';
-            chipRdyEl.classList.remove('ready', 'guarded');
-            if (capability.readinessClass) chipRdyEl.classList.add(capability.readinessClass);
-          }
+      v.kind = null;
+      if (isGuarded && capability && capability.noteText) v.kind = 'guard';
+      else if (!isGuarded && isCalling && capability && capability.chipText) v.kind = 'cap';
+      if (capability) {
+        this._setText('.pl-slug', capability.chipText || '');
+        var tagEl = this._setText('.pl-tag', capability.readinessLabel || '');
+        if (tagEl) {
+          tagEl.classList.remove('ready', 'guarded');
+          if (capability.readinessClass) tagEl.classList.add(capability.readinessClass);
         }
+        this._setText('.pl-note', capability.noteText || '');
       }
 
-      var noteEl = this.container.querySelector('.fsb-note');
-      if (noteEl) {
-        noteEl.classList.toggle('show', isGuarded && !!(capability && capability.noteText));
-        if (capability) {
-          var noteTextEl = this.container.querySelector('.fsb-note-text');
-          if (noteTextEl) noteTextEl.textContent = capability.noteText || '';
+      // A known total fills the track; the sweep and the end states use it otherwise.
+      var fill = this.container.querySelector('.pl-fill');
+      var determinate = !isFinal && !isTriggerWatch && progress.mode === 'determinate'
+        && progress.percent !== null && progress.percent !== undefined;
+      var count = '';
+      if (determinate) {
+        // Phase 229-01 (OVERLAY-03): monotonic clamp -- never let the fill visibly retreat.
+        var clampedPercent = Math.max(this._lastVisiblePercent || 0, Number(progress.percent) || 0);
+        this._lastVisiblePercent = clampedPercent;
+        v.percent = clampedPercent;
+        if (fill) fill.style.transform = 'scaleX(' + (clampedPercent / 100) + ')';
+        if (this._paint) this._paint.last.fill = fill ? fill.style.transform : undefined;
+        if (progress.label && /\d/.test(progress.label)) count = String(progress.label);
+      } else {
+        v.percent = null;
+        if (fill && !(this._paint && this._paint.last.fill && this._paint.last.fill.indexOf('translateX') === 0)) {
+          fill.style.transform = '';
+          if (this._paint) this._paint.last.fill = '';
         }
-      }
-
-      // Step-number pill color: an immediate (non-debounced) class write, kept
-      // separate from the debounced pill TEXT write below -- coupling the
-      // color to the debounce would let the ring color and pill color visibly
-      // desync during the hold window.
-      var stepNumberEl = this.container.querySelector('.fsb-step-number');
-      if (stepNumberEl) {
-        stepNumberEl.classList.toggle('calling', !isGuarded && isCalling);
-        stepNumberEl.classList.toggle('guarded', isGuarded);
-      }
-
-      var stopBtnEl = this.container.querySelector('.fsb-stop');
-      if (stopBtnEl) {
-        stopBtnEl.classList.toggle('hidden', !overlayState.stoppable);
-      }
-
-      // Scrollback log: render the 2 steps before the current one from the
-      // rolling buffer populated in _flushPendingText().
-      var logLines = this.container.querySelectorAll('.fsb-log-line');
-      if (logLines && logLines.length) {
-        var prevLines = this._logBuffer.slice(0, -1).slice(-2).reverse();
-        writeLabel(logLines[0], prevLines[0] || '');
-        writeLabel(logLines[1], prevLines[1] || '');
       }
 
       // Phase 229-02 (OVERLAY-05): suppress generic 'thinking-class' phase
@@ -1122,113 +1292,76 @@
         || display.detail === 'Working'
         || display.detail === phaseLabel;
       var suppressDetail = isThinking && detailIsGeneric && elapsedMs < 1000;
+      var detail = suppressDetail ? '' : (display.detail || 'Working');
+      if (isFinal && v.phaseTone === 'done') detail = 'Done';
+
+      // A new status opens the pill again; the fold is armed once it is written.
+      if (detail !== this._lastDetail || v.tone !== previousTone) {
+        this._folded = false;
+        this._clearFold();
+      }
+      this._lastDetail = detail;
+      this._foldDelay = isTriggerWatch ? PILL_WATCH_FOLD_MS : PILL_FOLD_AFTER_MS;
 
       // Phase 229-01 (OVERLAY-01): debounce text writes (flushes immediately on final).
-      var wantsText = {
-        title: display.title || '-',
-        subtitle: display.subtitle || '',
-        detail: suppressDetail ? '' : (display.detail || 'Working'),
-        stepNumberLabel: progress.label || phaseLabel
-      };
-      var isFinal = overlayState.lifecycle === 'final';
-      this._scheduleTextWrite(wantsText, isFinal);
+      this._scheduleTextWrite({ detail: detail, count: count }, isFinal);
 
-      // .fsb-phase elapsed timer display (D-02) -- initial 0:00 seeded in timer-start block above
-
-      // Phase 229-01 (OVERLAY-04): action counter batching -- write only when value changes.
-      var actionCount = overlayState.actionCount;
-      var etaEl = this.container.querySelector('.fsb-eta');
-      if (etaEl && actionCount !== this._lastActionCount) {
-        if (actionCount !== null && actionCount !== undefined) {
-          writeActions(etaEl, actionCount);
-        } else {
-          etaEl.textContent = '';
-        }
-        this._lastActionCount = actionCount;
-      }
-
-      var bar = this.container.querySelector('.fsb-progress-bar');
-      var fill = this.container.querySelector('.fsb-progress-fill');
-      fill.classList.toggle('guarded', isGuarded);
-      // Trigger watchers don't have progress -- they sit and observe. The
-      // indeterminate sweep implies forward motion, which misreads as
-      // "something is happening". Hide the bar entirely; the breathing
-      // edge-glow + static caption carry the "armed and waiting" signal.
-      var isTriggerWatch = overlayState.phase === 'trigger-watch'
-        || overlayState.mode === 'trigger-watch';
-      if (isTriggerWatch) {
-        fill.style.transform = '';
-        fill.style.transformOrigin = '';
-        bar.classList.add('hidden');
-        bar.classList.remove('indeterminate');
-      } else if (progress.mode === 'determinate' && progress.percent !== null) {
-        bar.classList.remove('indeterminate');
-        bar.classList.remove('hidden');
-        fill.style.width = '100%';
-        // Phase 229-01 (OVERLAY-03): monotonic clamp -- never let bar visibly retreat.
-        var clampedPercent = Math.max(this._lastVisiblePercent || 0, progress.percent);
-        this._lastVisiblePercent = clampedPercent;
-        fill.style.transform = 'scaleX(' + (clampedPercent / 100) + ')';
-      } else {
-        fill.style.width = '38%';
-        fill.style.transform = '';
-        fill.style.transformOrigin = '';
-        if (overlayState.lifecycle === 'final') {
-          bar.classList.add('hidden');
-          bar.classList.remove('indeterminate');
-        } else {
-          bar.classList.remove('hidden');
-          bar.classList.add('indeterminate');
-        }
-      }
-
-      // Completion freeze (D-08, D-09, D-10, POLISH-03)
-      if (overlayState.lifecycle === 'final' && !this._frozen) {
+      // Completion freeze (D-08, D-09, D-10): the timer stops, the track fills,
+      // and after the hold the pill leaves.
+      if (isFinal && !this._frozen) {
         this._frozen = true;
         this._stopTimerLoop();
-
-        // Freeze elapsed time at final value
-        if (this._startTime) {
-          var finalElapsed = performance.now() - this._startTime;
-          var finalPhaseEl = this.container.querySelector('.fsb-phase');
-          if (finalPhaseEl) {
-            finalPhaseEl.textContent = this._formatElapsed(finalElapsed);
-          }
-        }
-
-        // Success-specific presentation (D-08)
-        if (overlayState.result === 'success') {
-          // Green progress bar
-          fill.classList.add('complete');
-          // Green glow on overlay
-          this.container.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(52, 211, 153, 0.3)';
-          // Done pill
-          writeLabel(this.container.querySelector('.fsb-step-number'), 'Done');
-        }
-        // Failure: bar stays orange, pill keeps existing text (D-10) -- no action needed
-
-        // Auto-hide after 3 seconds (D-09)
+        if (this._startTime) this._setTime(this._formatElapsed(performance.now() - this._startTime));
+        this._clearFold();
+        this._folded = false;
+        this._peek = false;
         var self = this;
         if (this._autoHideTimer !== null) clearTimeout(this._autoHideTimer);
         this._autoHideTimer = setTimeout(function() {
           self._autoHideTimer = null;
-          self.hide();
-          if (self._autoDestroyTimer !== null) clearTimeout(self._autoDestroyTimer);
-          self._autoDestroyTimer = setTimeout(function() {
-            self._autoDestroyTimer = null;
-            self.destroy();
-          }, 200);
-        }, 3000);
+          self.dismiss();
+        }, PILL_FINAL_HOLD_MS);
       }
 
-      // Auto-broadcast overlay state to dashboard if streaming
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        window.FSB.domStream.broadcastOverlayState();
-      }
+      this._render();
+      this._paintMotion(Date.now());
     }
 
     /**
-     * Show the overlay (remove hidden class)
+     * The toolbar icon's current motion for this tab: { form, startedAt }, or
+     * null when the icon is idle. The pill plays it from the same start time.
+     */
+    setMotion(motion) {
+      var next = motion && PILL_FORMS[motion.form] && Number.isFinite(Number(motion.startedAt))
+        ? { form: motion.form, startedAt: Number(motion.startedAt) }
+        : null;
+      var wasRing = !!(this._motion && this._motion.form === 'ring');
+      this._motion = next;
+      if (!this.container) return;
+      if (next && next.form === 'ring') this._clearFold();
+      else if (wasRing) this._armFold();
+      this._paintMotion(Date.now());
+    }
+
+    /**
+     * An action is running on this page (true) or has just ended (false). The
+     * status stays open while it runs and folds a little after it ends.
+     */
+    noteAction(active) {
+      this._actionInFlight = !!active;
+      if (!this.container || this._frozen) return;
+      var v = this._view;
+      var tone = this._effectiveTone();
+      if (tone !== v.tone) {
+        v.tone = tone;
+        this._render();
+      }
+      if (active) this._clearFold();
+      else this._armFold();
+    }
+
+    /**
+     * Show the overlay: re-promote it so it stays above newly opened popovers.
      */
     show() {
       if (this.host && this.host.parentNode) {
@@ -1241,25 +1374,86 @@
           document.documentElement.appendChild(this.host);
         }
       }
-      if (this.container) {
-        this.container.classList.remove('hidden');
-      }
     }
 
-    /**
-     * Hide the overlay (add hidden class for fade out)
-     */
     hide() {
-      if (this.container) {
-        this.container.classList.add('hidden');
-      }
+      this.dismiss();
     }
 
     /**
-     * Remove overlay from DOM completely
+     * Leave: the spawn run backwards. The status folds, the pill draws back to
+     * the seed and lifts away, then it is removed.
+     */
+    dismiss() {
+      if (!this.container || this._leaving) return;
+      this._clearBeats();
+      this._clearFold();
+      if (this._autoHideTimer !== null) {
+        clearTimeout(this._autoHideTimer);
+        this._autoHideTimer = null;
+      }
+      this._reduced = pillReducedMotion();
+      if (this._reduced) {
+        this.destroy();
+        return;
+      }
+      this._leaving = 1;
+      this._peek = false;
+      this._render();
+      var self = this;
+      this._beat(PILL_EXIT_BEATS[0], function () { self._leaving = 2; self._render(); });
+      this._beat(PILL_EXIT_BEATS[1], function () { self._leaving = 3; self._render(); });
+      if (this._autoDestroyTimer !== null) clearTimeout(this._autoDestroyTimer);
+      this._autoDestroyTimer = setTimeout(function () {
+        self._autoDestroyTimer = null;
+        self.destroy();
+      }, PILL_EXIT_BEATS[2]);
+    }
+
+    /**
+     * A new session takes over a pill that finished or is leaving: keep the
+     * host, morph back to the full shape, and start the timer again.
+     */
+    reset() {
+      if (!this.container) return;
+      this._revive();
+      this._render();
+    }
+
+    _revive() {
+      this._clearBeats();
+      this._clearFold();
+      if (this._autoHideTimer !== null) {
+        clearTimeout(this._autoHideTimer);
+        this._autoHideTimer = null;
+      }
+      if (this._autoDestroyTimer !== null) {
+        clearTimeout(this._autoDestroyTimer);
+        this._autoDestroyTimer = null;
+      }
+      if (this._textDebounceTimer !== null) {
+        clearTimeout(this._textDebounceTimer);
+        this._textDebounceTimer = null;
+      }
+      this._leaving = 0;
+      this._stage = 2;
+      this._frozen = false;
+      this._folded = false;
+      this._startTime = null;
+      this._pendingDisplay = null;
+      this._lastTextWriteAt = 0;
+      this._lastVisiblePercent = 0;
+      this._lastDetail = null;
+    }
+
+    /**
+     * Remove the pill from the page at once (page unload, port disconnect).
      */
     destroy() {
       this._stopTimerLoop();
+      this._clearBeats();
+      this._clearFold();
+      this._trackPointer(false);
       if (this._autoHideTimer !== null) {
         clearTimeout(this._autoHideTimer);
         this._autoHideTimer = null;
@@ -1276,10 +1470,23 @@
       this._pendingDisplay = null;
       this._lastTextWriteAt = 0;
       this._lastVisiblePercent = 0;
-      this._lastActionCount = null;
-      this._logBuffer = [];
       this._startTime = null;
       this._frozen = false;
+      this._stage = 2;
+      this._leaving = 0;
+      this._folded = false;
+      this._peek = false;
+      this._actionInFlight = false;
+      this._shownEnglish = null;
+      this._lastDetail = null;
+      this._lastArea = 0;
+      if (this._styledAreaRAF !== null) {
+        cancelAnimationFrame(this._styledAreaRAF);
+        this._styledAreaRAF = null;
+      }
+      this._styledArea = 0;
+      this._paint = null;
+      this._view = this._freshView();
       if (this.host) {
         demoteFromTopLayer(this.host);
         this.host.remove();
@@ -2037,21 +2244,29 @@
    * Uses Shadow DOM for style isolation. A single requestAnimationFrame loop
    * drives one continuous light bead clockwise around the viewport border,
    * with perimeter-proportional timing so the bead moves at uniform speed
-   * regardless of aspect ratio. Two color states:
+   * regardless of aspect ratio. Four color states:
    * - 'thinking' (orange/amber): AI analyzing page or planning actions (6s cycle)
    * - 'acting' (orange/red): Executing actions on the page (4s cycle)
+   * - 'watching' (orange): a trigger watch is armed (5s cycle)
+   * - 'calling' (violet): a capability call is in flight (4s cycle)
+   * It fades in when it appears and out when dismissed, so it arrives and
+   * leaves with the status pill instead of cutting in and off.
    */
+  const VIEWPORT_GLOW_FADE_OUT_MS = 500;
+
   class ViewportGlow {
     constructor() {
       this.host = null;
       this.shadow = null;
-      this.state = null; // 'thinking' | 'acting' | 'watching'
+      this.state = null; // 'thinking' | 'acting' | 'watching' | 'calling'
       this._rafId = null;
       this._startTime = null;
       this._bars = null; // cached DOM references: { top, right, bottom, left }
+      this._fadeTimer = null;
     }
 
     show(state) {
+      this._cancelFade();
       if (!this.host) {
         this._create();
         this.state = state;
@@ -2074,6 +2289,9 @@
     }
 
     setState(state) {
+      // A glow fading out stays on its way out: an action that ends after the
+      // session has, changing only the speed, must not bring it back. show() does.
+      if (this._fadeTimer !== null) return;
       if (!this.shadow || this.state === state) return;
       // Preserve visual position across speed change
       if (this._startTime !== null) {
@@ -2238,11 +2456,15 @@
       style.textContent = `
       :host { all: initial !important; }
 
+      @keyframes vgIn { from { opacity: 0; } }
+
       .viewport-glow-root {
         position: fixed;
         inset: 0;
         pointer-events: none;
         overflow: hidden;
+        transition: opacity 0.5s ease;
+        animation: vgIn 0.6s ease backwards;
         --glow-color-1: #ff8c00;
         --glow-color-2: #f59e0b;
         --glow-opacity: 0;
@@ -2314,6 +2536,12 @@
       .bar-bottom { bottom: 0; }
       .bar-left   { left: 0; }
       .bar-right  { right: 0; }
+
+      .viewport-glow-root.out { opacity: 0; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .viewport-glow-root { animation: none; transition: none; }
+      }
     `;
       this.shadow.appendChild(style);
 
@@ -2343,7 +2571,36 @@
       }
     }
 
+    _cancelFade() {
+      if (this._fadeTimer === null) return;
+      clearTimeout(this._fadeTimer);
+      this._fadeTimer = null;
+      const root = this.shadow ? this.shadow.querySelector('.viewport-glow-root') : null;
+      if (root) root.classList.remove('out');
+    }
+
+    /**
+     * Fade the edge out, then remove it. A show() before the fade ends keeps it.
+     */
+    dismiss() {
+      if (!this.host || this._fadeTimer !== null) return;
+      const root = this.shadow ? this.shadow.querySelector('.viewport-glow-root') : null;
+      if (!root || pillReducedMotion()) {
+        this.destroy();
+        return;
+      }
+      root.classList.add('out');
+      this._fadeTimer = setTimeout(() => {
+        this._fadeTimer = null;
+        this.destroy();
+      }, VIEWPORT_GLOW_FADE_OUT_MS);
+    }
+
     destroy() {
+      if (this._fadeTimer !== null) {
+        clearTimeout(this._fadeTimer);
+        this._fadeTimer = null;
+      }
       this._stopAnimation();
       if (this.host) {
         demoteFromTopLayer(this.host);
@@ -3009,11 +3266,6 @@
 
       // Start position tracking
       this._startTracking();
-
-      // Broadcast glow position to dashboard DOM stream
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        window.FSB.domStream.broadcastOverlayState();
-      }
     }
 
     showPulse(element) {
@@ -3098,20 +3350,6 @@
       };
     }
 
-    getStreamState() {
-      if (!this.currentGeometry) return null;
-
-      return {
-        x: this.currentGeometry.x,
-        y: this.currentGeometry.y,
-        w: this.currentGeometry.w,
-        h: this.currentGeometry.h,
-        state: 'active',
-        mode: this.currentGeometry.mode || 'box',
-        fragments: this.currentGeometry.fragments || null
-      };
-    }
-
     _startTracking() {
       // Phase 229-01 (OVERLAY-02): attach invalidation listeners ONCE per lifecycle.
       // Cached rect is reused on every rAF tick until resize/scroll/show() fires.
@@ -3159,13 +3397,6 @@
     }
 
     hide() {
-      // Broadcast glow removal to dashboard DOM stream before clearing
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        this.currentGeometry = null;
-        this.targetElement = null;
-        window.FSB.domStream.broadcastOverlayState();
-      }
-
       this._stopTracking();
 
       this._setActiveState(false);
@@ -3190,13 +3421,6 @@
     }
 
     destroy() {
-      // Broadcast glow removal to dashboard DOM stream
-      if (window.FSB && window.FSB.domStream && window.FSB.domStream.isStreaming()) {
-        this.currentGeometry = null;
-        this.targetElement = null;
-        window.FSB.domStream.broadcastOverlayState();
-      }
-
       this._stopTracking();
       if (this.host) {
         demoteFromTopLayer(this.host);

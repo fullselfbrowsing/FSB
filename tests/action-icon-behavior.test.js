@@ -8,7 +8,7 @@
  * Covers:
  *   ICON-01: every state still tracks its own canonical source (drift guard)
  *   ICON-02: the icon reads no phase at all -- it diverges from the overlay
- *   ICON-03: resting frame is full strength until a relay has actually connected
+ *   ICON-03: the resting frame is always the full-strength glyph
  *   ICON-04: watchdog alarm is armed only while a loop is owed
  *   ICON-05: the four forms -- orbit / sweep / ring / breathe -- and their geometry
  *   ICON-06: the breathe loops for as long as a watch is armed
@@ -27,6 +27,9 @@
  *   ICON-19: exact-pixel interning and deadline scheduling skip only invisible work
  *   ICON-20: setIcon is serialized, phase-correct, and failure-backoff bounded
  *   ICON-21: the animation preference is authoritative across every ingress
+ *   ICON-22: each tab reports its motion and start time to the status pill
+ *   ICON-23: FSB's Light theme puts every state on the white tile, edged so it shows on a
+ *            white toolbar; nothing else does
  *
  * ICON-01 reads the canonical sources directly, so a timing or palette change in
  * visual-feedback.js that the icon does not follow fails here. ICON-14/15 derive
@@ -63,13 +66,15 @@ const BEAD_FRACTION = 0.12;
 const FADE_FRACTION = 0.02;
 const BEAD_SEGMENTS = 24;
 const ORBIT_WIDTH_RATIO = 0.10;
+// The tile's corner radius as a share of its side, the same 30/128 the PNGs are
+// cut with (scripts/build-icon-corners.mjs).
+const CORNER_RATIO = 30 / 128;
 const FRAME_INTERVAL_MS = 66;
 const WATCHDOG = 'fsb-action-icon-watchdog';
 const ACTIVITY_TTL_MS = 60000;
 const BREATHE_MIN_ALPHA = 0.45;
 const BREATHE_GLOW_RATIO = 0.15625;
 const BREATHE_GLOW_ALPHA = 0.95;
-const RELAY_SEEN_KEY = 'fsbActionIconRelaySeen';
 const INTENT_KEY = 'fsbActionIconIntent';
 const ANIMATIONS_KEY = 'animatedActionHighlights';
 
@@ -125,6 +130,10 @@ function makeWorker(opts) {
   function makeCtx(size) {
     const ops = [];
     let path = [];
+    // What the open frame was drawn on, stamped onto its ImageData so an emitted
+    // toolbar frame says which tile it shows: the first fill is the plate, the
+    // first bitmap draw is the artwork.
+    let frameInfo = {};
     const ctx = {
       _ops: ops,
       globalAlpha: 1,
@@ -136,12 +145,15 @@ function makeWorker(opts) {
       strokeStyle: null,
       fillStyle: null,
       globalCompositeOperation: 'source-over',
-      clearRect() { ops.push({ op: 'clearRect' }); },
+      clearRect() { frameInfo = {}; ops.push({ op: 'clearRect' }); },
       drawImage(bitmap, x, y, w, h) {
+        const src = bitmap && bitmap.__bitmap ? bitmap.__bitmap : null;
+        if (src && !frameInfo.src) frameInfo.src = src;
         ops.push({
           op: 'drawImage', x, y, w, h, alpha: ctx.globalAlpha, filter: ctx.filter,
           composite: ctx.globalCompositeOperation,
-          source: bitmap && bitmap.__scratch ? 'scratch' : 'bitmap'
+          source: bitmap && bitmap.__scratch ? 'scratch' : 'bitmap',
+          src
         });
       },
       save() { ops.push({ op: 'save' }); },
@@ -161,6 +173,7 @@ function makeWorker(opts) {
       },
       clip() { ops.push({ op: 'clip', path: path.slice() }); },
       fillRect(x, y, w, h) {
+        if (!frameInfo.plate) frameInfo.plate = ctx.fillStyle;
         ops.push({
           op: 'fillRect', x, y, w, h, fillStyle: ctx.fillStyle,
           composite: ctx.globalCompositeOperation
@@ -187,7 +200,7 @@ function makeWorker(opts) {
       },
       getImageData() {
         imageSeq += 1;
-        const image = { __img: true, size, seq: imageSeq };
+        const image = { __img: true, size, seq: imageSeq, plate: frameInfo.plate, src: frameInfo.src };
         if (opts.identicalPixels) image.data = new Uint8ClampedArray(size * size * 4);
         return image;
       }
@@ -240,11 +253,19 @@ function makeWorker(opts) {
     },
     storage: {
       session: {
-        get: async (k) => (Object.prototype.hasOwnProperty.call(sessionStore, k) ? { [k]: sessionStore[k] } : {}),
+        get: async (k) => {
+          // Lets a test act at an exact point in init's sequence of reads.
+          if (opts.onSessionGet) opts.onSessionGet(k);
+          return Object.prototype.hasOwnProperty.call(sessionStore, k) ? { [k]: sessionStore[k] } : {};
+        },
         set: async (rec) => { Object.assign(sessionStore, rec); }
       },
       local: {
-        get: async (k) => (Object.prototype.hasOwnProperty.call(localStore, k) ? { [k]: localStore[k] } : {}),
+        get: async (k) => {
+          // Lets a test act at an exact point in init's sequence of reads.
+          if (opts.onLocalGet) opts.onLocalGet(k);
+          return Object.prototype.hasOwnProperty.call(localStore, k) ? { [k]: localStore[k] } : {};
+        },
         set: async (rec) => { Object.assign(localStore, rec); }
       },
       onChanged: {
@@ -262,8 +283,13 @@ function makeWorker(opts) {
     OffscreenCanvas: OffscreenCanvasStub,
     createImageBitmap: async (blob) => ({ __bitmap: blob.__url, closed: false, close() { this.closed = true; } }),
     fetch: async (url) => {
-      if (opts.failGlyphs) throw new Error('glyph fetch failed');
+      // true fails every glyph; a function fails the URLs it returns true for.
+      if (opts.failGlyphs === true || (typeof opts.failGlyphs === 'function' && opts.failGlyphs(url))) {
+        throw new Error('glyph fetch failed');
+      }
       fetches.push(url);
+      // Lets a test act at an exact point inside a frame build.
+      if (opts.onFetch) opts.onFetch(url);
       // Lets a test charge real wall-clock to the frame build, which is the only
       // way to tell "clock starts with the loop" from "clock starts before it".
       if (opts.buildDelayMs) now += opts.buildDelayMs;
@@ -365,7 +391,10 @@ function makeWorker(opts) {
       }
       return out;
     },
-    resetOps: (size) => { if (contexts[size]) contexts[size]._ops.length = 0; }
+    resetOps: (size) => { if (contexts[size]) contexts[size]._ops.length = 0; },
+    // The glow's scratch surface keeps its own op log.
+    scratchOps: (size) => (scratchContexts[size] || { _ops: [] })._ops,
+    resetScratch: (size) => { if (scratchContexts[size]) scratchContexts[size]._ops.length = 0; }
   };
 }
 
@@ -393,6 +422,14 @@ async function renderCapability(w, tabId) {
 }
 
 const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
+// Every frame ends by cutting itself with the artwork's rounded alpha: the
+// bitmap drawn destination-in over the whole tile. Returns that op, or null.
+const cutOf = (group, size) => {
+  const last = group && group[group.length - 1];
+  return last && last.op === 'drawImage' && last.source === 'bitmap'
+    && last.composite === 'destination-in'
+    && last.x === 0 && last.y === 0 && last.w === size && last.h === size ? last : null;
+};
 
 (async function run() {
 
@@ -400,11 +437,15 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   console.log('\nICON-01: each state tracks its own canonical source');
   // -------------------------------------------------------------------------
 
-  // The icon's own table. Key order is not pinned -- only the values are.
+  // The icon's own table. Key order is not pinned -- only the values are. Read
+  // from the STATES literal alone: other one-line maps (TILES) share its shape.
+  const statesStart = ICON_SRC.indexOf('var STATES = {');
+  assert(statesStart !== -1, 'the icon declares its STATES table');
+  const statesSrc = ICON_SRC.slice(statesStart, ICON_SRC.indexOf('\n  };', statesStart));
   const iconStates = {};
   const stateRe = /^\s{4}(\w+):\s*\{(.+?)\},?$/gm;
   let m;
-  while ((m = stateRe.exec(ICON_SRC)) !== null) {
+  while ((m = stateRe.exec(statesSrc)) !== null) {
     const body = m[2];
     const num = (k) => {
       const hit = body.match(new RegExp(k + ':\\s*(\\d+)'));
@@ -423,13 +464,14 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
       bounded: /bounded:/.test(body)
     };
   }
-  assertEq(Object.keys(iconStates).length, 4, 'icon defines exactly 4 states');
+  // The fifth state, ask, is the 1Password typed-login sheet's key badge.
+  assertEq(Object.keys(iconStates).length, 5, 'icon defines exactly 5 states');
   // The key IS the form. Under the tool-category model the old phase names
   // (acting / thinking) would misname the animations outright -- orbit means
   // reading now, so a key called "acting" pointing at it is a trap.
   assertEq(
-    ['sweep', 'orbit', 'ring', 'breathe'].map((s) => iconStates[s] && iconStates[s].form).join(','),
-    'sweep,orbit,ring,breathe',
+    ['sweep', 'orbit', 'ring', 'breathe', 'ask'].map((s) => iconStates[s] && iconStates[s].form).join(','),
+    'sweep,orbit,ring,breathe,ask',
     'every state is keyed by the form it draws'
   );
 
@@ -448,32 +490,36 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   assertEq(iconStates.orbit.from, actingCss ? actingCss[1].toLowerCase() : null, 'acting: --glow-color-1 matches');
   assertEq(iconStates.orbit.to, actingCss ? actingCss[2].toLowerCase() : null, 'acting: --glow-color-2 matches');
 
-  // -- thinking: the indeterminate progress sweep ---------------------------
-  const sweepAnim = GLOW_SRC.match(/animation:\s*fsbProgressSweep\s*([\d.]+)s\s*([a-z-]+)\s*infinite/);
-  assert(!!sweepAnim, 'located the fsbProgressSweep animation shorthand');
-  assertEq(iconStates.sweep.duration, sweepAnim ? Math.round(Number(sweepAnim[1]) * 1000) : null,
-    'thinking: period matches fsbProgressSweep');
-  assertEq(sweepAnim && sweepAnim[2], 'ease-in-out', 'fsbProgressSweep is ease-in-out, as the icon assumes');
-
-  const sweepFill = GLOW_SRC.match(/\.fsb-progress-fill\s*\{[^}]*?background:\s*linear-gradient\(90deg,\s*(#[0-9a-fA-F]{6}),\s*(#[0-9a-fA-F]{6})\)/);
-  assert(!!sweepFill, 'located the .fsb-progress-fill gradient');
-  assertEq(iconStates.sweep.from, sweepFill ? sweepFill[1].toLowerCase() : null, 'thinking: gradient head matches');
-  assertEq(iconStates.sweep.to, sweepFill ? sweepFill[2].toLowerCase() : null, 'thinking: gradient tail matches');
-
-  // The canonical translate range, which the design export got wrong (-160/330).
-  const sweepKf = GLOW_SRC.match(/@keyframes fsbProgressSweep\s*\{[^}]*?0%\s*\{\s*transform:\s*translateX\((-?[\d.]+)%\)[^}]*?\}[^}]*?100%\s*\{\s*transform:\s*translateX\((-?[\d.]+)%\)/);
-  assert(!!sweepKf, 'located the fsbProgressSweep keyframe stops');
-  if (sweepKf) {
-    assert(ICON_SRC.includes('SWEEP_FROM_PCT = ' + (Number(sweepKf[1]) / 100).toFixed(2)),
-      'icon SWEEP_FROM_PCT tracks the canonical translateX start');
-    assert(ICON_SRC.includes('SWEEP_TO_PCT = ' + (Number(sweepKf[2]) / 100).toFixed(2)),
-      'icon SWEEP_TO_PCT tracks the canonical translateX end');
+  // -- the status pill plays the icon's own motions ------------------------
+  // The pill on the page is drawn from the same numbers, so the icon and the
+  // pill stay one system: same periods, same sweep, same ring and breathe.
+  const pillForms = GLOW_SRC.match(/const PILL_FORMS = Object\.freeze\(\{\s*sweep:\s*(\d+),\s*orbit:\s*(\d+),\s*ring:\s*(\d+),\s*breathe:\s*(\d+)\s*\}\)/);
+  assert(!!pillForms, 'located the pill motion periods');
+  if (pillForms) {
+    assertEq(Number(pillForms[1]), iconStates.sweep.duration, 'pill sweep period matches the icon');
+    assertEq(Number(pillForms[2]), iconStates.orbit.duration, 'pill orbit period matches the icon');
+    assertEq(Number(pillForms[3]), iconStates.ring.duration, 'pill ring period matches the icon');
+    assertEq(Number(pillForms[4]), iconStates.breathe.duration, 'pill breathe period matches the icon');
   }
-  const sweepWidth = GLOW_SRC.match(/\.fsb-progress-bar\.indeterminate\s+\.fsb-progress-fill\s*\{[^}]*?width:\s*(\d+)%/);
-  assert(!!sweepWidth, 'located the indeterminate fill width');
-  if (sweepWidth) {
-    assert(ICON_SRC.includes('SWEEP_FILL_FRACTION = ' + (Number(sweepWidth[1]) / 100)),
-      'icon SWEEP_FILL_FRACTION tracks the canonical 38% fill');
+
+  // Sweep: ease-in-out from -120% to 320% of a 38% fill on the orange gradient.
+  const pillSweep = GLOW_SRC.match(/m\.sweepX = (-?\d+) \+ (\d+) \* pillBezier\(0\.42, 0, 0\.58, 1, p\)/);
+  assert(!!pillSweep, 'located the pill sweep, ease-in-out as the icon assumes');
+  if (pillSweep) {
+    const from = Number(pillSweep[1]);
+    const to = from + Number(pillSweep[2]);
+    assert(ICON_SRC.includes('SWEEP_FROM_PCT = ' + (from / 100).toFixed(2)),
+      'icon SWEEP_FROM_PCT tracks the pill sweep start');
+    assert(ICON_SRC.includes('SWEEP_TO_PCT = ' + (to / 100).toFixed(2)),
+      'icon SWEEP_TO_PCT tracks the pill sweep end');
+  }
+  const pillFill = GLOW_SRC.match(/\.pl-fill\s*\{[^}]*?width:\s*(\d+)%;[^}]*?background:\s*linear-gradient\(90deg,\s*(#[0-9a-fA-F]{6}),\s*(#[0-9a-fA-F]{6})\)/);
+  assert(!!pillFill, 'located the pill track fill');
+  if (pillFill) {
+    assert(ICON_SRC.includes('SWEEP_FILL_FRACTION = ' + (Number(pillFill[1]) / 100)),
+      'icon SWEEP_FILL_FRACTION tracks the pill 38% fill');
+    assertEq(iconStates.sweep.from, pillFill[2].toLowerCase(), 'sweep: gradient head matches the pill');
+    assertEq(iconStates.sweep.to, pillFill[3].toLowerCase(), 'sweep: gradient tail matches the pill');
   }
 
   // -- watching: the trigger badge dot cadence ------------------------------
@@ -489,13 +535,20 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   assert(/var BREATHE_HOLD_MS = null;/.test(ICON_SRC),
     'the breathe is unbounded -- it loops while a watch is armed');
 
-  // -- calling: design-only, no upstream source -----------------------------
-  // Asserted as an absence, so this fails loudly the day someone DOES add a ring
-  // pulse upstream and the icon should start tracking it instead.
+  // -- calling: the ring, now also on the pill -------------------------------
+  // The pill plays it from the icon's clock in script, so there is no CSS ring
+  // keyframe or 1.6s literal to drift out of step with the icon.
   assert(!/@keyframes\s+\w*[Cc]apRing/.test(GLOW_SRC) && !/1\.6s/.test(GLOW_SRC),
-    'no capability ring pulse or 1.6s cadence exists upstream (calling is design-only)');
+    'the pill ring is clock-driven: no CSS ring keyframe or 1.6s cadence');
   assertEq(iconStates.ring.duration, 1600, 'calling: 1.6s, from the design export');
   assertEq(iconStates.ring.from, '#8b5cf6', 'calling: the capability violet');
+  assert(/m\.ring = 0\.9 - 0\.55 \* o;/.test(GLOW_SRC) && /if \(p < 0\.7\)/.test(GLOW_SRC)
+    && ICON_SRC.includes('CAP_ALPHA_HIGH = 0.9') && ICON_SRC.includes('CAP_ALPHA_LOW = 0.35')
+    && ICON_SRC.includes('CAP_PING_STOP = 0.7'),
+    'pill ring alpha 0.9 to 0.35 over 70% matches the icon');
+  assert(/stroke: #8b5cf6/.test(GLOW_SRC), 'pill ring uses the capability violet');
+  assert(/\(0\.45 \+ 0\.55 \* m\.peak\)/.test(GLOW_SRC) && ICON_SRC.includes('BREATHE_MIN_ALPHA = ' + BREATHE_MIN_ALPHA),
+    'pill breathe floor matches the icon');
 
   // -------------------------------------------------------------------------
   console.log('\nICON-02: the icon no longer reads phase at all');
@@ -511,50 +564,57 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     'the on-page overlay still maps phases -- only the icon opted out');
 
   // -------------------------------------------------------------------------
-  console.log('\nICON-03: resting frame is full strength until a relay connects');
+  console.log('\nICON-03: the resting frame is the full-strength glyph');
   // -------------------------------------------------------------------------
 
   {
     const w = makeWorker();
     await w.api.init({ hasLiveSession: () => false });
 
-    // Static cache renders in order: idle:on, idle:off, watching:on, watching:off,
-    // ring:kickoff, each at 16 then 32. Idle sequence numbers remain unchanged.
-    const IDLE_ON_32 = 2;
-    const IDLE_OFF_32 = 4;
+    // Static cache renders in order: idle, watching, ring:kickoff, each at 16
+    // then 32.
+    const IDLE_32 = 2;
 
     assertEq(w.emits.length, 1, 'init emits exactly one resting frame');
-    assertEq(w.emits[0].imageData[32].seq, IDLE_ON_32, 'fresh install rests on the UNDIMMED idle frame');
+    assertEq(w.emits[0].imageData[32].seq, IDLE_32, 'fresh install rests on the UNDIMMED idle frame');
     assert(w.emits[0].imageData[16] && w.emits[0].imageData[32], 'every emit carries both 16 and 32');
 
     const g32 = w.groups(32);
-    assertEq(g32.length, 5, 'four resting frames and one Ring kickoff render at 32');
-    assertEq(g32[0][0].alpha, 1, 'idle:on drawn at full alpha');
-    assertEq(g32[0][0].filter, 'none', 'idle:on drawn unfiltered');
-    assertEq(g32[1][0].alpha, 0.5, 'idle:off drawn at half alpha');
-    assert(/grayscale/.test(g32[1][0].filter), 'idle:off drawn desaturated');
+    assertEq(g32.length, 3, 'two resting frames and one Ring kickoff render at 32');
+    const firstDraw = (group) => opsOf(group, 'drawImage')[0] || {};
+    assertEq(firstDraw(g32[0]).alpha, 1, 'idle drawn at full alpha');
+    assertEq(firstDraw(g32[0]).filter, 'none', 'idle drawn unfiltered');
+    assert(g32.every((g) => opsOf(g, 'drawImage').every((d) => !/grayscale/.test(d.filter))),
+      'no static frame is desaturated');
 
-    // The regression: a relay that never connects must not dim anything.
-    w.api.setConnected(false);
-    assertEq(w.emits.length, 1, 'a failed/never-connected relay causes no repaint');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_ON_32,
-      'icon stays UNDIMMED when the relay has never connected');
-
-    // Once a relay has connected, losing it is a real signal and does dim.
-    w.api.setConnected(true);
-    assertEq(w.emits.length, 1, 'connecting does not repaint (appearance unchanged)');
-    assertEq(w.localStore[RELAY_SEEN_KEY], true, 'first connect records the relay install-wide');
-
-    w.api.setConnected(false);
-    assertEq(w.emits.length, 2, 'losing a relay that HAD connected repaints');
-    assertEq(w.emits[1].imageData[32].seq, IDLE_OFF_32, 'dropped relay dims the icon');
+    // The artwork's corners are cut (transparent). Every frame rebuilds the
+    // square tile with black under it, draws, then cuts itself back to the
+    // artwork's alpha, so its corners match the static icon in every state.
+    const idle = g32[0] || [];
+    const plate = opsOf(idle, 'fillRect')[0];
+    assert(!!plate && plate.fillStyle === '#000000' && plate.w === 32 && plate.h === 32
+      && plate.composite === 'source-over' && idle.indexOf(plate) < idle.indexOf(firstDraw(idle)),
+    'idle paints the black square under the artwork first');
+    assert(g32.every((g) => !!cutOf(g, 32)), 'every static frame ends with the corner cut');
+    assertEq(typeof w.api.setConnected, 'undefined',
+      'the icon API has no connection switch that could dim it');
   }
 
   {
-    // A dashboard user restarting the browser: relay known, not yet reconnected.
-    const w = makeWorker({ local: { [RELAY_SEEN_KEY]: true } });
+    // An install upgraded from a build that dimmed the icon while its server
+    // relay was down. Neither leftover -- the install-wide flag in local storage
+    // or the connected field in the stored intent -- may dim the new icon.
+    const w = makeWorker({
+      local: { fsbActionIconRelaySeen: true },
+      session: { [INTENT_KEY]: { animating: false, claims: {}, resolved: null, connected: false, updatedAt: 1 } }
+    });
     await w.api.init({ hasLiveSession: () => false });
-    assertEq(w.emits[0].imageData[32].seq, 4, 'known relay + not connected dims from the first frame');
+    assertEq(w.emits.length, 1, 'legacy relay state still emits exactly one resting frame');
+    assertEq(w.emits[0].imageData[32].seq, 2, 'legacy relay state rests on the undimmed idle frame');
+    assert(!Object.prototype.hasOwnProperty.call(w.sessionStore[INTENT_KEY] || {}, 'connected'),
+      'the rewritten intent drops the legacy connected field');
+    assertEq(w.localStore.fsbActionIconRelaySeen, true,
+      'the icon does not rewrite the legacy flag');
   }
 
   // -------------------------------------------------------------------------
@@ -606,7 +666,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   }
 
   // -------------------------------------------------------------------------
-  console.log('\nICON-05a: acting traces the sharp square perimeter');
+  console.log('\nICON-05a: acting traces the rounded tile\'s outline');
   // -------------------------------------------------------------------------
 
   {
@@ -619,9 +679,13 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assert(!/createConicGradient|strokeBeadConic|conicGradients/.test(ICON_SRC),
       'Orbit no longer carries a circular/conic-gradient code path');
 
+    assert(ICON_SRC.includes('var CORNER_RATIO = 30 / 128;'),
+      'the icon declares the corner radius its PNGs are cut with');
+
     const close = (a, b, tol = 1e-7) => Math.abs(a - b) <= tol;
     const pointsOf = (stroke) => (stroke && stroke.path || [])
       .filter((p) => p.kind === 'moveTo' || p.kind === 'lineTo');
+    const arcEnd = (a) => ({ x: a.cx + a.r * Math.cos(a.a1), y: a.cy + a.r * Math.sin(a.a1) });
     const strokeAlpha = (stroke) => {
       const hit = stroke && String(stroke.strokeStyle).match(/,\s*([\d.]+)\)\s*$/);
       return hit ? Number(hit[1]) : NaN;
@@ -632,26 +696,84 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
       const half = width / 2;
       const far = size - half;
       const side = size - width;
+      // The bead's centreline: the rounded tile outline inset by half the stroke,
+      // worked out here independently of the module. Its corner arcs share their
+      // centres with the tile's own corners, so the bead's outer edge runs exactly
+      // along the tile's curve.
+      const tileRadius = CORNER_RATIO * size;
+      const rc = Math.min(side / 2, Math.max(0, tileRadius - half));
+      const straight = side - 2 * rc;
+      const quarter = Math.PI / 2 * rc;
+      const perimeter = 4 * (straight + quarter);
+      const centres = {
+        tr: { x: size - tileRadius, y: tileRadius },
+        br: { x: size - tileRadius, y: size - tileRadius },
+        bl: { x: tileRadius, y: size - tileRadius },
+        tl: { x: tileRadius, y: tileRadius }
+      };
+      const arcAt = (corner, angle) => ({
+        x: centres[corner].x + rc * Math.cos(angle),
+        y: centres[corner].y + rc * Math.sin(angle)
+      });
+      const runs = [
+        { len: straight, at: (t) => ({ x: half + rc + t, y: half }) },
+        { len: quarter, at: (t) => arcAt('tr', -Math.PI / 2 + t / rc) },
+        { len: straight, at: (t) => ({ x: far, y: half + rc + t }) },
+        { len: quarter, at: (t) => arcAt('br', t / rc) },
+        { len: straight, at: (t) => ({ x: far - rc - t, y: far }) },
+        { len: quarter, at: (t) => arcAt('bl', Math.PI / 2 + t / rc) },
+        { len: straight, at: (t) => ({ x: half, y: far - rc - t }) },
+        { len: quarter, at: (t) => arcAt('tl', Math.PI + t / rc) }
+      ];
+      const pointAt = (distance) => {
+        let d = ((distance % perimeter) + perimeter) % perimeter;
+        for (const run of runs) {
+          if (d <= run.len) return run.at(d);
+          d -= run.len;
+        }
+        return runs[0].at(0);
+      };
+      const onStraight = (p) => {
+        const along = (v) => v >= half + rc - 1e-7 && v <= far - rc + 1e-7;
+        if (close(p.y, half) && along(p.x)) return 'top';
+        if (close(p.x, far) && along(p.y)) return 'right';
+        if (close(p.y, far) && along(p.x)) return 'bottom';
+        if (close(p.x, half) && along(p.y)) return 'left';
+        return null;
+      };
+      const cornerOf = (a) => Object.keys(centres)
+        .find((k) => close(a.cx, centres[k].x) && close(a.cy, centres[k].y)) || null;
+      // A segment that starts inside a corner opens with a moveTo on the curve.
+      const onCurve = (p) => Object.keys(centres).some((k) => {
+        const c = centres[k];
+        const outward = (k[1] === 'r' ? p.x >= c.x - 1e-7 : p.x <= c.x + 1e-7)
+          && (k[0] === 'b' ? p.y >= c.y - 1e-7 : p.y <= c.y + 1e-7);
+        return outward && close(Math.hypot(p.x - c.x, p.y - c.y), rc);
+      });
+      const arcStart = (a) => ({ x: a.cx + a.r * Math.cos(a.a0), y: a.cy + a.r * Math.sin(a.a0) });
+
       const frames = acting[size];
       const firstFrame = frames[0] || [];
       const strokes = opsOf(firstFrame, 'stroke');
 
-      assertEq(opsOf(firstFrame, 'arc').length, 0, `${size}px: Orbit draws no circular arcs`);
+      assert(rc > 0 && straight > 0, `${size}px: the orbit has both straight runs and rounded corners`);
       assertEq(opsOf(firstFrame, 'conic').length, 0, `${size}px: Orbit draws no conic gradient`);
       assertEq(strokes.length, BEAD_SEGMENTS, `${size}px: Orbit uses the locked segment count`);
       assert(strokes.every((s) => s.lineCap === 'butt' && s.lineJoin === 'miter'),
-        `${size}px: segments use butt caps and sharp miter joins`);
+        `${size}px: segments use butt caps and miter joins`);
+      assert(frames.every((f) => !!cutOf(f, size)), `${size}px: every Orbit frame ends with the corner cut`);
 
       const firstPoints = pointsOf(strokes[0]);
       const start = firstPoints[0] || { x: NaN, y: NaN };
       assertClose(start.x, size / 2, 1e-7, `${size}px: progress 0 starts at top centre`);
       assertClose(start.y, half, 1e-7, `${size}px: top edge sits half a stroke inside`);
 
-      const lastPoints = pointsOf(strokes[strokes.length - 1]);
-      const end = lastPoints[lastPoints.length - 1] || { x: NaN, y: NaN };
-      assertClose(end.x, half + (0.5 + BEAD_FRACTION * 4) * side, 1e-7,
-        `${size}px: trailing edge lands exactly 12% of the perimeter after the start`);
-      assertClose(end.y, half, 1e-7, `${size}px: the initial bead remains on the top edge`);
+      const lastPath = (strokes[strokes.length - 1] || {}).path || [];
+      const lastEntry = lastPath[lastPath.length - 1] || {};
+      const end = lastEntry.kind === 'arc' ? arcEnd(lastEntry) : lastEntry;
+      const expectedEnd = pointAt(straight / 2 + BEAD_FRACTION * perimeter);
+      assert(close(end.x, expectedEnd.x) && close(end.y, expectedEnd.y),
+        `${size}px: trailing edge lands exactly 12% of the rounded outline after the start`);
 
       const firstAlpha = strokeAlpha(strokes[0]);
       const middleAlpha = strokeAlpha(strokes[Math.floor(strokes.length / 2)]);
@@ -661,50 +783,50 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
       assertClose(lastAlpha, expectedEdgeAlpha, 1e-9, `${size}px: trailing fade is preserved`);
       assertClose(middleAlpha, 1, 1e-9, `${size}px: bead centre remains fully opaque`);
 
-      let allOnEdges = true;
-      let allInside = true;
+      let allOnOutline = true;
+      let arcsConcentric = true;
+      let arcsContinuous = true;
       let noDiagonals = true;
       const visited = new Set();
       for (const frame of frames) {
         for (const stroke of opsOf(frame, 'stroke')) {
-          const points = pointsOf(stroke);
-          for (const point of points) {
-            const onTop = close(point.y, half);
-            const onRight = close(point.x, far);
-            const onBottom = close(point.y, far);
-            const onLeft = close(point.x, half);
-            if (!(onTop || onRight || onBottom || onLeft)) allOnEdges = false;
-            if (point.x - half < -1e-7 || point.x + half > size + 1e-7
-                || point.y - half < -1e-7 || point.y + half > size + 1e-7) {
-              allInside = false;
+          let prev = null;
+          for (const entry of stroke.path || []) {
+            if (entry.kind === 'arc') {
+              const corner = cornerOf(entry);
+              if (!corner || !close(entry.r, rc)) arcsConcentric = false;
+              if (corner) visited.add(corner);
+              const from = arcStart(entry);
+              if (!prev || !close(prev.x, from.x, 1e-6) || !close(prev.y, from.y, 1e-6)) arcsContinuous = false;
+              prev = arcEnd(entry);
+              continue;
             }
-            if (onTop) visited.add('top');
-            if (onRight) visited.add('right');
-            if (onBottom) visited.add('bottom');
-            if (onLeft) visited.add('left');
-          }
-          for (let i = 1; i < points.length; i++) {
-            if (!close(points[i - 1].x, points[i].x)
-                && !close(points[i - 1].y, points[i].y)) {
+            if (entry.kind !== 'moveTo' && entry.kind !== 'lineTo') continue;
+            const run = onStraight(entry);
+            if (!run && !(entry.kind === 'moveTo' && onCurve(entry))) allOnOutline = false;
+            if (run) visited.add(run);
+            if (entry.kind === 'lineTo' && prev && !close(prev.x, entry.x) && !close(prev.y, entry.y)) {
               noDiagonals = false;
             }
+            prev = entry;
           }
         }
       }
-      assert(allOnEdges, `${size}px: every Orbit coordinate lies on a square edge`);
-      assert(allInside, `${size}px: the outer stroke edge hugs but never leaves the tile`);
-      assert(noDiagonals, `${size}px: no segment shortcuts diagonally across a corner`);
-      assertEq(Array.from(visited).sort().join(','), 'bottom,left,right,top',
-        `${size}px: one cycle visits all four edges`);
+      assert(allOnOutline, `${size}px: every Orbit coordinate lies on the inset outline`);
+      assert(arcsConcentric, `${size}px: every corner arc shares its centre with the tile's own rounded corner`);
+      assert(arcsContinuous, `${size}px: every arc starts where the path already is, so no stray line joins it`);
+      assertClose(rc + half, tileRadius, 1e-9, `${size}px: so the bead's outer edge is the tile's corner curve`);
+      assert(noDiagonals, `${size}px: no straight segment shortcuts diagonally across a corner`);
+      assertEq(Array.from(visited).sort().join(','), 'bl,bottom,br,left,right,tl,top,tr',
+        `${size}px: one cycle visits all four sides and all four corners`);
 
-      const secondFrameStrokes = opsOf(frames[1] || [], 'stroke');
-      const cornerStroke = secondFrameStrokes.find((stroke) =>
-        pointsOf(stroke).some((p) => close(p.x, far) && close(p.y, half)));
-      assert(!!cornerStroke, `${size}px: a corner-crossing frame explicitly visits top-right`);
-      assert(pointsOf(cornerStroke).length >= 3,
-        `${size}px: the corner is an intermediate vertex rather than a diagonal endpoint`);
+      const cornerStroke = opsOf(frames[1] || [], 'stroke').find((stroke) =>
+        (stroke.path || []).some((p) => p.kind === 'arc' && cornerOf(p) === 'tr'));
+      assert(!!cornerStroke, `${size}px: a corner-crossing frame follows the top-right curve`);
+      assert(!!cornerStroke && (cornerStroke.path || []).some((p) => onStraight(p) === 'top'),
+        `${size}px: and joins it from the top side's straight run`);
 
-      const nextStart = pointsOf(secondFrameStrokes[0])[0] || { x: NaN, y: NaN };
+      const nextStart = pointsOf(opsOf(frames[1] || [], 'stroke')[0])[0] || { x: NaN, y: NaN };
       assert(close(nextStart.y, half) && nextStart.x > start.x,
         `${size}px: frame progression moves clockwise from top centre`);
     }
@@ -723,6 +845,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(frames.length, Math.round(1200 / 66), 'thinking builds one cycle of sweep frames');
     const f0 = frames[0] || [];
 
+    assert(frames.every((f) => !!cutOf(f, 32)), 'every sweep frame ends with the corner cut');
     assertEq(opsOf(f0, 'arc').length, 0, 'the sweep carries no orbit bead');
     assertEq(opsOf(f0, 'fill').length, 2, 'two fills: the track and the moving fill');
     assertEq(opsOf(f0, 'clip').length, 1, 'the fill is clipped to the track, as overflow:hidden does');
@@ -799,12 +922,26 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(s0.length, 2, 'progress 0 draws the inset ring plus the ping');
     assert(/139, 92, 246/.test(s0[0] && s0[0].strokeStyle || ''), 'ring uses the capability violet');
 
-    const ringRect = s0[0] && s0[0].path.find((p) => p.kind === 'rect');
-    assert(!!ringRect, 'the ring is a rect stroke');
-    assert(!!ringRect && ringRect.x === s0[0].lineWidth / 2,
+    // Both strokes trace the tile's rounded outline: roundRectPath records
+    // moveTo(x + r, y) and then the four corners as arcTo, clockwise from top-right.
+    const boxOf = (stroke) => {
+      const path = (stroke && stroke.path) || [];
+      const move = path.find((p) => p.kind === 'moveTo');
+      const corners = path.filter((p) => p.kind === 'arcTo');
+      if (!move || corners.length !== 4) return null;
+      const x = corners[3].x1;
+      return { x, y: move.y, w: corners[0].x1 - x, h: corners[1].y1 - move.y, r: corners[0].r };
+    };
+    assert(frames.every((f) => !!cutOf(f, 32)), 'every ring frame ends with the corner cut');
+    const ringBox = boxOf(s0[0]);
+    const ringHalf = s0[0] ? s0[0].lineWidth / 2 : NaN;
+    assert(!!ringBox, 'the ring is a rounded-rectangle stroke');
+    assert(!!ringBox && ringBox.x === ringHalf && ringBox.y === ringHalf,
       'the ring is inset by half its own stroke width, so it sits fully inside the tile');
-    assert(!!ringRect && ringRect.x + ringRect.w + s0[0].lineWidth / 2 <= 32,
+    assert(!!ringBox && ringBox.x + ringBox.w + ringHalf <= 32,
       'the ring stays inside the 32px tile');
+    assertClose(ringBox ? ringBox.r : NaN, CORNER_RATIO * 32 - ringHalf, 1e-9,
+      'its corners are the tile\'s curve shrunk by the same inset, so its outer edge is the tile\'s edge');
 
     // Alpha dips to the 70% stop and recovers by 100%.
     const alphaOf = (i) => {
@@ -820,17 +957,16 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
       'ring recovers between the 70% and 100% stops');
 
     // The ping travels INWARD and fades out, then stops being drawn entirely.
-    const pingRect = (i) => {
-      const st = opsOf(frames[i] || [], 'stroke')[1];
-      return st ? st.path.find((p) => p.kind === 'rect') : null;
-    };
-    const p0 = pingRect(0);
-    const pMid = pingRect(Math.round(0.35 * frames.length));
+    const pingBox = (i) => boxOf(opsOf(frames[i] || [], 'stroke')[1]);
+    const p0 = pingBox(0);
+    const pMid = pingBox(Math.round(0.35 * frames.length));
     assert(!!p0 && !!pMid, 'the ping is drawn early in the cycle');
     assert(!!p0 && !!pMid && pMid.x > p0.x && pMid.w < p0.w,
       'the ping contracts inward rather than spreading outward');
+    assert(!!p0 && !!pMid && [p0, pMid].every((b) => Math.abs(b.r - (CORNER_RATIO * 32 - b.x)) <= 1e-9),
+      'the ping keeps the tile\'s curve at every inset');
     // Full travel is CAP_PING_INSET_RATIO * size; at 32 that is ~4.8px.
-    const pLate = pingRect(Math.round(0.65 * frames.length));
+    const pLate = pingBox(Math.round(0.65 * frames.length));
     assert(!!pLate && (pLate.x - p0.x) > 4,
       'the ping travels at least 4px inward before it fades out');
     assertEq(opsOf(frames[frames.length - 1] || [], 'stroke').length, 1,
@@ -857,20 +993,24 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(opsOf(f0, 'arc').length, 0, 'breathe draws no bead');
     assertEq(opsOf(f0, 'stroke').length, 0, 'breathe draws no ring');
 
-    // THE regression this guards. The artwork is a flat opaque tile, so fading
-    // it fades the whole icon -- the plate has to be repainted solid and the
-    // mark composited over it, exactly as the design nests the lockup inside a
-    // static black container.
+    // THE regression this guards. The artwork is a flat tile, so fading it fades
+    // the whole icon -- the plate has to be repainted solid and the mark
+    // composited over it, exactly as the design nests the lockup inside a static
+    // black container. The frame's corner cut then rounds the plate with the rest.
     const plateAt = (frameSet, i) => opsOf(frameSet[i] || [], 'fillRect')[0];
     const plate0 = plateAt(frames, 0);
     assert(!!plate0, 'every breathe frame repaints the plate');
     assertEq(plate0 && plate0.fillStyle, '#000000', 'the plate is solid black');
     assertEq(plate0 && plate0.w, 32, 'and covers the whole tile');
     assertEq(plate0 && plate0.composite, 'source-over', 'painted normally, not blended');
+    assert(frames.every((f) => !!cutOf(f, 32)) && frames16.every((f) => !!cutOf(f, 16)),
+      'every breathe frame ends with the corner cut, at 16px and 32px');
 
-    // The mark is the LAST drawImage -- the glow pass, when present, precedes it.
+    // The mark is the last ordinary bitmap draw -- the glow pass, when present,
+    // precedes it, and only the corner cut follows it.
     const markAt = (frameSet, i) => {
-      const draws = opsOf(frameSet[i] || [], 'drawImage').filter((d) => d.source === 'bitmap');
+      const draws = opsOf(frameSet[i] || [], 'drawImage')
+        .filter((d) => d.source === 'bitmap' && d.composite !== 'destination-in');
       return draws[draws.length - 1] || {};
     };
     const glowAt = (frameSet, i) => opsOf(frameSet[i] || [], 'drawImage').find((d) => d.source === 'scratch');
@@ -944,6 +1084,37 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   }
 
   // -------------------------------------------------------------------------
+  console.log('\nICON-05e: asking is a rounded inset ring with a key dot, inside the corner cut');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => false });
+    w.resetOps(16);
+    w.resetOps(32);
+    w.api.setAsking(1, true);
+    await flush();
+    const frames = w.groups(32);
+    assertEq(frames.length, Math.round(1600 / 66), 'asking builds one cycle of frames');
+    const f0 = frames[0] || [];
+    const ring = opsOf(f0, 'stroke')[0];
+    const path = (ring && ring.path) || [];
+    const move = path.find((p) => p.kind === 'moveTo');
+    const corners = path.filter((p) => p.kind === 'arcTo');
+    const half = ring ? ring.lineWidth / 2 : NaN;
+    assert(/255, 140, 0/.test(ring && ring.strokeStyle || ''), 'the ask ring uses the design orange');
+    assertEq(corners.length, 4, 'the ask ring traces the tile\'s rounded outline, as the capability ring does');
+    assert(!!move && move.y === half && corners.length === 4 && corners[3].x1 === half,
+      'the ask ring is inset by half its stroke width, so it sits fully inside the tile');
+    assertClose(corners[0] ? corners[0].r : NaN, CORNER_RATIO * 32 - half, 1e-9,
+      'its corners are the tile\'s curve shrunk by the same inset');
+    const dot = opsOf(f0, 'arc')[0];
+    assert(!!dot && dot.cx + dot.r <= 32 && dot.cy + dot.r <= 32, 'the key dot sits inside the tile');
+    assert(frames.every((f) => !!cutOf(f, 32)), 'every ask frame ends with the corner cut');
+    w.api.setAsking(1, false);
+  }
+
+  // -------------------------------------------------------------------------
   console.log('\nICON-06: the breathe loops for as long as a watch is armed');
   // -------------------------------------------------------------------------
 
@@ -951,8 +1122,8 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     const w = makeWorker();
     await w.api.init({ hasLiveSession: () => false });
 
-    // Static cache order is unchanged: seq 2 is idle:on@32.
-    const IDLE_ON_32 = 2;
+    // Static cache order is unchanged: seq 2 is idle@32.
+    const IDLE_32 = 2;
 
     w.api.setWatching(true);
     await flush();
@@ -979,7 +1150,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     await flush();
     assertEq(w.timerCount(), 0, 'disarming stops the loop');
     assert(w.alarmLog.cleared.includes(WATCHDOG), 'and clears the watchdog');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_ON_32,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_32,
       'disarming drops straight to the idle frame');
   }
 
@@ -1037,8 +1208,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   {
     // Worker died mid-animation, session is still live -> restart the loop.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } },
-      local: { [RELAY_SEEN_KEY]: true }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => true });
     await new Promise((r) => setImmediate(r));
@@ -1050,7 +1220,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   {
     // Worker died mid-animation, but the session is gone -> snap to static.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => false });
     await flush();
@@ -1065,7 +1235,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   {
     // A stored SESSION claim with no live session behind it is dropped.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'session:1': 'orbit' }, resolved: 'orbit', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'session:1': 'orbit' }, resolved: 'orbit', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => false });
     await flush();
@@ -1079,7 +1249,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // older generation accidentally wrote Ring into session storage, recovery
     // must not resurrect it without a matching promise that can end it.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'capability:1': 'ring' }, resolved: 'ring', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'capability:1': 'ring' }, resolved: 'ring', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => true });
     await flush();
@@ -1109,7 +1279,6 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     await ctx.fsbActionIcon.init({});
     ctx.fsbActionIcon.noteActivity(1, 'orbit');
     ctx.fsbActionIcon.setWatching(true);
-    ctx.fsbActionIcon.setConnected(true);
     await ctx.fsbActionIcon.repair();
     assert(true, 'a worker without OffscreenCanvas degrades silently instead of throwing');
     assertEq(w.errors.filter((e) => /setIcon failed/.test(e)).length, 0, 'no spurious emit failures');
@@ -1236,7 +1405,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // A live arm during boot coexists with a stored claim rather than being
     // clobbered by the restore.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     const booting = w.api.init({ hasLiveSession: () => true });
     w.api.setWatching(true, 9);
@@ -1251,7 +1420,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // A disarm during boot is also authoritative even though the claim has not
     // been restored into memory yet.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     const booting = w.api.init({ hasLiveSession: () => true });
     w.api.setWatching(false, 5);
@@ -1335,10 +1504,10 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     w.api.noteActivity(1, 'orbit');
     await flush();
 
-    // Static cache is seqs 1-10; the acting frames follow, frame f at 32 = 12+2f.
+    // Static cache is seqs 1-6; the acting frames follow, frame f at 32 = 8+2f.
     const first = w.emits[staticEmits];
     assert(!!first, 'the loop emitted a frame');
-    assertEq(first && first.imageData[32].seq, 12,
+    assertEq(first && first.imageData[32].seq, 8,
       'the first frame shown is frame 0, not a frame partway into the cycle');
   }
 
@@ -1672,7 +1841,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(resolvedNow(), 'ring', 'beginCapability claims Ring');
     assertEq(w.emits.length, emitsBefore + 1,
       'beginCapability paints the cached kickoff frame synchronously');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 10,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 6,
       'the immediate frame is the cached Ring kickoff');
     await flush();
     assertEq(w.timerCount(), 1, 'Ring repeats while the capability remains unsettled');
@@ -1810,7 +1979,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     w.resolveNextIcon();
     await flush();
     assertEq(w.emits.length, before + 2, 'completion drains exactly one latest frame');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 18,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 14,
       'the drained frame matches the current wall-clock phase, not the oldest queued phase');
     w.resolveNextIcon();
     await flush();
@@ -1879,6 +2048,385 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(w.timerCount(), 0, 'disabling live motion stops its scheduler immediately');
     assertEq((w.sessionStore[INTENT_KEY] || {}).claims['watch:3'], 'breathe',
       'disabling live motion does not mutate watch functionality');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-22: each tab reports its motion and start time to the status pill');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    assertEq(w.api.getMotion(7), null, 'a tab with no claim has no motion');
+    w.api.noteActivity(7, 'sweep');
+    await flush();
+    const sweep = w.api.getMotion(7);
+    assertEq(sweep && sweep.form, 'sweep', 'a driving tool gives the tab a sweep');
+    assert(sweep && Number.isFinite(sweep.startedAt), 'the motion carries its start time');
+    const told = heard.filter((h) => h.tabId === 7);
+    assert(told.length >= 1 && told[told.length - 1].motion && told[told.length - 1].motion.form === 'sweep',
+      'the listener hears the tab change to sweep');
+    assertEq(told[told.length - 1].motion.startedAt, sweep.startedAt, 'the listener and getMotion agree on the start time');
+
+    w.api.noteActivity(7, 'orbit');
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'orbit', 'a read on the same tab switches it to orbit');
+    w.api.beginCapability(7);
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'ring', 'a capability call outranks the session claim');
+    w.api.setWatching(true, 7);
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'breathe', 'a watch outranks everything');
+    assertEq(w.api.getMotion(8), null, 'another tab keeps its own (empty) claims');
+    w.api.setWatching(false, 7);
+    w.api.endCapability(7);
+    await flush();
+    assertEq(w.api.getMotion(7).form, 'orbit', 'releasing the watch and the call falls back to the session claim');
+
+    const before = heard.length;
+    w.api.dropTab(7);
+    await flush();
+    assertEq(w.api.getMotion(7), null, 'a closed tab has no motion');
+    assert(heard.slice(before).some((h) => h.tabId === 7 && h.motion === null), 'the listener hears a closed tab go idle');
+    assertEq(w.api.getMotion(undefined), null, 'tab-less claims never reach a page');
+  }
+
+  {
+    const w = makeWorker({ local: { [ANIMATIONS_KEY]: false } });
+    await w.api.init({ hasLiveSession: () => true });
+    w.api.noteActivity(3, 'sweep');
+    await flush();
+    assertEq(w.api.getMotion(3), null, 'with animations off the pill gets no motion either');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-23: FSB\'s Light theme puts every state on the white tile');
+  // -------------------------------------------------------------------------
+
+  const THEME_KEY = 'fsbThemePreference';
+  const PAGE_SRC = {
+    'settings page (options.js)': fs.readFileSync(path.join(ROOT, 'extension/ui/options.js'), 'utf8'),
+    'side panel (sidepanel.js)': fs.readFileSync(path.join(ROOT, 'extension/ui/sidepanel.js'), 'utf8'),
+    'popup (popup.js)': fs.readFileSync(path.join(ROOT, 'extension/ui/popup.js'), 'utf8')
+  };
+  // A top-level function, from its signature to its closing brace.
+  const fnBody = (src, signature) => {
+    const at = src.indexOf(signature);
+    return at === -1 ? '' : src.slice(at, src.indexOf('\n}\n', at) + 2);
+  };
+  const lastShown = (w, size) => {
+    const e = w.emits[w.emits.length - 1];
+    return e && e.imageData && e.imageData[size];
+  };
+  const fromPair = (src, light, size) => typeof src === 'string'
+    && src.endsWith('/assets/icon' + (size === 16 ? 16 : 128) + (light ? '_light' : '') + '.png');
+  // An emitted frame's ImageData carries the plate and artwork it was drawn with.
+  const onTile = (image, light, size) => !!image && image.plate === (light ? '#ffffff' : '#000000')
+    && fromPair(image.src, light, size);
+  const lightFetches = (w) => w.fetches.filter((u) => /_light\.png$/.test(u)).length;
+  // The white tile's edge: a neutral hairline, 1px at 16 and 2px at 32, traced
+  // as the tile's rounded outline inset by half its width (roundRectPath records
+  // moveTo(x + r, y) and then the four corners as arcTo). It is a frame's first
+  // stroke, drawn after the mark and so before any motion stroke and the cut.
+  const EDGE_COLOR = 'rgba(0, 0, 0, 0.2)';
+  const edgeBox = (stroke) => {
+    const p = (stroke && stroke.path) || [];
+    const move = p.find((e) => e.kind === 'moveTo');
+    const corners = p.filter((e) => e.kind === 'arcTo');
+    if (!move || corners.length !== 4) return null;
+    const x = corners[3].x1;
+    return { x, y: move.y, w: corners[0].x1 - x, h: corners[1].y1 - move.y, r: corners[0].r };
+  };
+  const hasEdge = (group, size, alpha) => {
+    const strokes = opsOf(group, 'stroke');
+    const edge = strokes[0];
+    const width = size === 16 ? 1 : 2;
+    const box = edgeBox(edge);
+    const mark = (group || []).findIndex((o) => o.op === 'drawImage' && o.source === 'bitmap');
+    return !!edge && edge.strokeStyle === EDGE_COLOR && edge.lineWidth === width && edge.alpha === alpha
+      && strokes.filter((s) => s.strokeStyle === EDGE_COLOR).length === 1
+      && !!box && box.x === width / 2 && box.y === width / 2
+      && box.w === size - width && box.h === size - width
+      && Math.abs(box.r - (CORNER_RATIO * size - width / 2)) < 1e-9
+      && mark !== -1 && mark < group.indexOf(edge);
+  };
+  // A light frame's strokes past its edge: the motion's own.
+  const motionStrokes = (frames, light) => JSON.stringify(frames.map((f) => opsOf(f, 'stroke').slice(light ? 1 : 0)));
+
+  {
+    // The pages keep the choice in localStorage, out of the worker's reach, and
+    // copy it to where the icon reads it.
+    assert(ICON_SRC.includes("var THEME_KEY = 'fsbThemePreference';"),
+      'the icon reads the theme from chrome.storage.local fsbThemePreference');
+    for (const [label, src] of Object.entries(PAGE_SRC)) {
+      assert(fnBody(src, 'function mirrorThemePreference(').includes('chrome.storage.local.set({ fsbThemePreference: preference })'),
+        `the ${label} copies the preference there`);
+    }
+    assert(fnBody(PAGE_SRC['settings page (options.js)'], 'function setThemePreference(').includes('mirrorThemePreference(preference);'),
+      'the settings toggle copies each choice as it is made');
+    for (const label of ['side panel (sidepanel.js)', 'popup (popup.js)']) {
+      assert(fnBody(PAGE_SRC[label], 'function applyTheme()').includes('mirrorThemePreference(preference);'),
+        `the ${label} copies the stored choice whenever it applies the theme`);
+    }
+  }
+
+  for (const value of [undefined, 'system', 'dark', 'Light', true]) {
+    const w = makeWorker(value === undefined ? {} : { local: { [THEME_KEY]: value } });
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const label = value === undefined ? 'no stored theme' : 'a stored ' + JSON.stringify(value);
+    assert(onTile(lastShown(w, 16), false, 16) && onTile(lastShown(w, 32), false, 32), `${label} keeps the black tile`);
+    assertEq(lightFetches(w), 0, `${label} never fetches the light pair`);
+    // The third resting frame is the ring's kickoff, whose violet stroke is the ring.
+    assert([16, 32].every((size) => {
+      const resting = w.groups(size);
+      return resting.length === 3 && resting.slice(0, 2).every((f) => opsOf(f, 'stroke').length === 0)
+        && resting.every((f) => opsOf(f, 'stroke').every((s) => s.strokeStyle !== EDGE_COLOR));
+    }), `${label}: the black tile draws no edge`);
+  }
+
+  {
+    const w = makeWorker({ local: { [THEME_KEY]: 'light' } });
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    for (const size of [16, 32]) {
+      // The resting frames render in order: idle, watching, ring:kickoff.
+      const resting = w.groups(size);
+      const idle = resting[0];
+      const plate = (idle || [])[0];
+      assert(!!plate && plate.op === 'fillRect' && plate.fillStyle === '#ffffff' && plate.w === size && plate.h === size,
+        `${size}px: idle opens with the white plate as a full square`);
+      const mark = opsOf(idle, 'drawImage')[0];
+      assert(!!mark && fromPair(mark.src, true, size) && mark.composite === 'source-over',
+        `${size}px: the artwork is the light pair's`);
+      const cut = cutOf(idle, size);
+      assert(!!cut && fromPair(cut.src, true, size), `${size}px: the corner cut uses the light pair's own alpha`);
+      assertEq(resting.length, 3, `${size}px: the three resting frames render`);
+      assert(hasEdge(resting[0], size, 1), `${size}px: idle traces the white tile's edge`);
+      assert(hasEdge(resting[1], size, 1), `${size}px: so does the resting watch`);
+      assert(hasEdge(resting[2], size, 1), `${size}px: and the ring's first frame, under the violet`);
+    }
+    assert(onTile(lastShown(w, 16), true, 16) && onTile(lastShown(w, 32), true, 32),
+      'the toolbar shows the white tile at both sizes');
+    assertEq(w.fetches.filter((u) => /icon(16|128)\.png$/.test(u)).length, 0, 'the black pair is never fetched');
+  }
+
+  {
+    const light = makeWorker({ local: { [THEME_KEY]: 'light' } });
+    const dark = makeWorker();
+    await light.api.init({ hasLiveSession: () => true });
+    await dark.api.init({ hasLiveSession: () => true });
+    await flush();
+
+    const ls = await renderActivity(light, 'sweep');
+    const ds = await renderActivity(dark, 'sweep');
+    assert(ls[32].length > 0 && ls[32].length === ds[32].length, 'the sweep has as many frames on either tile');
+    assertEq((opsOf(ls[32][0], 'fill')[0] || {}).fillStyle, 'rgba(0, 0, 0, 0.1)',
+      'its track turns from 10% white to 10% black');
+    const gradients = (frames) => JSON.stringify(frames.map((f) => opsOf(f, 'linear')));
+    assertEq(gradients(ls[32]), gradients(ds[32]), 'its moving fill is the same orange, in the same place, every frame');
+    assert(ls[32].every((f) => (opsOf(f, 'fillRect')[0] || {}).fillStyle === '#ffffff'),
+      'every light sweep frame sits on the white plate');
+    assert(ls[16].every((f) => { const c = cutOf(f, 16); return !!c && fromPair(c.src, true, 16); })
+      && ls[32].every((f) => { const c = cutOf(f, 32); return !!c && fromPair(c.src, true, 32); }),
+      'and ends with the light cut at 16px and 32px');
+    assert([16, 32].every((size) => ls[size].every((f) => hasEdge(f, size, 1))),
+      'every light sweep frame traces the edge');
+
+    const lo = await renderActivity(light, 'orbit', 2);
+    const dorb = await renderActivity(dark, 'orbit', 2);
+    assert(lo[32].length > 0 && motionStrokes(lo[32], true) === motionStrokes(dorb[32], false)
+      && motionStrokes(lo[16], true) === motionStrokes(dorb[16], false),
+      'past the edge, the orbit bead is stroke-for-stroke the same on either tile');
+    assert([16, 32].every((size) => lo[size].every((f) => hasEdge(f, size, 1))),
+      'and every light orbit frame draws the edge first, so the bead passes over it');
+    const lr = await renderCapability(light, 3);
+    const dr = await renderCapability(dark, 3);
+    assert(lr[32].length > 0 && motionStrokes(lr[32], true) === motionStrokes(dr[32], false)
+      && motionStrokes(lr[16], true) === motionStrokes(dr[16], false),
+      'and so is the capability ring');
+    assert([16, 32].every((size) => lr[size].every((f) => hasEdge(f, size, 1))),
+      'which also paints over the edge');
+  }
+
+  {
+    const light = makeWorker({ local: { [THEME_KEY]: 'light' } });
+    const dark = makeWorker();
+    await light.api.init({ hasLiveSession: () => true });
+    await dark.api.init({ hasLiveSession: () => true });
+    await flush();
+    for (const w of [light, dark]) { w.resetOps(16); w.resetOps(32); w.resetScratch(32); }
+    light.api.setWatching(true, 5);
+    dark.api.setWatching(true, 5);
+    await flush();
+    const lf = light.groups(32);
+    const df = dark.groups(32);
+    const mid = lf.length >> 1;
+    assert(lf.length > 0 && lf.length === df.length, 'the breathe has as many frames on either tile');
+    assertEq((opsOf(lf[mid], 'fillRect')[0] || {}).fillStyle, '#ffffff', 'it fades the mark over the white plate');
+    const glow = opsOf(lf[mid], 'drawImage').find((d) => d.source === 'scratch');
+    assertEq(glow && glow.composite, 'multiply', 'the glow is multiplied in, so the white plate contributes nothing');
+    const tint = light.scratchOps(32).filter((o) => o.op === 'fillRect');
+    assert(tint.length >= 2 && tint.every((o, i) => (i % 2 === 0
+      ? o.fillStyle === '#ffffff' && o.composite === 'source-over'
+      : o.composite === 'screen')),
+      'its scratch starts as a white square and screens the orange in, which turns only the black mark orange');
+    const markAlphas = (frames) => JSON.stringify(frames.map((f) => {
+      const draws = opsOf(f, 'drawImage').filter((d) => d.source === 'bitmap' && d.composite !== 'destination-in');
+      return (draws[draws.length - 1] || {}).alpha;
+    }));
+    assertEq(markAlphas(lf), markAlphas(df), 'the mark fades on the same ramp as on the black tile');
+    const blooms = (frames) => JSON.stringify(frames.map((f) => {
+      const g = opsOf(f, 'drawImage').find((d) => d.source === 'scratch');
+      return g ? [g.alpha, g.filter] : null;
+    }));
+    assertEq(blooms(lf), blooms(df), 'and the glow blooms on the same curve');
+    assert(lf.every((f) => { const c = cutOf(f, 32); return !!c && fromPair(c.src, true, 32); }),
+      'every light breathe frame ends with the light cut');
+    const lf16 = light.groups(16);
+    assert(lf.every((f) => hasEdge(f, 32, 1)) && lf16.length === lf.length && lf16.every((f) => hasEdge(f, 16, 1)),
+      'the breathe fades only the mark: its edge stays at full strength');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const blackIdle = lastShown(w, 32);
+    assert(onTile(blackIdle, false, 32), 'idle starts on the black tile');
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    assert(onTile(lastShown(w, 16), true, 16) && onTile(lastShown(w, 32), true, 32),
+      'choosing Light repaints the idle icon on the white tile');
+    const fetched = w.fetches.length;
+    w.setLocal(THEME_KEY, 'dark');
+    await flush();
+    assert(lastShown(w, 32) === blackIdle, 'choosing Dark again shows the very frame it showed before');
+    assertEq(w.fetches.length, fetched, 'without fetching or decoding anything');
+    const emitted = w.emits.length;
+    w.setLocal(THEME_KEY, 'system');
+    await flush();
+    assertEq(w.emits.length, emitted, 'System is the black tile too, so it repaints nothing');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    await flush();
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    w.api.noteActivity(4, 'orbit');
+    await flush();
+    const before = w.api.getMotion(4);
+    assert(!!before && before.form === 'orbit' && onTile(lastShown(w, 32), false, 32), 'orbiting on the black tile');
+    w.advance(500);
+    const heardAt = heard.length;
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    const after = w.api.getMotion(4);
+    assert(!!after && after.form === 'orbit', 'the orbit carries on after the switch');
+    assert(!!after && !!before && after.startedAt === before.startedAt + 500, 'restarting its cycle on the white tile');
+    assert(heard.slice(heardAt).some((h) => h.tabId === 4 && h.motion && after && h.motion.startedAt === after.startedAt),
+      'and the status pill hears the new start time, so the two stay in step');
+    assert(onTile(lastShown(w, 32), true, 32), 'the frames on screen now come from the white tile');
+    assertEq(w.timerCount(), 1, 'one animation scheduler, not one per tile');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const blackIdle = lastShown(w, 32);
+    const emitted = w.emits.length;
+    w.setLocal(THEME_KEY, 'light');
+    w.setLocal(THEME_KEY, 'dark');   // before the white tile's frames exist
+    await flush();
+    assertEq(w.emits.length, emitted, 'Light then Dark before the white tile is ready repaints nothing');
+    assert(lastShown(w, 32) === blackIdle, 'and leaves the black tile on screen');
+    w.setLocal(THEME_KEY, 'light');
+    w.setLocal(THEME_KEY, 'dark');
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    assert(onTile(lastShown(w, 32), true, 32), 'Light, Dark, Light lands on Light');
+    assertEq(w.emits.length, emitted + 1, 'with a single repaint');
+  }
+
+  // A switch can reach init at two points: while the stored tile's artwork is
+  // still being fetched, and after its resting frames exist but before init is
+  // done (it still reads the stored intent then). Both must land.
+  const initMoments = [
+    ['while init fetches the stored tile', 'onFetch', () => true],
+    ['after the stored tile is rendered, before init is done', 'onSessionGet', (key) => key === INTENT_KEY]
+  ];
+  for (const [moment, hook, at] of initMoments) {
+    for (const [stored, chosen] of [['light', 'dark'], ['dark', 'light']]) {
+      let w = null;
+      let switched = false;
+      w = makeWorker({
+        local: { [THEME_KEY]: stored },
+        [hook]: (arg) => { if (!switched && at(arg)) { switched = true; w.setLocal(THEME_KEY, chosen); } }
+      });
+      await w.api.init({ hasLiveSession: () => false });
+      await flush();
+      assert(switched && onTile(lastShown(w, 16), chosen === 'light', 16) && onTile(lastShown(w, 32), chosen === 'light', 32),
+        `${chosen} chosen ${moment} (${stored} stored) lands`);
+    }
+  }
+
+  {
+    const w = makeWorker({ failGlyphs: (url) => /_light\.png$/.test(url) });
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const blackIdle = lastShown(w, 32);
+    const emitted = w.emits.length;
+    w.setLocal(THEME_KEY, 'light');
+    await flush();
+    assertEq(w.emits.length, emitted, 'a light pair that will not load repaints nothing');
+    assert(lastShown(w, 32) === blackIdle, 'so the black tile stays on screen');
+    assert(w.errors.some((e) => /could not render the light tile/.test(e)), 'and the failure is reported');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-24: the status pill keeps the icon\'s clock');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    w.api.noteActivity(4, 'orbit');
+    await flush();
+    const before = w.api.getMotion(4);
+    assert(!!before && before.form === 'orbit', 'orbiting before the watchdog beat');
+    w.advance(1700);
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    await w.api.repair();
+    await flush();
+    const after = w.api.getMotion(4);
+    assert(!!after && after.startedAt === before.startedAt, 'a watchdog beat on a healthy loop keeps its start time');
+    assert(!heard.some((h) => h.tabId === 4 && h.motion && h.motion.startedAt !== before.startedAt),
+      'so the status pill is never told to start its cycle over');
+    assertEq(w.timerCount(), 1, 'and the loop is still running');
+  }
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => true });
+    w.api.noteActivity(7, 'sweep');
+    await flush();
+    w.advance(800);
+    const heard = [];
+    w.api.onMotionChange((tabId, motion) => heard.push({ tabId, motion }));
+    const orbitAt = w.nowValue();
+    w.api.noteActivity(7, 'orbit');
+    await flush();
+    const orbits = heard.filter((h) => h.tabId === 7 && h.motion && h.motion.form === 'orbit');
+    assert(orbits.length >= 1, 'the pill hears the tab move to orbit');
+    assert(orbits.every((h) => h.motion.startedAt >= orbitAt),
+      'while the orbit frames build, the pill never gets the sweep\'s start time');
+    assert(w.api.getMotion(7).startedAt >= orbitAt, 'and the orbit starts no earlier than its claim');
   }
 
   // -------------------------------------------------------------------------

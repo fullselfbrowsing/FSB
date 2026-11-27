@@ -769,8 +769,9 @@ assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
   // Rolled for the UI locale work: ui-locale.js and copy-exact.js scripts and
-  // data-i18n keys on static copy. No delegation control was added.
-  'cdd94600df72e6bfceb97c5ba55066ce5905bd958e8ddda8d1d142c9adc17369',
+  // data-i18n keys on static copy. Rolled again when the 1Password card check
+  // overlay became a sheet built by sidepanel.js. No delegation control was added.
+  '8d303d922f614492c0a07d3ef64b79c2ce2af82fb8b00264d12d7f0945151bb6',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
@@ -779,9 +780,16 @@ assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
 // Rolled when the prefers-reduced-motion block gained .pixel-letter coverage:
 // the block already silenced the delegation spinner and status dot, but the
-// automation loader kept animating for users who asked it not to.
+// automation loader kept animating for users who asked it not to. Rolled again
+// for the 1Password prompts (.vp rules) replacing the old login and card
+// prompt styles, and for the owner's colour decisions
+// (design-system/decisions/0014-0018): one red, green and amber; softer status
+// colours and the core's surfaces in dark mode; indigo folded into the brand
+// orange; four transparency steps. Every changed computed value was traced to
+// one of those decisions. Rolled again when monospace stacks moved to
+// --fsb-font-mono (decision 0012). No delegation or ownership rule changed.
 assert.equal(sha256(delegationCssSource),
-  'db8ee02f3ed61b84b9ced7af1e9c043460b4f8fa24ba222d79e235badb058ef7',
+  '0542d4a8cd530c2a624de1f14a46c0ddbde7294a3475bfe788b25b5607ba5aca',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
 :host {
   background: #141110;
@@ -135,7 +135,7 @@
   border-radius: 999px;
   color: var(--text);
   display: inline-flex;
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   font-weight: 500;
   gap: 9px;
@@ -187,7 +187,7 @@
   border-radius: 999px;
   color: var(--accent-2);
   display: inline-flex;
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 700;
   gap: 10px;
@@ -248,7 +248,7 @@
 
 .pr-meter-num {
   color: var(--accent);
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -257,7 +257,7 @@
 
 .pr-meter-label {
   color: var(--text-dim);
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.6rem;
   font-weight: 400;
   letter-spacing: 0.05em;
@@ -377,7 +377,7 @@
 
 .pr-unit-label {
   color: var(--text-dim);
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -397,7 +397,7 @@
   align-items: center;
   color: var(--text-dim);
   display: inline-flex;
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   gap: 9px;
   line-height: 1.5;
@@ -411,7 +411,7 @@
 
 .pr-footnote {
   color: #6a5f57;
-  font-family: 'Space Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   margin: 42px 0 0;

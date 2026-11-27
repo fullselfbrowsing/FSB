@@ -371,11 +371,6 @@
       "reason": "brand, package, or CLI name"
     },
     {
-      "id": "dashboard.template.022.placeholder",
-      "sourceSha256": "100680ad546ce6a577f42f52df33b4cfdca756859e664b8d7de329b150d09ce9",
-      "reason": "example URL"
-    },
-    {
       "id": "home.comparison.competitor.mariner.logo.alt",
       "sourceSha256": "ce770667e5f9b0d8f55367bb79419689d90c48451bb33f079f3a9a72ae132de8",
       "reason": "product, provider, or model name"
@@ -1744,16 +1739,6 @@
         "reason": "identical term in Spanish"
       },
       {
-        "id": "dashboard.runtime.preview.errorLabel",
-        "sourceSha256": "ca00fccfb408989eddc401062c4d1219a6aceb6b9b55412357f1790862e8f178",
-        "reason": "natural Spanish technical term or product name"
-      },
-      {
-        "id": "dashboard.template.002",
-        "sourceSha256": "703390318bd55aef50b7823d2b90a846debff99e6e3d401a24a921b733912a6d",
-        "reason": "natural Spanish technical term or product name"
-      },
-      {
         "id": "home.install.manualFlag",
         "sourceSha256": "36bde66f289a35683683b041c6d8f418a5f36607b547da25d00ad55891e80b88",
         "reason": "natural Spanish technical term or product name"
@@ -1768,31 +1753,6 @@
       {
         "id": "about.memory.category.design",
         "sourceSha256": "5ed5105680207b4de7fda499d5a5c202b21424b4ee0465603ba99218a6c22891",
-        "reason": "natural German loanword or product name"
-      },
-      {
-        "id": "dashboard.template.001",
-        "sourceSha256": "67b696468610b879ed7f224dbf6b0861f27e39d20454cb9d7af1ec52d3e5eeaa",
-        "reason": "natural German loanword or product name"
-      },
-      {
-        "id": "dashboard.template.002",
-        "sourceSha256": "703390318bd55aef50b7823d2b90a846debff99e6e3d401a24a921b733912a6d",
-        "reason": "natural German loanword or product name"
-      },
-      {
-        "id": "dashboard.template.012",
-        "sourceSha256": "8e2c7ac508139a02af859de64a4743c1f3946837279332c35ec8f5ddf20654ae",
-        "reason": "natural German loanword or product name"
-      },
-      {
-        "id": "dashboard.template.062",
-        "sourceSha256": "a1794783aab72d205dc532b1170d1be63ebdce8816b57c21acb451c15dab969a",
-        "reason": "natural German loanword or product name"
-      },
-      {
-        "id": "dashboard.runtime.status.offline",
-        "sourceSha256": "a1794783aab72d205dc532b1170d1be63ebdce8816b57c21acb451c15dab969a",
         "reason": "natural German loanword or product name"
       },
       {
@@ -1834,18 +1794,6 @@
         "sourceSha256": "76fdefeb182deaf6f854e1de1612f48a88358af73b63752aff9a2ec2b06f7912",
         "targetSha256": "1ebe8cf4f395b169e5c6c60a5cf9214472f807b5600bbbd89e1f26cac52a6a8e",
         "reason": "natural German compound spelling for a technical product label"
-      },
-      {
-        "id": "dashboard.template.010",
-        "sourceSha256": "0a878454544f2e300b6936a35fea1c4872b4c218636aa53634414e2c23287b6f",
-        "targetSha256": "39054c349f52971fb276e575ca697f36cd0c51bdceabc4e94be05f88135f7ce1",
-        "reason": "natural German compound spelling with the invariant FSB brand name"
-      },
-      {
-        "id": "dashboard.meta.title",
-        "sourceSha256": "0a878454544f2e300b6936a35fea1c4872b4c218636aa53634414e2c23287b6f",
-        "targetSha256": "39054c349f52971fb276e575ca697f36cd0c51bdceabc4e94be05f88135f7ce1",
-        "reason": "natural German compound spelling with the invariant FSB brand name"
       },
       {
         "id": "phantomStream.feature.playwright.title",

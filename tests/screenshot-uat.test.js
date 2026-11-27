@@ -246,7 +246,7 @@ test('real Chromium compositor preserves visual landmarks across UAT capture mod
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
         return {
           fixture: document.documentElement.dataset.fixtureReady,
-          font: document.fonts.check('700 24px UatSpaceMono'),
+          font: document.fonts.check('700 24px UatWebFont'),
           shadow: !!document.querySelector('#shadow-host').shadowRoot,
           canvas: !!document.querySelector('#canvas-landmark').getContext('2d'),
           viewport: [innerWidth, innerHeight, scrollX, scrollY],

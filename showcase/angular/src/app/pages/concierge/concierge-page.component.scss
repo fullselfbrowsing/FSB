@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Poppins:wght@100;200;900&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Poppins:wght@100;200;900&display=swap');
 
 :host {
   background: #ff6b35;
@@ -59,7 +59,7 @@
   border-radius: 999px;
   color: var(--ink);
   display: inline-flex;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   gap: 8px;
@@ -174,7 +174,7 @@
   border-radius: 7px;
   color: var(--ink);
   display: inline-flex;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 600;
   gap: 7px;
@@ -391,7 +391,7 @@
 .con-cmd code {
   color: #f7ede9;
   display: block;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.7;
   overflow-x: auto;
@@ -463,7 +463,7 @@
 .con-vs-head > div {
   background: rgba(255, 255, 255, 0.03);
   color: rgba(247, 237, 233, 0.5);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -507,7 +507,7 @@
   border-radius: 8px;
   color: #ff8c42;
   display: inline-flex;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.76rem;
   font-weight: 700;
   height: 26px;
@@ -618,7 +618,7 @@
 
 .con-cbname {
   color: rgba(247, 237, 233, 0.5);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
@@ -630,7 +630,7 @@
   color: rgba(247, 237, 233, 0.66);
   cursor: pointer;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
   gap: 7px;
@@ -657,7 +657,7 @@
 
 .con-codecard code {
   color: #f7ede9;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   line-height: 1.7;
   white-space: pre;
@@ -709,7 +709,7 @@
   border-radius: 6px;
   color: #ff8c42;
   display: inline-flex;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.64rem;
   font-weight: 700;
   gap: 7px;
@@ -722,7 +722,7 @@
 .con-pkg code {
   color: var(--ink);
   display: block;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   font-weight: 600;
   margin-bottom: 10px;
@@ -761,7 +761,7 @@
 
 .con-mrow .v {
   color: var(--ink);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 600;
   text-align: right;
@@ -796,7 +796,7 @@
 .con-irow-head {
   background: rgba(20, 10, 6, 0.1);
   color: var(--ink-3);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -815,7 +815,7 @@
 
 .con-ipath {
   color: var(--ink);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.76rem;
   opacity: 0.82;
   word-break: break-all;
@@ -904,7 +904,7 @@
   align-items: center;
   color: #ff8c42;
   display: inline-flex;
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   gap: 6px;
@@ -941,7 +941,7 @@
 
 .con-drow .v {
   color: rgba(247, 237, 233, 0.85);
-  font-family: 'SF Mono', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   text-align: right;
   word-break: break-all;
@@ -1082,39 +1082,6 @@
   font-size: 1.32rem;
 }
 
-.fsb-row {
-  align-items: baseline;
-  display: inline-flex;
-  font-family: 'Poppins', system-ui, sans-serif;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.fsb-f {
-  font-weight: 100;
-}
-
-.fsb-f::before {
-  content: 'F';
-}
-
-.fsb-s {
-  font-weight: 900;
-}
-
-.fsb-s::before {
-  content: 'S';
-}
-
-.fsb-b {
-  display: inline-block;
-  fill: currentColor;
-  height: 0.74em;
-  margin-left: 0.01em;
-  vertical-align: baseline;
-  width: auto;
-}
-
 .footer-links {
   display: flex;
   flex-wrap: wrap;
@@ -1186,7 +1153,7 @@
 }
 
 .version-tag {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 .footer-bottom .version-tag {

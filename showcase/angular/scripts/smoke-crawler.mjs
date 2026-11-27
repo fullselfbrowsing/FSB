@@ -88,7 +88,7 @@ const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.flatMap(({ canonical }) => {
     return routePath === '' ? `${PROD_HOST}${prefix}` : `${PROD_HOST}${prefix}${routePath}`;
   });
 });
-const EXCLUDED_SITEMAP_LOCS = ['/legal', '/dashboard', '/stats'].map((path) => `${PROD_HOST}${path}`);
+const EXCLUDED_SITEMAP_LOCS = ['/legal', '/stats'].map((path) => `${PROD_HOST}${path}`);
 const AEO_MUST_CONTAIN = [
   'trigger',
   'stop_trigger',
@@ -103,7 +103,7 @@ const AEO_MUST_CONTAIN = [
   't1-guarded-fail-closed',
   'fill_credential',
   'use_payment_method',
-  'secrets do not cross the MCP bridge',
+  'never reach the MCP client or the model',
   'OpenClaw',
   'Hermes',
   'FSB: E-Commerce Autopilot by Grok 4.1',
@@ -242,7 +242,7 @@ async function checkSitemapLocs() {
   record(
     excludedPresent.length === 0,
     'sitemap excludes noindex/client-only routes',
-    excludedPresent.length === 0 ? '/legal, /dashboard, /stats absent' : `present ${excludedPresent.join(', ')}`
+    excludedPresent.length === 0 ? '/legal, /stats absent' : `present ${excludedPresent.join(', ')}`
   );
   for (const loc of locs) {
     // When running locally, rewrite the prod-host URLs in sitemap.xml to BASE_URL

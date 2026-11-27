@@ -9,11 +9,13 @@ const ROOT = path.resolve(__dirname, '..');
 const PHASE_DIR = '.planning/milestones/v0.9.91-phases/61-delegation-ux-sw-eviction-persistence';
 const UAT_PATH = `${PHASE_DIR}/61-HUMAN-UAT.md`;
 const VALIDATION_PATH = `${PHASE_DIR}/61-VALIDATION.md`;
-const PRE_PHASE61_ROOT_TEST_HASH = '1f02d3f54f3136054ccb26f10dbff97e1c30ed7118cae72e0f0dfc758577f683';
+// Both prior-chain digests were re-pinned when the Live Dashboard tests were
+// retired and their commands left the root chain.
+const PRE_PHASE61_ROOT_TEST_HASH = 'c1b12fc60df2ea81bdee37d56aa4d100bfc69399bef865ddf4f94d935b27f0e3';
 const PHASE62_DIR = '.planning/milestones/v0.9.91-phases/62-ci-drift-smoke-gate-doctor-extensions';
 const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
 const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
-const PRE_PHASE62_ROOT_TEST_HASH = '8069c2f916171cd373a073d52c5874aa29bad9a0710c7104efde6ce21ee9e282';
+const PRE_PHASE62_ROOT_TEST_HASH = '1d7dd9f24142e5763a2db5a3bfef252413eccbe377c4e6845cd4358945528b14';
 const PHASE63_DIR = '.planning/milestones/v0.9.91-phases/63-native-messaging-host';
 const PHASE63_UAT_PATH = `${PHASE63_DIR}/63-HUMAN-UAT.md`;
 const PHASE63_VALIDATION_PATH = `${PHASE63_DIR}/63-VALIDATION.md`;
@@ -154,17 +156,21 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node --test tests/google-sheets-session.test.js tests/google-sheets-content-actions.test.js tests/gsheets-handler.test.js tests/google-sheets-wiring.test.js tests/spreadsheet-record-redaction.test.js',
   'node tests/sidepanel-automation-runner.test.js',
   'node tests/server-client-ip-geo.test.js',
-  'node tests/ws-client-relay-reconnect.test.js',
   'node --test tests/network-capture-debugger-lifecycle.test.js',
   'node tests/extension-ui-locale.test.js',
   'node scripts/verify-extension-i18n.mjs',
   'node scripts/verify-extension-copy.mjs',
+  'node scripts/verify-design-system.mjs',
+  'node scripts/check-style-literals.mjs',
+  'node tests/design-system-checks.test.js',
   'node tests/benchmark-assets-parity.test.js',
   'node tests/showcase-static-cache-policy.test.js',
   'node tests/showcase-capability-logos.test.js',
   'node tests/about-knowledge-categories-parity.test.js',
   'node tests/showcase-depth-ghost-parity.test.js',
   'node tests/icon-fonts-parity.test.js',
+  'node tests/fsb-wordmark-parity.test.js',
+  'node tests/fsb-icon-corners.test.js',
   'node tests/jev-gateway-config.test.js',
   'node tests/jev-gateway-contract.test.js',
   'node tests/jev-gateway-upstream.test.js',
@@ -172,6 +178,13 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/jev-gateway-log-hygiene.test.js',
   'node tests/jev-calibration-profile.test.js',
   'node tests/server-jev-gateway-boot.test.js',
+  'node --test tests/content-click-single-activation.test.js',
+  'node tests/onboarding-depth-adopt.test.js',
+  'node tests/onepassword-broker.test.js',
+  'node tests/onepassword-client.test.js',
+  'node tests/onepassword-credential-sheet.test.js',
+  'node tests/onepassword-mcp-errors.test.js',
+  'node tests/dashboard-sunset.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([

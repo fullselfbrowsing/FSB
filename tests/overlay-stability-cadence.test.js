@@ -80,22 +80,16 @@ function makeElement(tag, opts) {
     get innerHTML() { return this._innerHTML; },
     set innerHTML(v) {
       this._innerHTML = String(v);
-      // Parse a tiny subset: any class="..." attribute creates a child stub
-      // Sufficient for ProgressOverlay's container.innerHTML which sets up
-      // .fsb-task, .fsb-summary, .fsb-step-text, .fsb-step-number, .fsb-eta,
-      // .fsb-phase, .fsb-progress-bar, .fsb-progress-fill, .fsb-client-badge,
-      // .fsb-stop, .fsb-chip*, .fsb-note*, .fsb-log*.
+      // Any innerHTML write seeds one child stub per class the status pill's
+      // markup uses, which is all ProgressOverlay queries.
       const childClasses = [
-        'fsb-header','fsb-logo','fsb-title','fsb-client-badge','fsb-stop',
-        'fsb-task','fsb-summary',
-        'fsb-chip','fsb-chip-lock','fsb-chip-txt','fsb-chip-rdy',
-        'fsb-note','fsb-note-icon','fsb-note-text',
-        'fsb-step','fsb-step-number','fsb-step-text',
-        'fsb-log','fsb-log-line','fsb-log-line',
-        'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill'
+        'pl-body','pl-row','pl-mark','pl-wm','pl-div','pl-agent','pl-name','pl-gap','pl-ok','pl-time','pl-stop',
+        'pl-text','pl-out','pl-in','pl-count',
+        'pl-more','pl-meta','pl-tick','pl-who','pl-slug','pl-tag','pl-note',
+        'pl-track','pl-fill','pl-ping','pl-ring','pl-bead','pl-cap'
       ];
       this.children = childClasses.map(c => {
-        const ch = makeElement(c === 'fsb-logo' ? 'img' : 'span');
+        const ch = makeElement('span');
         ch.classList.add(c);
         ch.parentNode = this;
         return ch;
@@ -266,7 +260,7 @@ function buildOverlay() {
   overlay.host = makeElement('div');
   overlay.shadow = overlay.host.attachShadow({ mode: 'open' });
   const container = makeElement('div');
-  container.classList.add('fsb-overlay');
+  container.classList.add('pl-host');
   container.innerHTML = '<inflate/>'; // triggers child seeding in our stub
   overlay.shadow.appendChild(container);
   overlay.container = container;
@@ -310,7 +304,7 @@ console.log('\n--- Test 2: First update writes immediately (cold path) ---');
   const o = buildOverlay();
   o.update(makeState({ title: 'T1', detail: 'D1' }));
   // Immediate flush expected (elapsed since _lastTextWriteAt=0 is huge).
-  const detailEl = o.container.querySelector('.fsb-step-text');
+  const detailEl = o.container.querySelector('.pl-in');
   assertEq(detailEl.textContent, 'D1', 'cold path writes detail immediately');
   o.destroy();
 }
@@ -321,7 +315,7 @@ console.log('\n--- Test 3: 10 rapid updates within 50ms coalesce to latest ---')
   const o = buildOverlay();
   // First call writes immediately at t=2000
   o.update(makeState({ detail: 'first' }));
-  const detailEl = o.container.querySelector('.fsb-step-text');
+  const detailEl = o.container.querySelector('.pl-in');
   assertEq(detailEl.textContent, 'first', 'initial write present');
   // 10 burst calls within 50ms (advance 5ms each)
   for (let i = 0; i < 10; i++) {
@@ -347,10 +341,11 @@ console.log('\n--- Test 4: lifecycle === "final" flushes immediately, bypassing 
   advanceNow(50);
   // Queue a pending update inside the debounce window
   o.update(makeState({ detail: 'queued' }));
-  const detailEl = o.container.querySelector('.fsb-step-text');
+  const detailEl = o.container.querySelector('.pl-in');
   assertEq(detailEl.textContent, 'pre-final', 'queued update did not flush yet');
   // Now a final update should flush immediately.
-  o.update(makeState({ lifecycle: 'final', detail: 'FINAL', title: 'Done', result: 'success' }));
+  // An error keeps its own line; a success would read Done (overlay-content-audit).
+  o.update(makeState({ lifecycle: 'final', detail: 'FINAL', title: 'Done', result: 'error' }));
   assertEq(detailEl.textContent, 'FINAL', 'final lifecycle bypasses debounce and flushes synchronously');
   o.destroy();
 }
@@ -360,7 +355,7 @@ console.log('\n--- Phase 230 Test A: dwell floor honored — 800ms gap < 1200ms 
   setNow(3500);
   const o = buildOverlay();
   o.update(makeState({ detail: 'first' }));
-  const detailEl = o.container.querySelector('.fsb-step-text');
+  const detailEl = o.container.querySelector('.pl-in');
   assertEq(detailEl.textContent, 'first', 'first write present');
   // Advance 800ms in mocked time — past 400ms debounce, before 1200ms dwell floor.
   advanceNow(800);
@@ -378,7 +373,7 @@ console.log('\n--- Phase 230 Test B: latest-wins during dwell hold ---');
   setNow(5000);
   const o = buildOverlay();
   o.update(makeState({ detail: 'A' }));
-  const detailEl = o.container.querySelector('.fsb-step-text');
+  const detailEl = o.container.querySelector('.pl-in');
   assertEq(detailEl.textContent, 'A', 'A flushed');
   // Three updates within the dwell window, all queued, latest wins.
   advanceNow(200);
@@ -401,8 +396,8 @@ console.log('\n--- Phase 230 Test C: lifecycle === final bypasses dwell floor --
   o.update(makeState({ detail: 'pre' }));
   advanceNow(100); // 100ms — well inside dwell floor
   // Final lifecycle should flush immediately even though dwell hasn't expired.
-  o.update(makeState({ lifecycle: 'final', detail: 'POST', title: 'Done', result: 'success' }));
-  const detailEl = o.container.querySelector('.fsb-step-text');
+  o.update(makeState({ lifecycle: 'final', detail: 'POST', title: 'Done', result: 'error' }));
+  const detailEl = o.container.querySelector('.pl-in');
   assertEq(detailEl.textContent, 'POST', 'Phase 230: final lifecycle bypasses dwell floor');
   o.destroy();
 }
@@ -413,7 +408,7 @@ console.log('\n--- Phase 230 Test D: first write of session bypasses dwell floor
   const o = buildOverlay();
   // Cold path — _lastTextWriteAt is 0; should write immediately, not wait 1200ms.
   o.update(makeState({ detail: 'cold' }));
-  const detailEl = o.container.querySelector('.fsb-step-text');
+  const detailEl = o.container.querySelector('.pl-in');
   assertEq(detailEl.textContent, 'cold', 'Phase 230: first write bypasses dwell floor (cold path immediate)');
   o.destroy();
 }
@@ -424,7 +419,7 @@ console.log('\n--- Test 5: monotonic progress clamp (40, 25, 50 -> 0.40, 0.40, 0
   const o = buildOverlay();
   function pct(p) { return makeState({ progress: { mode: 'determinate', percent: p, label: p + '%' } }); }
   o.update(pct(40));
-  const fillEl = o.container.querySelector('.fsb-progress-fill');
+  const fillEl = o.container.querySelector('.pl-fill');
   assertEq(fillEl.style.transform, 'scaleX(0.4)', 'percent 40 -> scaleX(0.4)');
   o.update(pct(25));
   assertEq(fillEl.style.transform, 'scaleX(0.4)', 'percent 25 clamped to floor 0.4');
@@ -455,61 +450,9 @@ console.log('\n--- Test 7: monotonic floor resets when a new session starts (aft
   const o2 = buildOverlay();
   assertEq(o2._lastVisiblePercent, 0, 'new session starts with floor=0');
   o2.update(makeState({ progress: { mode: 'determinate', percent: 10, label: '10%' } }));
-  const fillEl = o2.container.querySelector('.fsb-progress-fill');
+  const fillEl = o2.container.querySelector('.pl-fill');
   assertEq(fillEl.style.transform, 'scaleX(0.1)', 'new session honors low percent (no stale clamp)');
   o2.destroy();
-}
-
-console.log('\n--- Test 8: action counter batching -- 5 same writes = 1 DOM write ---');
-{
-  setNow(7000);
-  const o = buildOverlay();
-  const etaEl = o.container.querySelector('.fsb-eta');
-  let writes = 0;
-  let last = etaEl.textContent;
-  // Wrap textContent setter
-  Object.defineProperty(etaEl, 'textContent', {
-    get() { return last; },
-    set(v) { writes += 1; last = String(v); }
-  });
-  for (let i = 0; i < 5; i++) {
-    o.update(makeState({ actionCount: 3 }));
-  }
-  assertEq(writes, 1, 'counter writes ETA exactly once for 5 identical actionCount calls');
-  assertEq(last, 'Actions: 3', 'counter shows Actions: 3');
-  o.destroy();
-}
-
-console.log('\n--- Test 9: action counter batching -- 3 -> 4 -> 4 -> 5 = 3 writes (initial 3, then 4, then 5) ---');
-{
-  setNow(8000);
-  const o = buildOverlay();
-  const etaEl = o.container.querySelector('.fsb-eta');
-  let writes = 0;
-  let last = etaEl.textContent;
-  Object.defineProperty(etaEl, 'textContent', {
-    get() { return last; },
-    set(v) { writes += 1; last = String(v); }
-  });
-  o.update(makeState({ actionCount: 3 }));
-  o.update(makeState({ actionCount: 4 }));
-  o.update(makeState({ actionCount: 4 }));
-  o.update(makeState({ actionCount: 5 }));
-  assertEq(writes, 3, 'counter writes ETA exactly 3 times for 3->4->4->5');
-  assertEq(last, 'Actions: 5', 'final value is Actions: 5');
-  o.destroy();
-}
-
-console.log('\n--- Test 10: action counter null/undefined clears ETA (preserves else-branch) ---');
-{
-  setNow(9000);
-  const o = buildOverlay();
-  o.update(makeState({ actionCount: 7 }));
-  const etaEl = o.container.querySelector('.fsb-eta');
-  assertEq(etaEl.textContent, 'Actions: 7', 'initial counter set');
-  o.update(makeState({ actionCount: null }));
-  assertEq(etaEl.textContent, '', 'null actionCount clears ETA');
-  o.destroy();
 }
 
 // ===========================================================================
@@ -615,85 +558,45 @@ console.log('\n--- Test 13: show() marking _rectDirty=true then false leaves cac
 }
 
 // ===========================================================================
-// describe('capability-call scrollback log (_logBuffer)')
+// describe('status pill: immediate tone, debounced text')
 // ===========================================================================
 
-console.log('\n--- Test 14: _logBuffer accumulates, dedupes consecutive repeats, caps at 3 entries ---');
+console.log('\n--- Test 16: the pill TONE updates immediately on update(), independent of the text debounce ---');
 {
-  setNow(50000);
-  const o = buildOverlay();
-  o.update(makeState({ detail: 'D1' })); // cold path -- flushes immediately
-  assertEq(o._logBuffer.length, 1, 'buffer has 1 entry after first flush');
-  assertEq(JSON.stringify(o._logBuffer), JSON.stringify(['D1']), 'buffer contents after D1');
-
-  advanceNow(1300); // clears both the 400ms debounce and the 1200ms dwell floor
-  o.update(makeState({ detail: 'D1' })); // identical detail -- dedup guard, no push
-  assertEq(o._logBuffer.length, 1, 'identical consecutive detail does not push a duplicate');
-
-  advanceNow(1300);
-  o.update(makeState({ detail: 'D2' }));
-  assertEq(o._logBuffer.length, 2, 'distinct detail pushes a new entry');
-
-  advanceNow(1300);
-  o.update(makeState({ detail: 'D3' }));
-  assertEq(o._logBuffer.length, 3, 'buffer grows to 3');
-
-  advanceNow(1300);
-  o.update(makeState({ detail: 'D4' }));
-  assertEq(o._logBuffer.length, 3, 'buffer caps at 3 entries (oldest shifted out)');
-  assertEq(JSON.stringify(o._logBuffer), JSON.stringify(['D2', 'D3', 'D4']), 'D1 shifted out; most recent 3 kept, oldest-first');
-
-  // One more settling update (duplicate detail, no new push) so the DOM render
-  // reflects the buffer as it stood AFTER the D4 push (render reads the buffer
-  // at the START of update(), one call before its own flush lands).
-  advanceNow(1300);
-  o.update(makeState({ detail: 'D4' }));
-  const logLines = o.container.querySelectorAll('.fsb-log-line');
-  assertEq(logLines[0].textContent, 'D3', '.fsb-log-line[0] shows the most recent PRIOR step (D3), excluding current (D4)');
-  assertEq(logLines[1].textContent, 'D2', '.fsb-log-line[1] shows the step before that (D2)');
-
-  o.destroy();
-}
-
-console.log('\n--- Test 15: destroy() resets _logBuffer to empty ---');
-{
-  setNow(60000);
-  const o = buildOverlay();
-  o.update(makeState({ detail: 'D1' }));
-  advanceNow(1300);
-  o.update(makeState({ detail: 'D2' }));
-  assert(o._logBuffer.length > 0, 'buffer is non-empty before destroy()');
-  o.destroy();
-  assertEq(o._logBuffer.length, 0, 'destroy() resets _logBuffer to empty (per-session state, mirrors _lastActionCount reset)');
-}
-
-// ===========================================================================
-// describe('capability-call step-number pill: immediate class, debounced text')
-// ===========================================================================
-
-console.log('\n--- Test 16: step-number pill CLASS updates immediately on update(), independent of the text debounce ---');
-{
-  // Matches the EXISTING precedent for .fsb-progress-bar's indeterminate/hidden
-  // classes, which also update immediately on every update() call while the
-  // step TEXT is debounced -- capability/guarded pill coloring follows the
-  // same established split between structural state (immediate) and
-  // human-readable text (debounced for readability).
+  // Structural state (tone, third row) is immediate; the human-readable status
+  // line is debounced for readability -- the same split the card had.
   setNow(70000);
   const o = buildOverlay();
   o.update(makeState({ detail: 'first' })); // cold path, settles the debounce state
-  const stepNumberEl = o.container.querySelector('.fsb-step-number');
-  assert(!stepNumberEl.classList.contains('calling'), 'no .calling class before any capability update');
-
+  assert(!o.container.classList.contains('calling'), 'no calling tone before any capability update');
   // Immediately queue another update inside the debounce/dwell window --
-  // the TEXT should NOT flush yet, but the pill CLASS should update right away.
+  // the TEXT should NOT flush yet, but the tone should change right away.
   o.update(makeState({
     phase: 'calling', detail: 'second', guarded: false,
     capability: { chipText: 'x', readinessLabel: 'T1 ready', readinessClass: 'ready', noteText: null }
   }));
-  assert(stepNumberEl.classList.contains('calling'), 'pill CLASS is .calling immediately, even inside the debounce window');
-  const stepTextEl = o.container.querySelector('.fsb-step-text');
-  assertEq(stepTextEl.textContent, 'first', 'pill TEXT still shows the prior value -- held by the dwell floor (unchanged behavior)');
+  assert(o.container.classList.contains('calling'), 'calling tone is immediate, even inside the debounce window');
+  const stepTextEl = o.container.querySelector('.pl-in');
+  assertEq(stepTextEl.textContent, 'first', 'status line still shows the prior value -- held by the dwell floor (unchanged behavior)');
+  o.destroy();
+}
 
+console.log('\n--- Test 17: a new status line comes forward while the old one falls back ---');
+{
+  setNow(80000);
+  const o = buildOverlay();
+  o.update(makeState({ detail: 'one' }));
+  const inEl = o.container.querySelector('.pl-in');
+  const outEl = o.container.querySelector('.pl-out');
+  const firstSide = inEl.classList.contains('a') ? 'a' : 'b';
+  advanceNow(1300);
+  o.update(makeState({ detail: 'two' }));
+  assertEq(inEl.textContent, 'two', 'the new line is written');
+  assertEq(outEl.textContent, 'one', 'the old line moves behind it to fade out');
+  assert(!inEl.classList.contains(firstSide) && !outEl.classList.contains(firstSide), 'the a/b flip restarts both animations');
+  advanceNow(1300);
+  o.update(makeState({ detail: 'two' }));
+  assertEq(outEl.textContent, 'one', 'an unchanged line does not replay the swap');
   o.destroy();
 }
 

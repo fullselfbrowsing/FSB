@@ -90,7 +90,7 @@
   border: 1px solid var(--border-color);
   border-radius: 999px;
   background: var(--bg-card);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -139,7 +139,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.18);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .agents-hero-actions {
@@ -214,7 +214,7 @@
 }
 
 .ag-node-label {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -252,8 +252,6 @@
   to { background-position: 10px 0; }
 }
 
-/* The shell and home wordmark rules are view-encapsulated, so the flow strip
-   carries its own copy. */
 .fsb-highlight-wordmark {
   color: var(--text-primary);
   display: inline-block;
@@ -262,37 +260,11 @@
   margin: 0;
 }
 
+/* Highlight copies set the letters on their raw advances, the way wordmark() in
+   scripts/build-benchmark-assets.mjs draws the mark in the benchmark charts. Everything
+   else about the mark comes from src/styles/fsb-wordmark.css. */
 .fsb-highlight-wordmark .fsb-row {
-  align-items: baseline;
-  display: inline-flex;
-  font-family: 'Poppins', system-ui, sans-serif;
   letter-spacing: 0;
-  line-height: 1;
-}
-
-.fsb-highlight-wordmark .fsb-f {
-  font-weight: 100;
-}
-
-.fsb-highlight-wordmark .fsb-f::before {
-  content: 'F';
-}
-
-.fsb-highlight-wordmark .fsb-s {
-  font-weight: 900;
-}
-
-.fsb-highlight-wordmark .fsb-s::before {
-  content: 'S';
-}
-
-.fsb-highlight-wordmark .fsb-b {
-  display: inline-block;
-  fill: currentColor;
-  height: 0.74em;
-  margin-left: 0.01em;
-  vertical-align: baseline;
-  width: auto;
 }
 
 /* --- Works With --- */
@@ -365,7 +337,7 @@
 }
 
 .ag-agent-maker {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.66rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -393,7 +365,7 @@
   gap: 8px;
   padding-top: 14px;
   border-top: 1px dashed var(--border-color);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -416,7 +388,7 @@
 .ag-more-label {
   width: 100%;
   margin-bottom: 6px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.1em;
   text-align: center;
@@ -489,7 +461,7 @@
 .power-card-stat {
   display: inline-block;
   margin-bottom: 14px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -550,7 +522,7 @@
   height: 42px;
   margin-bottom: 16px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 107, 53, 0.12);
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 1.3rem;
 }
@@ -623,7 +595,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-body);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.84rem;
   color: var(--text-primary);
   text-align: left;
@@ -632,7 +604,7 @@
 }
 
 .ag-cmd:hover {
-  border-color: rgba(255, 107, 53, 0.4);
+  border-color: var(--primary-glow-strong);
   box-shadow: var(--shadow-glow);
 }
 
@@ -679,7 +651,7 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-body);
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--text-secondary);
   cursor: pointer;
@@ -688,7 +660,7 @@
 
 .ag-host:hover,
 .ag-host.on {
-  border-color: rgba(255, 107, 53, 0.4);
+  border-color: var(--primary-glow-strong);
   color: var(--primary);
 }
 
@@ -729,13 +701,13 @@
   width: 30px;
   height: 30px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 107, 53, 0.12);
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 1rem;
 }
 
 .prompt-card-label {
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -753,7 +725,7 @@
 .prompt-caret {
   display: inline-block;
   margin-right: 8px;
-  font-family: 'Space Mono', 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
   color: var(--primary);
   user-select: none;

@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API Configuration"
   },
-  "panel_8d261a372f": {
-    "message": "Sync"
-  },
   "panel_703390318b": {
     "message": "Beta"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "Discard"
-  },
-  "panel_49e49bb440": {
-    "message": "Generate"
   },
   "panel_0e91610117": {
     "message": "Refresh"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "Read full policy →"
   },
-  "panel_04dfac3671": {
-    "message": "Disconnected"
-  },
-  "panel_acf2db1614": {
-    "message": "Server Sync"
-  },
-  "panel_609bbbdf07": {
-    "message": "Hash Key"
-  },
-  "panel_534803768c": {
-    "message": "Pair Dashboard"
-  },
-  "panel_9a177de63c": {
-    "message": "Scan to Pair"
-  },
-  "panel_43e3ece73f": {
-    "message": "remaining"
-  },
   "panel_c9b3c38247": {
     "message": "Total"
   },
@@ -984,36 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "Turning voice input off stops FSB from using your microphone, but does not revoke Chrome's saved permission."
-  },
-  "panel_76e917ee87": {
-    "message": "Pair this extension with the FSB dashboard for remote control and result storage"
-  },
-  "panel_c11de3bb2e": {
-    "message": "Connect to FSB server for result storage and dashboard access"
-  },
-  "panel_097b5fa7f6": {
-    "message": "Generate a key, then pair the dashboard to link this browser to the FSB server."
-  },
-  "panel_75d0625c55": {
-    "message": "Background agents have left the building"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB stays focused on precise single-attempt browser execution. Scheduled and recurring task work is better served by tools built for it:"
-  },
-  "panel_5a694f4532": {
-    "message": "for an open-source agent loop, and"
-  },
-  "panel_6e34781c2f": {
-    "message": "for managed long-running automations. Pick whichever fits the way you work."
-  },
-  "panel_e76c360683": {
-    "message": "Try OpenClaw"
-  },
-  "panel_1a58d9154d": {
-    "message": "Try Claude Routines"
-  },
-  "panel_582ba53e9e": {
-    "message": "Retired in v0.9.45rc1 · April 2026"
   },
   "panel_9f83a0b7bf": {
     "message": "Long-term memory learned from past automation sessions"
@@ -1555,8 +1501,8 @@
   "panel_d2286811e6": {
     "message": "Connect MCP clients like Claude Code and Cursor, then verify with the doctor command"
   },
-  "panel_f3cb441c27": {
-    "message": "Read how FSB handles data, storage, and optional server sync"
+  "panel_71b36c0b35": {
+    "message": "Read how FSB handles data and storage"
   },
   "panel_476481e410": {
     "message": "Report bugs, request features, and track development progress"
@@ -1636,20 +1582,8 @@
   "panel_22965568d2": {
     "message": "Connected"
   },
-  "panel_ee172faa9c": {
-    "message": "Invalid key"
-  },
   "panel_031a8f0f65": {
     "message": "Failed"
-  },
-  "panel_424a2551d3": {
-    "message": "Expired"
-  },
-  "panel_c7730178f4": {
-    "message": "Generate new code"
-  },
-  "panel_ac116124f7": {
-    "message": "Could not generate pairing code. Try again."
   },
   "panel_d03fd96d28": {
     "message": "Choose a loaded model..."
@@ -1720,7 +1654,7 @@
     "message": "69 MCP tools"
   },
   "entry_feat_tools_sub": {
-    "message": "From your coding agent"
+    "message": "From your agent"
   },
   "entry_get_started": {
     "message": "Get started"
@@ -1744,7 +1678,7 @@
     "message": "Recommended"
   },
   "entry_agent_desc": {
-    "message": "Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 69 tools, no API key, nothing to configure in the browser."
+    "message": "Give Grok Bot, Muse, Dots, OpenClaw, Hermes or your coding agent a real browser over MCP. No API key, nothing to configure in the browser."
   },
   "entry_in_browser": {
     "message": "In this browser"
@@ -1800,11 +1734,17 @@
   "entry_mcp_3": {
     "message": "Ask your agent to browse. It drives FSB's DOM engine for you."
   },
-  "entry_claw_name": {
-    "message": "Set it up for your Claw"
+  "entry_agents_card_name": {
+    "message": "Running an always-on agent?"
   },
-  "entry_claw_desc": {
-    "message": "Guided OpenClaw install in the control panel"
+  "entry_agents_card_desc": {
+    "message": "Grok Bot, Muse, Dots, OpenClaw and Hermes drive FSB over MCP too. See how on the Agents page."
+  },
+  "entry_clawhub_lead": {
+    "message": "On OpenClaw or Hermes? The fastest route is the"
+  },
+  "entry_clawhub_link": {
+    "message": "FSB Skill on ClawHub"
   },
   "entry_prefer_key": {
     "message": "Prefer your own key?"
@@ -2192,6 +2132,87 @@
   },
   "entry_toast_copied": {
     "message": "Install command copied"
+  },
+  "entry_toast_panel": {
+    "message": "Opening the control panel"
+  },
+  "entry_explore": {
+    "message": "Explore FSB"
+  },
+  "entry_panel_opened": {
+    "message": "Control panel opened"
+  },
+  "entry_more_panel": {
+    "message": "There's always much more to discover about FSB. It all lives in the control panel."
+  },
+  "entry_connect_heading": {
+    "message": "Connect $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_aria": {
+    "message": "$NAME$ API key",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_lm_url_aria": {
+    "message": "LM Studio server URL"
+  },
+  "entry_cue_begin": {
+    "message": "Begin"
+  },
+  "entry_nudge_path": {
+    "message": "Pick a path to continue"
+  },
+  "entry_nudge_key": {
+    "message": "Add a key, or skip to MCP"
+  },
+  "entry_nudge_local": {
+    "message": "Start LM Studio, or skip to MCP"
+  },
+  "entry_stage_aria": {
+    "message": "FSB onboarding. Swipe or use the arrow keys to move between steps."
+  },
+  "entry_rail_aria": {
+    "message": "Onboarding steps"
+  },
+  "entry_rail_back": {
+    "message": "Back to $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_go": {
+    "message": "Go to $STEP$",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_current": {
+    "message": "$STEP$, current step",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_rail_ahead": {
+    "message": "$STEP$, not reached yet",
+    "placeholders": {
+      "step": {
+        "content": "$1"
+      }
+    }
   },
   "entry_onboarding_tag": {
     "message": "Onboarding"
@@ -3080,66 +3101,6 @@
   "copy_84e9814ece": {
     "message": "Failed to clear research results"
   },
-  "copy_491c2ddc8e": {
-    "message": "Please enter a server URL first"
-  },
-  "copy_9526d57756": {
-    "message": "Hash key generated and saved"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "Failed to generate hash key"
-  },
-  "copy_52b3b70484": {
-    "message": "Cannot connect to server: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "No hash key to copy"
-  },
-  "copy_f0b64c63d8": {
-    "message": "Hash key copied"
-  },
-  "copy_0cf23c4489": {
-    "message": "Failed to copy"
-  },
-  "copy_8cab3b4552": {
-    "message": "Please enter server URL and hash key"
-  },
-  "copy_271b7b0f3b": {
-    "message": "Server connection successful"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "Hash key is invalid"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "Cannot connect to server"
-  },
-  "copy_0ea446a05f": {
-    "message": "Server did not return a hash key"
-  },
-  "copy_e5697f10b5": {
-    "message": "Malformed pairing response"
-  },
-  "copy_30fa7c27e5": {
-    "message": "Could not generate pairing code: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "Could not register hash key: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "Delete this memory?"
   },
@@ -3188,9 +3149,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "Remote control active"
   },
   "copy_23a711ebd2": {
     "message": "No models match search"
@@ -3314,12 +3272,6 @@
   },
   "copy_f38984cf15": {
     "message": "Anonymous usage data is being sent. Click to stop."
-  },
-  "copy_81649d0543": {
-    "message": "Your server hash key"
-  },
-  "copy_e4cdf160f5": {
-    "message": "Copy hash key"
   },
   "copy_8c16fe2070": {
     "message": "When enabled, new memories are automatically analyzed by AI for deeper insights"
@@ -4666,5 +4618,803 @@
         "content": "$1"
       }
     }
+  },
+  "panel_88c976fabd": {
+    "message": "FSB signs in with logins from your 1Password. FSB itself stores no passwords."
+  },
+  "panel_8b70975df7": {
+    "message": "When enabled, FSB detects login pages and signs in with the matching 1Password login."
+  },
+  "panel_818962bda5": {
+    "message": "Checking 1Password connection..."
+  },
+  "panel_5c0a336c67": {
+    "message": "Choose the vaults FSB may read. A vault used only by FSB is safest."
+  },
+  "panel_161c79f605": {
+    "message": "Save new logins to"
+  },
+  "panel_cc6d7a8340": {
+    "message": "Do not save"
+  },
+  "panel_5d4b7e9caa": {
+    "message": "Save vault access"
+  },
+  "panel_5ab21b8830": {
+    "message": "Move your old FSB vault to 1Password"
+  },
+  "panel_911c744cd5": {
+    "message": "Enter the PIN of your old FSB vault. Items moved to 1Password are erased from FSB."
+  },
+  "panel_3f6118f701": {
+    "message": "Move to 1Password"
+  },
+  "panel_0f5320398c": {
+    "message": "Delete old vault"
+  },
+  "panel_00f3328a04": {
+    "message": "No logins in the vaults FSB can use. Add or edit logins in 1Password."
+  },
+  "panel_c6e98715b7": {
+    "message": "FSB fills checkout forms with credit cards from your 1Password, after you approve each fill."
+  },
+  "panel_4875f94fbf": {
+    "message": "Connect 1Password in Passwords to use your cards."
+  },
+  "panel_b9675cca57": {
+    "message": "No credit cards in the vaults FSB can use. Add or edit cards in 1Password."
+  },
+  "panel_6b033a4f5e": {
+    "message": "1Password is connected through the desktop app ($ACCOUNT$).",
+    "placeholders": {
+      "account": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_881be2da38": {
+    "message": "1Password is connected with a service account."
+  },
+  "panel_d41e4d121e": {
+    "message": "1Password is not connected."
+  },
+  "panel_5848961ce6": {
+    "message": "Choose the vaults FSB may use to finish setup."
+  },
+  "panel_216dcfd214": {
+    "message": "Enter your 1Password account name"
+  },
+  "panel_a94d6f85db": {
+    "message": "Connecting... Approve FSB in the 1Password app if asked."
+  },
+  "panel_616c3a2010": {
+    "message": "1Password connected"
+  },
+  "panel_e520e3cf11": {
+    "message": "Choose at least one vault"
+  },
+  "panel_cc541e4c1e": {
+    "message": "Vault access saved"
+  },
+  "panel_5c78004e58": {
+    "message": "1Password disconnected"
+  },
+  "panel_e95f94cbda": {
+    "message": "FSB's old vault still holds items FSB no longer uses. Logins: $LOGINS$. Cards: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_9c26cd899e": {
+    "message": "Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$.",
+    "placeholders": {
+      "logins": {
+        "content": "$1"
+      },
+      "cards": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_5df84a7380": {
+    "message": "Not moved and kept in FSB: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_777fa3f904": {
+    "message": "Delete the old FSB vault? Anything not moved to 1Password will be lost."
+  },
+  "panel_ed17465290": {
+    "message": "Old vault deleted"
+  },
+  "panel_3d763a56b2": {
+    "message": "Items: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_f44f4aefa8": {
+    "message": "Moving..."
+  },
+  "panel_498fd066bf": {
+    "message": "Could not reach 1Password: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_fd0873e284": {
+    "message": "Enter your credentials to sign in. FSB can save them to 1Password for next time."
+  },
+  "copy_751ac3de88": {
+    "message": "Enter your credentials to sign in. FSB uses them once and does not store them."
+  },
+  "copy_264681c742": {
+    "message": "Save to 1Password"
+  },
+  "entry_vault_checking": {
+    "message": "Checking 1Password"
+  },
+  "entry_vault_signing_1p": {
+    "message": "Signing in with 1Password"
+  },
+  "entry_vault_filled_1p": {
+    "message": "Filled from 1Password"
+  },
+  "entry_vault_signing_typed": {
+    "message": "Signing in"
+  },
+  "entry_vault_typed_by_you": {
+    "message": "typed by you · not sent to $CLIENT$",
+    "placeholders": {
+      "client": {
+        "content": "$1",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_typed_by_you_agent": {
+    "message": "typed by you · not sent to your agent"
+  },
+  "entry_vault_filled_saved": {
+    "message": "Filled · saved to 1Password"
+  },
+  "entry_vault_filled_not_saved": {
+    "message": "Filled · not saved"
+  },
+  "entry_vault_cancelled": {
+    "message": "Cancelled · nothing filled"
+  },
+  "entry_vault_page_changed": {
+    "message": "Page changed · nothing filled"
+  },
+  "entry_vault_several": {
+    "message": "$COUNT$ logins match · $CLIENT$ will ask you",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      },
+      "client": {
+        "content": "$2",
+        "example": "Claude"
+      }
+    }
+  },
+  "entry_vault_several_agent": {
+    "message": "$COUNT$ logins match · your agent will ask you",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "entry_vault_chip_username": {
+    "message": "Username"
+  },
+  "entry_vault_chip_password": {
+    "message": "Password"
+  },
+  "entry_vault_chip_code": {
+    "message": "Code"
+  },
+  "entry_vault_sheet_sign_in": {
+    "message": "Sign in"
+  },
+  "entry_vault_sheet_user": {
+    "message": "Email or username"
+  },
+  "entry_vault_sheet_hide": {
+    "message": "Hide password"
+  },
+  "entry_vault_sheet_no_save": {
+    "message": "Not saved · no vault set for new logins"
+  },
+  "entry_vault_sheet_paused": {
+    "message": "Paused"
+  },
+  "entry_vault_sheet_paused_hint": {
+    "message": "· click to keep typing"
+  },
+  "entry_vault_sheet_covered": {
+    "message": "Partly covered by the page"
+  },
+  "entry_vault_sheet_use_1p": {
+    "message": "Use 1Password instead"
+  },
+  "entry_vault_sheet_add_title": {
+    "message": "Add it in 1Password"
+  },
+  "entry_vault_sheet_add_note": {
+    "message": "Save a login for this site in 1Password, then continue."
+  },
+  "entry_vault_sheet_type_instead": {
+    "message": "Type it here instead"
+  },
+  "entry_vault_sheet_still_missing": {
+    "message": "Still nothing saved for this site."
+  },
+  "entry_vault_approve": {
+    "message": "Approve FSB in 1Password"
+  },
+  "entry_vault_waiting_for_you": {
+    "message": "waiting for you"
+  },
+  "entry_vault_entering_code": {
+    "message": "Entering the code"
+  },
+  "entry_vault_one_time_code": {
+    "message": "one-time code"
+  },
+  "entry_vault_not_https": {
+    "message": "Not filled · page isn't https"
+  },
+  "entry_vault_card_needs_https": {
+    "message": "Not filled · cards need https"
+  },
+  "entry_vault_locked": {
+    "message": "1Password is locked"
+  },
+  "entry_vault_unlock": {
+    "message": "unlock it to continue"
+  },
+  "entry_vault_unreachable": {
+    "message": "Can't reach 1Password"
+  },
+  "entry_vault_filling_card": {
+    "message": "Filling card"
+  },
+  "entry_vault_card_filled": {
+    "message": "Card filled · review and pay"
+  },
+  "entry_vault_chip_number": {
+    "message": "Number"
+  },
+  "entry_vault_chip_expiry": {
+    "message": "Expiry"
+  },
+  "entry_vault_chip_cvc": {
+    "message": "CVC"
+  },
+  "entry_vault_chip_name": {
+    "message": "Name"
+  },
+  "copy_e86c3bc142": {
+    "message": "Which account?"
+  },
+  "copy_02451a3272": {
+    "message": "Sign in as $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "maya-reyes"
+      }
+    }
+  },
+  "copy_83644bf92d": {
+    "message": "Type it instead"
+  },
+  "copy_bfd402b2f6": {
+    "message": "Sign in"
+  },
+  "copy_2a347f1933": {
+    "message": "Email or username"
+  },
+  "copy_50eb1b1291": {
+    "message": "Signed in with 1Password"
+  },
+  "copy_edfed2d184": {
+    "message": "Signed in on $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "copy_bb4e80e140": {
+    "message": "Saved to 1Password"
+  },
+  "copy_22b3467c1b": {
+    "message": "Not saved"
+  },
+  "copy_8a56b97150": {
+    "message": "Skipped the sign-in"
+  },
+  "copy_7e0ea9bb72": {
+    "message": "FSB carries on without it."
+  },
+  "copy_735479c991": {
+    "message": "Card filled on $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "shop.example.com"
+      }
+    }
+  },
+  "copy_adffcba678": {
+    "message": "$CARD$ · $LAST4$. Review and pay.",
+    "placeholders": {
+      "card": {
+        "content": "$1",
+        "example": "Everyday Visa"
+      },
+      "last4": {
+        "content": "$2",
+        "example": "4242"
+      }
+    }
+  },
+  "copy_007b25d9d1": {
+    "message": "You declined the card fill"
+  },
+  "copy_4c3bff7c9b": {
+    "message": "Nothing was read from 1Password."
+  },
+  "copy_db8bc38f4b": {
+    "message": "The card fill timed out"
+  },
+  "copy_58723d2bab": {
+    "message": "Fill your card?"
+  },
+  "copy_a2d285b352": {
+    "message": "Decline"
+  },
+  "copy_99fd8ff2d5": {
+    "message": "Fill card"
+  },
+  "copy_2a48c44dfa": {
+    "message": "Not filled on $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1",
+        "example": "portal.example"
+      }
+    }
+  },
+  "copy_6490e5d9ad": {
+    "message": "The page isn't https."
+  },
+  "copy_5decaf89b7": {
+    "message": "Page changed, nothing filled"
+  },
+  "copy_b41f042ed0": {
+    "message": "The tab moved to another site."
+  },
+  "copy_99955bb437": {
+    "message": "1Password isn't connected"
+  },
+  "copy_fb57653d59": {
+    "message": "FSB can't sign in or fill cards yet."
+  },
+  "copy_5cbafe67aa": {
+    "message": "Open Vault settings"
+  },
+  "copy_270e420dd3": {
+    "message": "this page"
+  },
+  "panel_5d55c415e3": {
+    "message": "Vault"
+  },
+  "panel_c82d7338de": {
+    "message": "FSB signs in and fills checkouts with items from your 1Password. FSB itself stores no passwords or cards."
+  },
+  "panel_a55fac2bfd": {
+    "message": "FSB fills checkout forms with cards from your 1Password."
+  },
+  "panel_caf0111717": {
+    "message": "Local server"
+  },
+  "panel_101f4d9537": {
+    "message": "This browser"
+  },
+  "panel_87bdac40eb": {
+    "message": "FSB extension"
+  },
+  "panel_ec5ba0abb7": {
+    "message": "Access"
+  },
+  "panel_22894e363f": {
+    "message": "Vaults FSB may read"
+  },
+  "panel_5e05243ee1": {
+    "message": "A vault used only by FSB is safest."
+  },
+  "panel_07ce99bab0": {
+    "message": "Sign-in rules"
+  },
+  "panel_be0dc4e4f5": {
+    "message": "Taken from each 1Password item"
+  },
+  "panel_7f70ddcd8e": {
+    "message": "Only on the sites saved in a login."
+  },
+  "panel_374082363f": {
+    "message": "Never from https to http."
+  },
+  "panel_059151ea45": {
+    "message": "Card fills"
+  },
+  "panel_42e70101ec": {
+    "message": "Your agent asks you first"
+  },
+  "panel_949603eecc": {
+    "message": "Over MCP in its own app. In autopilot, in the side panel."
+  },
+  "panel_33e5a068d8": {
+    "message": "https pages only."
+  },
+  "panel_e8cb2edbc4": {
+    "message": "What agents see"
+  },
+  "panel_107fa062ba": {
+    "message": "Over MCP and in autopilot"
+  },
+  "panel_c53616b513": {
+    "message": "Titles, usernames, sites, last four digits."
+  },
+  "panel_ed87d52230": {
+    "message": "Never a password, code or card number."
+  },
+  "panel_fb8e7a1a3c": {
+    "message": "Items"
+  },
+  "panel_f5b53d4968": {
+    "message": "Once connected"
+  },
+  "panel_543eb6e59b": {
+    "message": "Logins"
+  },
+  "panel_a52fcbbc33": {
+    "message": "Cards"
+  },
+  "panel_3304ef1777": {
+    "message": "Search titles, usernames and sites"
+  },
+  "panel_5a80aae52c": {
+    "message": "Read only. Edit logins in 1Password."
+  },
+  "panel_547ca35987": {
+    "message": "Read from 1Password only at fill time, for the site in the tab."
+  },
+  "panel_2fdf0b746a": {
+    "message": "Logins and cards appear here after you choose at least one vault."
+  },
+  "panel_10c5739b95": {
+    "message": "Waiting for approval"
+  },
+  "panel_a424e33d90": {
+    "message": "Locked"
+  },
+  "panel_5ad99230df": {
+    "message": "Not reachable"
+  },
+  "panel_dce083a2c4": {
+    "message": "Declined"
+  },
+  "panel_67a926f700": {
+    "message": "Not available"
+  },
+  "panel_1d09faf925": {
+    "message": "Update needed"
+  },
+  "panel_53f15ea2f2": {
+    "message": "Not paired"
+  },
+  "panel_a06130a5a2": {
+    "message": "Rate limited"
+  },
+  "panel_9f760ab207": {
+    "message": "Waiting for you"
+  },
+  "panel_8985693566": {
+    "message": "Not connected yet"
+  },
+  "panel_8a3ff2cbe7": {
+    "message": "Connecting to $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_65c448bae4": {
+    "message": "Connected with a service account"
+  },
+  "panel_4435385a73": {
+    "message": "The FSB local server is not running"
+  },
+  "panel_feb9d3f2ef": {
+    "message": "1Password app not found"
+  },
+  "panel_9d094cbe0c": {
+    "message": "Update the local server"
+  },
+  "panel_b0545ee348": {
+    "message": "Pair again"
+  },
+  "panel_a904382fc7": {
+    "message": "Slow down"
+  },
+  "panel_12e12023d2": {
+    "message": "Could not reach 1Password"
+  },
+  "panel_a5ae6c601d": {
+    "message": "Approve FSB in the 1Password app."
+  },
+  "panel_f83ab4c57f": {
+    "message": "Choose the vaults FSB may read."
+  },
+  "panel_b33cf191b9": {
+    "message": "Set up from the terminal. Disconnecting deletes the saved token, so it asks first."
+  },
+  "panel_8ba387915f": {
+    "message": "Unlock 1Password to continue. Your settings are kept."
+  },
+  "panel_041a40019f": {
+    "message": "Install the FSB local server, then try again."
+  },
+  "panel_40647b20fa": {
+    "message": "FSB can't read anything until you allow it. Try again, then allow FSB in 1Password."
+  },
+  "panel_0233589be3": {
+    "message": "This fsb-mcp-server is too old for 1Password, or can't load its SDK."
+  },
+  "panel_01ddad80a6": {
+    "message": "The server is running but no longer trusts this browser. Pairing again fixes it."
+  },
+  "panel_1c3eb3d073": {
+    "message": "Too many requests in a short time. Nothing is wrong with your account. Try again in a minute."
+  },
+  "panel_89857dc659": {
+    "message": "1Password is asking whether FSB may use it. FSB waits up to 75 seconds."
+  },
+  "panel_979a9a05cd": {
+    "message": "desktop app"
+  },
+  "panel_69ce0728e7": {
+    "message": "asking you"
+  },
+  "panel_14493f5f54": {
+    "message": "locked"
+  },
+  "panel_d7da083898": {
+    "message": "service account"
+  },
+  "panel_b2ee901616": {
+    "message": "1Password, then the FSB local server, then this browser"
+  },
+  "panel_c79b3dcef9": {
+    "message": "1Password, then the local server, which this browser cannot reach"
+  },
+  "panel_845f928640": {
+    "message": "Personal"
+  },
+  "panel_535c99f759": {
+    "message": "Only FSB"
+  },
+  "panel_e3c4b39d6d": {
+    "message": "Shared"
+  },
+  "panel_4a9d7b37d0": {
+    "message": "Your personal vault. All $COUNT$ items become available to agents.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "412"
+      }
+    }
+  },
+  "panel_a856394f27": {
+    "message": "Shared with others. All $COUNT$ items become available to agents.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "31"
+      }
+    }
+  },
+  "panel_98c8b495b1": {
+    "message": "All $COUNT$ items in this vault become available to agents.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "88"
+      }
+    }
+  },
+  "panel_ed4e942124": {
+    "message": "Anywhere on site"
+  },
+  "panel_b20197643c": {
+    "message": "Exact domain"
+  },
+  "panel_8b8c047cc1": {
+    "message": "$COUNT$ for this site",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "panel_1b774f3cfe": {
+    "message": "One-time code"
+  },
+  "panel_c68b5649c4": {
+    "message": "billing address on the card"
+  },
+  "panel_6b3ab0a8ac": {
+    "message": "no billing address saved"
+  },
+  "panel_fdee246866": {
+    "message": "Moving in batches of 10. Each batch is erased from FSB once 1Password confirms it."
+  },
+  "panel_72fe828489": {
+    "message": "Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$. The old vault is erased.",
+    "placeholders": {
+      "logins": {
+        "content": "$1",
+        "example": "14"
+      },
+      "cards": {
+        "content": "$2",
+        "example": "2"
+      }
+    }
+  },
+  "panel_e907c1655f": {
+    "message": "Stopped partway: $MOVED$ moved, $KEPT$ kept in FSB.",
+    "placeholders": {
+      "moved": {
+        "content": "$1",
+        "example": "12"
+      },
+      "kept": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "panel_dddfcb82ce": {
+    "message": "Disconnect 1Password? FSB forgets its 1Password settings."
+  },
+  "panel_91fa9fd3cf": {
+    "message": "Disconnect 1Password? FSB forgets its 1Password settings and deletes the saved service account token. Reconnecting needs the terminal again."
+  },
+  "panel_a2e8f0dbf3": {
+    "message": "Log in to 1Password"
+  },
+  "panel_26639e7832": {
+    "message": "Change account"
+  },
+  "panel_61a5454aac": {
+    "message": "Account name — shown at the top of the 1Password sidebar"
+  },
+  "panel_24f92b0c67": {
+    "message": "Uses the 1Password desktop app. It needs Settings > Developer > Integrate with 1Password SDKs turned on (FSB opens that page if it is off), then asks you to approve FSB."
+  },
+  "panel_0db703c375": {
+    "message": "Install 1Password"
+  },
+  "panel_887ff0e04c": {
+    "message": "Open 1Password settings"
+  },
+  "panel_af67e786b5": {
+    "message": "No save vault yet. Choose one so FSB can save new logins to 1Password."
+  },
+  "panel_9f088dbebd": {
+    "message": "Advanced"
+  },
+  "panel_1a6cfc8a7f": {
+    "message": "Limit FSB to these vaults"
+  },
+  "panel_104a4be90f": {
+    "message": "Use all vaults"
+  },
+  "panel_65f5a87194": {
+    "message": "Settings > Developer in 1Password"
+  },
+  "panel_f287bb0de3": {
+    "message": "Turn on Integrate with 1Password SDKs in 1Password, then come back. FSB keeps checking for 2 minutes."
+  },
+  "panel_0f6adb6e71": {
+    "message": "Integrate with 1Password SDKs is still off"
+  },
+  "panel_3facf5a8dc": {
+    "message": "On a managed device? Ask your admin."
+  },
+  "panel_8677bc43ad": {
+    "message": "Integrate with 1Password SDKs is off"
+  },
+  "panel_e5dab5535e": {
+    "message": "Turn on Integrate with 1Password SDKs in 1Password, then come back."
+  },
+  "panel_55a8cd8239": {
+    "message": "Logged in"
+  },
+  "panel_06e7541e0b": {
+    "message": "Logged in · $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bdba1e1a34": {
+    "message": "1Password may ask you to approve FSB again after 10 idle minutes, a lock, or a local-server restart."
+  },
+  "panel_41a0e0aead": {
+    "message": "Could not log in to 1Password"
+  },
+  "panel_f24552b4b3": {
+    "message": "Check the account name, then try again."
+  },
+  "panel_bf74b77b3d": {
+    "message": "Check the account name, then try again. Details: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_dcaa9bd319": {
+    "message": "Install the 1Password app and sign in, then try again."
+  },
+  "panel_e745c8fafe": {
+    "message": "1Password account: $ACCOUNT$",
+    "placeholders": {
+      "account": {
+        "content": "$1",
+        "example": "my.1password.com"
+      }
+    }
+  },
+  "panel_bfc0f038ef": {
+    "message": "All vaults in your 1Password account"
+  },
+  "panel_7a9e047a27": {
+    "message": "Only the vaults turned on under Advanced"
+  },
+  "panel_fec6b9e93d": {
+    "message": "Forget saved sign-in"
+  },
+  "panel_bf1eb6a9fc": {
+    "message": "Logged out in this browser. The local server still has the 1Password sign-in, and FSB removes it there the next time it can."
   }
 }

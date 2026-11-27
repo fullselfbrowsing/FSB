@@ -1118,6 +1118,7 @@ async function runLifecycleProtocolTests(supervisorModule) {
   assert(Object.isFrozen(initial.active));
   assert(Object.isFrozen(initial.restartLosses));
   assert(Object.isFrozen(initial.routeLosses));
+  assert.equal(harness.supervisor.activeCount(), 0, 'a fresh supervisor has no active run');
 
   const startPromise = harness.supervisor.handleExtRequest(
     startRequest({ adapterId: 'claude-code', task: 'lifecycle protocol fixture' }),
@@ -1130,6 +1131,7 @@ async function runLifecycleProtocolTests(supervisorModule) {
   const delegationId = harness.emitted[0].payload.delegationId;
   const running = await harness.supervisor.handleExtRequest(statusRequest(), harness.emit);
   assert.deepEqual(running.active, [{ delegationId, state: 'running' }]);
+  assert.equal(harness.supervisor.activeCount(), 1, 'a running delegation is active');
 
   const held = await harness.supervisor.handleExtRequest(
     lifecycleRequest('delegate.hold', delegationId),
@@ -1155,12 +1157,14 @@ async function runLifecycleProtocolTests(supervisorModule) {
     (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).active,
     [{ delegationId, state: 'held' }],
   );
+  assert.equal(harness.supervisor.activeCount(), 1, 'a held delegation still counts as active');
 
   const resumed = await harness.supervisor.handleExtRequest(
     lifecycleRequest('delegate.resume', delegationId),
     harness.emit,
   );
   assert.deepEqual(resumed, { delegationId, status: 'running' });
+  assert.equal(harness.supervisor.activeCount(), 1, 'a resumed delegation is active');
   assert.deepEqual(
     harness.lifecycleCalls.filter((call) => call.operation === 'signal').map((call) => [call.group, call.signal]),
     [
@@ -1180,6 +1184,7 @@ async function runLifecycleProtocolTests(supervisorModule) {
   const terminal = await startPromise;
   assert.equal(cancelled.status, 'cancelled');
   assert.equal(terminal.status, 'cancelled');
+  assert.equal(harness.supervisor.activeCount(), 0, 'a settled delegation is no longer active');
   assert.deepEqual(
     await harness.supervisor.handleExtRequest(
       lifecycleRequest('delegate.resume', delegationId),

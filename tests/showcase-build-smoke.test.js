@@ -437,6 +437,16 @@ if (Array.isArray(marketingRoutes) && Array.isArray(clientShellRoutes)) {
   check('showcase server clientShellRoutes covers every explicit client route',
     missingClientShellRoutes.length === 0,
     `missing ${missingClientShellRoutes.join(', ') || 'none'}`);
+  // The other direction: a route Angular no longer defines must leave the
+  // server's sets too, or the server keeps serving a page that is gone.
+  const staleMarketingRoutes = marketingRoutes.filter((route) => !prerenderRoutes.includes(route));
+  const staleClientShellRoutes = clientShellRoutes.filter((route) => !clientRoutes.includes(route));
+  check('showcase server marketingRoutes lists only Angular prerender routes',
+    staleMarketingRoutes.length === 0,
+    `stale ${staleMarketingRoutes.join(', ') || 'none'}`);
+  check('showcase server clientShellRoutes lists only Angular client routes',
+    staleClientShellRoutes.length === 0,
+    `stale ${staleClientShellRoutes.join(', ') || 'none'}`);
 }
 
 // dist/ must not contain a /stats prerendered page either. Only check if a

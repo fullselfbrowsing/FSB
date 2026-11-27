@@ -8,20 +8,18 @@
  * Each form quotes an existing on-page signal where one exists, so the icon and
  * the page read as one system. Three of the four do:
  *
- *   idle      - base glyph only. Full strength until a dashboard relay has
- *               connected at least once and then dropped.
- *   thinking  - SWEEP. The indeterminate progress bar, quoting
- *               .fsb-progress-bar.indeterminate .fsb-progress-fill and its
- *               fsbProgressSweep keyframe (1.2s ease-in-out, 38% fill,
- *               translateX -120% -> 320%). No orbit bead.
+ *   idle      - base glyph only, at full strength.
+ *   thinking  - SWEEP. The status pill's track sweep in visual-feedback.js
+ *               (1.2s ease-in-out, 38% fill, translateX -120% -> 320%). No
+ *               orbit bead.
  *   acting    - ORBIT. The ViewportGlow perimeter bead, 4s, _getDuration().
  *   calling   - CAPABILITY RING. An inset violet border repeating while an
  *               invocation is in flight, plus a ping travelling INWARD -- an
  *               icon cannot paint outside its own box, so the design's outward
  *               spread is unrenderable.
- *               This form has NO upstream source: there is no ring pulse and no
- *               1.6s cadence anywhere in the extension. It is design-only, and
- *               it deliberately diverges from ViewportGlow's 4s calling glow.
+ *               From the design export. The status pill plays the same ring
+ *               on its border, from this module's clock (getMotion), and it
+ *               deliberately diverges from ViewportGlow's 4s calling glow.
  *   watching  - BREATHE. Quotes the trigger badge dot's 2.4s ease-in-out
  *               cadence and loops for as long as a watch remains armed. The
  *               mark fades over a fixed black plate while a deliberately
@@ -29,6 +27,9 @@
  *
  * Everything canvas, timer and persistence related lives in this file. The
  * service worker drives it through the small public API at the bottom.
+ *
+ * Every form is drawn on the artwork's black tile, or on its white counterpart
+ * when FSB's theme is set to Light (TILES). Nothing else about a state changes.
  *
  * Classic script. Loaded into the MV3 service worker global scope.
  */
@@ -38,23 +39,28 @@
 
   // ---- Locked geometry + cadence -----------------------------------------
   var FRAME_INTERVAL_MS = 66;        // ~15fps. chrome.alarms floors at 30s.
-  var BEAD_FRACTION = 0.12;          // bead spans 12% of the square perimeter
-  var FADE_FRACTION = 0.02;          // 2% of the perimeter fades at each end
+  var BEAD_FRACTION = 0.12;          // bead spans 12% of the orbit path
+  var FADE_FRACTION = 0.02;          // 2% of the path fades at each end
   var SIZES = [16, 32];              // toolbar renders 16/24/32 DIPs
   var ORBIT_WIDTH_RATIO = 0.10;
   // Full bleed, so the toolbar mark is the same size as the static manifest icon.
   // Orbit's centreline sits half its own width inside that tile: its outside edge
-  // is flush with the square artwork without being clipped by the canvas.
+  // is flush with the tile's edge, round the corners too, without being clipped
+  // by the canvas.
   var GLYPH_SCALE = 1.0;
+  // The tile's corner radius as a share of its side: 30px on the 128px artwork,
+  // the same rounding the showcase draws its icon tiles with. The PNGs carry it in
+  // their alpha (scripts/build-icon-corners.mjs cuts it), every frame is cut with
+  // that alpha in renderFrame, and the orbit, ring and ping follow the same curve.
+  // tests/fsb-icon-corners.test.js keeps this equal to the files.
+  var CORNER_RATIO = 30 / 128;
   var BEAD_SEGMENTS = 24;
   var SEAM_OVERLAP = 0.5;            // fraction of a segment
-  var DIM_ALPHA = 0.5;
-  var DIM_FILTER = 'grayscale(0.8)';
 
   // ---- Sweep (thinking) ---------------------------------------------------
-  // Canonical: visual-feedback.js .fsb-progress-bar / .fsb-progress-fill and the
-  // fsbProgressSweep keyframe. The track is scaled for legibility rather than
-  // proportionally -- the canonical 4/128 height lands at half a pixel at 16px.
+  // Shared with the status pill's track sweep in visual-feedback.js. The track is
+  // scaled for legibility rather than proportionally -- a 4/128 height lands at
+  // half a pixel at 16px.
   var SWEEP_TRACK_W_RATIO = 0.594;   // 76/128, the design's own 32px check
   var SWEEP_TRACK_H_RATIO = 0.0625;  // 8/128 -> 1px at 16, 2px at 32
   var SWEEP_TRACK_H_MIN = 1;
@@ -104,13 +110,16 @@
   var CAP_PING_ALPHA = 0.55;
   var CAP_PING_STOP = 0.7;           // the keyframe's 70% stop
 
+  // ---- Tile edge (white tile only) ----------------------------------------
+  // A white tile on Chrome's white toolbar has no visible edge, so the mark
+  // floats loose. A neutral hairline traces the tile's rounded outline from the
+  // inside -- the tile is full bleed, so there is no room outside it for a
+  // shadow. One CSS pixel at either density, scaled like the capability ring.
+  var EDGE_W_RATIO = 0.0625;         // 1px at 16, 2px at 32
+  var EDGE_W_MIN = 1;
+
   var INTENT_KEY = 'fsbActionIconIntent';
   var ANIMATIONS_KEY = 'animatedActionHighlights';
-  // Install-scoped, so it outlives the session record above. Dimming means "the
-  // relay you use is down", not "you have never opened the dashboard": the relay
-  // has no enable switch and connect() runs unconditionally at startup, so a
-  // plain extension/MCP user would otherwise sit at the dimmed frame forever.
-  var RELAY_SEEN_KEY = 'fsbActionIconRelaySeen';
   // Armed only while a loop is owed. A frozen static frame needs no repair --
   // action state lives in the browser process and survives eviction intact --
   // so a permanent beat here would wake the worker every 30s forever for
@@ -129,6 +138,28 @@
   // was redrawn about a fifth chunkier to stay legible, so 16 has to come from
   // its own asset or the mark renders thin. 128 into 32 is an exact 4:1 reduction.
   var GLYPH_PATHS = { 16: 'assets/icon16.png', 32: 'assets/icon128.png' };
+  // The white tile's pair: the same artwork with its luminance inverted, written
+  // by scripts/build-icon-corners.mjs. Fetched only once Light is chosen.
+  var LIGHT_GLYPH_PATHS = { 16: 'assets/icon16_light.png', 32: 'assets/icon128_light.png' };
+
+  // ---- Tiles --------------------------------------------------------------
+  // FSB's theme setting can put the icon on a white tile: the brand's light logo,
+  // which is the dark one with its luminance inverted. Only an explicit Light
+  // choice does. The default, 'system', stays on the black tile: a worker can see
+  // neither the OS theme nor the browser's, and only an open FSB page could tell
+  // it when either changed. The pages keep the choice in localStorage, which a
+  // worker cannot read, so options.js, sidepanel.js and popup.js copy it here.
+  //
+  // tint and glow are the breathe's two blend steps (drawMarkGlow); each tile's
+  // pair leaves that tile's own plate untouched. edge is the hairline drawTileEdge
+  // traces round the tile; the black tile needs none.
+  var THEME_KEY = 'fsbThemePreference';
+  var TILES = {
+    dark: { glyphs: GLYPH_PATHS, plate: PLATE_COLOR, track: SWEEP_TRACK_COLOR, tint: 'multiply', glow: 'lighter' },
+    // The track is the dark tile's 10% white turned to 10% black; the status pill
+    // it quotes has no light form to copy. The edge reads as #cccccc on the plate.
+    light: { glyphs: LIGHT_GLYPH_PATHS, plate: '#ffffff', track: 'rgba(0, 0, 0, 0.1)', tint: 'screen', glow: 'multiply', edge: 'rgba(0, 0, 0, 0.2)' }
+  };
 
   // Normalized fade width expressed within the bead's own 0..1 span.
   var FADE_SPAN = FADE_FRACTION / BEAD_FRACTION;
@@ -140,19 +171,24 @@
   // would actively mislead here: orbit now means READING, so a key called
   // "acting" naming the read animation is a trap for the next reader.
   var STATES = {
-    // Driving the browser. fsbProgressSweep, visual-feedback.js -- 1.2s ease-in-out.
+    // Driving the browser. The status pill's track sweep -- 1.2s ease-in-out.
     sweep: { duration: 1200, form: 'sweep', from: '#ff8c00', to: '#ff6600', animated: true },
     // Reading. ViewportGlow _getDuration() + .state-acting custom properties.
     orbit: { duration: 4000, form: 'orbit', from: '#ff6600', to: '#ff8c00', animated: true },
-    // An in-flight capability invocation. Design-only: no ring pulse or 1.6s cadence exists upstream.
+    // An in-flight capability invocation. From the design export; the status pill plays it too.
     ring: { duration: 1600, form: 'ring', from: '#8b5cf6', to: '#8b5cf6', animated: true },
     // A trigger watch. fsb-trigger-badge-dot cadence.
-    breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS }
+    breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS },
+    // The page is asking the user to type a login (the 1Password sheet). The
+    // design's orange ring and key dot: it tells the real prompt from a
+    // lookalike drawn by the page.
+    ask: { duration: 1600, form: 'ask', from: '#ff8c00', to: '#ff8c00', animated: true }
   };
 
   // Highest claim wins. A watch outranks everything on every tab: it is the one
   // state the user armed deliberately and is waiting on.
-  var RANK = { breathe: 4, ring: 3, orbit: 2, sweep: 1 };
+  // The ask outranks a watch: the user is the one being waited on.
+  var RANK = { ask: 5, breathe: 4, ring: 3, orbit: 2, sweep: 1 };
 
   // ---- Module state -------------------------------------------------------
   var unavailable = false;
@@ -162,12 +198,14 @@
 
   var contexts = Object.create(null);       // size -> CanvasRenderingContext2D
   var scratches = Object.create(null);      // size -> scratch ctx, for the glow
-  var animatedFrames = Object.create(null); // state -> array of frame records
-  var animatedBuilds = Object.create(null); // state -> in-flight build promise
-  var staticFrames = Object.create(null);   // key -> frame record
+  // Frames and bitmaps are kept per tile, so a theme switch can never paint one
+  // tile's frames on the other, and switching back is instant.
+  var animatedFrames = Object.create(null); // 'tile:state' -> array of frame records
+  var animatedBuilds = Object.create(null); // 'tile:state' -> in-flight build promise
+  var staticFrames = Object.create(null);   // tile -> { key -> frame record }
   var canonicalFrameBuckets = Object.create(null); // pixel hash -> frame records
-  var glyphCache = null;                    // decoded bitmaps, shared by builds
-  var glyphBuild = null;                    // in-flight decode
+  var glyphCaches = Object.create(null);    // tile -> decoded bitmaps, shared by builds
+  var glyphBuilds = Object.create(null);    // tile -> in-flight decode
   var emitFailureLogged = false;
 
   // The toolbar icon is global but the things it reports are not: several tabs
@@ -178,13 +216,20 @@
   var preReadyClaimKeys = Object.create(null); // keys explicitly touched before restore
   var activityTimers = Object.create(null);  // claim key -> expiry timeout id
   var capabilityCounts = Object.create(null); // 'capability:<tabId>' -> in-flight invoke count
+  // The on-page status pill plays the same motion as the icon. It needs each
+  // tab's winning form and the moment it began, so it can place itself in the
+  // cycle from the wall clock.
+  var claimSince = Object.create(null);  // claim key -> Date.now() when it took its current state
+  var motionListeners = [];
+  var motionTabsSent = Object.create(null); // tab key -> true while it was last told of a motion
+  var motionNotifyQueued = false;
   var resolved = null;                // the state currently on screen
   var animating = false;
   var animationsEnabled = true;
+  var tile = 'dark';                  // the tile on screen
+  var wantedTile = 'dark';            // the latest tile asked for; ahead of `tile` while it builds
+  var tileExplicit = false;           // a switch arrived, so the stored value read at init is stale
   var preferenceListenerArmed = false;
-  var connected = false;
-  var relaySeen = false;
-  var connectedExplicit = false;
   var startTime = 0;
   var timerId = null;
   // chrome.action.setIcon is asynchronous. Keep one browser-process update in
@@ -286,8 +331,8 @@
   }
 
   // One scratch surface per size, reused. Needed because the artwork is a FLAT
-  // opaque tile: the mark is distinguished from the plate by luminance, not by
-  // alpha, so it cannot be isolated with a composite op on the main canvas.
+  // tile: the mark is distinguished from the plate by luminance, not by alpha,
+  // so it cannot be isolated with a composite op on the main canvas.
   function scratchFor(size) {
     var ctx = scratches[size];
     if (!ctx) {
@@ -299,23 +344,33 @@
 
   // An orange halo around the MARK, not around the tile.
   //
-  // 'multiply' on the scratch turns the white mark orange and leaves the black
-  // plate black (x * 0 = 0). Compositing that back with 'lighter' then adds only
-  // where the scratch is non-black, so the halo hugs the lettering and the plate
-  // contributes nothing. A filter on the tile itself would halo the SQUARE.
-  function drawMarkGlow(ctx, size, bitmap, spec, offset, drawn) {
+  // On the black tile, 'multiply' on the scratch turns the white mark orange and
+  // leaves the black plate black (x * 0 = 0). Compositing that back with
+  // 'lighter' then adds only where the scratch is non-black, so the halo hugs
+  // the lettering and the plate contributes nothing. A filter on the tile itself
+  // would halo the whole tile. The white tile uses the counterparts: 'screen'
+  // turns the black mark orange and leaves the white plate white
+  // (1 - 0 * (1 - x) = 1), and 'multiply' then leaves white untouched (x * 1 = x).
+  //
+  // The scratch starts as a square of the plate colour, which under the rounded
+  // artwork rebuilds the full tile. Without it, the tint over the transparent
+  // corners would paint them orange (a blend over nothing leaves the source
+  // colour), and the blur would carry that orange into the tile.
+  function drawMarkGlow(ctx, size, bitmap, spec, offset, drawn, look) {
     var scratch = scratchFor(size);
     scratch.globalCompositeOperation = 'source-over';
     scratch.globalAlpha = 1;
     scratch.filter = 'none';
     scratch.clearRect(0, 0, size, size);
+    scratch.fillStyle = look.plate;
+    scratch.fillRect(0, 0, size, size);
     scratch.drawImage(bitmap, offset, offset, drawn, drawn);
-    scratch.globalCompositeOperation = 'multiply';
+    scratch.globalCompositeOperation = look.tint;
     scratch.fillStyle = alphaColor(GLOW_RGB, 1);
     scratch.fillRect(0, 0, size, size);
     scratch.globalCompositeOperation = 'source-over';
 
-    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = look.glow;
     ctx.globalAlpha = spec.glowAlpha;
     ctx.filter = 'blur(' + (spec.glowRatio * size).toFixed(2) + 'px)';
     ctx.drawImage(scratch.canvas, 0, 0);
@@ -328,20 +383,19 @@
   // plate itself never moves. Fading the artwork instead fades the whole icon,
   // because the artwork IS the plate. So the plate is painted solid first and the
   // mark composited over it: black-on-black is a no-op, so only the lettering
-  // varies. Dim is deliberately different -- a dropped relay recedes the whole
-  // icon, and it outranks the glow because grayscale would fight an orange halo.
-  function drawGlyph(ctx, size, bitmap, spec) {
+  // varies. The white tile does the same over a white plate.
+  //
+  // Every frame starts from that plate as a full square. The artwork's cut
+  // corners are plain plate colour (black, or white in the light pair), so the
+  // square under it rebuilds the uncut tile; renderFrame then cuts the finished
+  // frame back to the artwork's own rounded edge, so whatever was drawn near a
+  // corner ends on exactly the edge pixels of the static icon.
+  function drawGlyph(ctx, size, bitmap, spec, look) {
     var drawn = size * GLYPH_SCALE;
     var offset = (size - drawn) / 2;
 
-    if (spec.dimmed === true) {
-      ctx.globalAlpha = DIM_ALPHA;
-      ctx.filter = DIM_FILTER;
-      ctx.drawImage(bitmap, offset, offset, drawn, drawn);
-      ctx.globalAlpha = 1;
-      ctx.filter = 'none';
-      return;
-    }
+    ctx.fillStyle = look.plate;
+    ctx.fillRect(0, 0, size, size);
 
     var markAlpha = typeof spec.glyphAlpha === 'number' ? spec.glyphAlpha : 1;
     var wantsGlow = typeof spec.glowRatio === 'number' && spec.glowRatio > 0
@@ -351,77 +405,136 @@
       return;
     }
 
-    ctx.fillStyle = PLATE_COLOR;
-    ctx.fillRect(0, 0, size, size);
-    if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn);
+    if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn, look);
     ctx.globalAlpha = markAlpha;
     ctx.drawImage(bitmap, offset, offset, drawn, drawn);
     ctx.globalAlpha = 1;
   }
 
-  function squareOrbitGeometry(size) {
+  // The tile's outline inset by `inset` px, its radius shrunk by the same amount
+  // so the curve stays parallel to the tile's edge. Square once that reaches 0.
+  function tilePath(ctx, size, inset) {
+    var span = size - inset * 2;
+    var radius = Math.max(0, CORNER_RATIO * size - inset);
+    if (radius > 0) {
+      roundRectPath(ctx, inset, inset, span, span, radius);
+      return;
+    }
+    ctx.beginPath();
+    ctx.rect(inset, inset, span, span);
+  }
+
+  // The white tile's hairline, inset by half its width so its outside edge is
+  // the tile's own rounded edge. It belongs to the plate: drawn right after the
+  // glyph, so the orbit, sweep and ring paint over it and the breathe never
+  // fades it. The path is closed and smooth, so cap and join never show; leaving
+  // them alone keeps the motion strokes that follow identical on either tile.
+  function drawTileEdge(ctx, size, look) {
+    if (!look.edge) return;
+    var width = Math.max(EDGE_W_MIN, Math.round(EDGE_W_RATIO * size));
+    ctx.lineWidth = width;
+    ctx.strokeStyle = look.edge;
+    tilePath(ctx, size, width / 2);
+    ctx.stroke();
+  }
+
+  // The orbit's centreline: the tile's outline inset by half the stroke, so the
+  // bead's outside edge runs flush with the tile along the sides and round the
+  // corners. Eight runs, clockwise from where the top side's straight run
+  // begins: one straight run per side and a quarter arc per corner.
+  function orbitGeometry(size) {
     var width = ORBIT_WIDTH_RATIO * size;
     var half = width / 2;
     var side = size - width;
+    var radius = Math.min(side / 2, Math.max(0, CORNER_RATIO * size - half));
+    var left = half;
+    var top = half;
+    var right = size - half;
+    var bottom = size - half;
+    var straight = side - radius * 2;
+    var arc = Math.PI / 2 * radius;
     return {
       width: width,
-      half: half,
-      left: half,
-      top: half,
-      right: size - half,
-      bottom: size - half,
-      side: side,
-      perimeter: side * 4
+      radius: radius,
+      runs: [
+        { length: straight, line: [left + radius, top, right - radius, top] },
+        { length: arc, arc: [right - radius, top + radius, -Math.PI / 2, 0] },
+        { length: straight, line: [right, top + radius, right, bottom - radius] },
+        { length: arc, arc: [right - radius, bottom - radius, 0, Math.PI / 2] },
+        { length: straight, line: [right - radius, bottom, left + radius, bottom] },
+        { length: arc, arc: [left + radius, bottom - radius, Math.PI / 2, Math.PI] },
+        { length: straight, line: [left, bottom - radius, left, top + radius] },
+        { length: arc, arc: [left + radius, top + radius, Math.PI, Math.PI * 1.5] }
+      ],
+      perimeter: (straight + arc) * 4,
+      // Half the top run is top centre: Orbit's 12 o'clock start.
+      startOffset: straight / 2
     };
   }
 
-  // Distance zero is the top-left corner. Increasing distance walks clockwise:
-  // top -> right -> bottom -> left. Callers use side / 2 as their phase offset,
-  // preserving Orbit's old 12-o'clock (top-centre) starting position.
-  function squareOrbitPointAt(geometry, distance) {
-    var perimeter = geometry.perimeter;
-    var d = distance % perimeter;
-    if (d < 0) d += perimeter;
-    if (d < geometry.side) {
-      return { x: geometry.left + d, y: geometry.top };
+  function orbitPointAt(geometry, run, t) {
+    var f = run.length > 0 ? t / run.length : 0;
+    if (run.line) {
+      return { x: lerp(run.line[0], run.line[2], f), y: lerp(run.line[1], run.line[3], f) };
     }
-    d -= geometry.side;
-    if (d < geometry.side) {
-      return { x: geometry.right, y: geometry.top + d };
-    }
-    d -= geometry.side;
-    if (d < geometry.side) {
-      return { x: geometry.right - d, y: geometry.bottom };
-    }
-    d -= geometry.side;
-    return { x: geometry.left, y: geometry.bottom - d };
+    var angle = lerp(run.arc[2], run.arc[3], f);
+    return {
+      x: run.arc[0] + geometry.radius * Math.cos(angle),
+      y: run.arc[1] + geometry.radius * Math.sin(angle)
+    };
   }
 
-  // Append one unwrapped distance interval. Corner distances are inserted as
-  // explicit vertices, so a segment that turns a corner follows the square and
-  // never shortcuts diagonally across the artwork.
-  function appendSquareOrbitInterval(ctx, geometry, start, end) {
-    var point = squareOrbitPointAt(geometry, start);
-    ctx.moveTo(point.x, point.y);
-    var corner = (Math.floor(start / geometry.side) + 1) * geometry.side;
-    while (corner < end) {
-      point = squareOrbitPointAt(geometry, corner);
-      ctx.lineTo(point.x, point.y);
-      corner += geometry.side;
+  // Append one unwrapped distance interval. Straight runs become lines and
+  // corners become arcs, so a segment that turns a corner follows the tile and
+  // never shortcuts across the artwork. A square tile has zero-length arcs,
+  // which become plain corner vertices joined with a miter.
+  function appendOrbitInterval(ctx, geometry, start, end) {
+    var runs = geometry.runs;
+    var base = Math.floor(start / geometry.perimeter) * geometry.perimeter;
+    var from = start - base;
+    var to = end - base;
+    var index = 0;
+    var runStart = 0;
+    while (index < runs.length * 2 && runStart + runs[index % runs.length].length <= from) {
+      runStart += runs[index % runs.length].length;
+      index++;
     }
-    point = squareOrbitPointAt(geometry, end);
-    ctx.lineTo(point.x, point.y);
+    var first = true;
+    for (var guard = 0; runStart < to && guard < runs.length * 3; guard++, index++) {
+      var run = runs[index % runs.length];
+      var t0 = Math.max(0, from - runStart);
+      var t1 = Math.min(run.length, to - runStart);
+      if (run.length === 0) {
+        var corner = orbitPointAt(geometry, run, 0);
+        if (first) ctx.moveTo(corner.x, corner.y);
+        else ctx.lineTo(corner.x, corner.y);
+        first = false;
+      } else if (t1 > t0) {
+        var p0 = orbitPointAt(geometry, run, t0);
+        if (first) ctx.moveTo(p0.x, p0.y);
+        if (run.line) {
+          var p1 = orbitPointAt(geometry, run, t1);
+          ctx.lineTo(p1.x, p1.y);
+        } else {
+          ctx.arc(run.arc[0], run.arc[1], geometry.radius,
+            lerp(run.arc[2], run.arc[3], t0 / run.length),
+            lerp(run.arc[2], run.arc[3], t1 / run.length));
+        }
+        first = false;
+      }
+      runStart += run.length;
+    }
   }
 
   // Canvas has no gradient primitive that follows an arbitrary path. The bead
   // is therefore a short sequence of colour/alpha segments, pre-rendered with
-  // the rest of the animation. Each segment carries a mitered polyline when it
-  // crosses a corner, keeping the outside edge sharp and fully inside the tile.
-  function strokeSquareOrbit(ctx, size, palette, progress) {
-    var geometry = squareOrbitGeometry(size);
+  // the rest of the animation. A segment that crosses a corner follows the
+  // tile's curve, keeping the outside edge fully inside the tile.
+  function strokeOrbit(ctx, size, palette, progress) {
+    var geometry = orbitGeometry(size);
     var head = parseHex(palette.from);
     var tail = parseHex(palette.to);
-    var start = progress * geometry.perimeter + geometry.side / 2;
+    var start = progress * geometry.perimeter + geometry.startOffset;
     ctx.lineWidth = geometry.width;
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'miter';
@@ -440,7 +553,7 @@
       var d0 = start + t0 * BEAD_FRACTION * geometry.perimeter;
       var d1 = start + tEnd * BEAD_FRACTION * geometry.perimeter;
       ctx.beginPath();
-      appendSquareOrbitInterval(ctx, geometry, d0, d1);
+      appendOrbitInterval(ctx, geometry, d0, d1);
       ctx.stroke();
     }
   }
@@ -468,14 +581,14 @@
     ctx.rect(x, y, w, h);
   }
 
-  function drawSweep(ctx, size, palette, progress) {
+  function drawSweep(ctx, size, palette, progress, look) {
     var trackW = SWEEP_TRACK_W_RATIO * size;
     var trackH = Math.max(SWEEP_TRACK_H_MIN, Math.round(SWEEP_TRACK_H_RATIO * size));
     var x = (size - trackW) / 2;
     var y = Math.round(SWEEP_CENTER_Y_RATIO * size - trackH / 2);
     var radius = trackH <= 2 ? 0 : trackH / 2;
 
-    ctx.fillStyle = SWEEP_TRACK_COLOR;
+    ctx.fillStyle = look.track;
     barPath(ctx, x, y, trackW, trackH, radius);
     ctx.fill();
 
@@ -501,6 +614,7 @@
   // Two strokes: the inset border, whose alpha dips and recovers, and a ping.
   // The design's ping spreads outward, which an icon cannot do -- there is no
   // canvas outside the tile -- so it travels inward from the border instead.
+  // Both follow the tile's rounded outline at their own inset.
   function drawCapabilityRing(ctx, size, progress) {
     var rgb = parseHex(CAP_COLOR);
     var width = Math.max(CAP_RING_W_MIN, Math.round(CAP_RING_W_RATIO * size));
@@ -521,8 +635,7 @@
     ctx.lineWidth = width;
     ctx.lineCap = 'butt';
     ctx.strokeStyle = mixColor(rgb, rgb, 0, ringAlpha);
-    ctx.beginPath();
-    ctx.rect(half, half, size - width, size - width);
+    tilePath(ctx, size, half);
     ctx.stroke();
 
     if (pingAlpha <= 0) return;
@@ -530,28 +643,66 @@
     var span = size - inset * 2;
     if (span <= 0) return;
     ctx.strokeStyle = mixColor(rgb, rgb, 0, pingAlpha);
+    tilePath(ctx, size, inset);
+    ctx.stroke();
+  }
+
+  // An orange inset ring and a key dot in the bottom-right corner, the dot
+  // easing between 85% and full strength.
+  function drawAskBadge(ctx, size, progress) {
+    var rgb = parseHex(STATES.ask.from);
+    var width = Math.max(CAP_RING_W_MIN, Math.round(CAP_RING_W_RATIO * size));
+    var half = width / 2;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = mixColor(rgb, rgb, 0, 1);
+    // The tile's rounded outline, as the capability ring draws it, so the
+    // corner cut in renderFrame never clips the ring's corners.
+    tilePath(ctx, size, half);
+    ctx.stroke();
+    var pulse = progress < 0.5 ? easeInOut(progress / 0.5) : 1 - easeInOut((progress - 0.5) / 0.5);
+    var radius = Math.max(2.5, size * 0.22);
+    var cx = size - radius - width * 0.5;
+    var cy = size - radius - width * 0.5;
+    ctx.fillStyle = mixColor(rgb, rgb, 0, lerp(0.85, 1, pulse));
     ctx.beginPath();
-    ctx.rect(inset, inset, span, span);
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, Math.round(size / 32));
+    ctx.strokeStyle = 'rgba(11, 11, 13, 0.85)';
     ctx.stroke();
   }
 
   // Renders one frame at every shipped size, each from its own source bitmap.
-  // Nothing paints a background of its own -- the artwork already carries an
-  // opaque tile, and a service worker cannot read the toolbar theme to pick one.
+  // The only background is the artwork's own tile, rebuilt as a square under it
+  // (drawGlyph). A service worker cannot read the toolbar theme, so the tile is
+  // black unless FSB's own theme is set to Light (TILES); the white tile also gets
+  // its edge (drawTileEdge). The last step cuts each frame with the artwork's
+  // alpha, so its rounded corners are pixel-for-pixel the static icon's in every
+  // state.
   //
-  // Exactly one clearRect and one drawImage per frame, glyph first: the test
-  // harness splits its recorded op log on clearRect to reconstruct frames.
-  function renderFrame(bitmaps, spec) {
+  // Exactly one clearRect per frame, which opens it: the test harness splits its
+  // recorded op log on clearRect to reconstruct frames. The glyph is the first
+  // bitmap draw and the corner cut is the last.
+  function renderFrame(bitmaps, spec, look) {
+    look = look || TILES.dark;
     var frame = {};
     for (var i = 0; i < SIZES.length; i++) {
       var size = SIZES[i];
       var ctx = contextFor(size);
       var progress = spec.progress || 0;
       ctx.clearRect(0, 0, size, size);
-      drawGlyph(ctx, size, bitmaps[size], spec);
-      if (spec.form === 'orbit') strokeSquareOrbit(ctx, size, spec.palette, progress);
-      else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress);
+      drawGlyph(ctx, size, bitmaps[size], spec, look);
+      drawTileEdge(ctx, size, look);
+      if (spec.form === 'orbit') strokeOrbit(ctx, size, spec.palette, progress);
+      else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress, look);
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
+      else if (spec.form === 'ask') drawAskBadge(ctx, size, progress);
+      var drawn = size * GLYPH_SCALE;
+      var offset = (size - drawn) / 2;
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.drawImage(bitmaps[size], offset, offset, drawn, drawn);
+      ctx.globalCompositeOperation = 'source-over';
       frame[size] = ctx.getImageData(0, 0, size, size);
     }
     // Reuse this exact request object for every cycle. Rebuilding the two nested
@@ -616,7 +767,7 @@
   // stop eases each segment separately rather than easing the whole cycle once.
   function frameSpec(state, progress) {
     var def = STATES[state];
-    var spec = { form: def.form, palette: def, progress: progress, dimmed: false };
+    var spec = { form: def.form, palette: def, progress: progress };
     if (def.form === 'breathe') {
       // 0%,100% -> min, 50% -> peak.
       var toPeak = progress < 0.5
@@ -634,12 +785,11 @@
 
   // What an armed watch shows before its frames exist -- during init, and on the
   // repair path after a worker restart. The breathe itself no longer settles.
-  function settledSpec(dimmed) {
+  function settledSpec() {
     return {
       form: 'breathe',
       palette: STATES.breathe,
       progress: 0,
-      dimmed: dimmed,
       glyphAlpha: SETTLE_ALPHA,
       glowRatio: SETTLE_GLOW_RATIO,
       glowAlpha: SETTLE_GLOW_ALPHA
@@ -656,12 +806,13 @@
   // One bitmap per output size. createImageBitmap rejects SVG sources in a
   // worker, so PNG is the only viable base image here. A partial failure closes
   // whatever already decoded rather than stranding it.
-  async function loadGlyphs() {
+  async function loadGlyphs(name) {
+    var paths = TILES[name].glyphs;
     var bitmaps = {};
     try {
       for (var i = 0; i < SIZES.length; i++) {
         var size = SIZES[i];
-        var response = await fetch(chrome.runtime.getURL(GLYPH_PATHS[size]));
+        var response = await fetch(chrome.runtime.getURL(paths[size]));
         var blob = await response.blob();
         bitmaps[size] = await createImageBitmap(blob);
       }
@@ -672,57 +823,71 @@
     return bitmaps;
   }
 
-  // Decoded once per worker and kept. Every state's build used to re-fetch and
-  // re-decode both PNGs, so a session that touched all four states paid the I/O
-  // and the decode four times over. The bitmaps are small; the decode is not.
-  function ensureGlyphs() {
-    if (glyphCache) return Promise.resolve(glyphCache);
-    if (glyphBuild) return glyphBuild;
-    glyphBuild = loadGlyphs().then(function (bitmaps) {
-      glyphCache = bitmaps;
-      glyphBuild = null;
+  // Decoded once per worker and tile, and kept. Every state's build used to
+  // re-fetch and re-decode both PNGs, so a session that touched all four states
+  // paid the I/O and the decode four times over. The bitmaps are small; the
+  // decode is not.
+  function ensureGlyphs(name) {
+    if (glyphCaches[name]) return Promise.resolve(glyphCaches[name]);
+    if (glyphBuilds[name]) return glyphBuilds[name];
+    var build = loadGlyphs(name).then(function (bitmaps) {
+      glyphCaches[name] = bitmaps;
+      delete glyphBuilds[name];
       return bitmaps;
     }, function (e) {
-      glyphBuild = null;
+      delete glyphBuilds[name];
       throw e;
     });
-    return glyphBuild;
+    glyphBuilds[name] = build;
+    return build;
   }
 
-  // Only the four resting frames and one Ring kickoff are rendered up front. A
+  // Only the two resting frames and one Ring kickoff are rendered up front. A
   // worker wake that never animates should not pay for full animation cycles.
-  async function buildStaticCache() {
-    var bitmaps = await ensureGlyphs();
-    staticFrames['idle:on'] = renderFrame(bitmaps, { dimmed: false });
-    staticFrames['idle:off'] = renderFrame(bitmaps, { dimmed: true });
-    // Keep the reduced-motion watching frames cached alongside idle so a cold
+  // The set is published whole, so a tile's resting frames are all there or
+  // none are.
+  async function buildStaticCache(name) {
+    var bitmaps = await ensureGlyphs(name);
+    var look = TILES[name];
+    var frames = Object.create(null);
+    // Idle is the bare glyph: no form, so nothing is drawn over the artwork.
+    frames['idle'] = renderFrame(bitmaps, {}, look);
+    // Keep the reduced-motion watching frame cached alongside idle so a cold
     // restore can render watch state without rebuilding the glyphs.
-    staticFrames['watching:on'] = renderFrame(bitmaps, settledSpec(false));
-    staticFrames['watching:off'] = renderFrame(bitmaps, settledSpec(true));
+    frames['watching'] = renderFrame(bitmaps, settledSpec(), look);
     // Keep one Ring frame ready so a short capability invoke can paint
     // immediately without delaying business logic for the full frame build.
-    staticFrames['ring:kickoff'] = renderFrame(bitmaps, frameSpec('ring', 0));
+    frames['ring:kickoff'] = renderFrame(bitmaps, frameSpec('ring', 0), look);
+    staticFrames[name] = frames;
   }
 
-  // One state's worth of frames, rendered on first use and kept for the life of
-  // the worker. Concurrent callers share the in-flight build; a failed build is
-  // dropped so a later transition can retry it.
-  function ensureAnimatedFrames(state) {
-    if (animatedFrames[state]) return Promise.resolve(animatedFrames[state]);
-    if (animatedBuilds[state]) return animatedBuilds[state];
+  // The animated frames for `state` on the tile on screen, or undefined until
+  // they are built.
+  function framesFor(state) {
+    return animatedFrames[tile + ':' + state];
+  }
+
+  // One state's worth of frames on one tile, rendered on first use and kept for
+  // the life of the worker. Concurrent callers share the in-flight build; a
+  // failed build is dropped so a later transition can retry it.
+  function ensureAnimatedFrames(state, name) {
+    var key = name + ':' + state;
+    if (animatedFrames[key]) return Promise.resolve(animatedFrames[key]);
+    if (animatedBuilds[key]) return animatedBuilds[key];
     var build = (async function () {
-      var bitmaps = await ensureGlyphs();
+      var bitmaps = await ensureGlyphs(name);
+      var look = TILES[name];
       var count = Math.round(STATES[state].duration / FRAME_INTERVAL_MS);
       var frames = new Array(count);
       for (var f = 0; f < count; f++) {
-        frames[f] = renderFrame(bitmaps, frameSpec(state, f / count));
+        frames[f] = renderFrame(bitmaps, frameSpec(state, f / count), look);
       }
-      animatedFrames[state] = frames;
+      animatedFrames[key] = frames;
       return frames;
     })();
-    animatedBuilds[state] = build;
+    animatedBuilds[key] = build;
     build.catch(function (e) {
-      delete animatedBuilds[state];
+      delete animatedBuilds[key];
       console.error('[FSB] action icon: could not render ' + state + ' frames:', e && e.message);
     });
     return build;
@@ -825,19 +990,16 @@
     drainEmit();
   }
 
-  // Dim is a "your relay dropped" signal, so it needs a relay to have been there
-  // in the first place. Until one has connected once, every resting frame is
-  // full strength -- that is the only appearance the design has.
+  // A settled breathe keeps its claim, so the resting frame it lands on is the
+  // watching one; only an empty claim set falls back to idle.
   function staticFrame() {
-    var dim = relaySeen && !connected;
-    // A settled breathe keeps its claim, so the resting frame it lands on is the
-    // watching one; only an empty claim set falls back to idle.
-    var base = resolved === 'breathe' ? 'watching' : 'idle';
-    return staticFrames[base + (dim ? ':off' : ':on')];
+    var frames = staticFrames[tile];
+    if (!frames) return null;
+    return frames[resolved === 'breathe' ? 'watching' : 'idle'];
   }
 
   function frameAt(now) {
-    var frames = animatedFrames[resolved];
+    var frames = framesFor(resolved);
     if (!frames || !frames.length) return null;
     var duration = STATES[resolved].duration;
     var elapsed = (now - startTime) % duration;
@@ -853,7 +1015,7 @@
   // same object, so omitting their timer wake cannot alter a displayed pixel or
   // the time at which a distinct frame is requested.
   function nextVisibleTickDelay(now, currentFrame) {
-    var frames = animatedFrames[resolved];
+    var frames = framesFor(resolved);
     if (!frames || !frames.length) return null;
     var elapsed = Math.max(0, now - startTime);
     var ordinal = Math.floor(elapsed / FRAME_INTERVAL_MS) + 1;
@@ -959,34 +1121,11 @@
         animating: animating,
         claims: claimCopy,
         resolved: resolved,
-        connected: connected,
         updatedAt: Date.now()
       };
       var result = area.set(record);
       if (result && typeof result.catch === 'function') result.catch(function () {});
     } catch (_e) { /* persistence is best-effort */ }
-  }
-
-  function persistRelaySeen() {
-    try {
-      var area = chrome.storage && chrome.storage.local;
-      if (!area || typeof area.set !== 'function') return;
-      var record = {};
-      record[RELAY_SEEN_KEY] = true;
-      var result = area.set(record);
-      if (result && typeof result.catch === 'function') result.catch(function () {});
-    } catch (_e) { /* persistence is best-effort */ }
-  }
-
-  async function readRelaySeen() {
-    try {
-      var area = chrome.storage && chrome.storage.local;
-      if (!area || typeof area.get !== 'function') return false;
-      var stored = await area.get(RELAY_SEEN_KEY);
-      return !!(stored && stored[RELAY_SEEN_KEY] === true);
-    } catch (_e) {
-      return false;
-    }
   }
 
   async function readAnimationsEnabled() {
@@ -1000,14 +1139,31 @@
     }
   }
 
+  // Only an explicit Light choice moves the icon to the white tile.
+  function tileFor(preference) {
+    return preference === 'light' ? 'light' : 'dark';
+  }
+
+  async function readTile() {
+    try {
+      var area = chrome.storage && chrome.storage.local;
+      if (!area || typeof area.get !== 'function') return 'dark';
+      var stored = await area.get(THEME_KEY);
+      return tileFor(stored && stored[THEME_KEY]);
+    } catch (_e) {
+      return 'dark';
+    }
+  }
+
   function armPreferenceListener() {
     if (preferenceListenerArmed) return;
     try {
       var changed = chrome.storage && chrome.storage.onChanged;
       if (!changed || typeof changed.addListener !== 'function') return;
       changed.addListener(function (changes, area) {
-        if (area !== 'local' || !changes || !changes[ANIMATIONS_KEY]) return;
-        setAnimationsEnabled(changes[ANIMATIONS_KEY].newValue !== false);
+        if (area !== 'local' || !changes) return;
+        if (changes[ANIMATIONS_KEY]) setAnimationsEnabled(changes[ANIMATIONS_KEY].newValue !== false);
+        if (changes[THEME_KEY]) setTile(tileFor(changes[THEME_KEY].newValue));
       });
       preferenceListenerArmed = true;
     } catch (_e) { /* preference synchronization is best-effort */ }
@@ -1057,21 +1213,31 @@
     animating = true;
     armWatchdog();
     persistIntent();
-    if (next === 'ring' && !animatedFrames[next]) {
-      emit(staticFrames['ring:kickoff']);
+    if (next === 'ring' && !framesFor(next) && staticFrames[tile]) {
+      emit(staticFrames[tile]['ring:kickoff']);
     }
-    if (animatedFrames[next]) {
-      // The clock starts WITH the loop, never before it. Setting it earlier let
-      // the frame build eat into the cycle: the first showing of a state began
-      // mid-animation, and a bounded hold was short by the build's duration.
+    playFrames(next);
+  }
+
+  // Runs `state`'s loop on the tile on screen, building that tile's frames first
+  // when it has none yet. The clock starts WITH the loop, never before it.
+  // Setting it earlier let the frame build eat into the cycle: the first showing
+  // of a state began mid-animation, and a bounded hold was short by the build's
+  // duration.
+  function playFrames(state) {
+    if (framesFor(state)) {
       startTime = Date.now();
       startLoop();
+      queueMotionNotify();
       return;
     }
-    ensureAnimatedFrames(next).then(function () {
-      if (!animating || resolved !== next) return;
+    var name = tile;
+    ensureAnimatedFrames(state, name).then(function () {
+      // A tile switch during the build restarts the loop itself.
+      if (!animating || resolved !== state || tile !== name) return;
       startTime = Date.now();
       startLoop();
+      queueMotionNotify();
     }).catch(function () { /* reported by ensureAnimatedFrames */ });
   }
 
@@ -1093,6 +1259,7 @@
     resolved = null;
     if (changed) persistIntent();
     emit(staticFrame());
+    queueMotionNotify();
   }
 
   // ---- Claims -------------------------------------------------------------
@@ -1135,6 +1302,8 @@
     if (!ready) preReadyClaimKeys[key] = true;
     if (had === want) return;
     if (want) claims[key] = want; else delete claims[key];
+    if (want) claimSince[key] = Date.now(); else delete claimSince[key];
+    queueMotionNotify();
     if (!ready) return;
     persistIntent();
     if (animationsEnabled) applyResolved();
@@ -1144,6 +1313,7 @@
     var next = isEnabled !== false;
     if (animationsEnabled === next) return;
     animationsEnabled = next;
+    queueMotionNotify();
     if (!ready || unavailable) return;
     if (!animationsEnabled) {
       // Preserve claims so re-enabling immediately restores the correct winner,
@@ -1154,7 +1324,52 @@
     applyResolved();
   }
 
+  // A switch renders the new tile's resting frames before showing anything, so
+  // the icon never goes blank, and lands only if it is still the one wanted: a
+  // quick Light, Dark, Light lands on whichever came last. A running animation
+  // restarts its cycle on the new tile; the restart reaches the status pill with
+  // the new start time, so the two stay in step.
+  function setTile(next) {
+    wantedTile = next;
+    tileExplicit = true;
+    if (!ready || unavailable) {
+      // init renders whichever tile is current when it gets there.
+      tile = next;
+      return;
+    }
+    if (tile === next) return;
+    var rendered = staticFrames[next] ? Promise.resolve() : buildStaticCache(next);
+    rendered.then(function () {
+      if (wantedTile !== next || tile === next) return;
+      tile = next;
+      if (animating && resolved) {
+        stopLoop();
+        playFrames(resolved);
+      } else {
+        emit(staticFrame());
+      }
+    }, function (e) {
+      console.error('[FSB] action icon: could not render the ' + next + ' tile:', e && e.message);
+    });
+  }
+
   // ---- Public API ---------------------------------------------------------
+
+  // Resting frames for the tile on screen, retried until that tile has them, so
+  // a switch made while they render still lands. False means the icon is off.
+  async function buildRestingFrames() {
+    try {
+      while (!staticFrames[tile]) await buildStaticCache(tile);
+      return true;
+    } catch (e) {
+      unavailable = true;
+      // repair() no-ops once unavailable, so a beat left armed by an earlier
+      // generation would wake the worker forever with nothing to do.
+      disarmWatchdog();
+      console.error('[FSB] action icon: base frames failed to render, icon disabled:', e && e.message);
+      return false;
+    }
+  }
 
   function init(options) {
     if (initPromise) return initPromise;
@@ -1174,19 +1389,14 @@
       }
       animationsEnabled = await readAnimationsEnabled();
       armPreferenceListener();
-      try {
-        await buildStaticCache();
-      } catch (e) {
-        unavailable = true;
-        // repair() no-ops once unavailable, so a beat left armed by an earlier
-        // generation would wake the worker forever with nothing to do.
-        disarmWatchdog();
-        console.error('[FSB] action icon: base frames failed to render, icon disabled:', e && e.message);
-        return;
-      }
+      var storedTile = await readTile();
+      // A switch that arrived during the read is newer than what it returned.
+      if (!tileExplicit) tile = wantedTile = storedTile;
+      if (!(await buildRestingFrames())) return;
       var intent = await readIntent();
       if (intent) {
-        if (!connectedExplicit) connected = intent.connected === true;
+        // Only the claims are read back. Fields an older build stored beside
+        // them are ignored, and the next write replaces the whole record.
         if (intent.claims && typeof intent.claims === 'object') {
           var storedKeys = Object.keys(intent.claims);
           for (var s = 0; s < storedKeys.length; s++) {
@@ -1194,15 +1404,14 @@
             // Capability claims never survive their owning promise or worker.
             // Ignore any stale record written by an older worker generation.
             if (sk.indexOf('capability:') === 0) continue;
+            // So do asks: the sheet that made one died with the old worker.
+            if (sk.indexOf('ask:') === 0) continue;
             // A call that raced this init already holds the truth for its key.
             if (Object.prototype.hasOwnProperty.call(preReadyClaimKeys, sk)) continue;
             if (STATES[intent.claims[sk]]) claims[sk] = intent.claims[sk];
           }
         }
       }
-      // OR, never assign: a setConnected(true) that raced this init already
-      // learned the relay, and the stored write may not have landed yet.
-      if (!relaySeen) relaySeen = await readRelaySeen();
       await pruneClosedTabClaims();
       var live = true;
       if (liveSessionProbe) {
@@ -1216,6 +1425,9 @@
           if (liveKeys[l].indexOf('session:') === 0) delete claims[liveKeys[l]];
         }
       }
+      // A switch during the reads above can leave the tile on screen without its
+      // resting frames; render them before going ready.
+      if (!staticFrames[tile] && !(await buildRestingFrames())) return;
       ready = true;
       preReadyClaimKeys = null;
       // Restart from frame 0 rather than resuming mid-cycle; this matches the
@@ -1294,6 +1506,13 @@
     setClaim('watch:' + tabKey(tabId), isWatching === true ? 'breathe' : null);
   }
 
+  // The page shows the typed-login sheet. A state, not a pulse: it lasts until
+  // the sheet is answered or closed.
+  function setAsking(tabId, isAsking) {
+    if (unavailable) return;
+    setClaim('ask:' + tabKey(tabId), isAsking === true ? 'ask' : null);
+  }
+
   // A closed tab cannot still be acting, invoking a capability, or watching.
   function dropTab(tabId) {
     var suffix = ':' + tabKey(tabId);
@@ -1305,31 +1524,15 @@
         clearActivityTimer(keys[i]);
         delete capabilityCounts[keys[i]];
         delete claims[keys[i]];
+        delete claimSince[keys[i]];
         changed = true;
       }
     }
-    if (!changed || !ready || unavailable) return;
+    if (!changed) return;
+    queueMotionNotify();
+    if (!ready || unavailable) return;
     persistIntent();
     applyResolved();
-  }
-
-  function setConnected(isConnected) {
-    if (unavailable) return;
-    var next = isConnected === true;
-    connectedExplicit = true;
-    // Recorded before the no-op bail so the very first connect still arms the
-    // dim, even when it lands on an already-true value restored from intent.
-    var learned = false;
-    if (next && !relaySeen) {
-      relaySeen = true;
-      learned = true;
-      persistRelaySeen();
-    }
-    if (connected === next && !learned) return;
-    connected = next;
-    if (!ready) return;
-    persistIntent();
-    if (!animating) emit(staticFrame());
   }
 
   // Watchdog entry point. A worker killed mid-cycle leaves the icon frozen on
@@ -1345,17 +1548,11 @@
         return;
       }
       if (animating && resolved && STATES[resolved]) {
-        var revived = resolved;
-        if (animatedFrames[revived]) {
-          startTime = Date.now();
-          startLoop();
-        } else {
-          ensureAnimatedFrames(revived).then(function () {
-            if (!animating || resolved !== revived) return;
-            startTime = Date.now();
-            startLoop();
-          }).catch(function () { /* reported by ensureAnimatedFrames */ });
-        }
+        // A loop that already has a clock on this worker carries on from where
+        // it is, so the beat never jumps the icon or the status pill back to
+        // frame 0. A fresh worker has no clock yet and starts the loop over.
+        if (framesFor(resolved) && startTime) startLoop();
+        else playFrames(resolved);
       } else {
         // Nothing is owed, so the beat that woke us retires itself here. This is
         // also the self-heal for an alarm stranded by an earlier generation.
@@ -1366,15 +1563,76 @@
     }).catch(function () { /* the icon is presentation-only */ });
   }
 
+  // ---- Motion for the on-page status pill ---------------------------------
+
+  // The form this tab's own claims resolve to, and when it began. When the icon
+  // is showing that same form, its own clock is the start time, so the pill and
+  // the icon sit at the same point in the cycle.
+  function getMotion(tabId) {
+    if (unavailable || !animationsEnabled) return null;
+    var tab = tabKey(tabId);
+    if (tab === 'global') return null;
+    var best = null;
+    var bestKey = null;
+    var prefixes = ['watch:', 'capability:', 'session:'];
+    for (var i = 0; i < prefixes.length; i++) {
+      var key = prefixes[i] + tab;
+      var state = claims[key];
+      if (state && STATES[state] && (!best || RANK[state] > RANK[best])) {
+        best = state;
+        bestKey = key;
+      }
+    }
+    if (!best) return null;
+    // A claim restored from storage has no recorded start; it begins now.
+    if (!claimSince[bestKey]) claimSince[bestKey] = Date.now();
+    // Until this form's frames are built, the icon's clock still belongs to the
+    // form it is leaving, so the pill takes the claim's own start meanwhile.
+    var startedAt = animating && resolved === best && startTime && framesFor(best)
+      ? startTime : claimSince[bestKey];
+    return { form: STATES[best].form, startedAt: startedAt };
+  }
+
+  function onMotionChange(listener) {
+    if (typeof listener === 'function') motionListeners.push(listener);
+  }
+
+  // Batched to one pass per turn: a claim change and the clock that follows it
+  // usually land together.
+  function queueMotionNotify() {
+    if (!motionListeners.length || motionNotifyQueued) return;
+    motionNotifyQueued = true;
+    Promise.resolve().then(flushMotionNotify);
+  }
+
+  function flushMotionNotify() {
+    motionNotifyQueued = false;
+    var tabs = Object.create(null);
+    Object.keys(claims).forEach(function (key) { tabs[key.slice(key.indexOf(':') + 1)] = true; });
+    Object.keys(motionTabsSent).forEach(function (tab) { tabs[tab] = true; });
+    var sent = Object.create(null);
+    Object.keys(tabs).forEach(function (tab) {
+      if (tab === 'global') return;
+      var motion = getMotion(Number(tab));
+      if (motion) sent[tab] = true;
+      for (var i = 0; i < motionListeners.length; i++) {
+        try { motionListeners[i](Number(tab), motion); } catch (_e) { /* the pill is presentation-only */ }
+      }
+    });
+    motionTabsSent = sent;
+  }
+
   globalThis.fsbActionIcon = Object.freeze({
     init: init,
     noteActivity: noteActivity,
     beginCapability: beginCapability,
     endCapability: endCapability,
     setWatching: setWatching,
+    setAsking: setAsking,
     setAnimationsEnabled: setAnimationsEnabled,
-    setConnected: setConnected,
     dropTab: dropTab,
-    repair: repair
+    repair: repair,
+    getMotion: getMotion,
+    onMotionChange: onMotionChange
   });
 })();

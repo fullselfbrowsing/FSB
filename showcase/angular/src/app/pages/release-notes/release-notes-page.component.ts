@@ -70,7 +70,7 @@ export class ReleaseNotesPageComponent implements OnInit, OnDestroy {
     { version: '0.1' },
   ];
 
-  readonly version = signal(APP_VERSION);
+  readonly version = signal(openingVersion(this.releases));
   readonly swapping = signal(false);
   /* The rail can outlive the written archive: any release without a section
      block falls through to the "notes pending" state instead of a blank column. */
@@ -149,3 +149,13 @@ const DOCUMENTED_VERSIONS: ReadonlySet<string> = new Set([
   '0.9.95', '0.9.92', '0.9.91', '0.9.90', '0.9.70', '0.9.60', '0.9.50', '0.9.30',
   '0.9.20', '0.9.8', '0.9.4', '0.9.1', '0.9.0', '0.3', '0.2', '0.1',
 ]);
+
+/* The page opens on the shipped version when its notes are written, and
+   otherwise on the newest release on the rail that has notes. The pending state
+   calls a release "earlier" and "archived", which is wrong for the version that
+   just shipped, so a release whose notes are still being written does not open
+   on it. Once its rail entry and section blocks land, it opens there again. */
+function openingVersion(releases: readonly ReleaseEntry[]): string {
+  if (DOCUMENTED_VERSIONS.has(APP_VERSION)) return APP_VERSION;
+  return releases.find((entry) => DOCUMENTED_VERSIONS.has(entry.version))?.version ?? APP_VERSION;
+}

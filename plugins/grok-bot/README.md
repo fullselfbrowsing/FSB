@@ -23,7 +23,7 @@ FSB's Chrome extension and MCP process must run **together on Grok Bot's own com
 3. Once this package is listed, open Bot's **Plugins → Marketplace**, search for **Full Self Browsing**, and install it. Team policies may restrict availability. The package does not install Node, Chrome or the extension automatically.
 4. Ask Bot to use FSB for a small browser read. If the extension shows a bridge pairing request, complete its local pairing flow. Confirm the connection targets the browser on Bot's computer before continuing.
 
-The configured server is named `fsb` and launches as `npx -y fsb-mcp-server@0.11.5`. Its first launch may download the package and dependencies. Keep one intended FSB server configuration active; an existing manual FSB connection may otherwise duplicate or override the plugin connection.
+The configured server is named `fsb` and launches as `npx -y fsb-mcp-server@0.95.0`. Its first launch may download the package and dependencies. Keep one intended FSB server configuration active; an existing manual FSB connection may otherwise duplicate or override the plugin connection.
 
 Manual MCP browsing requires no FSB API key or separate provider OAuth. Websites use the sessions in Bot's browser profile, so sign in there when needed. Optional FSB autopilot requires a configured model provider and can incur provider charges.
 
@@ -48,8 +48,8 @@ Run diagnostics **on Bot's computer**:
 ```bash
 node --version
 npx --version
-npx -y fsb-mcp-server@0.11.5 doctor
-npx -y fsb-mcp-server@0.11.5 status
+npx -y fsb-mcp-server@0.95.0 doctor
+npx -y fsb-mcp-server@0.95.0 status
 ```
 
 The doctor also checks optional model-provider configuration. A missing provider or model can produce a `config` failure even when Chrome is attached; manual MCP tools do not require that configuration. Verify a small manual page read separately.
@@ -84,10 +84,9 @@ The shared product policy is the [FSB Privacy Policy](https://www.full-selfbrows
 | Loopback WebSocket port `7225` on Bot's computer | Connect the MCP server to the FSB extension |
 | Websites and application APIs selected for the task | Browser operations using that profile's session |
 | `https://full-selfbrowsing.com/api/telemetry/events` | Extension anonymous usage telemetry, enabled by default; disable **Send anonymous usage data** in Advanced Settings |
-| `https://full-selfbrowsing.com/api/auth/register` and `wss://full-selfbrowsing.com/ws` | Extension dashboard registration and relay connection; PhantomStream live preview belongs to the dashboard feature |
 | `api.x.ai`, `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `openrouter.ai`, or the configured LM Studio/custom endpoint | Optional FSB AI features use the provider the user configures; LM Studio defaults to `http://localhost:1234` on that computer |
 
-Anonymous telemetry is separate from the dashboard relay. The policy describes usage fields, coarse region, retention and erasure. Relay connection timing depends on the installed extension build; disabling telemetry does not necessarily disconnect dashboard networking.
+The policy describes the anonymous telemetry's usage fields, coarse region, retention and erasure. Extension builds up to v0.9.95 also registered with `https://full-selfbrowsing.com/api/auth/register` and kept a `wss://full-selfbrowsing.com/ws` relay connection for the retired Live Dashboard; later builds do not.
 
 If separately enabled, HTTP serving uses loopback port `7226`. This plugin selects stdio and does not expose an HTTP endpoint. Browser pairing state, local session recordings and screenshot files are described in the product policy. [FSB source](https://github.com/fullselfbrowsing/FSB) contains the extension and published server implementation.
 

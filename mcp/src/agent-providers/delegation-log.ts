@@ -128,4 +128,5 @@ export function logDelegationEvent(
 }
 
 export const DELEGATION_LOG_FILENAME = LOG_FILENAME;
+export const DELEGATION_LOG_ROTATED_FILENAME = ROTATED_FILENAME;
 export const DELEGATION_LOG_MAX_BYTES = MAX_LOG_BYTES;

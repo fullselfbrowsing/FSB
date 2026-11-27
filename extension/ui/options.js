@@ -83,6 +83,8 @@ const defaultSettings = {
   showSidepanelProgress: true,
   // Credential Manager (Beta)
   enableLogin: false,
+  // Card fills from 1Password (Beta)
+  enableSavedPayments: false,
   // CAPTCHA Solver
   captchaSolverEnabled: false,
   captchaApiKey: '',
@@ -202,11 +204,7 @@ function getHostedApiKeyValue(provider) {
 const dashboardState = {
   currentSection: 'dashboard',
   hasUnsavedChanges: false,
-  connectionStatus: 'checking',
-  // Dashboard-relay WS connectivity, seeded by the getDashboardWebSocketStatus
-  // replay and kept live by the dashboardWsStatusChanged runtime push
-  // (initializeSyncSection). Read by _wsIsOpen() for the sync pill.
-  wsConnected: false
+  connectionStatus: 'checking'
 };
 
 // The visible selector may contain either kind, while the saved API and agent
@@ -294,10 +292,9 @@ function initializeDashboard() {
   // Initialize sections
   initializeSections();
 
-  // Initialize credential vault UI
-  loadCredentialVaultStatus();
-  loadPaymentVaultStatus();
-  initCredentialVaultListeners();
+  // Initialize the 1Password connection UI (Passwords / Payments) from saved
+  // settings only; items are read when one of those sections is shown.
+  loadOnePasswordStatus({ readItems: false });
 
   // Setup theme
   setupTheme();
@@ -401,6 +398,7 @@ function cacheElements() {
 
   // Credentials (Beta)
   elements.enableLogin = document.getElementById('enableLogin');
+  elements.enableSavedPayments = document.getElementById('enableSavedPayments');
 
   // CAPTCHA Solver
   elements.captchaSolverEnabled = document.getElementById('captchaSolverEnabled');
@@ -929,6 +927,7 @@ function setupEventListeners() {
     elements.animatedActionHighlights,
     elements.showSidepanelProgress,
     elements.enableLogin,
+    elements.enableSavedPayments,
     elements.captchaSolverEnabled,
     elements.captchaApiKey,
     elements.sttProvider,
@@ -1820,6 +1819,8 @@ function initFsbSelects() {
 }
 
 function normalizeSectionId(sectionId) {
+  // Passwords and Payments became one Vault page; old links still land there.
+  if (sectionId === 'passwords' || sectionId === 'payments') return 'vault';
   return sectionId === 'providers' ? 'api-config' : sectionId;
 }
 
@@ -1858,8 +1859,6 @@ function initializeSections() {
   if (hash && document.getElementById(hash)) {
     switchSection(hash);
   }
-  // Phase 213: prime the Sync pill so it has a value even if the user lands on a non-Sync section first.
-  try { initializeSyncSection(); } catch (e) { /* benign */ }
 }
 
 // Update model options based on provider
@@ -2193,6 +2192,9 @@ function loadSettings() {
       elements.enableLogin.checked = settings.enableLogin ?? false;
       updateCredentialsManagerVisibility(settings.enableLogin ?? false);
     }
+    if (elements.enableSavedPayments) {
+      elements.enableSavedPayments.checked = settings.enableSavedPayments ?? false;
+    }
 
     // CAPTCHA Solver
     if (elements.captchaSolverEnabled) {
@@ -2492,6 +2494,7 @@ function saveSettings() {
     animatedActionHighlights: elements.animatedActionHighlights?.checked ?? true,
     showSidepanelProgress: elements.showSidepanelProgress?.checked ?? false,
     enableLogin: elements.enableLogin?.checked ?? false,
+    enableSavedPayments: elements.enableSavedPayments?.checked ?? false,
     captchaSolverEnabled: elements.captchaSolverEnabled?.checked ?? false,
     captchaApiKey: (elements.captchaApiKey?.value || '').trim(),
     sttProvider: elements.sttProvider?.checked ? 'whisper' : 'browser',
@@ -2967,8 +2970,20 @@ function applyTheme(preference) {
   }
 }
 
+// The toolbar icon is drawn by the service worker, which cannot read this page's
+// localStorage, so the preference is copied where it can (utils/action-icon.js
+// puts the icon on its white tile only for an explicit 'light'). An identical
+// write raises no change event, so repeating it on every load costs nothing.
+function mirrorThemePreference(preference) {
+  try {
+    const result = chrome.storage.local.set({ fsbThemePreference: preference });
+    if (result && typeof result.catch === 'function') result.catch(() => {});
+  } catch (_e) { /* the icon stays on its black tile */ }
+}
+
 function setThemePreference(preference) {
   localStorage.setItem('fsb-theme', preference);
+  mirrorThemePreference(preference);
   applyTheme(preference);
   updateSystemThemeListener(preference);
 }
@@ -5055,230 +5070,945 @@ async function exportSessionText(sessionId, storageBackend) {
 }
 
 // ==========================================
-// Credential Vault Lifecycle (Passwords Beta)
+// Vault: logins and cards from 1Password
 // ==========================================
+// FSB keeps no passwords or cards of its own. The Vault page logs in to the
+// 1Password account the FSB local server uses, shows which vaults FSB may read
+// (all of them unless Advanced limits it), and read-only lists of what is in
+// them (design: the "FSB 1Password vault" handoff, Main and VaultStates
+// boards). Nothing here ever receives a password, one-time code, card number,
+// or CVV: the background answers with metadata only.
 
-let _vaultPinSetup = null;
-let _vaultPinConfirm = null;
-let _vaultPinUnlock = null;
-let _vaultSetupDigits = 6;
-let _unlockSubmitting = false;
+let _onePasswordStatus = null;
+let _onePasswordLegacy = null;
+let _legacyVaultPin = null;
+let _onePasswordBusy = false;
+const _vaultUi = {
+  error: null,
+  waiting: false,
+  connectToken: 0,
+  // The first status read has answered, so a guest sees Log in, not Checking.
+  checked: false,
+  // The user logged in from this page (the chrome.storage.local flag).
+  loggedIn: false,
+  // The account name field is open.
+  askAccount: false,
+  // A Log in on this page saved the sign-in the local server now holds, and
+  // it has not been approved yet. Only then may Cancel forget it.
+  createdSignIn: false,
+  // 'integration' while FSB waits for the 1Password setting, 'managed' once it stops.
+  integration: null,
+  scope: 'listed',
+  vaults: [],
+  vaultsLoaded: false,
+  allow: new Set(),
+  savedAllow: new Set(),
+  allowEdited: false,
+  savedSave: '',
+  logins: [],
+  cards: [],
+  itemsLoaded: false,
+  tab: 'logins',
+  legacyStage: 'pin',
+  legacyResult: null
+};
 
-async function loadCredentialVaultStatus() {
-  const statusText = document.getElementById('credentialVaultStatusText');
-  const setupPanel = document.getElementById('credentialVaultSetup');
-  const unlockPanel = document.getElementById('credentialVaultUnlock');
-  const unlockedPanel = document.getElementById('credentialVaultUnlocked');
-  const lockBtn = document.getElementById('lockCredentialVaultBtn');
-  const manager = document.getElementById('credentialsManager');
+// chrome.storage.local keys. The flag records that the user logged in here;
+// the account name is kept only to fill in the field next time.
+const ONEPASSWORD_LOGGED_IN_KEY = 'fsbOnePasswordLoggedIn';
+const ONEPASSWORD_ACCOUNT_KEY = 'fsbOnePasswordAccountName';
+// A Disconnect the local server never received: { authKind, accountName } of
+// the sign-in to forget there once a status read reaches it again.
+const ONEPASSWORD_DISCONNECT_PENDING_KEY = 'fsbOnePasswordDisconnectPending';
+// Opens Settings > Developer in the 1Password app.
+const ONEPASSWORD_DEVELOPER_SETTINGS_URL = 'onepassword://settings/developers';
+// While Integrate with 1Password SDKs is off, FSB tries again this often, for this long.
+const ONEPASSWORD_SETTING_RETRY_MS = 3000;
+const ONEPASSWORD_SETTING_WAIT_MS = 120000;
+// A try that is still running after this is waiting on the approval prompt.
+const ONEPASSWORD_APPROVAL_SHOWN_MS = 2500;
 
+// 'all': FSB reads every vault. 'listed': only the vaults chosen under Advanced.
+function onePasswordScope(status) {
+  return status && status.vaultScope === 'all' ? 'all' : 'listed';
+}
+
+// The vault new logins go to, while 1Password still lists it.
+function onePasswordSaveVault(status) {
+  return status && typeof status.effectiveSaveVaultId === 'string' ? status.effectiveSaveVaultId : '';
+}
+
+// Signed in, and FSB may read at least one vault.
+function onePasswordIsReady(status) {
+  if (!status || !status.configured) return false;
+  return onePasswordScope(status) === 'all' || (Array.isArray(status.vaultIds) && status.vaultIds.length > 0);
+}
+
+// Whether this page may ask 1Password for vaults and items. With the desktop
+// app that can show an approval prompt, so it waits until the user logs in.
+// A service account set up from the terminal never shows one.
+function onePasswordMayRead(status) {
+  return _vaultUi.loggedIn || !!(status && status.authKind === 'service-account');
+}
+
+function onePasswordStoredAccount(status) {
+  return status && status.authKind === 'desktop' && typeof status.accountName === 'string' ? status.accountName : '';
+}
+
+// With every vault readable FSB still leaves out transfer and unsupported vaults.
+function onePasswordVaultReadable(vault) {
+  return !!vault && vault.vaultType !== 'transfer' && vault.vaultType !== 'unsupported';
+}
+
+async function readOnePasswordLocal(key) {
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'getCredentialVaultStatus' });
-    if (!response) {
-      if (statusText) fsbUiSet(statusText, "Unable to reach vault service");
-      return;
-    }
-
-    // Hide all state panels first
-    if (setupPanel) setupPanel.style.display = 'none';
-    if (unlockPanel) unlockPanel.style.display = 'none';
-    if (unlockedPanel) unlockedPanel.style.display = 'none';
-    if (lockBtn) lockBtn.style.display = 'none';
-
-    if (!response.configured) {
-      if (statusText) fsbUiSet(statusText, "No vault configured. Create one to protect saved credentials.");
-      if (setupPanel) setupPanel.style.display = 'block';
-      if (manager) manager.style.display = 'none';
-      // Initialize setup PIN inputs
-      const setupContainer = document.getElementById('credentialVaultPinSetup');
-      const confirmContainer = document.getElementById('credentialVaultPinConfirm');
-      if (setupContainer && !_vaultPinSetup) {
-        _vaultPinSetup = createPinInput(setupContainer, _vaultSetupDigits);
-        _vaultPinConfirm = createPinInput(confirmContainer, _vaultSetupDigits);
-      }
-    } else if (!response.unlocked) {
-      if (statusText) fsbUiSet(statusText, "Vault is locked.");
-      if (unlockPanel) unlockPanel.style.display = 'block';
-      if (manager) manager.style.display = 'none';
-      // Initialize unlock PIN input
-      const unlockContainer = document.getElementById('credentialVaultPinUnlock');
-      const pinLen = response.pinLength || 6;
-      if (unlockContainer) {
-        _unlockSubmitting = false;
-        _vaultPinUnlock = createPinInput(unlockContainer, pinLen, {
-          onComplete: (pin) => submitVaultUnlock(pin)
-        });
-      }
-    } else {
-      if (statusText) fsbUiSet(statusText, "Vault unlocked for this session.");
-      if (unlockedPanel) unlockedPanel.style.display = 'block';
-      if (lockBtn) lockBtn.style.display = 'inline-flex';
-      if (manager) {
-        manager.style.display = 'block';
-        loadCredentials();
-      }
-    }
-  } catch (error) {
-    console.error('Failed to check vault status:', error);
-    if (statusText) fsbUiSet(statusText, "Error checking vault status.");
+    const stored = await chrome.storage.local.get(key);
+    return stored ? stored[key] : undefined;
+  } catch (_error) {
+    return undefined;
   }
 }
 
-async function submitVaultUnlock(pin) {
-  if (_unlockSubmitting) return;
-  _unlockSubmitting = true;
-  const unlockBtn = document.getElementById('unlockCredentialVaultBtn');
-  if (unlockBtn) { unlockBtn.disabled = true; fsbUiSet(unlockBtn, "Unlocking..."); }
+async function writeOnePasswordLocal(values) {
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'unlockCredentialVault', passphrase: pin });
-    if (response?.success) {
-      showToast('Vault unlocked', 'success');
-      loadCredentialVaultStatus();
-      loadPaymentVaultStatus();
-    } else {
-      showToast(response?.error || 'Incorrect PIN', 'error');
-      if (_vaultPinUnlock) _vaultPinUnlock.clear();
+    await chrome.storage.local.set(values);
+  } catch (_error) { /* the page itself still shows the right state */ }
+}
+
+async function setOnePasswordLoggedIn(loggedIn) {
+  _vaultUi.loggedIn = loggedIn === true;
+  if (_vaultUi.loggedIn) _vaultUi.createdSignIn = false;
+  await writeOnePasswordLocal({ [ONEPASSWORD_LOGGED_IN_KEY]: _vaultUi.loggedIn });
+}
+
+function onePasswordSameSignIn(pending, status) {
+  return !!pending && typeof pending === 'object' && !!status && !!status.authKind
+    && pending.authKind === status.authKind
+    && (pending.accountName || null) === (status.accountName || null);
+}
+
+// Finishes a Disconnect the local server did not receive, once it answers a
+// status read, if it still holds that same sign-in. Returns the status to show.
+async function finishPendingOnePasswordDisconnect(status) {
+  const pending = await readOnePasswordLocal(ONEPASSWORD_DISCONNECT_PENDING_KEY);
+  if (!pending) return status;
+  if (!onePasswordSameSignIn(pending, status)) {
+    // Gone already, or replaced by a sign-in set up since: nothing to forget.
+    await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: false });
+    return status;
+  }
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
+  } catch (_error) {
+    return status;
+  }
+  if (!response || !response.success) return status;
+  await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: false });
+  showToast('1Password disconnected', 'success');
+  return response.status || {};
+}
+
+// Reading the saved settings needs no 1Password sign-in. Listing vaults,
+// logins, or cards does, and with the desktop app that can show an approval
+// prompt, so those calls wait until the user opens the Vault page.
+function onePasswordSectionVisible() {
+  return !!document.getElementById('vault')?.classList.contains('active');
+}
+
+function setOnePasswordStatusText(english, subs) {
+  const statusText = document.getElementById('onePasswordStatusText');
+  if (statusText) fsbUiSet(statusText, english, subs);
+}
+
+// One state per 1Password situation, keyed on the codes the client and broker
+// return (VaultStates board). path: l1/l2 are the two links of the drawing.
+// login: Try again runs Log in again. account: offers Change account before
+// the user has logged in. guestSub: the line shown before that.
+const VAULT_VIEWS = {
+  checking: { pill: 'connecting', sub: 'Checking 1Password connection...', path: { l1: 'wait', l2: '' } },
+  none: { pill: 'disconnected', pillText: 'Not connected', sub: 'Not connected yet' },
+  waiting: { pill: 'connecting', pillText: 'Waiting for approval', sub: 'Connecting to $ACCOUNT$', body: 'Approve FSB in the 1Password app.',
+    cancel: true, account: true, path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
+  integration: { pill: 'connecting', pillText: 'Waiting for you', sub: 'Settings > Developer in 1Password',
+    body: 'Turn on Integrate with 1Password SDKs in 1Password, then come back. FSB keeps checking for 2 minutes.',
+    settings: true, cancel: true, account: true, path: { opDim: true, l1: 'wait', l2: 'ok' } },
+  managed: { pill: 'disconnected', pillText: 'Not available', sub: 'Integrate with 1Password SDKs is still off',
+    body: 'On a managed device? Ask your admin.', settings: true, retry: 'Try again', login: true, account: true,
+    path: { opDim: true, l1: 'bad', l2: 'ok' } },
+  integrationoff: { pill: 'disconnected', pillText: 'Not available', sub: 'Integrate with 1Password SDKs is off',
+    body: 'Turn on Integrate with 1Password SDKs in 1Password, then come back.', settings: true, retry: 'Try again', login: true, account: true,
+    path: { opDim: true, l1: 'bad', l2: 'ok' } },
+  vaults: { pill: 'connected', pillText: 'Logged in', sub: 'Logged in · $ACCOUNT$', body: 'Choose the vaults FSB may read.',
+    disconnect: true, path: { l1: 'ok', l2: 'ok' } },
+  ready: { pill: 'connected', pillText: 'Logged in', sub: 'Logged in · $ACCOUNT$',
+    body: '1Password may ask you to approve FSB again after 10 idle minutes, a lock, or a local-server restart.',
+    disconnect: true, path: { l1: 'ok', l2: 'ok' } },
+  service: { pill: 'connected', pillText: 'Connected', sub: 'Connected with a service account',
+    body: 'Set up from the terminal. Disconnecting deletes the saved token, so it asks first.', disconnect: true,
+    path: { op: 'service account', l1: 'ok', l2: 'ok' } },
+  locked: { pill: 'connecting', pillText: 'Locked', sub: 'Logged in · $ACCOUNT$', guestSub: 'Connecting to $ACCOUNT$',
+    body: 'Unlock 1Password to continue. Your settings are kept.', retry: 'Try again', login: true, account: true,
+    path: { lock: true, op: 'locked', l1: '', l2: '' } },
+  offline: { pill: 'disconnected', pillText: 'Not reachable', sub: 'The FSB local server is not running',
+    body: 'Install the FSB local server, then try again.', install: true, retry: 'Try again', path: { l1: '', l2: 'bad', cut: true, srv: 'dim' } },
+  declined: { pill: 'connecting', pillText: 'Declined', sub: 'Approve FSB in 1Password',
+    body: 'FSB can\'t read anything until you allow it. Try again, then allow FSB in 1Password.', retry: 'Try again', login: true, account: true,
+    path: { l1: '', l2: '' } },
+  signin: { pill: 'disconnected', pillText: 'Sign-in failed', sub: 'Could not log in to 1Password',
+    body: 'Check the account name, then try again.', retry: 'Try again', login: true, account: true, path: { l1: 'bad', l2: 'ok' } },
+  appmissing: { pill: 'disconnected', pillText: 'Not available', sub: '1Password app not found',
+    body: 'Install the 1Password app and sign in, then try again.', download: true, retry: 'Try again', login: true, account: true,
+    path: { opDim: true, l1: 'bad', l2: 'ok' } },
+  outdated: { pill: 'disconnected', pillText: 'Update needed', sub: 'Update the local server',
+    body: 'This fsb-mcp-server is too old for 1Password, or can\'t load its SDK.', install: true, retry: 'Try again', path: { srv: 'err', l1: '', l2: 'ok' } },
+  unpaired: { pill: 'connecting', pillText: 'Not paired', sub: 'Pair again',
+    body: 'The server is running but no longer trusts this browser. Pairing again fixes it.', retry: 'Pair again', pair: true, path: { l1: '', l2: 'wait' } },
+  rate: { pill: 'connecting', pillText: 'Rate limited', sub: 'Slow down',
+    body: 'Too many requests in a short time. Nothing is wrong with your account. Try again in a minute.', retry: 'Try again', path: { l1: 'wait', l2: 'ok' } },
+  approve: { pill: 'connecting', pillText: 'Waiting for you', sub: 'Approve FSB in 1Password',
+    body: '1Password is asking whether FSB may use it. FSB waits up to 75 seconds.', retry: 'Try again', login: true, account: true,
+    path: { ping: true, op: 'asking you', l1: 'wait', l2: '' } },
+  error: { pill: 'disconnected', pillText: 'Not reachable', retry: 'Try again', path: { l1: '', l2: '' } }
+};
+
+function vaultView() {
+  const status = _onePasswordStatus;
+  const error = _vaultUi.error;
+  if (_vaultUi.waiting) return 'waiting';
+  if (_vaultUi.integration) return _vaultUi.integration;
+  if (error) {
+    const code = error.errorCode;
+    if (code === 'onepassword_bridge_offline') return 'offline';
+    if (code === 'onepassword_bridge_unpaired') return 'unpaired';
+    if (code === 'onepassword_server_outdated' || code === 'onepassword_sdk_unavailable') return 'outdated';
+    if (code === 'onepassword_rate_limited') return 'rate';
+    if (code === 'onepassword_timeout') return 'approve';
+    if (code === 'onepassword_auth_failed') {
+      if (error.reason === 'locked') return 'locked';
+      if (error.reason === 'app_missing') return 'appmissing';
+      if (error.reason === 'integration_off') return 'integrationoff';
+      if (error.reason === 'declined') return 'declined';
+      return 'signin';
     }
+    if (!status) return 'error';
+  }
+  // A guest whose status could not be read without pairing: Log in pairs.
+  if (!status) return _vaultUi.checked && !_vaultUi.loggedIn ? 'none' : 'checking';
+  if (status.authKind === 'service-account') return 'service';
+  if (!status.authKind || !_vaultUi.loggedIn) return 'none';
+  if (onePasswordScope(status) !== 'all' && (!Array.isArray(status.vaultIds) || status.vaultIds.length === 0)) return 'vaults';
+  return 'ready';
+}
+
+function vaultShow(node, visible) {
+  if (node) node.hidden = !visible;
+}
+
+function vaultGroup(id, visible) {
+  const node = document.getElementById(id);
+  if (!node) return;
+  node.hidden = false;
+  node.style.display = visible ? 'contents' : 'none';
+}
+
+function renderVaultPath(spec) {
+  const path = spec.path || { l1: '', l2: '' };
+  const opNode = document.getElementById('vxNodeOp');
+  if (opNode) {
+    opNode.classList.toggle('dim', !!path.opDim);
+    vaultShow(opNode.querySelector('.ping'), !!path.ping);
+    vaultShow(opNode.querySelector('.lk'), !!path.lock);
+  }
+  const opSub = document.getElementById('vxNodeOpSub');
+  if (opSub) fsbUiSet(opSub, path.op || 'desktop app');
+  const srv = document.getElementById('vxNodeSrv');
+  if (srv) {
+    srv.classList.toggle('dim', path.srv === 'dim');
+    srv.classList.toggle('err', path.srv === 'err');
+  }
+  const link1 = document.getElementById('vxLink1');
+  const link2 = document.getElementById('vxLink2');
+  if (link1) link1.className = 'vx-link' + (path.l1 ? ' ' + path.l1 : '');
+  if (link2) {
+    link2.className = 'vx-link' + (path.l2 ? ' ' + path.l2 : '');
+    vaultShow(link2.querySelector('b'), !!path.cut);
+  }
+  const drawing = document.getElementById('onePasswordPath');
+  if (drawing) {
+    drawing.setAttribute('aria-label', path.cut
+      ? fsbUiLine('1Password, then the local server, which this browser cannot reach')
+      : fsbUiLine('1Password, then the FSB local server, then this browser'));
+  }
+}
+
+// The Log in button, or the account name field once FSB needs one.
+function renderOnePasswordSetup() {
+  const stored = onePasswordStoredAccount(_onePasswordStatus);
+  const asking = _vaultUi.askAccount;
+  vaultShow(document.getElementById('onePasswordLoginBtn'), !asking);
+  vaultShow(document.getElementById('onePasswordAccountRow'), asking);
+  vaultShow(document.getElementById('onePasswordAccountLine'), !asking && !!stored);
+  const accountText = document.getElementById('onePasswordAccountText');
+  if (accountText && stored) fsbUiSet(accountText, '1Password account: $ACCOUNT$', { account: stored });
+  for (const id of ['onePasswordLoginBtn', 'onePasswordContinueBtn', 'onePasswordForgetBtn']) {
+    const button = document.getElementById(id);
+    if (button) button.disabled = _onePasswordBusy;
+  }
+}
+
+function renderVault() {
+  const view = vaultView();
+  const spec = VAULT_VIEWS[view] || VAULT_VIEWS.error;
+  const status = _onePasswordStatus || {};
+  const accountInput = document.getElementById('onePasswordAccount');
+  const account = status.accountName || (accountInput && accountInput.value ? accountInput.value.trim() : '');
+
+  const pill = document.getElementById('onePasswordPill');
+  const pillText = document.getElementById('onePasswordPillText');
+  if (pill) pill.dataset.state = spec.pill;
+  if (pillText) {
+    if (spec.pillText) fsbUiSet(pillText, spec.pillText);
+    else pillText.textContent = '';
+  }
+  const sub = !_vaultUi.loggedIn && spec.guestSub ? spec.guestSub : spec.sub;
+  if (sub) setOnePasswordStatusText(sub, { account });
+
+  vaultShow(document.getElementById('onePasswordSetup'), view === 'none');
+  renderOnePasswordSetup();
+  vaultShow(document.getElementById('onePasswordConn'), view !== 'none' && view !== 'checking');
+  const body = document.getElementById('onePasswordBody');
+  if (body) {
+    const detail = view === 'signin' && _vaultUi.error && typeof _vaultUi.error.error === 'string' ? _vaultUi.error.error : '';
+    // The local server explains a failed sign-in in its own words.
+    if (detail) fsbUiSet(body, 'Check the account name, then try again. Details: $ERROR$', { error: detail });
+    else if (spec.body) fsbUiSet(body, spec.body);
+    else if (view !== 'error') body.textContent = '';
+  }
+  vaultShow(document.getElementById('onePasswordInstallCmd'), !!spec.install);
+  vaultShow(document.getElementById('onePasswordDownloadLink'), !!spec.download);
+  vaultShow(document.getElementById('onePasswordOpenSettingsBtn'), !!spec.settings);
+  vaultShow(document.getElementById('onePasswordDisconnectBtn'), !!spec.disconnect);
+  vaultShow(document.getElementById('onePasswordCancelBtn'), !!spec.cancel);
+  vaultShow(document.getElementById('onePasswordEditAccountBtn'),
+    !!spec.account && !_vaultUi.loggedIn && !!onePasswordStoredAccount(_onePasswordStatus));
+  const retry = document.getElementById('onePasswordRetryBtn');
+  if (retry) {
+    vaultShow(retry, !!spec.retry);
+    if (spec.retry) fsbUiSet(retry, spec.retry);
+  }
+  renderVaultPath(spec);
+
+  const connected = onePasswordMayRead(_onePasswordStatus)
+    && (view === 'vaults' || view === 'ready' || view === 'service' || view === 'locked');
+  vaultGroup('vaultAccessGroup', connected);
+  vaultGroup('vaultItemsGroup', connected);
+  vaultShow(document.getElementById('vaultRulesHeading'), !connected);
+  document.getElementById('onePasswordAccessCard')?.classList.toggle('vx-card-focus', view === 'vaults');
+  // No vault chosen yet: open the list that chooses them.
+  const advanced = document.getElementById('onePasswordAdvanced');
+  if (advanced && view === 'vaults') advanced.open = true;
+  renderVaultItems();
+}
+
+async function loadOnePasswordStatus(options = {}) {
+  _vaultUi.loggedIn = (await readOnePasswordLocal(ONEPASSWORD_LOGGED_IN_KEY)) === true;
+  const onPage = options.readItems === true || (options.readItems !== false && onePasswordSectionVisible());
+  // Until the user logs in, a look at the page only reads what is there: it
+  // never pairs FSB with the local server or asks 1Password anything.
+  let readItems = onPage && _vaultUi.loggedIn;
+  // Pairing FSB with the local server reconnects the bridge (and any MCP call
+  // in flight on it), so only a look at the Vault page may start it.
+  const pair = options.pair === true || readItems;
+
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordStatus', pair });
   } catch (error) {
-    showToast(fsbUiLine('Error unlocking vault: $ERROR$', { error: error.message }), 'error');
-    if (_vaultPinUnlock) _vaultPinUnlock.clear();
+    response = { success: false, error: error.message };
+  }
+
+  _onePasswordLegacy = response && response.legacy ? response.legacy : null;
+  renderLegacyVault(_onePasswordLegacy);
+  _vaultUi.checked = true;
+
+  if (!response || !response.success) {
+    _onePasswordStatus = null;
+    if (!pair && !_vaultUi.loggedIn) {
+      // Not paired yet. Log in pairs, and reports any problem it finds.
+      if (options.keepError !== true) _vaultUi.error = null;
+      renderVault();
+      return;
+    }
+    _vaultUi.error = { errorCode: (response && response.errorCode) || 'onepassword_request_failed', error: response && response.error, reason: response && response.reason };
+    setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
+    renderVault();
+    return;
+  }
+
+  _onePasswordStatus = await finishPendingOnePasswordDisconnect(response.status || {});
+  const status = _onePasswordStatus;
+  // No saved sign-in on the local server means the user is logged out.
+  if (_vaultUi.loggedIn && !status.authKind) await setOnePasswordLoggedIn(false);
+  if (!status.authKind) _vaultUi.createdSignIn = false;
+  if (onPage && status.authKind === 'service-account') readItems = true;
+  if (!_vaultUi.waiting && options.keepError !== true) _vaultUi.error = null;
+  const accountInput = document.getElementById('onePasswordAccount');
+  if (accountInput && !accountInput.value && status.accountName) accountInput.value = status.accountName;
+  _vaultUi.scope = onePasswordScope(status);
+  _vaultUi.allowEdited = false;
+  _vaultUi.savedSave = onePasswordSaveVault(status);
+  renderVault();
+  renderVaultAccess();
+
+  if (status.authKind && readItems) await loadOnePasswordVaults();
+  if (onePasswordIsReady(status) && readItems) {
+    await Promise.all([loadCredentials(), loadPaymentMethods()]);
+  }
+}
+
+// A failed 1Password call on this page: classified codes move the status card
+// to their own state; anything else is reported as it came.
+function noteVaultFailure(response) {
+  const code = response && response.errorCode;
+  if (code && /^onepassword_/.test(code)) {
+    _vaultUi.error = { errorCode: code, error: response.error, reason: response.reason };
+    renderVault();
+    return true;
+  }
+  if (response && response.error) showToast(response.error, 'error');
+  return false;
+}
+
+async function loadOnePasswordVaults() {
+  const list = document.getElementById('onePasswordVaultList');
+  if (!list) return;
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordListVaults' });
+  } catch (error) {
+    response = { success: false, error: error.message };
+  }
+  if (!response || !response.success) {
+    // Locked or unreachable: keep the vaults already on screen, or name the
+    // saved ones, so the page still says what FSB may read.
+    if (!_vaultUi.vaults.length) {
+      const saved = _onePasswordStatus && Array.isArray(_onePasswordStatus.vaults) ? _onePasswordStatus.vaults : [];
+      _vaultUi.vaults = saved.filter((vault) => vault && vault.id && vault.title).map((vault) => ({ id: vault.id, title: vault.title }));
+    }
+    renderVaultAccess();
+    if (!noteVaultFailure(response)) {
+      setOnePasswordStatusText('Could not reach 1Password: $ERROR$', { error: (response && response.error) || { english: 'Unknown error' } });
+    }
+    return;
+  }
+  _vaultUi.vaults = Array.isArray(response.vaults) ? response.vaults : [];
+  // A service account counts as logged in once 1Password has answered.
+  if (!_vaultUi.loggedIn && _onePasswordStatus && _onePasswordStatus.authKind === 'service-account'
+      && _onePasswordStatus.configured) {
+    await setOnePasswordLoggedIn(true);
+  }
+  // Reading every vault, the local server picks the Personal vault for new
+  // logins on its first list. Read the status again to show that choice.
+  if (_vaultUi.scope === 'all' && !_vaultUi.savedSave) await refreshOnePasswordSaveVault();
+  _vaultUi.vaultsLoaded = true;
+  renderVaultAccess();
+  renderVaultItems();
+}
+
+// Status only (no pairing, nothing asked of 1Password): picks up the save vault.
+async function refreshOnePasswordSaveVault() {
+  let response;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordStatus', pair: false });
+  } catch (_error) {
+    return;
+  }
+  if (!response || !response.success || !response.status) return;
+  _onePasswordStatus = response.status;
+  _vaultUi.savedSave = onePasswordSaveVault(response.status);
+}
+
+// What enabling a vault means, in plain language. Only the user knows which
+// vault is used by FSB alone, so that tag comes from the name.
+function vaultTag(vault) {
+  if (vault.vaultType === 'personal') {
+    return { cls: 'warn', text: 'Personal', warn: 'Your personal vault. All $COUNT$ items become available to agents.' };
+  }
+  if (vault.vaultType === 'everyone') {
+    return { cls: '', text: 'Shared', warn: 'Shared with others. All $COUNT$ items become available to agents.' };
+  }
+  if (/(^|[^a-z])fsb([^a-z]|$)/i.test(vault.title || '')) return { cls: 'ok', text: 'Only FSB', warn: null };
+  return { cls: '', text: '', warn: 'All $COUNT$ items in this vault become available to agents.' };
+}
+
+function vaultAccessDirty() {
+  if (_vaultUi.allow.size !== _vaultUi.savedAllow.size) return true;
+  return [..._vaultUi.allow].some((id) => !_vaultUi.savedAllow.has(id));
+}
+
+function renderVaultAccess() {
+  const list = document.getElementById('onePasswordVaultList');
+  const saveSelect = document.getElementById('onePasswordSaveVault');
+  const saveBtn = document.getElementById('onePasswordSaveVaultsBtn');
+  if (!list) return;
+  const scopeAll = _vaultUi.scope === 'all';
+  const vaults = _vaultUi.vaults.filter(onePasswordVaultReadable);
+  // Reading every vault, each one counts as turned on.
+  _vaultUi.savedAllow = scopeAll
+    ? new Set(vaults.map((vault) => vault.id))
+    : new Set((_onePasswordStatus && Array.isArray(_onePasswordStatus.vaultIds)) ? _onePasswordStatus.vaultIds : []);
+  if (!_vaultUi.allowEdited) _vaultUi.allow = new Set(_vaultUi.savedAllow);
+  const scopeText = document.getElementById('onePasswordScopeText');
+  if (scopeText) fsbUiSet(scopeText, scopeAll ? 'All vaults in your 1Password account' : 'Only the vaults turned on under Advanced');
+  list.innerHTML = vaults.map((vault) => {
+    const on = _vaultUi.allow.has(vault.id);
+    const tag = vaultTag(vault);
+    const count = String(vault.itemCount || 0);
+    const warnOn = on && !!tag.warn && !_vaultUi.savedAllow.has(vault.id);
+    return `
+    <div>
+      <label class="onepassword-vault-option vx-opt${on ? ' on' : ''}">
+        <input type="checkbox" value="${fsbUiEscape(vault.id)}" ${on ? 'checked' : ''}>
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        <span class="onepassword-vault-title">${escapeHtml(vault.title || vault.id)}</span>
+        ${tag.text ? `<span class="vx-tag${tag.cls ? ' ' + tag.cls : ''}">${fsbUiHtml(tag.text)}</span>` : ''}
+        ${vault.itemCount == null ? '' : `<span class="onepassword-vault-count">${fsbUiHtml('Items: $COUNT$', { count })}</span>`}
+      </label>
+      ${warnOn ? `<p class="vx-warn"><i class="fas fa-triangle-exclamation"></i><span>${fsbUiHtml(tag.warn, { count })}</span></p>` : ''}
+    </div>`;
+  }).join('');
+
+  // New logins can go to any vault FSB may read, as saved.
+  if (saveSelect) {
+    while (saveSelect.options.length > 1) saveSelect.remove(1);
+    for (const vault of vaults) {
+      if (!_vaultUi.savedAllow.has(vault.id)) continue;
+      const option = document.createElement('option');
+      option.value = vault.id;
+      option.textContent = vault.title || vault.id;
+      saveSelect.appendChild(option);
+    }
+    if (_vaultUi.savedSave && !Array.prototype.some.call(saveSelect.options, (option) => option.value === _vaultUi.savedSave)) {
+      const option = document.createElement('option');
+      option.value = _vaultUi.savedSave;
+      option.textContent = vaultTitle(_vaultUi.savedSave) || _vaultUi.savedSave;
+      saveSelect.appendChild(option);
+    }
+    saveSelect.value = _vaultUi.savedSave;
+    // The custom dropdown copies the options once; rebuild it for the new list.
+    if (typeof saveSelect._fsbRebuildMenu === 'function') saveSelect._fsbRebuildMenu();
+    if (typeof saveSelect._fsbSyncLabel === 'function') saveSelect._fsbSyncLabel();
+  }
+  vaultShow(document.getElementById('onePasswordSaveHint'), _vaultUi.vaultsLoaded && !_vaultUi.savedSave);
+  vaultShow(document.getElementById('onePasswordAllVaultsBtn'), !scopeAll);
+  if (saveBtn) saveBtn.disabled = !vaultAccessDirty();
+}
+
+function vaultTitle(vaultId) {
+  const fromList = _vaultUi.vaults.find((vault) => vault.id === vaultId);
+  if (fromList) return fromList.title || '';
+  const fromStatus = (_onePasswordStatus && Array.isArray(_onePasswordStatus.vaults) ? _onePasswordStatus.vaults : [])
+    .find((vault) => vault.id === vaultId);
+  return fromStatus ? (fromStatus.title || '') : '';
+}
+
+// Opens Settings > Developer in the 1Password app. Chrome asks the user before
+// it hands the link to 1Password.
+function openOnePasswordDeveloperSettings() {
+  const fallback = () => {
+    try {
+      window.open(ONEPASSWORD_DEVELOPER_SETTINGS_URL, '_blank', 'noopener');
+    } catch (_error) { /* the button on the page opens it too */ }
+  };
+  try {
+    if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+      Promise.resolve(chrome.tabs.create({ url: ONEPASSWORD_DEVELOPER_SETTINGS_URL })).catch(fallback);
+      return;
+    }
+  } catch (_error) { /* fall back to a window */ }
+  fallback();
+}
+
+// Opens the account name field, filled in with the name used last time.
+async function askOnePasswordAccount(prefill) {
+  _vaultUi.askAccount = true;
+  _vaultUi.error = null;
+  _vaultUi.integration = null;
+  const input = document.getElementById('onePasswordAccount');
+  if (input) {
+    if (prefill) input.value = prefill;
+    if (!input.value) {
+      const last = await readOnePasswordLocal(ONEPASSWORD_ACCOUNT_KEY);
+      if (typeof last === 'string') input.value = last;
+    }
+  }
+  renderVault();
+  if (input) input.focus();
+}
+
+// Log in to 1Password, the one button on this page. 1Password still needs its
+// Developer setting turned on (FSB can only open that pane), the account name
+// the first time, and the user's approval, which it asks for again after 10
+// idle minutes, a lock, or a restart of the local server.
+async function logInToOnePassword(options = {}) {
+  if (_onePasswordBusy) return;
+  const token = ++_vaultUi.connectToken;
+  _onePasswordBusy = true;
+  _vaultUi.error = null;
+  _vaultUi.integration = null;
+  renderVault();
+  try {
+    // Logging in again overrides a Disconnect still waiting for the server.
+    await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: false });
+    // The click is the go-ahead to pair FSB with the local server.
+    const current = await chrome.runtime.sendMessage({ action: 'onePasswordStatus', pair: true });
+    if (token !== _vaultUi.connectToken) return;
+    if (!current || !current.success) {
+      if (!noteVaultFailure(current)) showToast((current && current.error) || 'Unknown error', 'error');
+      return;
+    }
+    _onePasswordStatus = current.status || {};
+    // A service account set up from the terminal needs no account name.
+    if (_onePasswordStatus.authKind !== 'service-account') {
+      const stored = onePasswordStoredAccount(_onePasswordStatus);
+      const accountName = (typeof options.accountName === 'string' ? options.accountName.trim() : '') || stored;
+      if (!accountName) {
+        await askOnePasswordAccount('');
+        return;
+      }
+      if (accountName !== stored) {
+        const hadSignIn = !!_onePasswordStatus.authKind;
+        // A new sign-in reads every vault. Advanced can limit it later.
+        const configured = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', authKind: 'desktop', accountName, vaultScope: 'all' });
+        if (token !== _vaultUi.connectToken) return;
+        if (!configured || !configured.success) {
+          showToast((configured && configured.error) || 'Unknown error', 'error');
+          return;
+        }
+        if (configured.status) _onePasswordStatus = configured.status;
+        // Nothing was saved before this Log in, so Cancel may forget it again.
+        if (!hadSignIn) _vaultUi.createdSignIn = true;
+      }
+      _vaultUi.askAccount = false;
+      await writeOnePasswordLocal({ [ONEPASSWORD_ACCOUNT_KEY]: accountName });
+    }
+    await waitForOnePasswordApproval(token);
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
   } finally {
-    _unlockSubmitting = false;
-    if (unlockBtn) { unlockBtn.disabled = false; fsbUiSet(unlockBtn, "Unlock Vault"); }
+    if (token === _vaultUi.connectToken) {
+      _onePasswordBusy = false;
+      _vaultUi.waiting = false;
+      loadOnePasswordStatus({ readItems: true, keepError: true });
+    }
   }
 }
 
-function initCredentialVaultListeners() {
-  const setupBtn = document.getElementById('setupCredentialVaultBtn');
-  const unlockBtn = document.getElementById('unlockCredentialVaultBtn');
-  const lockBtn = document.getElementById('lockCredentialVaultBtn');
-
-  // PIN length toggle for setup
-  document.querySelectorAll('.pin-length-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const len = parseInt(btn.dataset.pinLength);
-      _vaultSetupDigits = len;
-      document.querySelectorAll('.pin-length-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      if (_vaultPinSetup) _vaultPinSetup.setDigitCount(len);
-      if (_vaultPinConfirm) _vaultPinConfirm.setDigitCount(len);
-    });
-  });
-
-  if (setupBtn) {
-    setupBtn.addEventListener('click', async () => {
-      const pin = _vaultPinSetup ? _vaultPinSetup.getValue() : '';
-      const confirmPin = _vaultPinConfirm ? _vaultPinConfirm.getValue() : '';
-      if (!pin || !/^\d{4}$|^\d{6}$/.test(pin)) {
-        showToast('Enter all ' + _vaultSetupDigits + ' digits', 'error');
-        return;
-      }
-      if (pin !== confirmPin) {
-        showToast('PINs do not match', 'error');
-        if (_vaultPinConfirm) _vaultPinConfirm.clear();
-        return;
-      }
-      setupBtn.disabled = true;
-      fsbUiSet(setupBtn, "Creating...");
-      try {
-        const response = await chrome.runtime.sendMessage({ action: 'createCredentialVault', passphrase: pin });
-        if (response?.success) {
-          showToast('Credential vault created', 'success');
-          _vaultPinSetup = null;
-          _vaultPinConfirm = null;
-          loadCredentialVaultStatus();
-          loadPaymentVaultStatus();
-        } else {
-          showToast(response?.error || 'Failed to create vault', 'error');
-        }
-      } catch (error) {
-        showToast(fsbUiLine('Error creating vault: $ERROR$', { error: error.message }), 'error');
-      } finally {
-        setupBtn.disabled = false;
-        fsbUiSet(setupBtn, "Set Up Vault");
-      }
-    });
-  }
-
-  if (unlockBtn) {
-    unlockBtn.addEventListener('click', async () => {
-      const pin = _vaultPinUnlock ? _vaultPinUnlock.getValue() : '';
-      if (!pin || !/^\d+$/.test(pin)) {
-        showToast('Enter your PIN', 'error');
-        return;
-      }
-      submitVaultUnlock(pin);
-    });
-  }
-
-  if (lockBtn) {
-    lockBtn.addEventListener('click', async () => {
-      try {
-        const response = await chrome.runtime.sendMessage({ action: 'lockCredentialVault' });
-        if (response?.success) {
-          showToast('Vault locked', 'success');
-          _vaultPinUnlock = null;
-          loadCredentialVaultStatus();
-          loadPaymentVaultStatus();
-        }
-      } catch (error) {
-        showToast(fsbUiLine('Error locking vault: $ERROR$', { error: error.message }), 'error');
-      }
-    });
-  }
-}
-
-async function loadPaymentVaultStatus() {
-  const statusText = document.getElementById('paymentMethodsStatusText');
-  const blockedPanel = document.getElementById('paymentMethodsBlocked');
-  const unlockPanel = document.getElementById('paymentMethodsUnlock');
-  const unlockedPanel = document.getElementById('paymentMethodsUnlocked');
-  const lockBtn = document.getElementById('lockPaymentMethodsBtn');
-  const paymentManager = document.getElementById('paymentMethodsManager');
-
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getPaymentVaultStatus' });
-    if (!response) {
-      if (statusText) fsbUiSet(statusText, "Unable to reach vault service");
+// Listing vaults is what makes 1Password ask the user to approve FSB. While
+// Integrate with 1Password SDKs is off, FSB opens that setting once and tries
+// again every few seconds for up to 2 minutes.
+async function waitForOnePasswordApproval(token) {
+  const startedAt = Date.now();
+  let settingOpened = false;
+  for (;;) {
+    _vaultUi.waiting = !_vaultUi.integration;
+    renderVault();
+    // A try that does not fail at once has reached the approval prompt.
+    const approvalShown = _vaultUi.integration ? setTimeout(() => {
+      if (token !== _vaultUi.connectToken) return;
+      _vaultUi.integration = null;
+      _vaultUi.waiting = true;
+      renderVault();
+    }, ONEPASSWORD_APPROVAL_SHOWN_MS) : null;
+    let vaults;
+    try {
+      vaults = await chrome.runtime.sendMessage({ action: 'onePasswordListVaults' });
+    } finally {
+      if (approvalShown) clearTimeout(approvalShown);
+    }
+    if (token !== _vaultUi.connectToken) return;
+    _vaultUi.waiting = false;
+    if (vaults && vaults.success) {
+      _vaultUi.integration = null;
+      _vaultUi.vaults = Array.isArray(vaults.vaults) ? vaults.vaults : [];
+      await setOnePasswordLoggedIn(true);
+      showToast('1Password connected', 'success');
       return;
     }
-
-    // Hide all state panels first
-    if (blockedPanel) blockedPanel.style.display = 'none';
-    if (unlockPanel) unlockPanel.style.display = 'none';
-    if (unlockedPanel) unlockedPanel.style.display = 'none';
-    if (lockBtn) lockBtn.style.display = 'none';
-    if (paymentManager) paymentManager.style.display = 'none';
-
-    if (!response.configured || !response.unlocked) {
-      // Credential vault not configured or locked -- payment methods blocked
-      if (statusText) fsbUiSet(statusText, "Unlock the credential vault first.");
-      if (blockedPanel) blockedPanel.style.display = 'block';
-    } else if (!response.paymentUnlocked) {
-      // Credential vault unlocked but payment access locked
-      if (statusText) fsbUiSet(statusText, "Payment methods are locked.");
-      if (unlockPanel) unlockPanel.style.display = 'block';
-    } else {
-      // Payment methods fully unlocked
-      if (statusText) fsbUiSet(statusText, "Payment methods unlocked for this session.");
-      if (unlockedPanel) unlockedPanel.style.display = 'block';
-      if (lockBtn) lockBtn.style.display = 'inline-flex';
+    if (vaults && vaults.errorCode === 'onepassword_auth_failed' && vaults.reason === 'integration_off') {
+      if (!settingOpened) {
+        settingOpened = true;
+        openOnePasswordDeveloperSettings();
+      }
+      if (Date.now() - startedAt >= ONEPASSWORD_SETTING_WAIT_MS) {
+        _vaultUi.integration = 'managed';
+        renderVault();
+        return;
+      }
+      _vaultUi.integration = 'integration';
+      renderVault();
+      await new Promise((resolve) => setTimeout(resolve, ONEPASSWORD_SETTING_RETRY_MS));
+      if (token !== _vaultUi.connectToken) return;
+      continue;
     }
-  } catch (error) {
-    console.error('Failed to check payment vault status:', error);
-    if (statusText) fsbUiSet(statusText, "Error checking payment status.");
+    _vaultUi.integration = null;
+    if (!noteVaultFailure(vaults)) showToast((vaults && vaults.error) || 'Unknown error', 'error');
+    return;
   }
 }
 
-// ==========================================
-// Credential Manager Functions (Passwords Beta)
-// ==========================================
+function continueOnePasswordLogin() {
+  const accountInput = document.getElementById('onePasswordAccount');
+  const accountName = (accountInput && accountInput.value || '').trim();
+  if (!accountName) {
+    showToast('Enter your 1Password account name', 'error');
+    return;
+  }
+  logInToOnePassword({ accountName });
+}
 
-// Current state for credential modal
-let credentialModalMode = 'add'; // 'add' or 'edit'
-let credentialEditingDomain = null;
+// Stops any wait in progress and opens the account name field.
+function changeOnePasswordAccount() {
+  _vaultUi.connectToken += 1;
+  _vaultUi.waiting = false;
+  _onePasswordBusy = false;
+  askOnePasswordAccount(onePasswordStoredAccount(_onePasswordStatus));
+}
 
-// Show/hide credentials manager based on toggle
+// Cancel while FSB waits for 1Password: a late answer is ignored. When this
+// page's Log in saved the sign-in and 1Password never approved it, FSB also
+// forgets it again. A sign-in that was there before (set up from the
+// terminal, or in another browser) and a service account are left alone.
+async function cancelOnePasswordConnect() {
+  const forget = _vaultUi.createdSignIn && !_vaultUi.loggedIn
+    && !(_onePasswordStatus && _onePasswordStatus.authKind === 'service-account');
+  _vaultUi.createdSignIn = false;
+  _vaultUi.connectToken += 1;
+  _vaultUi.waiting = false;
+  _vaultUi.integration = null;
+  _vaultUi.error = null;
+  _onePasswordBusy = false;
+  renderVault();
+  if (forget) {
+    try {
+      await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
+    } catch (_error) { /* the status reload below shows the result */ }
+  }
+  loadOnePasswordStatus();
+}
+
+// Limit FSB to the vaults turned on. The save vault stays if it is one of them.
+async function saveOnePasswordVaults() {
+  const vaultIds = [..._vaultUi.allow];
+  if (vaultIds.length === 0) {
+    showToast('Choose at least one vault', 'error');
+    return;
+  }
+  const saveVaultId = _vaultUi.savedSave && _vaultUi.allow.has(_vaultUi.savedSave) ? _vaultUi.savedSave : null;
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', vaultIds, saveVaultId });
+    if (response && response.success) {
+      showToast('Vault access saved', 'success');
+    } else {
+      showToast((response && response.error) || 'Unknown error', 'error');
+    }
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  loadOnePasswordStatus();
+}
+
+// Back to reading every vault.
+async function useAllOnePasswordVaults() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', vaultScope: 'all' });
+    if (response && response.success) showToast('Vault access saved', 'success');
+    else showToast((response && response.error) || 'Unknown error', 'error');
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  loadOnePasswordStatus();
+}
+
+// "Save new logins to" saves as soon as it changes.
+async function saveOnePasswordSaveVault(vaultId) {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordConfigure', saveVaultId: vaultId || null });
+    if (response && response.success) {
+      showToast('Vault access saved', 'success');
+      if (response.status) {
+        _onePasswordStatus = response.status;
+        _vaultUi.savedSave = onePasswordSaveVault(response.status);
+      }
+    } else {
+      showToast((response && response.error) || 'Unknown error', 'error');
+    }
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  renderVaultAccess();
+}
+
+async function disconnectOnePassword() {
+  const service = !!(_onePasswordStatus && _onePasswordStatus.authKind === 'service-account');
+  const question = service
+    ? fsbUiLine('Disconnect 1Password? FSB forgets its 1Password settings and deletes the saved service account token. Reconnecting needs the terminal again.')
+    : fsbUiLine('Disconnect 1Password? FSB forgets its 1Password settings.');
+  if (!confirm(question)) return;
+  const signIn = _onePasswordStatus && _onePasswordStatus.authKind
+    ? { authKind: _onePasswordStatus.authKind, accountName: _onePasswordStatus.accountName || null }
+    : null;
+  let response = null;
+  let failure = null;
+  try {
+    response = await chrome.runtime.sendMessage({ action: 'onePasswordDisconnect', forget: true });
+  } catch (error) {
+    failure = error;
+  }
+  if (response && response.success) {
+    showToast('1Password disconnected', 'success');
+  } else if (signIn) {
+    // The local server still holds the sign-in. The next status read that
+    // reaches it forgets it there.
+    await writeOnePasswordLocal({ [ONEPASSWORD_DISCONNECT_PENDING_KEY]: signIn });
+    showToast('Logged out in this browser. The local server still has the 1Password sign-in, and FSB removes it there the next time it can.', 'error');
+  } else if (failure) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: failure.message }), 'error');
+  } else {
+    showToast((response && response.error) || 'Unknown error', 'error');
+  }
+  // Logged out in this browser even if the local server could not be reached.
+  _vaultUi.createdSignIn = false;
+  await setOnePasswordLoggedIn(false);
+  _vaultUi.logins = [];
+  _vaultUi.cards = [];
+  _vaultUi.itemsLoaded = false;
+  _vaultUi.vaults = [];
+  _vaultUi.vaultsLoaded = false;
+  _vaultUi.askAccount = false;
+  loadOnePasswordStatus();
+}
+
+function retryOnePassword() {
+  const spec = VAULT_VIEWS[vaultView()] || {};
+  // Before the first Log in, and for every sign-in problem, Try again logs in again.
+  if (spec.login || !_vaultUi.loggedIn) {
+    logInToOnePassword();
+    return;
+  }
+  _vaultUi.error = null;
+  renderVault();
+  loadOnePasswordStatus({ readItems: true, pair: !!spec.pair || undefined });
+}
+
+function renderLegacyVault(legacy) {
+  const panel = document.getElementById('legacyVaultPanel');
+  if (!panel) return;
+  const stage = _vaultUi.legacyStage;
+  const present = !!(legacy && legacy.present);
+  if (stage === 'gone' || (!present && stage !== 'done')) {
+    panel.hidden = true;
+    _legacyVaultPin = null;
+    return;
+  }
+  panel.hidden = false;
+  const summary = document.getElementById('legacyVaultSummaryText');
+  const pinWrapper = document.getElementById('legacyVaultPinWrapper');
+  const actions = document.getElementById('legacyVaultActions');
+  const progress = document.getElementById('legacyVaultProgress');
+  const doneRow = document.getElementById('legacyVaultDoneRow');
+  vaultShow(actions, stage === 'pin');
+  vaultShow(progress, stage === 'moving');
+  vaultShow(doneRow, stage === 'done');
+  if (stage === 'moving') {
+    vaultShow(pinWrapper, false);
+    if (summary) fsbUiSet(summary, 'Moving in batches of 10. Each batch is erased from FSB once 1Password confirms it.');
+    return;
+  }
+  if (stage === 'done') {
+    vaultShow(pinWrapper, false);
+    const result = _vaultUi.legacyResult || {};
+    const moved = (result.imported?.logins || 0) + (result.imported?.cards || 0);
+    const kept = (result.failed?.logins || 0) + (result.failed?.cards || 0)
+      + (result.notAttempted?.logins || 0) + (result.notAttempted?.cards || 0)
+      + (result.unreadable || 0);
+    if (summary) {
+      if (kept > 0) fsbUiSet(summary, 'Stopped partway: $MOVED$ moved, $KEPT$ kept in FSB.', { moved: String(moved), kept: String(kept) });
+      else fsbUiSet(summary, 'Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$. The old vault is erased.', {
+        logins: String(result.imported?.logins || 0),
+        cards: String(result.imported?.cards || 0)
+      });
+    }
+    return;
+  }
+  if (summary) {
+    fsbUiSet(summary, 'FSB\'s old vault still holds items FSB no longer uses. Logins: $LOGINS$. Cards: $CARDS$.', {
+      logins: String(legacy.logins || 0),
+      cards: String(legacy.cards || 0)
+    });
+  }
+  const pinContainer = document.getElementById('legacyVaultPin');
+  vaultShow(pinWrapper, !!legacy.pinProtected);
+  if (legacy.pinProtected && pinContainer && !_legacyVaultPin && typeof createPinInput === 'function') {
+    _legacyVaultPin = createPinInput(pinContainer, legacy.pinLength || 6);
+  }
+}
+
+async function importLegacyVault() {
+  const importBtn = document.getElementById('legacyVaultImportBtn');
+  const pin = _legacyVaultPin ? _legacyVaultPin.getValue() : '';
+  if (_onePasswordLegacy && _onePasswordLegacy.pinProtected && !/^\d{4,6}$/.test(pin)) {
+    showToast('Enter your PIN', 'error');
+    return;
+  }
+  if (importBtn) importBtn.disabled = true;
+  _vaultUi.legacyStage = 'moving';
+  renderLegacyVault(_onePasswordLegacy);
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'legacyVaultImport', pin });
+    if (!response || !response.success) {
+      _vaultUi.legacyStage = 'pin';
+      showToast((response && response.error) || 'Unknown error', 'error');
+      if (_legacyVaultPin) _legacyVaultPin.clear();
+      return;
+    }
+    _vaultUi.legacyResult = response;
+    _vaultUi.legacyStage = 'done';
+    _legacyVaultPin = null;
+    showToast(fsbUiLine('Moved to 1Password. Logins: $LOGINS$. Cards: $CARDS$.', {
+      logins: String(response.imported?.logins || 0),
+      cards: String(response.imported?.cards || 0)
+    }), 'success');
+  } catch (error) {
+    _vaultUi.legacyStage = 'pin';
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  } finally {
+    if (importBtn) importBtn.disabled = false;
+    renderLegacyVault(_onePasswordLegacy);
+    loadOnePasswordStatus();
+  }
+}
+
+async function deleteLegacyVault() {
+  if (!confirm(fsbUiLine('Delete the old FSB vault? Anything not moved to 1Password will be lost.'))) return;
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'legacyVaultDelete' });
+    if (response && response.success) showToast('Old vault deleted', 'success');
+    else showToast((response && response.error) || 'Unknown error', 'error');
+  } catch (error) {
+    showToast(fsbUiLine('Could not reach 1Password: $ERROR$', { error: error.message }), 'error');
+  }
+  _legacyVaultPin = null;
+  loadOnePasswordStatus();
+}
+
+function dismissLegacyVault() {
+  _vaultUi.legacyStage = 'gone';
+  _vaultUi.legacyResult = null;
+  renderLegacyVault(_onePasswordLegacy);
+}
+
 function updateCaptchaSolverVisibility(enabled) {
   const configPanel = document.getElementById('captchaSolverConfig');
   if (configPanel) {
@@ -5286,348 +6016,221 @@ function updateCaptchaSolverVisibility(enabled) {
   }
 }
 
-function updateCredentialsManagerVisibility(enabled) {
-  const manager = document.getElementById('credentialsManager');
-  if (manager) {
-    // Only show manager if vault is unlocked (vault status drives visibility now)
-    if (enabled) {
-      loadCredentialVaultStatus();
-      loadPaymentVaultStatus();
-    } else {
-      manager.style.display = 'none';
-    }
-  }
+// The login list follows the 1Password connection, not the Auto-Login toggle:
+// MCP agents can fill logins even when autopilot auto-login is off.
+function updateCredentialsManagerVisibility(_enabled) {
+  loadOnePasswordStatus();
 }
 
-// Load and display all credentials
+// Load the logins FSB may use (read-only; edit them in 1Password)
 async function loadCredentials() {
+  if (!onePasswordMayRead(_onePasswordStatus)) return;
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'getAllCredentials' });
-
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordListLogins' });
     if (!response || !response.success) {
-      console.error('Failed to load credentials:', response?.error);
+      _vaultUi.logins = [];
+      noteVaultFailure(response);
+      renderVaultItems();
       return;
     }
-
-    const credentials = response.credentials || [];
-    const listEl = document.getElementById('credentialsList');
-    const emptyEl = document.getElementById('credentialsEmpty');
-
-    if (credentials.length === 0) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) emptyEl.style.display = 'flex';
-      return;
-    }
-
-    if (emptyEl) emptyEl.style.display = 'none';
-
-    if (listEl) {
-      listEl.innerHTML = credentials.map(cred => renderCredentialCard(cred)).join('');
-    }
+    _vaultUi.logins = Array.isArray(response.logins) ? response.logins : [];
+    _vaultUi.itemsLoaded = true;
+    renderVaultItems();
   } catch (error) {
-    console.error('Error loading credentials:', error);
+    console.error('Error loading 1Password logins:', error.message);
   }
 }
 
-// Render a single credential card
-function renderCredentialCard(cred) {
-  const initial = (cred.domain || '?')[0].toUpperCase();
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(cred.domain)}&sz=32`;
-  const dateStr = cred.updatedAt ? new Date(cred.updatedAt).toLocaleDateString() : '';
+function loginSites(login) {
+  if (Array.isArray(login.websites) && login.websites.length) return login.websites;
+  return (Array.isArray(login.domains) ? login.domains : []).map((host) => ({ host, rule: 'site', protocol: '' }));
+}
 
+// How many logins share each saved host, for the "2 for this site" chip.
+function loginSiteCounts(logins) {
+  const counts = {};
+  for (const login of logins) {
+    const hosts = new Set(loginSites(login).map((site) => site.host));
+    hosts.forEach((host) => { counts[host] = (counts[host] || 0) + 1; });
+  }
+  return counts;
+}
+
+// Render a single login (no favicon fetch: the site list stays on this device)
+function renderCredentialCard(login, siteCounts) {
+  const sites = loginSites(login);
+  const label = login.title || (sites[0] && sites[0].host) || '?';
+  const initial = label[0].toUpperCase();
+  const scope = sites.map((site) => (site.protocol === 'http' ? 'http://' : '') + site.host).join(', ');
+  const shared = Math.max(0, ...sites.map((site) => (siteCounts && siteCounts[site.host]) || 0));
+  const chips = [];
+  if (sites.length) {
+    chips.push(`<span class="vx-chip">${sites.every((site) => site.rule === 'exact') ? fsbUiHtml('Exact domain') : fsbUiHtml('Anywhere on site')}</span>`);
+  }
+  if (shared > 1) chips.push(`<span class="vx-chip warn">${fsbUiHtml('$COUNT$ for this site', { count: String(shared) })}</span>`);
+  if (login.hasOneTimeCode) chips.push(`<span class="vx-chip acc">${fsbUiHtml('One-time code')}</span>`);
+  if (sites.some((site) => site.protocol === 'http')) chips.push('<span class="vx-chip" translate="no">http</span>');
+  const search = [login.title, login.username, scope].filter(Boolean).join(' ').toLowerCase();
   return `
-    <div class="credential-card" data-domain="${escapeHtml(cred.domain)}">
-      <div class="credential-card-icon">
-        <img src="${faviconUrl}" alt="${initial}" onerror="this.style.display='none';this.parentNode.textContent='${initial}'">
-      </div>
+    <div class="credential-card" data-search="${fsbUiEscape(search)}">
+      <div class="credential-card-icon">${escapeHtml(initial)}</div>
       <div class="credential-card-info">
-        <div class="credential-card-domain">${escapeHtml(cred.domain)}</div>
-        <div class="credential-card-username">${cred.username ? escapeHtml(cred.username) : fsbUiHtml('No username')}</div>
+        <div class="credential-card-domain">${escapeHtml(label)}</div>
+        <div class="credential-card-username">${login.username ? escapeHtml(login.username) : fsbUiHtml('No username')}</div>
+        ${scope ? `<div class="credential-card-scope">${escapeHtml(scope)}</div>` : ''}
       </div>
-      <div class="credential-card-password" data-domain="${escapeHtml(cred.domain)}">
-        <span class="password-dots">--------</span>
-      </div>
-      <div class="credential-card-actions">
-        <button class="credential-action-btn" data-cred-action="toggle-password" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Show password')}>
-          <i class="fas fa-eye"></i>
-        </button>
-        <button class="credential-action-btn" data-cred-action="edit" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Edit')}>
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="credential-action-btn delete" data-cred-action="delete" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Delete')}>
-          <i class="fas fa-trash"></i>
-        </button>
-      </div>
+      <div class="vx-meta">${chips.join('')}</div>
+      <span class="vx-vault">${escapeHtml(vaultTitle(login.vaultId))}</span>
     </div>
   `;
 }
 
-// Filter credentials by search query
-function filterCredentials(query) {
-  const cards = document.querySelectorAll('.credential-card');
-  const lowerQuery = query.toLowerCase();
+function renderVaultItems() {
+  const view = vaultView();
+  const status = _onePasswordStatus;
+  const allowed = !!status && (onePasswordScope(status) === 'all' || (Array.isArray(status.vaultIds) && status.vaultIds.length > 0));
+  const tab = _vaultUi.tab;
+  const tools = document.getElementById('vaultItemsTools');
+  const loginsList = document.getElementById('credentialsList');
+  const cardsList = document.getElementById('paymentMethodsList');
+  const showLists = allowed && view !== 'vaults';
+  vaultShow(tools, showLists);
+  vaultShow(document.getElementById('vaultNoAccessEmpty'), !showLists);
+  vaultShow(document.getElementById('vaultLoginsNote'), showLists && tab === 'logins');
+  vaultShow(document.getElementById('vaultCardsNote'), showLists && tab === 'cards');
+  const loginCount = document.getElementById('vaultLoginCount');
+  const cardCount = document.getElementById('vaultCardCount');
+  if (loginCount) loginCount.textContent = _vaultUi.itemsLoaded ? String(_vaultUi.logins.length) : '';
+  if (cardCount) cardCount.textContent = _vaultUi.itemsLoaded ? String(_vaultUi.cards.length) : '';
+  for (const [id, name] of [['vaultTabLogins', 'logins'], ['vaultTabCards', 'cards']]) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    btn.classList.toggle('active', tab === name);
+    btn.setAttribute('aria-selected', tab === name ? 'true' : 'false');
+  }
+  if (loginsList) {
+    const counts = loginSiteCounts(_vaultUi.logins);
+    loginsList.innerHTML = showLists ? _vaultUi.logins.map((login) => renderCredentialCard(login, counts)).join('') : '';
+    vaultShow(loginsList, showLists && tab === 'logins');
+  }
+  if (cardsList) {
+    cardsList.innerHTML = showLists ? _vaultUi.cards.map(renderPaymentCard).join('') : '';
+    vaultShow(cardsList, showLists && tab === 'cards');
+  }
+  vaultShow(document.getElementById('credentialsEmpty'), showLists && _vaultUi.itemsLoaded && tab === 'logins' && _vaultUi.logins.length === 0);
+  vaultShow(document.getElementById('paymentMethodsEmpty'), showLists && _vaultUi.itemsLoaded && tab === 'cards' && _vaultUi.cards.length === 0);
+  const search = document.getElementById('credentialSearch');
+  if (search && search.value) filterCredentials(search.value);
+}
 
-  cards.forEach(card => {
-    const domain = card.dataset.domain || '';
-    const username = card.querySelector('.credential-card-username')?.textContent || '';
-    const matches = domain.toLowerCase().includes(lowerQuery) ||
-                    username.toLowerCase().includes(lowerQuery);
-    card.style.display = matches ? 'flex' : 'none';
+// Filter the visible list by title, username or site
+function filterCredentials(query) {
+  const lowerQuery = String(query || '').toLowerCase();
+  document.querySelectorAll('#credentialsList .credential-card, #paymentMethodsList .credential-card').forEach((card) => {
+    const haystack = card.dataset.search || '';
+    card.style.display = haystack.includes(lowerQuery) ? 'flex' : 'none';
   });
 }
 
-// Show add/edit modal
-async function showCredentialModal(mode, domain) {
-  credentialModalMode = mode;
-  credentialEditingDomain = domain || null;
-
-  const modal = document.getElementById('credentialModal');
-  const titleEl = document.getElementById('credentialModalTitle');
-  const domainInput = document.getElementById('credModalDomain');
-  const usernameInput = document.getElementById('credModalUsername');
-  const passwordInput = document.getElementById('credModalPassword');
-  const notesInput = document.getElementById('credModalNotes');
-
-  if (titleEl) fsbUiSet(titleEl, mode === 'edit' ? 'Edit Credential' : 'Add Credential');
-
-  // Clear fields
-  if (domainInput) domainInput.value = '';
-  if (usernameInput) usernameInput.value = '';
-  if (passwordInput) passwordInput.value = '';
-  if (notesInput) notesInput.value = '';
-
-  // Pre-fill for edit mode
-  if (mode === 'edit' && domain) {
-    if (domainInput) {
-      domainInput.value = domain;
-      domainInput.readOnly = true;
-    }
-
-    // Fetch full credential (including password) for editing
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'getFullCredential',
-        domain: domain
-      });
-
-      if (response?.success && response.credential) {
-        if (usernameInput) usernameInput.value = response.credential.username || '';
-        if (passwordInput) passwordInput.value = response.credential.password || '';
-        if (notesInput) notesInput.value = response.credential.notes || '';
-      }
-    } catch (error) {
-      console.error('Failed to load credential for editing:', error);
-    }
-  } else {
-    if (domainInput) domainInput.readOnly = false;
-  }
-
-  // Show modal
-  if (modal) modal.classList.remove('hidden');
-}
-
-// Hide modal
-function hideCredentialModal() {
-  const modal = document.getElementById('credentialModal');
-  if (modal) modal.classList.add('hidden');
-  credentialModalMode = 'add';
-  credentialEditingDomain = null;
-}
-
-// Save credential from modal
-async function saveCredentialFromModal() {
-  const domain = document.getElementById('credModalDomain')?.value?.trim();
-  const username = document.getElementById('credModalUsername')?.value?.trim();
-  const password = document.getElementById('credModalPassword')?.value;
-  const notes = document.getElementById('credModalNotes')?.value?.trim();
-
-  if (!domain) {
-    showToast('Domain is required', 'error');
-    return;
-  }
-
-  if (!username && !password) {
-    showToast('Username or password is required', 'error');
-    return;
-  }
-
-  try {
-    const action = credentialModalMode === 'edit' ? 'updateCredential' : 'saveCredential';
-    const message = credentialModalMode === 'edit'
-      ? { action, domain: credentialEditingDomain || domain, updates: { username, password, notes } }
-      : { action, domain, data: { username, password, notes } };
-
-    const response = await chrome.runtime.sendMessage(message);
-
-    if (response?.success) {
-      showToast(credentialModalMode === 'edit' ? 'Credential updated' : 'Credential saved', 'success');
-      hideCredentialModal();
-      loadCredentials();
-    } else {
-      showToast(fsbUiLine('Failed to save: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error saving credential: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-// Delete credential with confirmation
-async function deleteCredentialConfirm(domain) {
-  if (!confirm(fsbUiLine('Delete saved credential for "$DOMAIN$"? This cannot be undone.', { domain: domain }))) {
-    return;
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'deleteCredential',
-      domain: domain
-    });
-
-    if (response?.success) {
-      showToast('Credential deleted', 'success');
-      loadCredentials();
-    } else {
-      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error deleting credential: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-// Toggle password visibility for a credential card
-async function toggleCredentialPassword(domain) {
-  const passwordEl = document.querySelector(`.credential-card-password[data-domain="${domain}"]`);
-  if (!passwordEl) return;
-
-  const dotsEl = passwordEl.querySelector('.password-dots');
-  if (!dotsEl) return;
-
-  // If currently showing dots, fetch and show password
-  if (dotsEl.textContent === '--------') {
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'getFullCredential',
-        domain: domain
-      });
-
-      if (response?.success && response.credential) {
-        dotsEl.textContent = response.credential.password || '(empty)';
-        dotsEl.style.color = 'var(--text-primary)';
-
-        // Find the eye icon and switch it
-        const card = passwordEl.closest('.credential-card');
-        const eyeBtn = card?.querySelector('.credential-action-btn:first-child i');
-        if (eyeBtn) eyeBtn.className = 'fas fa-eye-slash';
-
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          dotsEl.textContent = '--------';
-          dotsEl.style.color = '';
-          if (eyeBtn) eyeBtn.className = 'fas fa-eye';
-        }, 5000);
-      }
-    } catch (error) {
-      console.error('Failed to fetch password:', error);
-    }
-  } else {
-    // Hide password
-    dotsEl.textContent = '--------';
-    dotsEl.style.color = '';
-
-    const card = passwordEl.closest('.credential-card');
-    const eyeBtn = card?.querySelector('.credential-action-btn:first-child i');
-    if (eyeBtn) eyeBtn.className = 'fas fa-eye';
-  }
-}
-
-// Initialize credential manager event listeners
 function initializeCredentialManager() {
-  // Event delegation for credential card action buttons (avoids inline onclick XSS risk)
-  const credList = document.getElementById('credentialsList');
-  if (credList) {
-    credList.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-cred-action]');
-      if (!btn) return;
-      const action = btn.dataset.credAction;
-      const domain = btn.dataset.credDomain;
-      if (!domain) return;
-      if (action === 'toggle-password') toggleCredentialPassword(domain);
-      else if (action === 'edit') showCredentialModal('edit', domain);
-      else if (action === 'delete') deleteCredentialConfirm(domain);
-    });
-  }
-
-  // Enable login toggle
   const enableLoginToggle = document.getElementById('enableLogin');
   if (enableLoginToggle) {
-    enableLoginToggle.addEventListener('change', (e) => {
-      updateCredentialsManagerVisibility(e.target.checked);
+    enableLoginToggle.addEventListener('change', () => {
+      markUnsavedChanges();
+    });
+  }
+  const enablePaymentsToggle = document.getElementById('enableSavedPayments');
+  if (enablePaymentsToggle) {
+    enablePaymentsToggle.addEventListener('change', () => {
       markUnsavedChanges();
     });
   }
 
-  // Search filter
   const searchInput = document.getElementById('credentialSearch');
   if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      filterCredentials(e.target.value);
+    searchInput.addEventListener('input', (e) => filterCredentials(e.target.value));
+  }
+
+  const refreshBtn = document.getElementById('refreshCredentialsBtn');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => Promise.all([loadCredentials(), loadPaymentMethods()]));
+
+  for (const id of ['vaultTabLogins', 'vaultTabCards']) {
+    const tabBtn = document.getElementById(id);
+    if (!tabBtn) continue;
+    tabBtn.addEventListener('click', () => {
+      _vaultUi.tab = tabBtn.dataset.tab === 'cards' ? 'cards' : 'logins';
+      renderVaultItems();
     });
   }
 
-  // Add New button
-  const addBtn = document.getElementById('addCredentialBtn');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => showCredentialModal('add'));
+  const vaultList = document.getElementById('onePasswordVaultList');
+  if (vaultList) {
+    vaultList.addEventListener('change', (e) => {
+      const box = e.target;
+      if (!box || box.type !== 'checkbox') return;
+      _vaultUi.allowEdited = true;
+      if (box.checked) _vaultUi.allow.add(box.value);
+      else _vaultUi.allow.delete(box.value);
+      renderVaultAccess();
+    });
+  }
+  const saveSelect = document.getElementById('onePasswordSaveVault');
+  if (saveSelect) {
+    saveSelect.addEventListener('change', () => {
+      if ((saveSelect.value || '') !== _vaultUi.savedSave) saveOnePasswordSaveVault(saveSelect.value || '');
+    });
   }
 
-  // Modal buttons
-  const modalSave = document.getElementById('credentialModalSave');
-  const modalCancel = document.getElementById('credentialModalCancel');
-  const modalClose = document.getElementById('credentialModalClose');
-  const modalBackdrop = document.querySelector('.credential-modal-backdrop');
-
-  if (modalSave) modalSave.addEventListener('click', saveCredentialFromModal);
-  if (modalCancel) modalCancel.addEventListener('click', hideCredentialModal);
-  if (modalClose) modalClose.addEventListener('click', hideCredentialModal);
-  if (modalBackdrop) modalBackdrop.addEventListener('click', hideCredentialModal);
-
-  // Modal password toggle
-  const toggleModalPw = document.getElementById('toggleCredModalPassword');
-  if (toggleModalPw) {
-    toggleModalPw.addEventListener('click', () => {
-      const pwField = document.getElementById('credModalPassword');
-      if (pwField) {
-        const isPassword = pwField.type === 'password';
-        pwField.type = isPassword ? 'text' : 'password';
-        const icon = toggleModalPw.querySelector('i');
-        if (icon) icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+  const loginBtn = document.getElementById('onePasswordLoginBtn');
+  if (loginBtn) loginBtn.addEventListener('click', () => logInToOnePassword());
+  const continueBtn = document.getElementById('onePasswordContinueBtn');
+  if (continueBtn) continueBtn.addEventListener('click', continueOnePasswordLogin);
+  const accountInput = document.getElementById('onePasswordAccount');
+  if (accountInput) {
+    accountInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        continueOnePasswordLogin();
       }
     });
   }
+  for (const id of ['onePasswordChangeAccountBtn', 'onePasswordEditAccountBtn']) {
+    const changeBtn = document.getElementById(id);
+    if (changeBtn) changeBtn.addEventListener('click', changeOnePasswordAccount);
+  }
+  const openSettingsBtn = document.getElementById('onePasswordOpenSettingsBtn');
+  if (openSettingsBtn) openSettingsBtn.addEventListener('click', openOnePasswordDeveloperSettings);
+  const saveVaultsBtn = document.getElementById('onePasswordSaveVaultsBtn');
+  if (saveVaultsBtn) saveVaultsBtn.addEventListener('click', saveOnePasswordVaults);
+  const allVaultsBtn = document.getElementById('onePasswordAllVaultsBtn');
+  if (allVaultsBtn) allVaultsBtn.addEventListener('click', useAllOnePasswordVaults);
+  const disconnectBtn = document.getElementById('onePasswordDisconnectBtn');
+  if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectOnePassword);
+  // Before Log in: forget a sign-in the local server holds from the terminal or another browser.
+  const forgetBtn = document.getElementById('onePasswordForgetBtn');
+  if (forgetBtn) forgetBtn.addEventListener('click', disconnectOnePassword);
+  const cancelBtn = document.getElementById('onePasswordCancelBtn');
+  if (cancelBtn) cancelBtn.addEventListener('click', cancelOnePasswordConnect);
+  const retryBtn = document.getElementById('onePasswordRetryBtn');
+  if (retryBtn) retryBtn.addEventListener('click', retryOnePassword);
+  const importBtn = document.getElementById('legacyVaultImportBtn');
+  if (importBtn) importBtn.addEventListener('click', importLegacyVault);
+  const deleteBtn = document.getElementById('legacyVaultDeleteBtn');
+  if (deleteBtn) deleteBtn.addEventListener('click', deleteLegacyVault);
+  const doneBtn = document.getElementById('legacyVaultDoneBtn');
+  if (doneBtn) doneBtn.addEventListener('click', dismissLegacyVault);
 
-  // Load credentials when switching to passwords section (override inside init to ensure DOM is ready)
-  // Also refresh memory data when switching to memory section (catches stale data)
+  // Refresh data when switching sections (DOM is ready by now)
   const origSwitchSection = switchSection;
   switchSection = function(sectionId) {
     origSwitchSection(sectionId);
-    if (sectionId === 'passwords') {
-      const enableLogin = document.getElementById('enableLogin');
-      if (enableLogin?.checked) {
-        loadCredentials();
-      }
+    const section = normalizeSectionId(sectionId);
+    if (section === 'vault') {
+      loadOnePasswordStatus({ readItems: true });
     }
     // Refresh memory tab when switching to it (picks up changes made while off-screen)
-    if (sectionId === 'memory') {
+    if (section === 'memory') {
       loadMemoryDashboard();
-    }
-    // Refresh payment vault status when switching to payments section
-    if (sectionId === 'payments') {
-      loadPaymentVaultStatus();
-    }
-    // Phase 213: Sync tab pill state machine (SYNC-02)
-    if (sectionId === 'sync') {
-      try { initializeSyncSection(); } catch (e) { /* benign if pill markup absent */ }
-      try { _refreshSyncPill(); } catch (e) { /* benign */ }
     }
   };
 }
@@ -5635,244 +6238,39 @@ function initializeCredentialManager() {
 // Initialize credential manager after DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   // Delay slightly to ensure all other init is done
-  setTimeout(initializeCredentialManager, 200);
+  setTimeout(() => {
+    initializeCredentialManager();
+    // Opened straight onto the Vault page (URL hash): read items now.
+    if (document.getElementById('vault')?.classList.contains('active')) loadOnePasswordStatus({ readItems: true });
+  }, 200);
 });
 
 // ==========================================
-// Payment Manager Functions (Payments Beta)
+// Vault cards: credit cards from 1Password (read-only)
 // ==========================================
 
-// Payment vault state
-let _paymentPinUnlock = null;
-let _paymentUnlockSubmitting = false;
-
-// Load payment vault status and render appropriate UI state
-async function loadPaymentVaultStatus() {
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getPaymentVaultStatus' });
-    if (!response) return;
-
-    const statusText = document.getElementById('paymentMethodsStatusText');
-    const blockedPanel = document.getElementById('paymentMethodsBlocked');
-    const unlockPanel = document.getElementById('paymentMethodsUnlock');
-    const unlockedPanel = document.getElementById('paymentMethodsUnlocked');
-    const lockBtn = document.getElementById('lockPaymentMethodsBtn');
-    const paymentManager = document.getElementById('paymentMethodsManager');
-
-    // Hide all states initially
-    if (blockedPanel) blockedPanel.style.display = 'none';
-    if (unlockPanel) unlockPanel.style.display = 'none';
-    if (unlockedPanel) unlockedPanel.style.display = 'none';
-    if (lockBtn) lockBtn.style.display = 'none';
-    if (paymentManager) paymentManager.style.display = 'none';
-
-    if (!response.configured) {
-      // Vault not configured -- direct user to Passwords section
-      if (statusText) fsbUiSet(statusText, "Configure a vault PIN in Passwords first.");
-      if (blockedPanel) blockedPanel.style.display = 'block';
-    } else if (!response.paymentUnlocked) {
-      // Vault configured but payment methods locked -- show PIN unlock
-      if (statusText) fsbUiSet(statusText, "Payment methods are locked.");
-      if (unlockPanel) unlockPanel.style.display = 'block';
-
-      // Fetch pinLength and create PIN input
-      const vaultStatus = await chrome.runtime.sendMessage({ action: 'getCredentialVaultStatus' });
-      const pinLength = (vaultStatus && vaultStatus.pinLength) || 6;
-      const container = document.getElementById('paymentMethodsPinUnlock');
-
-      if (container && !_paymentPinUnlock) {
-        _paymentPinUnlock = createPinInput(container, pinLength, {
-          onComplete: (pin) => submitPaymentUnlock(pin)
-        });
-      }
-    } else {
-      // Fully unlocked
-      if (statusText) fsbUiSet(statusText, "Payment methods are unlocked.");
-      if (unlockedPanel) unlockedPanel.style.display = 'block';
-      if (lockBtn) lockBtn.style.display = 'inline-flex';
-      if (paymentManager) paymentManager.style.display = 'block';
-      loadPaymentMethods();
-    }
-  } catch (error) {
-    console.error('Error loading payment vault status:', error);
-  }
-}
-
-// Submit payment unlock with PIN
-async function submitPaymentUnlock(pin) {
-  if (_paymentUnlockSubmitting) return;
-  _paymentUnlockSubmitting = true;
-
-  const unlockBtn = document.getElementById('unlockPaymentMethodsBtn');
-  const originalText = unlockBtn ? unlockBtn.textContent : '';
-  if (unlockBtn) {
-    unlockBtn.disabled = true;
-    fsbUiSet(unlockBtn, "Unlocking...");
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'unlockPaymentMethods',
-      passphrase: pin
-    });
-
-    if (response && response.success) {
-      showToast('Payment methods unlocked', 'success');
-      _paymentPinUnlock = null;
-      loadPaymentVaultStatus();
-    } else {
-      showToast(response?.error || 'Incorrect PIN', 'error');
-      if (_paymentPinUnlock) _paymentPinUnlock.clear();
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error unlocking payment methods: $ERROR$', { error: error.message }), 'error');
-    if (_paymentPinUnlock) _paymentPinUnlock.clear();
-  } finally {
-    _paymentUnlockSubmitting = false;
-    if (unlockBtn) {
-      unlockBtn.disabled = false;
-      unlockBtn.textContent = originalText;
-    }
-  }
-}
-
-// Initialize payment manager event listeners
-function initializePaymentManager() {
-  // Lock button
-  const lockBtn = document.getElementById('lockPaymentMethodsBtn');
-  if (lockBtn) {
-    lockBtn.addEventListener('click', async () => {
-      try {
-        const response = await chrome.runtime.sendMessage({ action: 'lockPaymentMethods' });
-        if (response && response.success) {
-          showToast('Payment methods locked', 'success');
-          _paymentPinUnlock = null;
-          loadPaymentVaultStatus();
-        } else {
-          showToast('Failed to lock payment methods', 'error');
-        }
-      } catch (error) {
-        showToast(fsbUiLine('Error locking payment methods: $ERROR$', { error: error.message }), 'error');
-      }
-    });
-  }
-
-  // Unlock button (manual trigger when PIN is typed but not auto-submitted)
-  const unlockBtn = document.getElementById('unlockPaymentMethodsBtn');
-  if (unlockBtn) {
-    unlockBtn.addEventListener('click', () => {
-      if (!_paymentPinUnlock) return;
-      const pin = _paymentPinUnlock.getValue();
-      if (!pin || !/^\d+$/.test(pin)) {
-        showToast('Please enter your numeric PIN', 'error');
-        return;
-      }
-      submitPaymentUnlock(pin);
-    });
-  }
-
-  // Payment card list event delegation
-  const paymentList = document.getElementById('paymentMethodsList');
-  if (paymentList) {
-    paymentList.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-payment-action]');
-      if (!btn) return;
-      const action = btn.dataset.paymentAction;
-      const id = btn.dataset.paymentId;
-      if (!id) return;
-      if (action === 'edit') showPaymentMethodModal('edit', id);
-      else if (action === 'delete') deletePaymentMethodConfirm(id);
-    });
-  }
-
-  // Payment search filter
-  const searchInput = document.getElementById('paymentMethodSearch');
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      filterPaymentMethods(e.target.value);
-    });
-  }
-
-  // Add Card button
-  const addBtn = document.getElementById('addPaymentMethodBtn');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => showPaymentMethodModal('add'));
-  }
-
-  // Modal buttons (Save, Cancel, Close, Backdrop)
-  const pmModalSave = document.getElementById('paymentMethodModalSave');
-  const pmModalCancel = document.getElementById('paymentMethodModalCancel');
-  const pmModalClose = document.getElementById('paymentMethodModalClose');
-  const pmModalBackdrop = document.querySelector('#paymentMethodModal .credential-modal-backdrop');
-
-  if (pmModalSave) pmModalSave.addEventListener('click', savePaymentMethodFromModal);
-  if (pmModalCancel) pmModalCancel.addEventListener('click', hidePaymentMethodModal);
-  if (pmModalClose) pmModalClose.addEventListener('click', hidePaymentMethodModal);
-  if (pmModalBackdrop) pmModalBackdrop.addEventListener('click', hidePaymentMethodModal);
-
-  // CVV visibility toggle
-  const toggleCvv = document.getElementById('togglePaymentMethodCvv');
-  if (toggleCvv) {
-    toggleCvv.addEventListener('click', () => {
-      const cvvField = document.getElementById('paymentMethodCvv');
-      if (cvvField) {
-        const isPassword = cvvField.type === 'password';
-        cvvField.type = isPassword ? 'text' : 'password';
-        const icon = toggleCvv.querySelector('i');
-        if (icon) icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
-      }
-    });
-  }
-
-  // Real-time brand detection on card number input
-  const cardNumInput = document.getElementById('paymentMethodCardNumber');
-  if (cardNumInput) {
-    cardNumInput.addEventListener('input', (e) => {
-      const brand = detectPaymentCardBrand(e.target.value);
-      const brandEl = document.getElementById('paymentMethodCardBrand');
-      const brandLabels = { visa: 'Visa', mastercard: 'MC', amex: 'Amex', discover: 'Discover', unknown: 'Unknown' };
-      if (brandEl) {
-        brandEl.textContent = brandLabels[brand] || 'Unknown';
-        brandEl.className = 'payment-card-brand ' + brand;
-      }
-    });
-  }
-
-  // Load vault status on init
-  loadPaymentVaultStatus();
-}
-
-// Load and display all payment methods
 async function loadPaymentMethods() {
+  if (!_onePasswordStatus) {
+    await loadOnePasswordStatus({ readItems: false, pair: true });
+  }
+  if (!onePasswordIsReady(_onePasswordStatus) || !onePasswordMayRead(_onePasswordStatus)) return;
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'getAllPaymentMethods' });
-
+    const response = await chrome.runtime.sendMessage({ action: 'onePasswordListCards' });
     if (!response || !response.success) {
-      console.error('Failed to load payment methods:', response?.error);
+      _vaultUi.cards = [];
+      noteVaultFailure(response);
+      renderVaultItems();
       return;
     }
-
-    const paymentMethods = response.paymentMethods || [];
-    const listEl = document.getElementById('paymentMethodsList');
-    const emptyEl = document.getElementById('paymentMethodsEmpty');
-
-    if (paymentMethods.length === 0) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) emptyEl.style.display = 'flex';
-      return;
-    }
-
-    if (emptyEl) emptyEl.style.display = 'none';
-
-    if (listEl) {
-      listEl.innerHTML = paymentMethods.map(pm => renderPaymentCard(pm)).join('');
-    }
+    _vaultUi.cards = Array.isArray(response.cards) ? response.cards : [];
+    _vaultUi.itemsLoaded = true;
+    renderVaultItems();
   } catch (error) {
-    console.error('Error loading payment methods:', error);
+    console.error('Error loading 1Password cards:', error.message);
   }
 }
 
-// Render a single payment card entry
+// Render a single card (brand, last 4 and expiry only)
 function renderPaymentCard(pm) {
   const brandLabels = {
     visa: 'Visa',
@@ -5883,276 +6281,28 @@ function renderPaymentCard(pm) {
     jcb: 'JCB'
   };
   const brandLabel = brandLabels[pm.cardBrand];
-
+  const name = pm.title || pm.cardholderName;
+  const masked = '**** ' + (pm.last4 || '****');
+  const expiry = pm.expiryMonth && pm.expiryYearLast2
+    ? ' · ' + fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })
+    : '';
+  const billing = pm.hasBillingAddress ? fsbUiHtml('billing address on the card') : fsbUiHtml('no billing address saved');
+  const scope = (pm.cardholderName ? escapeHtml(pm.cardholderName) + ' · ' : '') + billing;
+  const search = [pm.title, pm.cardholderName, brandLabel, pm.last4].filter(Boolean).join(' ').toLowerCase();
   return `
-    <div class="credential-card payment-card" data-payment-id="${escapeHtml(pm.id)}">
+    <div class="credential-card payment-card" data-payment-id="${fsbUiEscape(pm.id)}" data-search="${fsbUiEscape(search)}">
       <div class="credential-card-icon">
-        <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
+        <span class="payment-card-brand ${fsbUiEscape(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
       </div>
       <div class="credential-card-info">
-        <div class="credential-card-domain">${(pm.nickname || pm.cardholderName) ? escapeHtml(pm.nickname || pm.cardholderName) : fsbUiHtml('Card')}</div>
-        <div class="credential-card-username">${escapeHtml(pm.maskedNumber)} -- ${fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })}</div>
+        <div class="credential-card-domain">${name ? escapeHtml(name) : fsbUiHtml('Card')}</div>
+        <div class="credential-card-username">${escapeHtml(masked)}${expiry}</div>
+        <div class="credential-card-scope">${scope}</div>
       </div>
-      <div class="credential-card-actions">
-        <button class="credential-action-btn" data-payment-action="edit" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Edit')}>
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="credential-action-btn delete" data-payment-action="delete" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Delete')}>
-          <i class="fas fa-trash"></i>
-        </button>
-      </div>
+      <span class="vx-vault">${escapeHtml(vaultTitle(pm.vaultId))}</span>
     </div>
   `;
 }
-
-// Filter payment methods by search query
-function filterPaymentMethods(query) {
-  const cards = document.querySelectorAll('.payment-card');
-  const lowerQuery = query.toLowerCase();
-
-  cards.forEach(card => {
-    const name = card.querySelector('.credential-card-domain')?.textContent || '';
-    const details = card.querySelector('.credential-card-username')?.textContent || '';
-    const matches = name.toLowerCase().includes(lowerQuery) ||
-                    details.toLowerCase().includes(lowerQuery);
-    card.style.display = matches ? 'flex' : 'none';
-  });
-}
-
-// ==========================================
-// Payment Method Modal & Validation (193-02)
-// ==========================================
-
-// Client-side card brand detection (mirrors secure-config.js logic)
-function detectPaymentCardBrand(cardNumber) {
-  const digits = String(cardNumber || '').replace(/\D/g, '');
-  if (!digits) return 'unknown';
-  if (/^4/.test(digits)) return 'visa';
-  if (/^(5[1-5]|2[2-7])/.test(digits)) return 'mastercard';
-  if (/^3[47]/.test(digits)) return 'amex';
-  if (/^(6011|65|64[4-9])/.test(digits)) return 'discover';
-  return 'unknown';
-}
-
-// Luhn algorithm for card number validation
-function isValidPaymentCardNumber(cardNumber) {
-  const digits = String(cardNumber || '').replace(/\D/g, '');
-  if (!/^\d{12,19}$/.test(digits)) return false;
-  let sum = 0, shouldDouble = false;
-  for (let i = digits.length - 1; i >= 0; i--) {
-    let digit = Number(digits[i]);
-    if (shouldDouble) { digit *= 2; if (digit > 9) digit -= 9; }
-    sum += digit;
-    shouldDouble = !shouldDouble;
-  }
-  return sum % 10 === 0;
-}
-
-// Validate expiry is a future date
-function isValidPaymentExpiry(month, year) {
-  const m = parseInt(month, 10);
-  const y = String(year).length === 2 ? 2000 + parseInt(year, 10) : parseInt(year, 10);
-  if (!m || m < 1 || m > 12 || !y) return false;
-  const now = new Date();
-  if (y < now.getFullYear()) return false;
-  if (y === now.getFullYear() && m < now.getMonth() + 1) return false;
-  return true;
-}
-
-// Payment modal state
-let paymentModalMode = 'add'; // 'add' or 'edit'
-let paymentEditingId = null;
-
-// Show the payment method modal (add or edit mode)
-async function showPaymentMethodModal(mode, id) {
-  paymentModalMode = mode || 'add';
-  paymentEditingId = id || null;
-
-  const modal = document.getElementById('paymentMethodModal');
-  const title = document.getElementById('paymentMethodModalTitle');
-  const brandEl = document.getElementById('paymentMethodCardBrand');
-  const cardNumInput = document.getElementById('paymentMethodCardNumber');
-
-  if (title) fsbUiSet(title, mode === 'edit' ? 'Edit Payment Method' : 'Add Payment Method');
-
-  // Clear all form fields
-  const fieldIds = [
-    'paymentMethodNickname', 'paymentMethodCardholderName', 'paymentMethodCardNumber',
-    'paymentMethodExpiryYear', 'paymentMethodCvv',
-    'paymentMethodBillingName', 'paymentMethodAddressLine1', 'paymentMethodAddressLine2',
-    'paymentMethodCity', 'paymentMethodStateRegion', 'paymentMethodPostalCode', 'paymentMethodCountry'
-  ];
-  fieldIds.forEach(fid => {
-    const el = document.getElementById(fid);
-    if (el) el.value = '';
-  });
-
-  // Reset expiry month dropdown
-  const expiryMonthEl = document.getElementById('paymentMethodExpiryMonth');
-  if (expiryMonthEl) expiryMonthEl.value = '';
-
-  // Reset brand badge
-  if (brandEl) {
-    fsbUiSet(brandEl, "Unknown");
-    brandEl.className = 'payment-card-brand unknown';
-  }
-
-  if (mode === 'edit' && id) {
-    // Disable card number field in edit mode (immutable)
-    if (cardNumInput) {
-      cardNumInput.disabled = true;
-      cardNumInput.placeholder = '(cannot change card number)';
-    }
-
-    // Fetch full card data to pre-fill
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'getFullPaymentMethod', id });
-      if (response && response.success && response.paymentMethod) {
-        const pm = response.paymentMethod;
-        const setField = (fid, val) => {
-          const el = document.getElementById(fid);
-          if (el && val != null) el.value = val;
-        };
-        setField('paymentMethodNickname', pm.nickname);
-        setField('paymentMethodCardholderName', pm.cardholderName);
-        setField('paymentMethodCardNumber', pm.cardNumber);
-        setField('paymentMethodExpiryYear', pm.expiryYear);
-        setField('paymentMethodCvv', pm.cvv);
-        setField('paymentMethodBillingName', pm.billingName);
-        setField('paymentMethodAddressLine1', pm.addressLine1);
-        setField('paymentMethodAddressLine2', pm.addressLine2);
-        setField('paymentMethodCity', pm.city);
-        setField('paymentMethodStateRegion', pm.stateRegion);
-        setField('paymentMethodPostalCode', pm.postalCode);
-        setField('paymentMethodCountry', pm.country);
-        if (expiryMonthEl && pm.expiryMonth) expiryMonthEl.value = pm.expiryMonth;
-
-        // Set brand badge from stored data
-        if (brandEl && pm.cardBrand) {
-          const brandLabels = { visa: 'Visa', mastercard: 'MC', amex: 'Amex', discover: 'Discover', unknown: 'Unknown' };
-          brandEl.textContent = brandLabels[pm.cardBrand] || 'Unknown';
-          brandEl.className = 'payment-card-brand ' + (pm.cardBrand || 'unknown');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load payment method for editing:', error);
-    }
-  } else {
-    // Add mode: enable card number field
-    if (cardNumInput) {
-      cardNumInput.disabled = false;
-      cardNumInput.placeholder = '1234 5678 9012 3456';
-    }
-  }
-
-  // Show modal
-  if (modal) modal.classList.remove('hidden');
-}
-
-// Hide the payment method modal and reset state
-function hidePaymentMethodModal() {
-  const modal = document.getElementById('paymentMethodModal');
-  if (modal) modal.classList.add('hidden');
-  paymentModalMode = 'add';
-  paymentEditingId = null;
-
-  // Clear sensitive fields on close (T-193-04 mitigation)
-  const cvvField = document.getElementById('paymentMethodCvv');
-  if (cvvField) cvvField.value = '';
-  const cardNumField = document.getElementById('paymentMethodCardNumber');
-  if (cardNumField) cardNumField.value = '';
-}
-
-// Save or update payment method from modal data
-async function savePaymentMethodFromModal() {
-  const nickname = document.getElementById('paymentMethodNickname')?.value?.trim() || '';
-  const cardholderName = document.getElementById('paymentMethodCardholderName')?.value?.trim() || '';
-  const cardNumber = document.getElementById('paymentMethodCardNumber')?.value?.trim() || '';
-  const expiryMonth = document.getElementById('paymentMethodExpiryMonth')?.value || '';
-  const expiryYear = document.getElementById('paymentMethodExpiryYear')?.value?.trim() || '';
-  const cvv = document.getElementById('paymentMethodCvv')?.value?.trim() || '';
-  const billingName = document.getElementById('paymentMethodBillingName')?.value?.trim() || '';
-  const addressLine1 = document.getElementById('paymentMethodAddressLine1')?.value?.trim() || '';
-  const addressLine2 = document.getElementById('paymentMethodAddressLine2')?.value?.trim() || '';
-  const city = document.getElementById('paymentMethodCity')?.value?.trim() || '';
-  const stateRegion = document.getElementById('paymentMethodStateRegion')?.value?.trim() || '';
-  const postalCode = document.getElementById('paymentMethodPostalCode')?.value?.trim() || '';
-  const country = document.getElementById('paymentMethodCountry')?.value?.trim() || '';
-
-  // Validate required fields
-  if (paymentModalMode === 'add') {
-    if (!cardholderName || !cardNumber || !expiryMonth || !expiryYear || !cvv || !billingName || !addressLine1 || !city || !stateRegion || !postalCode || !country) {
-      showToast('All fields except Nickname and Address Line 2 are required', 'error');
-      return;
-    }
-    // Validate card number with Luhn algorithm
-    if (!isValidPaymentCardNumber(cardNumber)) {
-      showToast('Invalid card number', 'error');
-      return;
-    }
-    // Validate expiry date is in the future
-    if (!isValidPaymentExpiry(expiryMonth, expiryYear)) {
-      showToast('Card is expired or expiry is invalid', 'error');
-      return;
-    }
-  } else {
-    // Edit mode: only non-card fields are required
-    if (!cardholderName || !billingName || !addressLine1 || !city || !stateRegion || !postalCode || !country) {
-      showToast('All fields except Nickname and Address Line 2 are required', 'error');
-      return;
-    }
-  }
-
-  try {
-    let response;
-    if (paymentModalMode === 'edit' && paymentEditingId) {
-      // Update: only send mutable fields
-      response = await chrome.runtime.sendMessage({
-        action: 'updatePaymentMethod',
-        id: paymentEditingId,
-        updates: { cardholderName, nickname, billingName, addressLine1, addressLine2, city, stateRegion, postalCode, country }
-      });
-    } else {
-      // Create new payment method
-      response = await chrome.runtime.sendMessage({
-        action: 'savePaymentMethod',
-        data: { cardNumber, expiryMonth, expiryYear, cvv, cardholderName, nickname, billingName, addressLine1, addressLine2, city, stateRegion, postalCode, country }
-      });
-    }
-
-    if (response && response.success) {
-      showToast(paymentModalMode === 'edit' ? 'Payment method updated' : 'Payment method saved', 'success');
-      hidePaymentMethodModal();
-      loadPaymentMethods();
-    } else {
-      showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-// Delete payment method with confirmation
-async function deletePaymentMethodConfirm(id) {
-  if (!confirm(fsbUiLine('Delete this payment method? This cannot be undone.'))) return;
-
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'deletePaymentMethod', id });
-    if (response && response.success) {
-      showToast('Payment method deleted', 'success');
-      loadPaymentMethods();
-    } else {
-      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Error deleting payment method: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-// Initialize payment manager after DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(initializePaymentManager, 250);
-});
 
 // ==========================================
 // Site Explorer Functions
@@ -6692,325 +6842,12 @@ async function clearAllResearchResults() {
   }
 }
 
-function initializeSyncDeprecationAndButtons() {
-  // Sync consolidation: the deprecation card and Server Sync buttons both live in
-  // the Sync section. Keep wiring idempotent so re-init from /clear is safe.
-
-  // Server sync buttons
-  const btnGenerate = document.getElementById('btnGenerateHashKey');
-  const btnCopy = document.getElementById('btnCopyHashKey');
-  const btnTest = document.getElementById('btnTestConnection');
-
-  if (btnGenerate) btnGenerate.addEventListener('click', generateHashKey);
-  if (btnCopy) btnCopy.addEventListener('click', copyHashKey);
-  if (btnTest) btnTest.addEventListener('click', testServerConnection);
-
-  // QR pairing buttons (Phase 210)
-  const btnPair = document.getElementById('btnPairDashboard');
-  const btnCancelPair = document.getElementById('btnCancelPairing');
-  if (btnPair) btnPair.addEventListener('click', showPairingQR);
-  if (btnCancelPair) btnCancelPair.addEventListener('click', cancelPairing);
-
-  // Load server settings
-  loadServerSettings();
-}
-
 function formatTimeAgo(timestamp) {
   const diff = Date.now() - timestamp;
   if (diff < 60000) return 'Just now';
   if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
   if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
   return Math.floor(diff / 86400000) + 'd ago';
-}
-
-// Server sync functions
-const FSB_DEFAULT_SERVER_URL = 'https://full-selfbrowsing.com';
-
-async function loadServerSettings() {
-  try {
-    const stored = await chrome.storage.local.get(['serverUrl', 'serverHashKey']);
-    const urlInput = document.getElementById('serverUrl');
-    const keyInput = document.getElementById('serverHashKey');
-    const resolvedUrl = stored.serverUrl || FSB_DEFAULT_SERVER_URL;
-    if (urlInput) urlInput.value = resolvedUrl;
-    if (keyInput && stored.serverHashKey) keyInput.value = stored.serverHashKey;
-    if (!stored.serverUrl) {
-      try { await chrome.storage.local.set({ serverUrl: resolvedUrl }); } catch (_) { /* ignore */ }
-    }
-  } catch (e) {
-    // Fall back: still populate the field with the production default so Generate/Pair/Test work
-    const urlInput = document.getElementById('serverUrl');
-    if (urlInput && !urlInput.value) urlInput.value = FSB_DEFAULT_SERVER_URL;
-  }
-}
-
-async function generateHashKey() {
-  const serverUrl = document.getElementById('serverUrl')?.value?.trim();
-  if (!serverUrl) {
-    showToast('Please enter a server URL first', 'error');
-    return;
-  }
-
-  try {
-    const resp = await fetch(serverUrl + '/api/auth/register', { method: 'POST' });
-    const data = await resp.json();
-    if (data.hashKey) {
-      document.getElementById('serverHashKey').value = data.hashKey;
-      await chrome.storage.local.set({ serverUrl, serverHashKey: data.hashKey });
-      requestDashboardRelayReconnect(serverUrl, data.hashKey);
-      showToast('Hash key generated and saved', 'success');
-    } else {
-      showToast('Failed to generate hash key', 'error');
-    }
-  } catch (error) {
-    showToast(fsbUiLine('Cannot connect to server: $ERROR$', { error: error.message }), 'error');
-  }
-}
-
-function requestDashboardRelayReconnect(serverUrl, hashKey) {
-  try {
-    chrome.runtime.sendMessage({
-      action: 'reconnectDashboardWebSocket',
-      serverUrl: serverUrl,
-      serverHashKey: hashKey
-    }, function () {
-      var _ = chrome.runtime.lastError;
-    });
-  } catch (_) {
-    // The storage change listener in background.js is the primary path.
-  }
-}
-
-async function copyHashKey() {
-  const key = document.getElementById('serverHashKey')?.value;
-  if (!key) {
-    showToast('No hash key to copy', 'error');
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(key);
-    showToast('Hash key copied', 'success');
-  } catch (error) {
-    showToast('Failed to copy', 'error');
-  }
-}
-
-async function testServerConnection() {
-  const serverUrl = document.getElementById('serverUrl')?.value?.trim();
-  const hashKey = document.getElementById('serverHashKey')?.value?.trim();
-  const statusEl = document.getElementById('syncConnectionStatus');
-
-  if (!serverUrl || !hashKey) {
-    showToast('Please enter server URL and hash key', 'error');
-    return;
-  }
-
-  if (statusEl) fsbUiSet(statusEl, "Testing...");
-
-  try {
-    const resp = await fetch(serverUrl + '/api/auth/validate', {
-      headers: { 'X-FSB-Hash-Key': hashKey }
-    });
-    const data = await resp.json();
-    if (data.valid) {
-      if (statusEl) fsbUiSet(statusEl, "Connected");
-      if (statusEl) statusEl.className = 'connection-status connected';
-      showToast('Server connection successful', 'success');
-    } else {
-      if (statusEl) fsbUiSet(statusEl, "Invalid key");
-      if (statusEl) statusEl.className = 'connection-status error';
-      showToast('Hash key is invalid', 'error');
-    }
-  } catch (error) {
-    if (statusEl) fsbUiSet(statusEl, "Failed");
-    if (statusEl) statusEl.className = 'connection-status error';
-    showToast('Cannot connect to server', 'error');
-  }
-}
-
-// ===== QR Pairing Controller (Phase 210) =====
-// Implements CONTEXT D-01 (silent hash-key auto-gen), D-02 (in-overlay
-// regenerate on expiry), D-03 (urgency at <=10s). Reuses showToast,
-// chrome.storage.local, and FSB_DEFAULT_SERVER_URL.
-
-var pairingCountdownTimer = null;     // setTimeout handle
-var pairingFetchInFlight = false;     // duplicate-click guard (Pitfall 2)
-
-function clearPairingCountdown() {
-  if (pairingCountdownTimer) {
-    clearTimeout(pairingCountdownTimer);
-    pairingCountdownTimer = null;
-  }
-}
-
-async function ensureHashKey(serverUrl) {
-  const stored = await chrome.storage.local.get(['serverHashKey']);
-  if (stored.serverHashKey) return stored.serverHashKey;
-  // D-01: silent auto-generate via existing /api/auth/register flow.
-  const resp = await fetch(serverUrl + '/api/auth/register', { method: 'POST' });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  const data = await resp.json();
-  if (!data || !data.hashKey) throw new Error('Server did not return a hash key');
-  await chrome.storage.local.set({ serverUrl, serverHashKey: data.hashKey });
-  requestDashboardRelayReconnect(serverUrl, data.hashKey);
-  const keyInput = document.getElementById('serverHashKey');
-  if (keyInput) keyInput.value = data.hashKey;
-  return data.hashKey;
-}
-
-async function fetchPairingToken(serverUrl, hashKey) {
-  const resp = await fetch(serverUrl + '/api/pair/generate', {
-    method: 'POST',
-    headers: { 'X-FSB-Hash-Key': hashKey }
-  });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  const data = await resp.json();
-  if (!data || !data.token || !data.expiresAt) throw new Error('Malformed pairing response');
-  return data; // { token, expiresAt }
-}
-
-function renderPairingQR(qrCodeEl, token, cleanUrl) {
-  // QR payload contract (LOCKED): { t: token, s: serverUrl }
-  const payload = JSON.stringify({ t: token, s: cleanUrl });
-  const qr = qrcode(0, 'M');
-  qr.addData(payload);
-  qr.make();
-  qrCodeEl.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2 });
-}
-
-function startPairingCountdown(expiresAt) {
-  clearPairingCountdown();
-  const countdownEl = document.getElementById('pairingCountdown');
-  const expiry = new Date(expiresAt).getTime();
-  function tick() {
-    const remaining = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
-    countdownEl.textContent = remaining + 's';
-    // D-03: urgency at <=10s
-    if (remaining <= 10 && remaining > 0) {
-      countdownEl.classList.add('pairing-countdown-urgent');
-    } else if (remaining > 10) {
-      countdownEl.classList.remove('pairing-countdown-urgent');
-    }
-    if (remaining <= 0) {
-      clearPairingCountdown();
-      renderExpiredState();
-      return;
-    }
-    pairingCountdownTimer = setTimeout(tick, 1000);
-  }
-  tick();
-}
-
-function renderExpiredState() {
-  const countdownEl = document.getElementById('pairingCountdown');
-  const qrCodeEl = document.getElementById('pairingQRCode');
-  if (!countdownEl || !qrCodeEl) return;
-  // D-02: replace countdown text with Expired indicator
-  countdownEl.classList.remove('pairing-countdown-urgent');
-  countdownEl.classList.add('pairing-qr-expired');
-  fsbUiSet(countdownEl, "Expired");
-  // D-02: replace QR slot with Generate new code button
-  qrCodeEl.innerHTML = '';
-  const regenBtn = document.createElement('button');
-  regenBtn.type = 'button';
-  regenBtn.className = 'control-btn accent';
-  fsbUiSet(regenBtn, "Generate new code");
-  regenBtn.addEventListener('click', regeneratePairingToken);
-  qrCodeEl.appendChild(regenBtn);
-  // Overlay stays open (D-02): do NOT touch overlay.style.display here.
-}
-
-async function regeneratePairingToken() {
-  clearPairingCountdown();
-  if (pairingFetchInFlight) return;
-  const countdownEl = document.getElementById('pairingCountdown');
-  const qrCodeEl = document.getElementById('pairingQRCode');
-  const messageEl = document.getElementById('pairingQRMessage');
-  // Reset UI to live-token state before re-fetch.
-  countdownEl.classList.remove('pairing-qr-expired');
-  countdownEl.textContent = '60s';
-  qrCodeEl.innerHTML = '';
-  if (messageEl) messageEl.textContent = '';
-  try {
-    pairingFetchInFlight = true;
-    const stored = await chrome.storage.local.get(['serverUrl', 'serverHashKey']);
-    const serverUrl = (stored.serverUrl || FSB_DEFAULT_SERVER_URL).replace(/\/+$/, '');
-    const hashKey = stored.serverHashKey || (await ensureHashKey(serverUrl));
-    requestDashboardRelayReconnect(serverUrl, hashKey);
-    const data = await fetchPairingToken(serverUrl, hashKey);
-    renderPairingQR(qrCodeEl, data.token, serverUrl);
-    startPairingCountdown(data.expiresAt);
-  } catch (error) {
-    if (messageEl) {
-      messageEl.classList.add('pairing-qr-expired');
-      fsbUiSet(messageEl, "Could not generate pairing code. Try again.");
-    }
-    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: { english: error.message } }), 'error');
-  } finally {
-    pairingFetchInFlight = false;
-  }
-}
-
-async function showPairingQR() {
-  const overlay = document.getElementById('pairingQROverlay');
-  // Pitfall 2: duplicate-click guard
-  if (!overlay || overlay.style.display === 'flex' || pairingFetchInFlight) return;
-  clearPairingCountdown();
-  const qrCodeEl = document.getElementById('pairingQRCode');
-  const countdownEl = document.getElementById('pairingCountdown');
-  const messageEl = document.getElementById('pairingQRMessage');
-  if (messageEl) {
-    messageEl.classList.remove('pairing-qr-expired');
-    messageEl.textContent = '';
-  }
-  try {
-    pairingFetchInFlight = true;
-    const stored = await chrome.storage.local.get(['serverUrl', 'serverHashKey']);
-    // Pitfall 6: strip trailing slashes
-    const serverUrl = (stored.serverUrl || FSB_DEFAULT_SERVER_URL).replace(/\/+$/, '');
-    // D-01: silent hash-key auto-gen if missing. ensureHashKey throws on failure.
-    let hashKey = stored.serverHashKey;
-    if (!hashKey) {
-      try {
-        hashKey = await ensureHashKey(serverUrl);
-      } catch (error) {
-        showToast(fsbUiLine('Could not register hash key: $ERROR$', { error: { english: error.message } }), 'error');
-        return; // abort BEFORE opening overlay
-      }
-    }
-    requestDashboardRelayReconnect(serverUrl, hashKey);
-    const data = await fetchPairingToken(serverUrl, hashKey);
-    // Reset countdown DOM state before showing
-    countdownEl.classList.remove('pairing-countdown-urgent');
-    countdownEl.classList.remove('pairing-qr-expired');
-    countdownEl.textContent = '60s';
-    renderPairingQR(qrCodeEl, data.token, serverUrl);
-    overlay.style.display = 'flex';
-    startPairingCountdown(data.expiresAt);
-  } catch (error) {
-    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: { english: error.message } }), 'error');
-  } finally {
-    pairingFetchInFlight = false;
-  }
-}
-
-function cancelPairing() {
-  clearPairingCountdown();
-  const overlay = document.getElementById('pairingQROverlay');
-  const qrCodeEl = document.getElementById('pairingQRCode');
-  const countdownEl = document.getElementById('pairingCountdown');
-  const messageEl = document.getElementById('pairingQRMessage');
-  if (overlay) overlay.style.display = 'none';
-  if (qrCodeEl) qrCodeEl.innerHTML = '';
-  if (countdownEl) {
-    countdownEl.classList.remove('pairing-countdown-urgent');
-    countdownEl.classList.remove('pairing-qr-expired');
-    countdownEl.textContent = '60s';
-  }
-  if (messageEl) {
-    messageEl.classList.remove('pairing-qr-expired');
-    messageEl.textContent = '';
-  }
 }
 
 // ===== Memory Dashboard =====
@@ -7970,146 +7807,10 @@ async function clearAllMemories() {
   }
 }
 
-// Initialize sync section deprecation/button wiring and memory section when DOM is ready
+// Initialize the memory section when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(initializeSyncDeprecationAndButtons, 300);
   setTimeout(initializeMemorySection, 400);
 });
-
-// ============================================================================
-// Phase 213 - Sync tab pill state machine (SYNC-02)
-// Subscribes to remoteControlStateChanged runtime push and derives pill state
-// per CONTEXT D-19. Falls through to "disconnected" gracefully if 213-02's
-// runtime action getRemoteControlState is not yet registered (dispatch-order
-// tolerant per CONTEXT D-25).
-// ============================================================================
-
-var _syncSectionInitialized = false;
-var _syncLastRemoteControlState = null; // last payload from runtime push or replay
-
-function _isPairingOverlayVisible() {
-  var overlay = document.getElementById('pairingQROverlay');
-  if (!overlay) return false;
-  // Overlay visibility toggles via inline style.display per Phase 210
-  return overlay.style.display && overlay.style.display !== 'none';
-}
-
-function _hasServerHashKey() {
-  var input = document.getElementById('serverHashKey');
-  return !!(input && input.value && input.value.trim());
-}
-
-function _wsIsOpen() {
-  // dashboardState.wsConnected is the canonical readiness flag managed by
-  // the existing WS connect/disconnect handlers; fall back to false if absent.
-  return !!(typeof dashboardState !== 'undefined' && dashboardState && dashboardState.wsConnected === true);
-}
-
-function _deriveSyncPillState(remoteControlState) {
-  // CONTEXT D-19 derivation logic:
-  //   If remoteControlState.enabled === true -> remote-active
-  //   Else if WS open AND serverHashKey set -> connected
-  //   Else if pairing overlay visible -> connecting
-  //   Else -> disconnected
-  if (remoteControlState && remoteControlState.enabled === true) {
-    return 'remote-active';
-  }
-  if (_wsIsOpen() && _hasServerHashKey()) {
-    return 'connected';
-  }
-  if (_isPairingOverlayVisible()) {
-    return 'connecting';
-  }
-  return 'disconnected';
-}
-
-var _SYNC_PILL_LABELS = {
-  'connected': 'Connected',
-  'connecting': 'Connecting...',
-  'disconnected': 'Disconnected',
-  'remote-active': 'Remote control active'
-};
-
-function _applySyncPillState(state) {
-  var pill = document.getElementById('syncStatusPill');
-  if (!pill) return;
-  var key = (state === 'connected' || state === 'connecting' || state === 'disconnected' || state === 'remote-active')
-    ? state
-    : 'disconnected';
-  pill.setAttribute('data-state', key);
-  var labelEl = pill.querySelector('.label');
-  if (labelEl) {
-    labelEl.textContent = _SYNC_PILL_LABELS[key];
-  }
-}
-
-function _refreshSyncPill() {
-  _applySyncPillState(_deriveSyncPillState(_syncLastRemoteControlState));
-}
-
-function initializeSyncSection() {
-  if (_syncSectionInitialized) return;
-  _syncSectionInitialized = true;
-
-  // Replay-on-attach: ask background.js for the last cached ext:remote-control-state.
-  // If 213-02 has not registered the action yet, chrome.runtime.sendMessage will
-  // surface chrome.runtime.lastError and the response will be undefined -- we just
-  // fall through to the "unknown -> disconnected" default per CONTEXT D-25.
-  try {
-    chrome.runtime.sendMessage({ action: 'getRemoteControlState' }, function (response) {
-      var lastErr = chrome.runtime.lastError; // suppress lastError surface noise
-      if (lastErr) {
-        // Action not registered yet (213-02 dispatch-order tolerance). Stay disconnected.
-        _syncLastRemoteControlState = null;
-      } else if (response && typeof response === 'object') {
-        // Accept either { state: {...} } or the bare payload {...}
-        _syncLastRemoteControlState = response.state || response;
-      }
-      _refreshSyncPill();
-    });
-  } catch (e) {
-    // chrome.runtime unavailable in this context; default to disconnected
-    _refreshSyncPill();
-  }
-
-  // Seed the WS connectivity flag (the 'Connected' input to _deriveSyncPillState).
-  // The SW may be cold here: the query itself wakes it, it reports
-  // connected:false, and the 'dashboardWsStatusChanged' push below flips the
-  // pill once the socket reopens.
-  try {
-    chrome.runtime.sendMessage({ action: 'getDashboardWebSocketStatus' }, function (response) {
-      var lastErr = chrome.runtime.lastError; // suppress lastError surface noise
-      if (!lastErr && response && typeof response === 'object') {
-        dashboardState.wsConnected = response.connected === true;
-      }
-      _refreshSyncPill();
-    });
-  } catch (e) {
-    _refreshSyncPill();
-  }
-
-  // Live updates via runtime push from ws/ws-client.js: remote-control state
-  // (_broadcastRemoteControlState, 213-02) and relay WS connectivity
-  // (_broadcastDashboardWsStatus). Never return true here -- this listener
-  // never responds, and returning true would hold the message channel open.
-  if (chrome.runtime && chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
-    chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-      if (!request) return;
-      if (request.action === 'remoteControlStateChanged') {
-        if (request.state && typeof request.state === 'object') {
-          _syncLastRemoteControlState = request.state;
-          _refreshSyncPill();
-        }
-        return;
-      }
-      if (request.action === 'dashboardWsStatusChanged') {
-        dashboardState.wsConnected = request.connected === true;
-        _refreshSyncPill();
-      }
-    });
-  }
-}
-
 
 // ---------------------------------------------------------------------------
 // Phase 228 / Plan 02: FSBDiscoveryUI

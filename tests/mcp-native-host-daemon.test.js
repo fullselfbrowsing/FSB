@@ -431,6 +431,11 @@ async function runHealthSection() {
     assertEqual(initial.json.transport, 'streamable-http', 'existing transport evidence is preserved');
     assertEqual(initial.json.bridgeMode, 'hub', 'existing bridge topology evidence is preserved');
     assertEqual(initial.json.queuedMutationTools, false, 'existing queue evidence is preserved');
+    assertEqual(
+      Object.hasOwn(initial.json, 'stopRequests'),
+      false,
+      'a listener that does not watch for stop requests never claims to',
+    );
     assertEqual(version.DEFAULT_HTTP_HOST, '127.0.0.1', 'health stays on canonical loopback');
     assertEqual(version.DEFAULT_HTTP_PORT, 7226, 'health introduces no new serve port');
     assertEqual(typeof server.markServeReady, 'function', 'listener exposes lifecycle-only readiness authority');
@@ -441,6 +446,10 @@ async function runHealthSection() {
     assertEqual(ready.json.serveReady, true, 'the readiness authority is idempotent and monotonic while open');
     assertEqual(ready.json.service, initial.json.service, 'readiness does not change product identity');
     assertEqual(ready.json.nativeHostProtocol, 1, 'readiness does not change protocol identity');
+    server.advertiseStopRequests();
+    const advertised = await readHealth(server.healthEndpoint);
+    assertEqual(advertised.json.stopRequests, 1, 'the stop-request flag is the exact number 1');
+    assertEqual(advertised.json.serveReady, true, 'advertising stop requests changes nothing else');
   } finally {
     await server.close();
   }
@@ -1512,6 +1521,610 @@ async function runProductionEntrySection() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Step-down: a serve process started from the installed helper leaves on its
+// own when a refresh or uninstall writes <stable root>.stop-requested, but
+// only once it is idle.
+// ---------------------------------------------------------------------------
+
+const STEP_DOWN_STARTED_AT = 1_800_000_000_000;
+
+async function waitFor(predicate, message, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${message}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+function stepDownFakeBridge(probes, { withIdleProbe = true } = {}) {
+  const state = { connectCalls: 0, disconnectCalls: 0 };
+  const bridge = {
+    currentMode: 'hub',
+    topology: {
+      mode: 'hub',
+      activeHubInstanceId: 'step-down-hub',
+      extensionConnected: false,
+      hubConnected: true,
+      lastDisconnectReason: null,
+      lastExtensionHeartbeatAt: null,
+      relayCount: 0,
+    },
+    async connect() {
+      state.connectCalls += 1;
+    },
+    disconnect() {
+      state.disconnectCalls += 1;
+    },
+  };
+  if (withIdleProbe) bridge.isIdle = () => probes.bridgeIdle;
+  return { bridge, state };
+}
+
+function makeStepDownHarness(options = {}) {
+  const probes = { bridgeIdle: true, activeRuns: 0, activeCalls: 0 };
+  const scheduled = [];
+  const exits = [];
+  const signals = new Map();
+  const state = { supervisorCloseCalls: 0, httpCloseCalls: 0, advertised: 0 };
+  const { bridge, state: bridgeState } = stepDownFakeBridge(probes, {
+    withIdleProbe: options.legacyProbes !== true,
+  });
+  const supervisor = {
+    async recover() {
+      return {
+        confirmedKilled: 0,
+        staleCleared: 0,
+        ambiguousFailClosed: 0,
+        spawnAvailable: true,
+        profiles: [],
+      };
+    },
+    async close() {
+      state.supervisorCloseCalls += 1;
+      return { cancelled: 0, failed: 0, alreadySettled: 0 };
+    },
+    journalEntryForChild() {
+      return null;
+    },
+    async handleExtRequest() {
+      throw new Error('step-down handler must remain unused');
+    },
+  };
+  if (options.legacyProbes !== true) supervisor.activeCount = () => probes.activeRuns;
+
+  const dependencies = {
+    createBridge: () => bridge,
+    createQueue: () => ({ isRunning: false }),
+    async startHttp(startOptions) {
+      if (options.startHttpServer) {
+        const running = await options.startHttpServer(startOptions);
+        return {
+          endpoint: running.endpoint,
+          healthEndpoint: running.healthEndpoint,
+          markServeReady: () => running.markServeReady(),
+          advertiseStopRequests: () => {
+            state.advertised += 1;
+            running.advertiseStopRequests();
+          },
+          activeRequestCount: () => running.activeRequestCount(),
+          async close() {
+            state.httpCloseCalls += 1;
+            await running.close();
+          },
+        };
+      }
+      const server = {
+        endpoint: 'http://127.0.0.1:9/mcp',
+        healthEndpoint: 'http://127.0.0.1:9/health',
+        markServeReady() {},
+        advertiseStopRequests() {
+          state.advertised += 1;
+        },
+        async close() {
+          state.httpCloseCalls += 1;
+        },
+      };
+      if (options.legacyProbes !== true) server.activeRequestCount = () => probes.activeCalls;
+      return server;
+    },
+    createSupervisor: () => supervisor,
+    async prepareBridgeAuth() {},
+    async pushInventory() {},
+    registerSignal(signal, handler) {
+      signals.set(signal, handler);
+    },
+    exit(code) {
+      exits.push(code);
+    },
+    resolveStableRoot: () => options.stableRoot ?? null,
+    processStartedAt: () => STEP_DOWN_STARTED_AT,
+    scheduleStopRequestCheck(run, delayMs) {
+      const entry = { run, delayMs, ran: false, cancelled: false };
+      scheduled.push(entry);
+      return () => {
+        entry.cancelled = true;
+      };
+    },
+  };
+  const armed = () => scheduled.filter((entry) => !entry.ran && !entry.cancelled);
+  const tick = () => {
+    const pending = armed();
+    if (pending.length !== 1) {
+      throw new Error(`expected exactly one armed stop-request check, found ${pending.length}`);
+    }
+    pending[0].ran = true;
+    pending[0].run();
+  };
+  return {
+    armed,
+    bridgeState,
+    dependencies,
+    exits,
+    probes,
+    scheduled,
+    signals,
+    state,
+    tick,
+  };
+}
+
+function stopRequest(overrides = {}) {
+  return {
+    version: 1,
+    token: 'a'.repeat(32),
+    requestedAt: STEP_DOWN_STARTED_AT + 5_000,
+    reason: 'refresh',
+    ...overrides,
+  };
+}
+
+function lastDelegationLogRecord(home) {
+  const logPath = path.join(home, '.fsb', 'agent-runtime', 'delegation-events.jsonl');
+  const lines = readFileSync(logPath, 'utf8').trim().split('\n');
+  const record = JSON.parse(lines[lines.length - 1]);
+  delete record.ts;
+  return record;
+}
+
+async function runStepDownStableRootCases(lifecycle, scratch, platform) {
+  const { symlink, realpath } = require('node:fs/promises');
+  const home = path.join(scratch, 'home');
+  const stableRoot = path.join(home, '.fsb', 'native-host');
+  const buildIndex = path.join(stableRoot, 'runtime', 'package', 'build', 'index.js');
+  const input = (entryScript, overrides = {}) => ({
+    platform,
+    entryScript,
+    homeDirectory: home,
+    execPath: process.execPath,
+    ...overrides,
+  });
+
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(buildIndex)),
+    null,
+    'a stable root with no installed runtime never answers stop requests',
+  );
+
+  await mkdir(path.dirname(buildIndex), { recursive: true });
+  await writeFile(buildIndex, '// installed runtime entry\n');
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(buildIndex)),
+    stableRoot,
+    'the installed runtime entry resolves to its stable root',
+  );
+
+  const linkDirectory = path.join(scratch, 'links');
+  await mkdir(linkDirectory, { recursive: true });
+  const linkedEntry = path.join(linkDirectory, 'index.js');
+  await symlink(buildIndex, linkedEntry);
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(linkedEntry)),
+    stableRoot,
+    'a symlinked entry is compared after resolution',
+  );
+
+  const workspaceEntry = path.join(scratch, 'workspace', 'mcp', 'build', 'index.js');
+  await mkdir(path.dirname(workspaceEntry), { recursive: true });
+  await writeFile(workspaceEntry, '// workspace build\n');
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(workspaceEntry)),
+    null,
+    'a workspace build never answers the installed helper stop request',
+  );
+
+  const nextEntry = path.join(
+    `${stableRoot}.next-${'b'.repeat(32)}`,
+    'runtime',
+    'package',
+    'build',
+    'index.js',
+  );
+  await mkdir(path.dirname(nextEntry), { recursive: true });
+  await writeFile(nextEntry, '// staged runtime\n');
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(nextEntry)),
+    null,
+    'a sibling staged runtime is not the stable root',
+  );
+
+  const otherNativeEntry = path.join(stableRoot, 'runtime', 'package', 'build', 'native-host', 'index.js');
+  await mkdir(path.dirname(otherNativeEntry), { recursive: true });
+  await writeFile(otherNativeEntry, '// native wake entry\n');
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(otherNativeEntry)),
+    null,
+    'only the serve entry point counts, not other scripts inside the runtime',
+  );
+
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(path.join(scratch, 'missing.js'))),
+    null,
+    'a missing entry script never answers stop requests',
+  );
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(buildIndex, { homeDirectory: 'relative/home' })),
+    null,
+    'a relative home directory refuses instead of guessing a root',
+  );
+  assertEqual(
+    lifecycle.stableRootForServeEntry(input(buildIndex, { platform: 'win32' })),
+    null,
+    'Windows without LOCALAPPDATA has no stable root',
+  );
+  assertEqual(await realpath(stableRoot), stableRoot, 'the scratch stable root is already resolved');
+}
+
+function runStepDownParseCases(lifecycle) {
+  const parse = lifecycle.parseServeStopRequest;
+  const refresh = parse(stopRequest());
+  assert(
+    refresh && refresh.reason === 'refresh' && refresh.requestedAt === STEP_DOWN_STARTED_AT + 5_000,
+    'a well-formed refresh request parses to its reason and time',
+  );
+  assertEqual(parse(stopRequest({ reason: 'uninstall' }))?.reason, 'uninstall', 'an uninstall request parses');
+  assertEqual(
+    parse({ ...stopRequest(), extra: true })?.reason,
+    'refresh',
+    'unknown extra fields do not hide an otherwise valid request',
+  );
+  for (const [label, value] of [
+    ['null', null],
+    ['an array', [stopRequest()]],
+    ['a string', JSON.stringify(stopRequest())],
+    ['version 2', stopRequest({ version: 2 })],
+    ['a missing token', { version: 1, requestedAt: STEP_DOWN_STARTED_AT, reason: 'refresh' }],
+    ['an empty token', stopRequest({ token: '' })],
+    ['a string requestedAt', stopRequest({ requestedAt: String(STEP_DOWN_STARTED_AT) })],
+    ['a zero requestedAt', stopRequest({ requestedAt: 0 })],
+    ['an infinite requestedAt', stopRequest({ requestedAt: Number.POSITIVE_INFINITY })],
+    ['an unknown reason', stopRequest({ reason: 'restart' })],
+    ['a non-plain object', Object.assign(Object.create({ inherited: true }), stopRequest())],
+  ]) {
+    assertEqual(parse(value), null, `${label} is not a stop request`);
+  }
+}
+
+function sendPartialPost(endpoint) {
+  const http = require('node:http');
+  const url = new URL(endpoint);
+  const request = http.request({
+    host: url.hostname,
+    port: url.port,
+    path: url.pathname,
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+    },
+  });
+  const response = new Promise((resolve, reject) => {
+    request.once('response', (res) => {
+      res.resume();
+      res.once('end', () => resolve(res.statusCode));
+    });
+    request.once('error', reject);
+  });
+  response.catch(() => undefined);
+  request.write('{"jsonrpc":"2.0","id":1,');
+  return {
+    request,
+    response,
+    finish() {
+      request.end('"method":"ping"}');
+      return response;
+    },
+  };
+}
+
+async function runStepDownHttpCountCases(startHttpServer) {
+  const http = require('node:http');
+  const probes = { bridgeIdle: true };
+  const { bridge } = stepDownFakeBridge(probes);
+  const running = await startHttpServer({
+    host: '127.0.0.1',
+    port: 0,
+    bridge,
+    queue: { isRunning: false },
+  });
+  const sockets = [];
+  try {
+    assertEqual(running.activeRequestCount(), 0, 'a fresh listener has no MCP call in flight');
+    await readHealth(running.healthEndpoint);
+    assertEqual(running.activeRequestCount(), 0, 'health probes are not MCP calls');
+
+    const completed = sendPartialPost(running.endpoint);
+    await waitFor(() => running.activeRequestCount() === 1, 'the partial POST to be counted');
+    assertEqual(running.activeRequestCount(), 1, 'a POST whose body is still arriving counts as in flight');
+    const status = await completed.finish();
+    assertEqual(status, 400, 'the completed session-less POST is answered');
+    await waitFor(() => running.activeRequestCount() === 0, 'the answered POST to be released');
+    assertEqual(running.activeRequestCount(), 0, 'an answered POST is released');
+
+    const aborted = sendPartialPost(running.endpoint);
+    await waitFor(() => running.activeRequestCount() === 1, 'the second partial POST to be counted');
+    aborted.request.destroy();
+    await waitFor(() => running.activeRequestCount() === 0, 'the aborted POST to be released');
+    assertEqual(running.activeRequestCount(), 0, 'a POST the client abandons is released');
+
+    const url = new URL(running.endpoint);
+    const initialize = await fetch(running.endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-03-26',
+          capabilities: {},
+          clientInfo: { name: 'step-down-test', version: '1.0.0' },
+        },
+      }),
+    });
+    await initialize.text();
+    const sessionId = initialize.headers.get('mcp-session-id');
+    assert(typeof sessionId === 'string' && sessionId.length > 0, 'an MCP session initializes over the listener');
+    await waitFor(() => running.activeRequestCount() === 0, 'the initialize call to be released');
+
+    const stream = await new Promise((resolve, reject) => {
+      const request = http.request({
+        host: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'GET',
+        headers: {
+          accept: 'text/event-stream',
+          'mcp-session-id': sessionId,
+          'mcp-protocol-version': '2025-03-26',
+        },
+      }, (res) => resolve({ request, res }));
+      request.once('error', reject);
+      request.end();
+    });
+    sockets.push(stream.request);
+    assertEqual(stream.res.statusCode, 200, 'the session opens its standing notification stream');
+    assertEqual(
+      running.activeRequestCount(),
+      0,
+      'an open notification stream is not a call in flight',
+    );
+  } finally {
+    for (const request of sockets) request.destroy();
+    await running.close();
+  }
+}
+
+async function runStepDownLifecycleCases(lifecycle, startHttpServer, scratch) {
+  const { rm: remove, symlink, unlink } = require('node:fs/promises');
+  const root = path.join(scratch, 'lifecycle');
+  const stableRoot = path.join(root, '.fsb', 'native-host');
+  const stopPath = `${stableRoot}.stop-requested`;
+  await mkdir(stableRoot, { recursive: true });
+  const writeStop = (value) => writeFile(stopPath, typeof value === 'string' ? value : JSON.stringify(value));
+
+  assertEqual(lifecycle.SERVE_STOP_REQUEST_POLL_MS, 2_000, 'stop requests are polled every 2 s');
+  assertEqual(lifecycle.SERVE_STOP_REQUEST_SUFFIX, '.stop-requested', 'the stop request sits beside the stable root');
+
+  // A serve process that did not start from the stable root never polls.
+  const outside = makeStepDownHarness();
+  const outsideRunning = await lifecycle.startServeDelegation({
+    host: '127.0.0.1',
+    port: 0,
+    dependencies: outside.dependencies,
+  });
+  assertEqual(outside.scheduled.length, 0, 'a serve process outside the stable root arms no stop-request check');
+  assertEqual(outside.state.advertised, 0, 'a serve process outside the stable root never advertises stop requests');
+  await outsideRunning.shutdown();
+
+  // The refresh path, one condition at a time.
+  const harness = makeStepDownHarness({ stableRoot });
+  const running = await lifecycle.startServeDelegation({
+    host: '127.0.0.1',
+    port: 0,
+    dependencies: harness.dependencies,
+  });
+  assertEqual(harness.armed().length, 1, 'a stable-root serve process arms one stop-request check');
+  assertEqual(harness.state.advertised, 1, 'a stable-root serve process advertises stop requests once it watches for them');
+  assertEqual(harness.scheduled[0].delayMs, 2_000, 'the first check waits the poll interval');
+
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'with no stop request the check re-arms');
+  assertEqual(harness.scheduled[1].delayMs, 2_000, 'the next check waits the poll interval again');
+
+  await writeStop(stopRequest({ requestedAt: STEP_DOWN_STARTED_AT - 1 }));
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'a request written before this process started is ignored');
+
+  await writeStop(stopRequest({ version: 2 }));
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'a request in an unknown format is ignored');
+
+  await writeStop('{ not json');
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'an unreadable request is ignored');
+
+  await writeStop(JSON.stringify({ ...stopRequest(), padding: 'x'.repeat(5_000) }));
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'an oversized request file is ignored');
+
+  await unlink(stopPath);
+  const decoy = path.join(root, 'decoy.json');
+  await writeFile(decoy, JSON.stringify(stopRequest()));
+  await symlink(decoy, stopPath);
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'a symlinked request file is ignored');
+  await unlink(stopPath);
+
+  await writeStop(stopRequest());
+  harness.probes.bridgeIdle = false;
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'a busy bridge defers the step-down');
+  harness.probes.bridgeIdle = true;
+  harness.probes.activeRuns = 1;
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'an unsettled delegated run defers the step-down');
+  harness.probes.activeRuns = 0;
+  harness.probes.activeCalls = 1;
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'an MCP call in flight defers the step-down');
+  assertEqual(harness.exits.length, 0, 'no deferred check exits the process');
+
+  await unlink(stopPath);
+  harness.probes.activeCalls = 0;
+  harness.tick();
+  assertEqual(harness.armed().length, 1, 'a request withdrawn while busy cancels the pending step-down');
+  assertEqual(harness.exits.length, 0, 'a withdrawn request never exits the process');
+
+  await writeStop(stopRequest({ requestedAt: STEP_DOWN_STARTED_AT }));
+  harness.tick();
+  assertEqual(harness.armed().length, 0, 'an idle process with a current request stops polling');
+  const result = await running.shutdown();
+  assertEqual(result.exitCode, 0, 'the step-down is a clean shutdown');
+  assertEqual(harness.exits.join(','), '0', 'the step-down exits exactly once with code 0');
+  assertEqual(harness.state.supervisorCloseCalls, 1, 'the step-down closes the supervisor once');
+  assertEqual(harness.state.httpCloseCalls, 1, 'the step-down closes the listener once');
+  assertEqual(harness.bridgeState.disconnectCalls, 1, 'the step-down disconnects the bridge once');
+  assert(readFileSync(stopPath, 'utf8').length > 0, 'the step-down leaves the stop request for its writer to remove');
+  const refreshRecord = lastDelegationLogRecord(scratch);
+  assertEqual(
+    Object.keys(refreshRecord).sort().join(','),
+    'degraded,event,exitCode,reason',
+    'the shutdown record carries only the closed shutdown fields',
+  );
+  assert(
+    refreshRecord.event === 'daemon_shutdown'
+      && refreshRecord.exitCode === 0
+      && refreshRecord.degraded === false
+      && refreshRecord.reason === 'refresh_requested',
+    'the shutdown record names the refresh request',
+  );
+  assertEqual(harness.scheduled.length, 11, 'no check is armed after the step-down');
+
+  // An uninstall request is reported as such.
+  await writeStop(stopRequest({ reason: 'uninstall' }));
+  const uninstall = makeStepDownHarness({ stableRoot });
+  const uninstallRunning = await lifecycle.startServeDelegation({
+    host: '127.0.0.1',
+    port: 0,
+    dependencies: uninstall.dependencies,
+  });
+  uninstall.tick();
+  assertEqual(uninstall.armed().length, 0, 'an idle process steps down for an uninstall request');
+  await uninstallRunning.shutdown();
+  assertEqual(uninstall.exits.join(','), '0', 'the uninstall step-down exits once with code 0');
+  assertEqual(
+    lastDelegationLogRecord(scratch).reason,
+    'uninstall_requested',
+    'the shutdown record names the uninstall request',
+  );
+
+  // Parts that cannot report idleness are treated as busy, and SIGTERM still
+  // shuts down and disarms the pending check.
+  await writeStop(stopRequest());
+  const legacy = makeStepDownHarness({ stableRoot, legacyProbes: true });
+  const legacyRunning = await lifecycle.startServeDelegation({
+    host: '127.0.0.1',
+    port: 0,
+    dependencies: legacy.dependencies,
+  });
+  for (let attempt = 0; attempt < 3; attempt += 1) legacy.tick();
+  assertEqual(legacy.armed().length, 1, 'parts without idle probes never step down');
+  assertEqual(legacy.exits.length, 0, 'parts without idle probes never exit on a request');
+  legacy.signals.get('SIGTERM')();
+  assertEqual(legacy.armed().length, 0, 'SIGTERM disarms the pending stop-request check');
+  await legacyRunning.shutdown();
+  assertEqual(legacy.exits.join(','), '0', 'SIGTERM still shuts down once');
+  assertEqual(
+    Object.hasOwn(lastDelegationLogRecord(scratch), 'reason'),
+    false,
+    'a signal shutdown records no step-down reason',
+  );
+
+  // A real listener: a call still uploading its body holds the step-down.
+  const live = makeStepDownHarness({ stableRoot, startHttpServer });
+  const liveRunning = await lifecycle.startServeDelegation({
+    host: '127.0.0.1',
+    port: 0,
+    dependencies: live.dependencies,
+  });
+  const liveHealth = await readHealth(liveRunning.healthEndpoint);
+  assertEqual(liveHealth.json.stopRequests, 1, 'a stable-root serve reports stop requests on /health');
+  const inFlight = sendPartialPost(liveRunning.endpoint);
+  await waitFor(
+    () => liveRunning.httpServer.activeRequestCount() === 1,
+    'the live partial POST to be counted',
+  );
+  live.tick();
+  assertEqual(live.armed().length, 1, 'a live MCP call holds the step-down');
+  await inFlight.finish();
+  await waitFor(
+    () => liveRunning.httpServer.activeRequestCount() === 0,
+    'the live POST to be released',
+  );
+  live.tick();
+  assertEqual(live.armed().length, 0, 'the step-down proceeds once the live call is answered');
+  const liveResult = await liveRunning.shutdown();
+  assertEqual(liveResult.exitCode, 0, 'the live step-down is clean');
+  assertEqual(live.state.httpCloseCalls, 1, 'the live listener is closed by the step-down');
+
+  await remove(root, { recursive: true, force: true });
+}
+
+async function runStepDownSection() {
+  if (process.platform === 'win32') {
+    console.log('  SKIP: step-down cases use POSIX paths and symlinks');
+    return;
+  }
+  const { realpath } = require('node:fs/promises');
+  const [{ startHttpServer }, lifecycle] = await Promise.all([
+    importBuild('http.js'),
+    importBuild('agent-providers/serve-delegation.js'),
+  ]);
+  const scratch = await realpath(await mkdtemp(path.join(os.tmpdir(), 'fsb-step-down-')));
+  const previousHome = process.env.HOME;
+  // Shutdown appends to <home>/.fsb/agent-runtime/delegation-events.jsonl, so
+  // these cases run against a scratch home and never touch the real one.
+  process.env.HOME = scratch;
+  try {
+    await runStepDownStableRootCases(
+      lifecycle,
+      scratch,
+      process.platform === 'darwin' ? 'darwin' : 'linux',
+    );
+    runStepDownParseCases(lifecycle);
+    await runStepDownHttpCountCases(startHttpServer);
+    await runStepDownLifecycleCases(lifecycle, startHttpServer, scratch);
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    await rm(scratch, { recursive: true, force: true });
+  }
+}
+
 async function runCase(name, callback) {
   console.log(`\n${name}`);
   try {
@@ -1525,7 +2138,13 @@ async function runCase(name, callback) {
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex >= 0 ? process.argv[sectionIndex + 1] : null;
-  const knownSections = new Set(['health', 'bind-race', 'wake-daemon', 'production-entry']);
+  const knownSections = new Set([
+    'health',
+    'bind-race',
+    'wake-daemon',
+    'production-entry',
+    'step-down',
+  ]);
   if (section && !knownSections.has(section)) {
     throw new Error(`Unknown section: ${section}`);
   }
@@ -1541,6 +2160,9 @@ async function main() {
   }
   if (!section || section === 'production-entry') {
     await runCase('production one-shot native entry', runProductionEntrySection);
+  }
+  if (!section || section === 'step-down') {
+    await runCase('stable-root serve step-down', runStepDownSection);
   }
 
   console.log(`\nMCP native host daemon tests: ${passed} passed, ${failed} failed`);

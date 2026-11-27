@@ -1,0 +1,12 @@
+/* FSB design system: the stylesheet specimen pages link.
+   Import lines only. Shipped pages do not load this file: the extension loads
+   extension/shared/fsb-ui-core.css and the showcase loads
+   showcase/angular/src/styles.scss, which the files below mirror. */
+@import url("tokens/fonts.css");
+@import url("tokens/colors.css");
+@import url("tokens/typography.css");
+@import url("tokens/spacing.css");
+@import url("tokens/effects.css");
+@import url("tokens/product-surface.css");
+@import url("tokens/overlay.css");
+@import url("tokens/reset.css");

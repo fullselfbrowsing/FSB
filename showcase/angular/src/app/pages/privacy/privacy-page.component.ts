@@ -115,7 +115,7 @@ const PRIVACY_RAIL_INDEX = $localize`:@@depth.rail.index:Index`;
 /* The date in the page's "Last updated" line (privacy.header.updated in the template),
    in the form structured data wants. tests/showcase-privacy-page.test.js fails when
    the two disagree, so changing the policy means changing both. */
-const PRIVACY_LAST_UPDATED = '2026-09-29';
+const PRIVACY_LAST_UPDATED = '2026-11-27';
 
 // Imported at the end so the $localize calls at the top of the file keep the line numbers messages.xlf records.
 import { PageJsonLdService } from '../../core/seo/page-json-ld.service';

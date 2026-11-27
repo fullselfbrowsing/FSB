@@ -39,7 +39,7 @@
 }
 
 .fsb-end-mark::before {
-  background: radial-gradient(closest-side, rgba(255, 107, 53, .14), transparent);
+  background: radial-gradient(closest-side, var(--primary-soft), transparent);
   content: '';
   height: 90%;
   left: 50%;
@@ -55,39 +55,6 @@
   display: inline-block;
   font-size: 1em;
   line-height: 1;
-}
-
-.fsb-row {
-  align-items: baseline;
-  display: inline-flex;
-  font-family: 'Poppins', system-ui, sans-serif;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.fsb-f {
-  font-weight: 100;
-}
-
-.fsb-f::before {
-  content: 'F';
-}
-
-.fsb-s {
-  font-weight: 900;
-}
-
-.fsb-s::before {
-  content: 'S';
-}
-
-.fsb-b {
-  display: inline-block;
-  fill: currentColor;
-  height: 0.74em;
-  margin-left: 0.01em;
-  vertical-align: baseline;
-  width: auto;
 }
 
 .fsb-end-groups {
@@ -222,7 +189,7 @@
 }
 
 .version-tag {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.4em;
 }
 

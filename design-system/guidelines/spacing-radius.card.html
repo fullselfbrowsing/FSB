@@ -1,0 +1,24 @@
+<!-- @dsCard group="Spacing" viewport="700x200" subtitle="8 / 12 / 16 / 24px plus pill" name="Radius" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<style>
+body { padding: 20px 22px; background: var(--bg-body); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: .6rem; color: var(--text-muted); }
+.var { font-family: var(--font-mono); font-size: .6rem; color: var(--primary); }
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.t{padding:15px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-card)}
+.bx{height:50px;background:var(--primary-gradient);margin-bottom:11px}
+.t b{display:block;font-size:.76rem;color:var(--text-primary)}
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="t"><div class="bx" style="border-radius:.5rem"></div><b>sm</b><span class="var">--radius-sm</span><div class="lbl">8px</div></div><div class="t"><div class="bx" style="border-radius:.75rem"></div><b>md</b><span class="var">--radius-md</span><div class="lbl">12px</div></div><div class="t"><div class="bx" style="border-radius:1rem"></div><b>lg</b><span class="var">--radius-lg</span><div class="lbl">16px</div></div><div class="t"><div class="bx" style="border-radius:1.5rem"></div><b>xl</b><span class="var">--radius-xl</span><div class="lbl">24px</div></div><div class="t"><div class="bx" style="border-radius:999px"></div><b>pill</b><span class="var">--radius-pill</span><div class="lbl">999px</div></div>
+</div>
+</body>
+</html>
