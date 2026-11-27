@@ -23,7 +23,7 @@ created: 2026-07-12
 | **Full suite command** | `npm test` |
 | **Estimated runtime** | focused slices < 20 seconds; full suite several minutes |
 
-The current workspace has user-owned deletions of historical phase artifacts. For the full suite only, create a temporary untracked symlink from `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` to `.planning/milestones/v1.0.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`, remove it with a shell trap, and never stage it.
+The current workspace has user-owned deletions of historical phase artifacts. For the full suite only, create a temporary untracked symlink from `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` to `.planning/milestones/v0.13.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`, remove it with a shell trap, and never stage it.
 
 ---
 

@@ -3610,6 +3610,1183 @@
     })()`;
   }
 
+  // ==== Phase 68 fast-mode element menu (begin) ====
+  // Value-free element menu for autopilot fast mode (Phase 68: AUTO-02, AUTO-03,
+  // D-13, D-15, D-19). Nothing in this block reads a form field's value
+  // property, typed text or an editable region. Labels come from attributes and
+  // from jevSafeText, a text walker that skips form controls, option lists and
+  // editable regions; operations and risk come from code (tag, role, state and
+  // structure). Helpers from other modules are resolved through FSB at call
+  // time. The LLM snapshot path is not used or changed here.
+
+  const jevMenuConstants = Object.freeze({
+    MENU_CAP: 48,
+    MENU_CAP_MIN: 32,
+    MENU_CAP_MAX: 64,
+    MENU_POOL: 256,          // candidates asked of getFilteredElements (its own default is 50)
+    TEXT_EXCERPT_CHARS: 2000,
+    LABEL_CHARS: 80,
+    ROLE_CHARS: 32,
+    MORE_BELOW_PX: 200
+  });
+
+  // jevSafeText never descends into these (the root node itself is always walked).
+  const jevSafeTextSkipTags = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'DATALIST', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
+  const jevTextEntryRoles = ['textbox', 'searchbox', 'combobox', 'listbox', 'spinbutton'];
+  // Roles whose name may come from their own contents.
+  const jevContentsRoles = ['button', 'link', 'menuitem', 'option', 'tab', 'treeitem', 'checkbox', 'radio', 'switch'];
+  const jevClickRoles = ['button', 'link', 'tab', 'menuitem', 'option', 'treeitem'];
+  const jevToggleRoles = ['checkbox', 'switch', 'radio', 'menuitemcheckbox', 'menuitemradio'];
+  const jevButtonInputTypes = ['submit', 'button', 'reset', 'image'];
+  const jevNonEditableInputTypes = ['hidden', 'submit', 'button', 'reset', 'image'];
+
+  // Every rule is evaluated (a union, never first match); the reported reason is
+  // the first one found in this fixed order, so results are deterministic.
+  const jevRiskReasonOrder = Object.freeze([
+    'purpose_danger',
+    'purpose_intent',
+    'commit_word',
+    'form_submit',
+    'alertdialog',
+    'dialog_affirmative',
+    'download',
+    'javascript_href',
+    'logout',
+    'file_input',
+    'consent_checkbox',
+    'credential_or_payment_form',
+    'enter_submits_form',
+    'vault_filled',
+    'unclassified'
+  ]);
+  const jevRiskIntents = ['submit', 'login', 'signup', 'download'];
+  // D-19: anything that commits, sends, pays, deletes, publishes, authenticates
+  // or changes an account goes to the LLM. Over-exclusion only costs speed.
+  const jevCommitWords = Object.freeze([
+    'submit', 'send', 'post', 'publish', 'save', 'apply', 'update', 'confirm', 'done', 'finish',
+    'complete', 'checkout', 'check\\s*out', 'pay', 'purchase', 'buy', 'order', 'place\\s+order',
+    'delete', 'remove', 'erase', 'discard', 'archive', 'cancel', 'unsubscribe', 'subscribe',
+    'sign\\s*in', 'log\\s*in', 'login', 'sign\\s*up', 'signup', 'register', 'create\\s+account',
+    'log\\s*out', 'logout', 'sign\\s*out', 'transfer', 'withdraw', 'donate', 'accept', 'agree',
+    'approve', 'authori[sz]e', 'allow', 'install', 'upgrade', 'reset', 'deactivate',
+    'close\\s+account', 'share', 'invite', 'upload', 'book', 'reserve', 'vote', 'report', 'block',
+    'like', 'unlike', 'follow', 'unfollow', 'following', 'retweet', 'repost', 'bid', 'connect',
+    'join', 'leave', 'mute', 'unmute', 'trial', 'spam', 'rate', 'star', 'unstar', 'pin', 'enrol',
+    'enroll', 'claim', 'redeem', 'activate', 'enable', 'disable', 'turn\\s+on', 'turn\\s+off', 'mark\\s+as'
+  ]);
+  const jevCommitWordPattern = new RegExp('\\b(?:' + jevCommitWords.join('|') + ')\\b', 'i');
+  const jevAffirmativePattern = /\b(?:ok|okay|yes|continue|proceed|confirm|sure|got\s+it|i\s+understand|accept|agree|allow|approve)\b/i;
+  const jevLogoutPattern = /log[\s_-]*(?:out|off)|sign[\s_-]*(?:out|off)/i;
+  const jevConsentPattern = /agree|accept|terms|subscri|consent|newsletter|opt[\s_-]?in|marketing/i;
+  // The word lists above read English only, so they are a floor and never the
+  // gate: a control fast mode acts on must also be a structurally safe kind
+  // (jevStructurallySafe), else it is 'unclassified'. The paging and reveal
+  // names below are matched whole against every name source.
+  const jevSafeActionNamePattern = new RegExp('^(?:[\\u2039\\u00ab\\u2190<]\\s*)?(?:next|next page|previous|previous page|prev'
+    + '|more|show more|load more|see more|view more|read more|show all|see all|view all|show details|view details'
+    + '|more details|details|show less|hide details|expand|expand all|collapse|older|newer|older posts|newer posts'
+    + '|(?:go to )?page \\d{1,4})(?:\\s*[\\u203a\\u00bb\\u2192>])?$|^[\\u2039\\u00ab\\u2190\\u203a\\u00bb\\u2192]$', 'i');
+  // A native checkbox naming one of these may change an account or privacy setting.
+  const jevAccountTogglePattern = /public|private|privacy|visib|profile|notif|e-?mail\s+me|shar(?:e|ing)|track|personali[sz]|cookie/i;
+  const jevReadableNamePattern = /^[\x20-\x7e]*$/;
+  // Toggle roles that stay off-limits even on a native checkbox or radio.
+  const jevSwitchRoles = ['switch', 'menuitemcheckbox', 'menuitemradio'];
+  // The press_enter submit-control check evaluates every rule except these.
+  const jevEnterSubmitCheck = Object.freeze({ skip: Object.freeze(['form_submit', 'enter_submits_form', 'unclassified']) });
+
+  function jevAttr(el, name) {
+    if (!el || typeof el.getAttribute !== 'function') return null;
+    try {
+      return el.getAttribute(name);
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  function jevLower(text) {
+    return typeof text === 'string' ? text.toLowerCase() : '';
+  }
+
+  function jevTag(el) {
+    return el && typeof el.tagName === 'string' ? el.tagName.toUpperCase() : '';
+  }
+
+  function jevCollapse(text) {
+    return String(text === null || text === undefined ? '' : text).replace(/\s+/g, ' ').trim();
+  }
+
+  function jevCut(text, maxChars) {
+    const chars = Array.from(text);
+    return chars.length > maxChars ? chars.slice(0, maxChars).join('') : text;
+  }
+
+  function jevLimit(maxChars, fallback) {
+    return typeof maxChars === 'number' && Number.isFinite(maxChars) && maxChars > 0 ? Math.floor(maxChars) : fallback;
+  }
+
+  // Append a text piece with whitespace already collapsed, so the running
+  // length tracks the collapsed length.
+  function jevAppendText(out, raw) {
+    if (typeof raw !== 'string' || raw === '') return out;
+    let piece = raw.replace(/\s+/g, ' ');
+    if (piece.charAt(0) === ' ' && (out === '' || out.charAt(out.length - 1) === ' ')) piece = piece.slice(1);
+    return out + piece;
+  }
+
+  function jevExplicitRole(el) {
+    const raw = jevAttr(el, 'role');
+    if (!raw) return '';
+    return jevLower(raw.trim().split(/\s+/)[0] || '');
+  }
+
+  function jevIsEditableRegion(el) {
+    const flag = jevAttr(el, 'contenteditable');
+    return flag !== null && jevLower(flag) !== 'false';
+  }
+
+  function jevInputType(el) {
+    return jevLower((jevAttr(el, 'type') || '').trim()) || 'text';
+  }
+
+  // A form control, an option list, an editable region or a text-entry role.
+  function jevIsFieldLike(el) {
+    return jevSafeTextSkipTags.has(jevTag(el)) || jevIsEditableRegion(el) || jevTextEntryRoles.includes(jevExplicitRole(el));
+  }
+
+  function jevSafeTextSkips(el) {
+    return jevIsFieldLike(el) || jevAttr(el, 'aria-hidden') === 'true';
+  }
+
+  function jevById(id) {
+    try {
+      if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') return null;
+      return document.getElementById(id);
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  /**
+   * Text of node's text descendants, never descending into a form control,
+   * an option list, an editable region, a text-entry role or an aria-hidden
+   * subtree. The root itself is always walked (an option entry keeps its own
+   * text). Reads only text-node nodeValue; whitespace is collapsed and the
+   * result is cut at maxChars code points.
+   */
+  function jevSafeText(node, maxChars) {
+    const limit = jevLimit(maxChars, jevMenuConstants.LABEL_CHARS);
+    if (!node || typeof node !== 'object') return '';
+    if (node.nodeType === 3) return jevCut(jevCollapse(node.nodeValue), limit);
+    const budget = limit * 2 + 2;
+    const stack = [];
+    const pushChildren = (parent) => {
+      const kids = parent.childNodes;
+      if (!kids || typeof kids.length !== 'number') return;
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    };
+    let out = '';
+    pushChildren(node);
+    while (stack.length > 0 && out.length < budget) {
+      const current = stack.pop();
+      if (!current) continue;
+      if (current.nodeType === 3) {
+        out = jevAppendText(out, current.nodeValue);
+        continue;
+      }
+      if (current.nodeType !== 1 || jevSafeTextSkips(current)) continue;
+      pushChildren(current);
+    }
+    return jevCut(out.trim(), limit);
+  }
+
+  function jevNameText(text) {
+    let clean = typeof text === 'string' ? text : '';
+    const strip = FSB.stripUnicodeControl;
+    if (clean && typeof strip === 'function') clean = strip(clean) || '';
+    return jevCut(jevCollapse(clean), jevMenuConstants.LABEL_CHARS);
+  }
+
+  function jevFallbackRole(el) {
+    const tag = jevTag(el);
+    if (tag === 'BUTTON' || tag === 'SUMMARY') return 'button';
+    if (tag === 'A') return jevAttr(el, 'href') !== null ? 'link' : '';
+    if (tag === 'OPTION') return 'option';
+    if (tag === 'TEXTAREA') return 'textbox';
+    if (tag === 'SELECT') return 'combobox';
+    if (tag === 'INPUT') {
+      const type = jevInputType(el);
+      if (type === 'checkbox' || type === 'radio') return type;
+      if (jevButtonInputTypes.includes(type)) return 'button';
+      return type === 'search' ? 'searchbox' : 'textbox';
+    }
+    return '';
+  }
+
+  // The element's role as FSB.getImplicitRole reports it (explicit role first),
+  // lower-case, first token only.
+  function jevImplicitRole(el) {
+    let role = null;
+    const getRole = FSB.getImplicitRole;
+    if (typeof getRole === 'function') {
+      try {
+        role = getRole(el);
+      } catch (_e) {
+        role = null;
+      }
+    }
+    if (typeof role !== 'string' || !role.trim()) role = jevExplicitRole(el) || jevFallbackRole(el);
+    return jevLower(role.trim().split(/\s+/)[0] || '');
+  }
+
+  // Associated label text: the element's labels when it has a labels list,
+  // else the nearest LABEL ancestor. Each label goes through jevSafeText, so a
+  // control, an option list or an editable region inside a label never adds text.
+  function jevLabelElementsText(el) {
+    const room = jevMenuConstants.LABEL_CHARS * 2;
+    const labels = el.labels;
+    if (labels && typeof labels === 'object' && typeof labels.length === 'number') {
+      const parts = [];
+      for (let i = 0; i < labels.length; i++) {
+        const label = labels[i];
+        if (!label || label === el || jevIsFieldLike(label)) continue;
+        const text = jevSafeText(label, room);
+        if (text) parts.push(text);
+      }
+      return parts.join(' ');
+    }
+    for (let node = el.parentElement; node; node = node.parentElement) {
+      if (jevTag(node) === 'LABEL') return jevSafeText(node, room);
+    }
+    return '';
+  }
+
+  /**
+   * Menu label for one element: the first non-empty source in ARIA priority
+   * order. The static value attribute of button-type inputs and the alt of an
+   * image input come first (F18); then aria-labelledby, aria-label, associated
+   * labels, contents for name-from-content roles, img alt, placeholder, title.
+   * Every text-derived source goes through jevSafeText. Never the value property.
+   */
+  function jevMenuLabel(el) {
+    if (!el || el.nodeType !== 1) return '';
+    const room = jevMenuConstants.LABEL_CHARS * 2;
+    const tag = jevTag(el);
+    if (tag === 'INPUT') {
+      const type = jevInputType(el);
+      if (type === 'submit' || type === 'button' || type === 'reset') {
+        const fromAttribute = jevNameText(el.getAttribute('value'));
+        if (fromAttribute) return fromAttribute;
+      } else if (type === 'image') {
+        const alt = jevNameText(jevAttr(el, 'alt'));
+        if (alt) return alt;
+      }
+    }
+    const labelledBy = jevAttr(el, 'aria-labelledby');
+    if (labelledBy) {
+      const parts = [];
+      for (const id of labelledBy.trim().split(/\s+/)) {
+        const ref = id ? jevById(id) : null;
+        if (!ref || ref === el || jevIsFieldLike(ref)) continue;
+        const text = jevSafeText(ref, room);
+        if (text) parts.push(text);
+      }
+      const joined = jevNameText(parts.join(' '));
+      if (joined) return joined;
+    }
+    const ariaLabel = jevNameText(jevAttr(el, 'aria-label'));
+    if (ariaLabel) return ariaLabel;
+    const fromLabels = jevNameText(jevLabelElementsText(el));
+    if (fromLabels) return fromLabels;
+    const ownContentsAllowed = tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT'
+      && !jevIsEditableRegion(el) && el.isContentEditable !== true;
+    if (ownContentsAllowed && jevContentsRoles.includes(jevImplicitRole(el))) {
+      const contents = jevNameText(jevSafeText(el, room));
+      if (contents) return contents;
+    }
+    if (tag === 'IMG') {
+      const alt = jevNameText(jevAttr(el, 'alt'));
+      if (alt) return alt;
+    }
+    if (tag === 'INPUT' || tag === 'TEXTAREA') {
+      const placeholder = jevNameText(jevAttr(el, 'placeholder'));
+      if (placeholder) return placeholder;
+    }
+    return jevNameText(jevAttr(el, 'title'));
+  }
+
+  function jevPurposeOf(el) {
+    const infer = FSB.inferElementPurpose;
+    if (typeof infer !== 'function') return {};
+    try {
+      const purpose = infer(el);
+      return purpose && typeof purpose === 'object' ? purpose : {};
+    } catch (_e) {
+      return {};
+    }
+  }
+
+  function jevIsVaultFilled(el) {
+    const marks = FSB.vaultFilledElements;
+    return !!(marks && typeof marks.has === 'function' && el && marks.has(el));
+  }
+
+  function jevFormOf(el) {
+    const owner = el.form;
+    if (owner && typeof owner === 'object') return owner;
+    for (let node = el.parentElement; node; node = node.parentElement) {
+      if (jevTag(node) === 'FORM') return node;
+    }
+    return null;
+  }
+
+  function jevFormMembers(form) {
+    const list = form && form.elements;
+    const members = [];
+    if (!list || typeof list.length !== 'number') return members;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i]) members.push(list[i]);
+    }
+    return members;
+  }
+
+  // A password field or a payment / one-time-code / password autocomplete field.
+  function jevIsSensitiveField(el) {
+    if (jevTag(el) === 'INPUT' && jevInputType(el) === 'password') return true;
+    const tokens = jevLower(jevAttr(el, 'autocomplete') || '').split(/\s+/).filter(Boolean);
+    return tokens.some((token) => token.indexOf('cc-') === 0 || token === 'one-time-code'
+      || token === 'current-password' || token === 'new-password');
+  }
+
+  function jevIsSensitivePurpose(el) {
+    const tag = jevTag(el);
+    if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return false;
+    const purpose = jevPurposeOf(el);
+    return purpose.role === 'payment-input' || (purpose.role === 'credential-input' && purpose.intent === 'password');
+  }
+
+  // A form that holds a password, payment or one-time-code field, or a field
+  // filled from the vault, is a credential or payment flow.
+  function jevFormIsSensitive(form, cache) {
+    if (cache && typeof cache.has === 'function' && cache.has(form)) return cache.get(form);
+    let sensitive = false;
+    for (const member of jevFormMembers(form)) {
+      if (jevIsSensitiveField(member) || jevIsVaultFilled(member) || jevIsSensitivePurpose(member)) {
+        sensitive = true;
+        break;
+      }
+    }
+    if (cache && typeof cache.set === 'function') cache.set(form, sensitive);
+    return sensitive;
+  }
+
+  function jevIsUserEditable(el) {
+    const tag = jevTag(el);
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    return tag === 'INPUT' && !jevNonEditableInputTypes.includes(jevInputType(el));
+  }
+
+  // input type=submit|image, or a button whose type is submit or missing.
+  function jevIsSubmitControl(el) {
+    const tag = jevTag(el);
+    if (tag === 'INPUT') {
+      const type = jevInputType(el);
+      return type === 'submit' || type === 'image';
+    }
+    if (tag === 'BUTTON') {
+      const type = jevLower((jevAttr(el, 'type') || '').trim());
+      return type !== 'button' && type !== 'reset';
+    }
+    return false;
+  }
+
+  function jevIsResetControl(el) {
+    const tag = jevTag(el);
+    return (tag === 'INPUT' || tag === 'BUTTON') && jevLower((jevAttr(el, 'type') || '').trim()) === 'reset';
+  }
+
+  // press_enter is offered only on an INPUT whose type is search or whose role
+  // is searchbox; the purpose heuristics never count.
+  function jevIsSearchField(el) {
+    return jevTag(el) === 'INPUT' && (jevInputType(el) === 'search' || jevExplicitRole(el) === 'searchbox');
+  }
+
+  // D-19: Enter in a search field may submit its form, so the form must hold
+  // nothing but the search: no other user-editable control, no password,
+  // payment or one-time-code field, and no submit control that any rule other
+  // than the generic form_submit rule excludes.
+  function jevSearchEnterBlocked(el) {
+    const form = el.form;
+    if (!form || typeof form !== 'object') return false;
+    for (const member of jevFormMembers(form)) {
+      if (member === el) continue;
+      if (jevIsSensitiveField(member) || jevIsUserEditable(member)) return true;
+      if (jevIsSubmitControl(member) && jevRiskReasons(member, {}, jevEnterSubmitCheck).length > 0) return true;
+    }
+    return false;
+  }
+
+  function jevDetailsOpen(summary) {
+    const parent = summary.parentElement;
+    if (!parent || jevTag(parent) !== 'DETAILS') return null;
+    return typeof parent.hasAttribute === 'function' && parent.hasAttribute('open');
+  }
+
+  // "On" controls get no operations at all, so a fast step can never switch
+  // something off (T-68-01).
+  function jevIsOn(el) {
+    for (const name of ['aria-checked', 'aria-pressed']) {
+      const state = jevLower(jevAttr(el, name) || '');
+      if (state === 'true' || state === 'mixed') return true;
+    }
+    for (const name of ['aria-expanded', 'aria-selected']) {
+      if (jevLower(jevAttr(el, name) || '') === 'true') return true;
+    }
+    return jevTag(el) === 'SUMMARY' && jevDetailsOpen(el) === true;
+  }
+
+  // Kind and code-derived operations for one element (RESEARCH Pattern 4).
+  // type_text and select_option are never produced (AUTO-03).
+  function jevControl(el) {
+    if (!el || el.nodeType !== 1) return { kind: 'none', ops: [] };
+    const tag = jevTag(el);
+    const role = jevExplicitRole(el);
+    let kind = 'none';
+    let baseOps = [];
+    if (tag === 'INPUT') {
+      const type = jevInputType(el);
+      if (type === 'hidden' || type === 'file') {
+        kind = type;
+      } else if (type === 'checkbox' || type === 'radio') {
+        kind = 'toggle';
+        // A native box given a switch role is a switch, and switches get no ops.
+        baseOps = el.checked === true || el.indeterminate === true || jevSwitchRoles.includes(role) ? [] : ['check_box'];
+      } else if (jevButtonInputTypes.includes(type)) {
+        kind = 'action';
+        baseOps = ['click', 'hover'];
+      } else if (jevIsSearchField(el) && !jevSearchEnterBlocked(el)) {
+        kind = 'search';
+        baseOps = ['press_enter'];
+      } else {
+        kind = 'text_entry';
+        baseOps = ['click'];
+      }
+    } else if (tag === 'TEXTAREA' || tag === 'SELECT' || jevIsEditableRegion(el) || el.isContentEditable === true
+      || jevTextEntryRoles.includes(role)) {
+      kind = 'text_entry';
+      baseOps = ['click'];
+    } else if (jevToggleRoles.includes(role)) {
+      // ARIA toggles (switch, checkbox, radio, menuitemcheckbox, menuitemradio)
+      // get no operations in any state: a switch usually saves a setting at
+      // once, and script-defined state cannot prove a click only switches
+      // something on (T-68-01). Their steps go to the LLM.
+      kind = 'toggle';
+      baseOps = [];
+    } else if (tag === 'BUTTON' || tag === 'SUMMARY' || (tag === 'A' && jevAttr(el, 'href') !== null)
+      || jevClickRoles.includes(role)) {
+      kind = 'action';
+      baseOps = ['click', 'hover'];
+    }
+    return { kind, ops: jevIsOn(el) ? [] : baseOps };
+  }
+
+  /**
+   * Code-derived operations for one element. ctx is accepted for symmetry with
+   * classifyJevRisk; the operations depend only on tag, role, state and form.
+   */
+  function jevElementOps(el, ctx) {
+    void ctx;
+    return jevControl(el).ops.slice();
+  }
+
+  function jevFindAncestor(el, test) {
+    for (let node = el; node; node = node.parentElement) {
+      if (node.nodeType === 1 && test(node)) return node;
+    }
+    return null;
+  }
+
+  function jevIsDialogNode(node) {
+    if (jevExplicitRole(node) === 'dialog') return true;
+    if (jevLower(jevAttr(node, 'aria-modal') || '') === 'true') return true;
+    return jevTag(node) === 'DIALOG' && typeof node.hasAttribute === 'function' && node.hasAttribute('open');
+  }
+
+  function jevIsCheckboxLike(el) {
+    if (jevTag(el) === 'INPUT') {
+      const type = jevInputType(el);
+      if (type === 'checkbox' || type === 'radio') return true;
+    }
+    return jevToggleRoles.includes(jevExplicitRole(el));
+  }
+
+  function jevIsScriptHref(href) {
+    return jevLower(String(href).replace(/[\u0000- \u007f]/g, '')).indexOf('javascript:') === 0;
+  }
+
+  // A same-origin http(s) navigation link: no download, no inline click
+  // handler, no Rails/Turbo non-GET method or confirm prompt, and a
+  // fragment-only href only when it names an element on this page (a bare
+  // "#" usually means a script handles the click). Fails closed when the
+  // page address or the URL parser is unavailable.
+  function jevIsSafeLink(el) {
+    if (jevTag(el) !== 'A') return false;
+    const role = jevExplicitRole(el);
+    if (role !== '' && role !== 'link' && role !== 'menuitem') return false;
+    if (typeof el.hasAttribute !== 'function' || el.hasAttribute('download') || el.hasAttribute('onclick')) return false;
+    for (const name of ['data-method', 'data-turbo-method']) {
+      const method = jevAttr(el, name);
+      if (method !== null && jevLower(method.trim()) !== 'get') return false;
+    }
+    if (jevAttr(el, 'data-confirm') !== null || jevAttr(el, 'data-turbo-confirm') !== null) return false;
+    const href = (jevAttr(el, 'href') || '').trim();
+    if (!href) return false;
+    if (href.charAt(0) === '#') return href.length > 1 && jevById(href.slice(1)) !== null;
+    const UrlCtor = typeof URL === 'function' ? URL : null;
+    const page = typeof window !== 'undefined' && window && window.location ? String(window.location.href || '') : '';
+    if (!UrlCtor || !page) return false;
+    try {
+      const base = typeof document !== 'undefined' && document && typeof document.baseURI === 'string' && document.baseURI
+        ? document.baseURI
+        : page;
+      const target = new UrlCtor(href, base);
+      return (target.protocol === 'http:' || target.protocol === 'https:') && target.origin === new UrlCtor(page).origin;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  // The English word lists can judge a name only when it is English: every
+  // name is printable ASCII and the nearest lang (the element's, else the
+  // page's) is empty or English.
+  function jevNamesReadable(el, names) {
+    const holder = jevFindAncestor(el, (node) => jevAttr(node, 'lang') !== null);
+    let lang = holder ? jevAttr(holder, 'lang') : null;
+    if (lang === null && typeof document !== 'undefined' && document) lang = jevAttr(document.documentElement, 'lang');
+    const code = jevLower((lang || '').trim());
+    if (code !== '' && code !== 'en' && code.indexOf('en-') !== 0) return false;
+    return names.every((name) => jevReadableNamePattern.test(name));
+  }
+
+  /**
+   * True when fast mode may act on this kind of control at all (D-19). The
+   * deny lists cannot read every language, so eligibility is opt-in:
+   *   - a native checkbox or radio (check_box) without a switch role, whose
+   *     names the English lists can read and that names no account or
+   *     privacy setting;
+   *   - a same-origin navigation link (jevIsSafeLink), a tab, the summary of
+   *     a details element, or a collapsed disclosure (aria-expanded="false");
+   *   - any other button-like control only when every name is on the short
+   *     paging and reveal list (jevSafeActionNamePattern).
+   * ARIA toggles are never safe. Search fields, text entry and controls with
+   * no operation are judged by their own rules.
+   */
+  function jevStructurallySafe(el, names) {
+    const kind = jevControl(el).kind;
+    if (kind === 'toggle') {
+      if (jevTag(el) !== 'INPUT' || jevSwitchRoles.includes(jevExplicitRole(el))) return false;
+      return jevNamesReadable(el, names) && !names.some((name) => jevAccountTogglePattern.test(name));
+    }
+    if (kind !== 'action') return true;
+    if (jevExplicitRole(el) === 'tab' || jevTag(el) === 'SUMMARY') return true;
+    if (jevLower(jevAttr(el, 'aria-expanded') || '') === 'false') return true;
+    if (jevIsSafeLink(el)) return true;
+    return names.length > 0 && names.every((name) => jevSafeActionNamePattern.test(name));
+  }
+
+  // Name sources the risk rules test: the menu label, the element's own text
+  // (not for fields or editable regions), title, aria-label, the value
+  // attribute of buttons and button-type inputs, and aria-describedby text.
+  // Read for classification only; none of it leaves this function.
+  function jevRiskNames(el, label) {
+    const names = [];
+    const push = (text) => {
+      const clean = jevCollapse(typeof text === 'string' ? text.slice(0, 1000) : '');
+      if (clean) names.push(clean.slice(0, 200));
+    };
+    const tag = jevTag(el);
+    push(label);
+    if (!jevIsFieldLike(el) && el.isContentEditable !== true) push(el.textContent);
+    push(jevAttr(el, 'title'));
+    push(jevAttr(el, 'aria-label'));
+    if (tag === 'BUTTON' || (tag === 'INPUT' && jevButtonInputTypes.includes(jevInputType(el)))) {
+      push(el.getAttribute('value'));
+      if (tag === 'INPUT') push(jevAttr(el, 'alt'));
+    }
+    const describedBy = jevAttr(el, 'aria-describedby');
+    if (describedBy) {
+      for (const id of describedBy.trim().split(/\s+/)) {
+        const ref = id ? jevById(id) : null;
+        if (ref && !jevIsFieldLike(ref)) push(ref.textContent);
+      }
+    }
+    return names;
+  }
+
+  // All matching reason codes in jevRiskReasonOrder order (options.skip leaves
+  // rules out, used by the press_enter submit-control check).
+  function jevRiskReasons(el, ctx, options) {
+    if (!el || el.nodeType !== 1) return [];
+    const context = ctx && typeof ctx === 'object' ? ctx : {};
+    const skip = options && Array.isArray(options.skip) ? options.skip : [];
+    const want = (reason) => !skip.includes(reason);
+    const label = typeof context.label === 'string' ? context.label : jevMenuLabel(el);
+    const purpose = context.purpose && typeof context.purpose === 'object' ? context.purpose : jevPurposeOf(el);
+    const names = jevRiskNames(el, label);
+    const anyName = (pattern) => names.some((name) => pattern.test(name));
+    const tag = jevTag(el);
+    const href = jevAttr(el, 'href');
+    const form = jevFormOf(el);
+    const found = new Set();
+
+    if (purpose.danger === true) found.add('purpose_danger');
+    if (typeof purpose.intent === 'string' && jevRiskIntents.includes(purpose.intent)) found.add('purpose_intent');
+    if (anyName(jevCommitWordPattern)) found.add('commit_word');
+    if (want('form_submit') && form && (jevIsSubmitControl(el) || jevIsResetControl(el))) found.add('form_submit');
+    if (jevFindAncestor(el, (node) => jevExplicitRole(node) === 'alertdialog')) found.add('alertdialog');
+    if (jevFindAncestor(el, jevIsDialogNode) && anyName(jevAffirmativePattern)) found.add('dialog_affirmative');
+    if ((tag === 'A' || tag === 'AREA') && typeof el.hasAttribute === 'function' && el.hasAttribute('download')) found.add('download');
+    if (href !== null && jevIsScriptHref(href)) found.add('javascript_href');
+    if ((href !== null && jevLogoutPattern.test(href)) || anyName(jevLogoutPattern)) found.add('logout');
+    if (tag === 'INPUT' && jevInputType(el) === 'file') found.add('file_input');
+    if (jevIsCheckboxLike(el) && (anyName(jevConsentPattern) || purpose.role === 'consent-input')) found.add('consent_checkbox');
+    if (jevIsSensitiveField(el) || (form && jevFormIsSensitive(form, context.formCache))) found.add('credential_or_payment_form');
+    if (want('enter_submits_form') && jevIsSearchField(el) && jevSearchEnterBlocked(el)) found.add('enter_submits_form');
+    if (jevIsVaultFilled(el)) found.add('vault_filled');
+    if (want('unclassified') && !jevStructurallySafe(el, names)) found.add('unclassified');
+
+    return jevRiskReasonOrder.filter((reason) => found.has(reason) && want(reason));
+  }
+
+  /**
+   * Code-only risk exclusion (D-19, F3). Returns a reason code, or null when no
+   * rule matches; 'unclassified' means no word rule fired but the control is
+   * not a structurally safe kind (jevStructurallySafe), so it is never fast-
+   * acted either. ctx {label, purpose} is optional: missing values are computed
+   * with jevMenuLabel and FSB.inferElementPurpose, so classifyJevRisk(el, {})
+   * also works at execution time. Vault-filled state is read from
+   * FSB.vaultFilledElements.
+   */
+  function classifyJevRisk(el, ctx) {
+    const reasons = jevRiskReasons(el, ctx, null);
+    return reasons.length > 0 ? reasons[0] : null;
+  }
+
+  // jevVisibleText skips these elements and everything under them.
+  const jevVisibleSkipTags = new Set([
+    'INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'DATALIST', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE',
+    'SVG', 'CANVAS', 'IFRAME', 'OBJECT', 'EMBED'
+  ]);
+  // Inline elements join their text without a separator; any other element
+  // is separated from its neighbours by a space.
+  const jevInlineTags = new Set([
+    'A', 'ABBR', 'B', 'BDI', 'BDO', 'CITE', 'CODE', 'DATA', 'DFN', 'EM', 'I', 'KBD', 'LABEL', 'MARK',
+    'Q', 'S', 'SAMP', 'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TIME', 'U', 'VAR', 'WBR'
+  ]);
+  const jevTextSeparator = Object.freeze({ separator: true });
+
+  function jevComputedStyle(el) {
+    try {
+      if (typeof window !== 'undefined' && window && typeof window.getComputedStyle === 'function') {
+        return window.getComputedStyle(el);
+      }
+    } catch (_e) {
+      return null;
+    }
+    return null;
+  }
+
+  function jevIsOverlayNode(el) {
+    const isOverlay = FSB.isFsbElement;
+    if (typeof isOverlay !== 'function') return false;
+    try {
+      return isOverlay(el) === true;
+    } catch (_e) {
+      return true;
+    }
+  }
+
+  function jevVisibleSkips(el) {
+    if (jevVisibleSkipTags.has(jevTag(el))) return true;
+    if (jevIsEditableRegion(el) || jevTextEntryRoles.includes(jevExplicitRole(el))) return true;
+    if (jevAttr(el, 'aria-hidden') === 'true') return true;
+    if (typeof el.hasAttribute === 'function' && el.hasAttribute('hidden')) return true;
+    if (jevIsOverlayNode(el)) return true;
+    const style = jevComputedStyle(el);
+    return !!style && (style.display === 'none' || style.visibility === 'hidden');
+  }
+
+  /**
+   * Visible-text excerpt of the page (F4): text nodes under document.body,
+   * skipping form controls, option lists, scripts, styles, templates, svg,
+   * editable regions, text-entry roles, aria-hidden and hidden subtrees,
+   * display:none / visibility:hidden subtrees and FSB's own overlay nodes.
+   * Whitespace is collapsed and the result is cut at maxChars code points.
+   */
+  function jevVisibleText(maxChars) {
+    const limit = jevLimit(maxChars, jevMenuConstants.TEXT_EXCERPT_CHARS);
+    const body = typeof document !== 'undefined' && document ? document.body : null;
+    if (!body || typeof body !== 'object') return '';
+    if (jevIsEditableRegion(body) || body.isContentEditable === true || jevLower(document.designMode) === 'on') return '';
+    const budget = limit * 2 + 2;
+    const stack = [];
+    const pushChildren = (parent) => {
+      const kids = parent.childNodes;
+      if (!kids || typeof kids.length !== 'number') return;
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    };
+    let out = '';
+    pushChildren(body);
+    while (stack.length > 0 && out.length < budget) {
+      const current = stack.pop();
+      if (current === jevTextSeparator) {
+        out = jevAppendText(out, ' ');
+        continue;
+      }
+      if (!current) continue;
+      if (current.nodeType === 3) {
+        out = jevAppendText(out, current.nodeValue);
+        continue;
+      }
+      if (current.nodeType !== 1 || jevVisibleSkips(current)) continue;
+      if (!jevInlineTags.has(jevTag(current))) {
+        out = jevAppendText(out, ' ');
+        stack.push(jevTextSeparator);
+      }
+      pushChildren(current);
+    }
+    return jevCut(out.trim(), limit);
+  }
+
+  function jevIsMainFrame() {
+    try {
+      return typeof window !== 'undefined' && !!window && window.top === window;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function jevCentreInViewport(el) {
+    try {
+      const rect = el.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      return x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  // 4 = DOCUMENT_POSITION_FOLLOWING, 2 = DOCUMENT_POSITION_PRECEDING.
+  function jevDocumentOrder(a, b) {
+    if (a.el !== b.el && typeof a.el.compareDocumentPosition === 'function') {
+      try {
+        const position = a.el.compareDocumentPosition(b.el);
+        if (position & 4) return -1;
+        if (position & 2) return 1;
+      } catch (_e) {
+        return a.index - b.index;
+      }
+    }
+    return a.index - b.index;
+  }
+
+  function jevClampCap(cap) {
+    const limits = jevMenuConstants;
+    if (typeof cap !== 'number' || !Number.isFinite(cap)) return limits.MENU_CAP;
+    return Math.min(limits.MENU_CAP_MAX, Math.max(limits.MENU_CAP_MIN, Math.floor(cap)));
+  }
+
+  function jevTriState(el, name) {
+    const state = jevLower(jevAttr(el, name) || '');
+    if (state === 'true') return true;
+    if (state === 'false') return false;
+    return state === 'mixed' ? 'mixed' : null;
+  }
+
+  // Content/SW-local state bits (never part of the request element schema).
+  function jevElementState(el) {
+    const tag = jevTag(el);
+    let checked = jevTriState(el, 'aria-checked');
+    if (tag === 'INPUT') {
+      const type = jevInputType(el);
+      if (type === 'checkbox' || type === 'radio') checked = el.indeterminate === true ? 'mixed' : el.checked === true;
+    }
+    let expanded = jevTriState(el, 'aria-expanded');
+    if (tag === 'SUMMARY') {
+      const open = jevDetailsOpen(el);
+      if (open !== null) expanded = open;
+    }
+    return { checked, expanded, selected: jevTriState(el, 'aria-selected'), pressed: jevTriState(el, 'aria-pressed') };
+  }
+
+  function jevMenuRole(el) {
+    const role = jevImplicitRole(el) || jevLower(jevTag(el));
+    return jevCut(role, jevMenuConstants.ROLE_CHARS);
+  }
+
+  // FSB's own overlay nodes and injected canvas-editor pseudo-elements are never offered.
+  function jevSkipCandidate(el) {
+    if (!el || typeof el !== 'object' || el.nodeType !== 1) return true;
+    if (el.dataset && el.dataset.fsbRole) return true;
+    return jevIsOverlayNode(el);
+  }
+
+  function jevBuildEntry(el, label, inViewport, formCache) {
+    const tag = jevTag(el);
+    const control = jevControl(el);
+    const rawPurpose = jevPurposeOf(el);
+    const purpose = {
+      sensitive: rawPurpose.sensitive === true,
+      danger: rawPurpose.danger === true,
+      intent: typeof rawPurpose.intent === 'string' ? rawPurpose.intent : null
+    };
+    const inputType = tag === 'INPUT' ? jevInputType(el) : null;
+    const autocomplete = jevCollapse(jevAttr(el, 'autocomplete') || '');
+    const hidden = inputType === 'hidden'
+      || (typeof el.hasAttribute === 'function' && el.hasAttribute('hidden'))
+      || jevAttr(el, 'aria-hidden') === 'true';
+    const vaultFilled = jevIsVaultFilled(el);
+    const risk = classifyJevRisk(el, { label, purpose: rawPurpose, formCache });
+    const disabled = el.disabled === true || jevLower(jevAttr(el, 'aria-disabled') || '') === 'true';
+    const fastEligible = control.ops.length > 0 && risk === null && inViewport === true
+      && control.kind !== 'text_entry' && !vaultFilled && !hidden && !purpose.sensitive && !disabled;
+    return {
+      handle: null,
+      role: jevMenuRole(el),
+      label,
+      ops: control.ops.slice(),
+      inputType,
+      autocomplete: autocomplete || null,
+      purpose,
+      hidden,
+      risk,
+      fastEligible,
+      vaultFilled,
+      state: jevElementState(el),
+      inViewport: inViewport === true
+    };
+  }
+
+  function jevStateBit(value) {
+    if (value === true) return 't';
+    if (value === false) return 'f';
+    return value === 'mixed' ? 'm' : '-';
+  }
+
+  // FNV-1a 32-bit over url, title, count and each entry's role, label, ops and state bits.
+  function jevMenuSignature(url, title, entries) {
+    const text = JSON.stringify([
+      url,
+      title,
+      entries.length,
+      entries.map((entry) => [
+        entry.role,
+        entry.label,
+        entry.ops.join(','),
+        jevStateBit(entry.state.checked) + jevStateBit(entry.state.expanded)
+          + jevStateBit(entry.state.selected) + jevStateBit(entry.state.pressed)
+      ])
+    ]);
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  }
+
+  // Map one recent-action descriptor {selector?, ref?, role?, name?} to the
+  // handle of the menu entry for the same element, else null. A selector or
+  // ref that resolves decides the answer; role+name must match exactly one entry.
+  function jevRecentHandle(descriptor, keptElements, entries) {
+    if (!descriptor || typeof descriptor !== 'object') return null;
+    let target = null;
+    if (typeof descriptor.selector === 'string' && descriptor.selector) {
+      try {
+        const find = FSB.querySelectorWithShadow;
+        target = typeof find === 'function' ? find(descriptor.selector) : null;
+      } catch (_e) {
+        target = null;
+      }
+    }
+    if (!target && typeof descriptor.ref === 'string' && descriptor.ref) {
+      const refs = FSB.refMap;
+      const resolved = refs && typeof refs.resolve === 'function' ? refs.resolve(descriptor.ref) : null;
+      target = resolved && resolved.stale === false ? resolved.element : null;
+    }
+    if (target) {
+      const index = keptElements.indexOf(target);
+      return index >= 0 ? entries[index].handle : null;
+    }
+    if (typeof descriptor.role !== 'string' || typeof descriptor.name !== 'string') return null;
+    const role = jevLower(descriptor.role.trim());
+    const name = jevNameText(descriptor.name);
+    if (!role || !name) return null;
+    const matches = entries.filter((entry) => entry.role === role && entry.label === name);
+    return matches.length === 1 ? matches[0].handle : null;
+  }
+
+  /**
+   * Build the value-free fast-mode menu for the main frame (AUTO-02, D-13).
+   * Candidates come from FSB.getFilteredElements with an explicit pool of
+   * MENU_POOL (its own default of 50 is score-sliced before any ordering), are
+   * ordered in-viewport first and then by document order, and are capped at
+   * options.cap clamped to MENU_CAP_MIN..MENU_CAP_MAX (default MENU_CAP).
+   * truncated is true when another keepable candidate exists beyond the cap or
+   * when the pool returned MENU_POOL elements. Kept entries are registered in
+   * FSB.jevRefMap (one reset per menu); FSB.refMap is never touched.
+   */
+  function buildJevMenu(options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    const limits = jevMenuConstants;
+    if (!jevIsMainFrame()) return { success: false, reason: 'not_main_frame' };
+    const registry = FSB.jevRefMap;
+    if (!registry || typeof registry.reset !== 'function' || typeof registry.register !== 'function') {
+      return { success: false, reason: 'registry_unavailable' };
+    }
+    const getCandidates = FSB.getFilteredElements;
+    if (typeof getCandidates !== 'function') return { success: false, reason: 'candidates_unavailable' };
+    let pool;
+    try {
+      pool = getCandidates({
+        maxElements: limits.MENU_POOL,
+        viewportComplete: true,
+        prioritizeViewport: true,
+        taskType: 'general',
+        guideSelectors: null
+      });
+    } catch (_e) {
+      return { success: false, reason: 'candidates_failed' };
+    }
+    const candidates = pool && typeof pool.length === 'number' ? Array.from(pool) : [];
+    const ordered = candidates.map((el, index) => ({ el, index, inViewport: jevCentreInViewport(el) }));
+    ordered.sort((a, b) => {
+      if (a.inViewport !== b.inViewport) return a.inViewport ? -1 : 1;
+      return jevDocumentOrder(a, b);
+    });
+
+    const cap = jevClampCap(opts.cap);
+    const keptElements = [];
+    const entries = [];
+    const formCache = new Map();
+    let anotherKeepable = false;
+    for (const item of ordered) {
+      if (jevSkipCandidate(item.el)) continue;
+      const label = jevMenuLabel(item.el);
+      if (!label) continue;
+      if (entries.length >= cap) {
+        anotherKeepable = true;
+        break;
+      }
+      keptElements.push(item.el);
+      entries.push(jevBuildEntry(item.el, label, item.inViewport, formCache));
+    }
+    const truncated = anotherKeepable || candidates.length >= limits.MENU_POOL;
+
+    FSB.jevRefMap.reset();
+    for (let i = 0; i < entries.length; i++) {
+      entries[i].handle = FSB.jevRefMap.register(keptElements[i], entries[i].role, entries[i].label);
+    }
+
+    const url = String((window.location && window.location.href) || '');
+    const title = typeof document.title === 'string' ? document.title : '';
+    const docElement = document.documentElement;
+    const body = document.body;
+    const scrollHeight = Math.max(Number(docElement && docElement.scrollHeight) || 0, Number(body && body.scrollHeight) || 0);
+    const scrollTop = Number(window.scrollY !== undefined ? window.scrollY : window.pageYOffset) || 0;
+    const viewportHeight = Number(window.innerHeight) || 0;
+    const moreBelow = scrollHeight - (scrollTop + viewportHeight) > limits.MORE_BELOW_PX;
+    const recent = Array.isArray(opts.recent) ? opts.recent.slice(0, 10) : [];
+
+    return {
+      success: true,
+      generation: FSB.jevRefMap.generation,
+      url,
+      title,
+      visibleText: jevVisibleText(limits.TEXT_EXCERPT_CHARS),
+      moreBelow,
+      signature: jevMenuSignature(url, title, entries),
+      count: entries.length,
+      truncated,
+      entries,
+      recentHandles: recent.map((descriptor) => jevRecentHandle(descriptor, keptElements, entries))
+    };
+  }
+
+  // Strict target resolution for fast-mode actions (plan 68-03: AUTO-02,
+  // AUTO-05, D-14, D-19, F15-F17). executeAction receives the registry tool's
+  // content verb (tool-executor.js sends tool._contentVerb), so the verb is
+  // mapped to its menu op here; any other verb, including an op name such as
+  // 'check_box', is refused.
+  const jevContentVerbOps = Object.freeze({
+    click: 'click',
+    toggleCheckbox: 'check_box',
+    pressEnter: 'press_enter',
+    hover: 'hover'
+  });
+  const jevHandlePattern = /^j[1-9][0-9]{0,2}$/;
+  const jevHiddenReasons = ['display:none', 'visibility:hidden', 'opacity:0'];
+  const jevDisabledReasons = ['disabled', 'aria-disabled', 'fieldset-disabled'];
+  const jevOccludedReasons = ['obscured'];
+
+  function jevRefuse(reason) {
+    return { ok: false, reason };
+  }
+
+  // accessibility.js isElementActionable, mapped to one reason code (null when
+  // actionable). It checks occlusion only when the centre is in the viewport,
+  // so the caller checks the centre separately (F15).
+  function jevActionabilityReason(el) {
+    const check = FSB.isElementActionable;
+    if (typeof check !== 'function') return 'not_actionable';
+    let verdict;
+    try {
+      verdict = check(el);
+    } catch (_e) {
+      return 'not_actionable';
+    }
+    if (!verdict || typeof verdict !== 'object') return 'not_actionable';
+    if (verdict.actionable === true) return null;
+    const reasons = Array.isArray(verdict.reasons) ? verdict.reasons : [];
+    if (reasons.some((reason) => jevHiddenReasons.includes(reason))) return 'hidden';
+    if (reasons.some((reason) => jevDisabledReasons.includes(reason))) return 'disabled';
+    if (reasons.some((reason) => jevOccludedReasons.includes(reason))) return 'occluded';
+    return 'not_actionable';
+  }
+
+  // The first CSS candidate from FSB.generateSelectors that matches exactly
+  // this element in the document. XPath candidates are skipped and no
+  // caller-supplied selector is ever used.
+  function jevUniqueSelector(el) {
+    const generate = FSB.generateSelectors;
+    if (typeof generate !== 'function') return null;
+    let candidates;
+    try {
+      candidates = generate(el);
+    } catch (_e) {
+      return null;
+    }
+    if (!candidates || typeof candidates.length !== 'number') return null;
+    for (let i = 0; i < candidates.length; i++) {
+      const item = candidates[i];
+      const sel = typeof item === 'string' ? item : (item && typeof item.selector === 'string' ? item.selector : '');
+      if (!sel || sel !== sel.trim() || sel.charAt(0) === '/') continue;
+      let matches;
+      try {
+        matches = document.querySelectorAll(sel);
+      } catch (_e) {
+        continue;
+      }
+      if (matches && matches.length === 1 && matches[0] === el) return sel;
+    }
+    return null;
+  }
+
+  /**
+   * Resolve a fast-mode target strictly. params carry jevHandle, jevGeneration,
+   * expectedRole and expectedName (only fast-mode calls carry them); tool is
+   * the executeAction content verb. Returns {ok:true, element, selector} or
+   * {ok:false, reason}. There is no fallback of any kind: a stale, changed,
+   * risky, hidden, disabled, occluded or ambiguous target is refused and the
+   * caller dispatches nothing.
+   */
+  function resolveJevHandle(params, tool) {
+    const p = params && typeof params === 'object' ? params : {};
+    if (p.selector !== undefined || p.ref !== undefined) return jevRefuse('conflicting_target');
+    if (typeof p.jevHandle !== 'string' || !jevHandlePattern.test(p.jevHandle)) return jevRefuse('bad_handle');
+    const registry = FSB.jevRefMap;
+    if (!registry || typeof registry.get !== 'function') return jevRefuse('unavailable');
+    if (typeof p.jevGeneration !== 'string' || p.jevGeneration !== registry.generation) {
+      return jevRefuse('generation_mismatch');
+    }
+    const entry = registry.get(p.jevHandle);
+    if (!entry) return jevRefuse('unknown_handle');
+    let el = null;
+    try {
+      el = entry.element && typeof entry.element.deref === 'function' ? entry.element.deref() : null;
+    } catch (_e) {
+      el = null;
+    }
+    if (!el || el.isConnected !== true) return jevRefuse('detached');
+    const role = jevMenuRole(el);
+    if (role !== entry.role || role !== p.expectedRole) return jevRefuse('role_changed');
+    const label = jevMenuLabel(el);
+    if (label !== entry.name || label !== p.expectedName) return jevRefuse('name_changed');
+    // The verb's op must still be one of the element's code-derived ops, so a
+    // control that turned "on" since the menu is never toggled off (T-68-01).
+    const op = typeof tool === 'string' && Object.prototype.hasOwnProperty.call(jevContentVerbOps, tool)
+      ? jevContentVerbOps[tool]
+      : null;
+    if (!op || !jevElementOps(el, {}).includes(op)) return jevRefuse('op_not_available');
+    // Risk is checked again at execution, not only when the menu was built (D-19).
+    if (classifyJevRisk(el, {}) !== null) return jevRefuse('risk_excluded');
+    const blocked = jevActionabilityReason(el);
+    if (blocked) return jevRefuse(blocked);
+    if (!jevCentreInViewport(el)) return jevRefuse('out_of_viewport');
+    const selector = jevUniqueSelector(el);
+    if (!selector) return jevRefuse('selector_not_unique');
+    return { ok: true, element: el, selector };
+  }
+
+  /**
+   * One-shot capture observation (plan 68-03, D-22, T-68-11). While a capture
+   * menu is armed (FSB._jevCaptureArm, set only by a getJevMenu request with
+   * capture:true), report which menu handle the next action's target is, then
+   * disarm. The target comes only from params.selector (set by the caller or by
+   * the ref branch, which has already run): the element cache when it returns
+   * an element, else FSB.querySelectorWithShadow; refs are never resolved here,
+   * so nothing falls back to CSS. The message carries the armed generation, the
+   * handle (or null), whether a target resolved, and the content verb; never a
+   * label, selector, text or value. Returns true when a message was attempted.
+   */
+  function noteJevCaptureObservation(tool, params) {
+    const arm = FSB._jevCaptureArm;
+    if (!arm || typeof arm !== 'object') return false;
+    FSB._jevCaptureArm = null;
+    const generation = typeof arm.generation === 'string' ? arm.generation : null;
+    let target = null;
+    try {
+      const selector = params && typeof params === 'object' && typeof params.selector === 'string' ? params.selector : '';
+      if (selector) {
+        const cache = FSB.elementCache;
+        const cached = cache && typeof cache.get === 'function' ? cache.get(selector) : null;
+        if (cached && typeof cached === 'object' && cached.nodeType === 1) {
+          target = cached;
+        } else if (typeof FSB.querySelectorWithShadow === 'function') {
+          target = FSB.querySelectorWithShadow(selector) || null;
+        }
+      }
+    } catch (_e) {
+      target = null;
+    }
+    let handle = null;
+    if (target) {
+      try {
+        const registry = FSB.jevRefMap;
+        if (generation !== null && registry && registry.generation === generation && typeof registry.findHandle === 'function') {
+          handle = registry.findHandle(target) || null;
+        }
+      } catch (_e) {
+        handle = null;
+      }
+    }
+    const message = {
+      action: 'jevCaptureObservation',
+      generation,
+      handle: typeof handle === 'string' ? handle : null,
+      resolved: !!target,
+      tool: typeof tool === 'string' ? tool : null
+    };
+    try {
+      const sent = chrome.runtime.sendMessage(message);
+      if (sent && typeof sent.catch === 'function') sent.catch(() => {});
+    } catch (_e) {
+      // Capture is diagnostic only; a failed send never affects the action.
+    }
+    return true;
+  }
+  // ==== Phase 68 fast-mode element menu (end) ====
+
   // ============================================================================
   // EXPORT TO NAMESPACE
   // ============================================================================
@@ -3639,6 +4816,16 @@
   FSB.extractEcommerceProducts = extractEcommerceProducts;
   FSB.calculateElementScore = calculateElementScore;
   FSB.getFilteredElements = getFilteredElements;
+  FSB.jevMenuConstants = jevMenuConstants;
+  FSB.jevSafeText = jevSafeText;
+  FSB.jevMenuLabel = jevMenuLabel;
+  FSB.classifyJevRisk = classifyJevRisk;
+  FSB.jevElementOps = jevElementOps;
+  FSB.jevVisibleText = jevVisibleText;
+  FSB.buildJevMenu = buildJevMenu;
+  FSB.jevContentVerbOps = jevContentVerbOps;
+  FSB.resolveJevHandle = resolveJevHandle;
+  FSB.noteJevCaptureObservation = noteJevCaptureObservation;
   FSB.findElementByStrategies = findElementByStrategies;
   FSB.buildMarkdownSnapshot = buildMarkdownSnapshot;
   FSB.findMainContentRoot = findMainContentRoot;

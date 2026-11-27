@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-accordion-drilldown-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-click-accordion-drilldown",
+    "version": 1,
+    "fixtureSha256": "63db2630f092705015178de23cd968cb8af00a5980aed8e618b4f3bb519029be"
+  },
+  "step": 1,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion", "stuck"],
+    "goal": "In Organization, then Security, then Sessions, turn on Require re-authentication for exports. Change nothing else.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/accordion-drilldown/index.html",
+      "title": "Admin settings",
+      "text": "Admin settings\nOrganization\nSecurity\nBilling\nMembers"
+    },
+    "elements": [
+      { "id": "e0", "role": "button", "label": "Organization", "ops": ["click"] },
+      { "id": "e1", "role": "button", "label": "Security", "ops": ["click"] },
+      { "id": "e2", "role": "button", "label": "Billing", "ops": ["click"] },
+      { "id": "e3", "role": "button", "label": "Members", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "click", "targetId": "e0", "changed": true }
+    ],
+    "offeredOps": ["click", "scroll"]
+  },
+  "labels": {
+    "operation": "click",
+    "target": "e1",
+    "completion": false,
+    "stuck": false,
+    "risk": null
+  },
+  "note": "Organization is open. Security (e1) is the next section on the way to Sessions; nothing has been changed yet."
+}

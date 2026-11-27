@@ -6,6 +6,7 @@ import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 import { TOOL_REGISTRY, jsonSchemaToZod } from './schema-bridge.js';
+import { mcpToolDescription, mcpParamDescriptions } from './descriptions.js';
 
 // ---------------------------------------------------------------------------
 // Bridge message type mapping
@@ -114,7 +115,7 @@ export function registerReadOnlyTools(
   const readOnlyTools = TOOL_REGISTRY.filter(t => t._readOnly);
 
   for (const tool of readOnlyTools) {
-    const zodShape = jsonSchemaToZod(tool.inputSchema);
+    const zodShape = jsonSchemaToZod(tool.inputSchema, mcpParamDescriptions(tool.name));
     const messageBuilder = MESSAGE_TYPE_MAP[tool.name];
 
     if (!messageBuilder) {
@@ -125,7 +126,7 @@ export function registerReadOnlyTools(
 
     server.tool(
       tool.name,
-      tool.description,
+      mcpToolDescription(tool.name, tool.description),
       zodShape,
       async (params: Record<string, unknown>) => {
         if (!bridge.isConnected) {

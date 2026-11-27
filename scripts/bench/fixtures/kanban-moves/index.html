@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-bench-app="kanban-moves">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint board</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 1020px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 3px 10px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .status { margin: 0 0 12px; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 0 0 12px; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .visually-hidden { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; margin-bottom: 14px; }
+  .column { background: #eceef2; border-radius: 8px; padding: 10px; }
+  .column h2 { font-size: 1rem; margin: 0 0 8px; }
+  .cards { list-style: none; margin: 0; padding: 0; min-height: 40px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+  .card h3 { font-size: 0.95rem; margin: 0 0 6px; }
+  .menu { margin-top: 6px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; box-shadow: 0 4px 12px rgba(28, 34, 48, 0.12); }
+  .menu-item { padding: 5px 10px; cursor: pointer; user-select: none; }
+  .menu-item:hover, .menu-item:focus { background: #eef3ff; outline: none; }
+  .summary p { margin: 0 0 4px; }
+  .summary .k { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sprint board</h1>
+  <p id="move-status" class="status" role="status" hidden></p>
+  <p id="move-error" class="error" role="alert" hidden></p>
+  <div class="board" id="board"></div>
+  <section class="panel summary" aria-labelledby="summary-heading">
+    <h2 id="summary-heading" class="visually-hidden">Board summary</h2>
+    <p><span class="k">Doing:</span> <output data-bench-marker="column-doing"></output></p>
+    <p><span class="k">Done:</span> <output data-bench-marker="column-done"></output></p>
+  </section>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const COLUMNS = [
+      { slug: 'todo', label: 'To do' },
+      { slug: 'doing', label: 'Doing' },
+      { slug: 'done', label: 'Done' },
+    ];
+    const INITIAL = {
+      todo: ['Write release notes', 'Fix login redirect', 'Update dependencies', 'Draft roadmap'],
+      doing: ['Review PR 42'],
+      done: ['Set up CI'],
+    };
+    const board = document.getElementById('board');
+    const status = document.getElementById('move-status');
+    const error = document.getElementById('move-error');
+    const lists = new Map();
+    const cards = [];
+    let busy = false;
+
+    for (const column of COLUMNS) {
+      const section = document.createElement('section');
+      section.className = 'column';
+      section.setAttribute('aria-labelledby', `column-${column.slug}`);
+      const heading = document.createElement('h2');
+      heading.id = `column-${column.slug}`;
+      heading.textContent = column.label;
+      const list = document.createElement('ul');
+      list.className = 'cards';
+      list.dataset.column = column.slug;
+      section.append(heading, list);
+      board.append(section);
+      lists.set(column.slug, list);
+    }
+
+    function columnTitles(slug) {
+      return cards.filter((card) => card.column === slug).map((card) => card.title).sort();
+    }
+
+    function updateSummary() {
+      setMarker('column-doing', columnTitles('doing').join('|'));
+      setMarker('column-done', columnTitles('done').join('|'));
+    }
+
+    function closeMenu(card, focusButton) {
+      card.menu.hidden = true;
+      card.button.setAttribute('aria-expanded', 'false');
+      if (focusButton) card.button.focus();
+    }
+
+    function openMenu(card) {
+      for (const other of cards) if (other !== card) closeMenu(other, false);
+      card.menu.hidden = false;
+      card.button.setAttribute('aria-expanded', 'true');
+      const first = card.menu.querySelector('[role="menuitem"]');
+      if (first) first.focus();
+    }
+
+    function buildMenu(card) {
+      const items = COLUMNS.filter((column) => column.slug !== card.column).map((column) => {
+        const item = document.createElement('div');
+        item.className = 'menu-item';
+        item.setAttribute('role', 'menuitem');
+        item.tabIndex = -1;
+        item.dataset.column = column.slug;
+        item.textContent = column.label;
+        onActivate(item, () => moveCard(card, column));
+        return item;
+      });
+      items.forEach((item, index) => {
+        item.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            items[(index + 1) % items.length].focus();
+          } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            items[(index - 1 + items.length) % items.length].focus();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMenu(card, true);
+          }
+        });
+      });
+      card.menu.replaceChildren(...items);
+    }
+
+    async function moveCard(card, column) {
+      // A move to the card's own column is a no-op and sends nothing.
+      if (busy || card.column === column.slug) return;
+      busy = true;
+      error.hidden = true;
+      try {
+        await benchPost('move', { card: card.title, column: column.slug });
+        card.column = column.slug;
+        lists.get(column.slug).append(card.element);
+        closeMenu(card, false);
+        buildMenu(card);
+        updateSummary();
+        status.textContent = `Moved ${card.title} to ${column.label}.`;
+        status.hidden = false;
+        card.button.focus();
+      } catch {
+        error.textContent = 'The card could not be moved. Try again.';
+        error.hidden = false;
+      } finally {
+        busy = false;
+      }
+    }
+
+    let menuIndex = 0;
+    for (const column of COLUMNS) {
+      for (const title of INITIAL[column.slug]) {
+        menuIndex += 1;
+        const element = document.createElement('li');
+        element.className = 'card';
+        element.dataset.card = title;
+        const heading = document.createElement('h3');
+        heading.textContent = title;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn';
+        button.setAttribute('aria-haspopup', 'menu');
+        button.setAttribute('aria-expanded', 'false');
+        button.setAttribute('aria-controls', `move-menu-${menuIndex}`);
+        button.append('Move to');
+        const context = document.createElement('span');
+        context.className = 'visually-hidden';
+        context.textContent = `: ${title}`;
+        button.append(context);
+        const menu = document.createElement('div');
+        menu.className = 'menu';
+        menu.id = `move-menu-${menuIndex}`;
+        menu.setAttribute('role', 'menu');
+        menu.setAttribute('aria-label', `Move ${title} to`);
+        menu.hidden = true;
+        element.append(heading, button, menu);
+        lists.get(column.slug).append(element);
+        const card = { title, column: column.slug, element, button, menu };
+        cards.push(card);
+        buildMenu(card);
+        button.addEventListener('click', () => (menu.hidden ? openMenu(card) : closeMenu(card, false)));
+        button.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            openMenu(card);
+          }
+        });
+      }
+    }
+
+    document.addEventListener('click', (event) => {
+      for (const card of cards) {
+        if (!card.menu.hidden && !card.element.contains(event.target)) closeMenu(card, false);
+      }
+    });
+
+    updateSummary();
+  })();
+</script>
+</body>
+</html>

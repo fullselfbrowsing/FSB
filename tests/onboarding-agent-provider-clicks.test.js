@@ -19,7 +19,8 @@ const ALL_CLIENT_IDS = [
   'antigravity',
   'codex',
   'opencode',
-  'cline'
+  'cline',
+  'gemini'
 ];
 
 function sha256(filePath) {
@@ -139,7 +140,7 @@ function createHarness(initialStore, options) {
   const allIdsMatch = ONBOARDING_SOURCE.match(/const ALL_INSTALL_CLIENT_IDS = \[([\s\S]*?)\];/);
   assert(allIdsMatch, 'all-client expansion constant exists');
   const sourceAllIds = Array.from(allIdsMatch[1].matchAll(/'([^']+)'/g), (match) => match[1]);
-  assert.deepStrictEqual(sourceAllIds, ALL_CLIENT_IDS, 'all expands to the exact eight flag-backed ids');
+  assert.deepStrictEqual(sourceAllIds, ALL_CLIENT_IDS, 'all expands to the exact nine flag-backed ids');
   assert(!sourceAllIds.includes('openclaw'), 'all expansion excludes openclaw');
 
   const copyCommandSource = extractFunction(ONBOARDING_SOURCE, 'copyCommand');
@@ -160,13 +161,13 @@ function createHarness(initialStore, options) {
 
   assert.strictEqual(
     sha256(ONBOARDING_HTML_PATH),
-    '27e535ef3e829e205223b8a7dfeda5aeb6bd29b7e99b895079cc71cd9b10c9d0',
-    'onboarding.html hash rolled for the locale script and onboarding tag key'
+    'c2b75c8a5ca86333e4a73200136bb118a1d5f3845d88e59cd5a7296bddd5c3e3',
+    'onboarding.html hash rolled: the stage label no longer mentions scrolling, which the wheel no longer does'
   );
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),
-    '6aa97ce28241b88c8939b88d1b8f3875ba7ba89d989712e81a72d8c4de010987',
-    'onboarding.css has no Phase 57 change'
+    '886331468e7f18e3fd68104fcf237ea1142c1acd2cfc0697a952a6fdd19d3be7',
+    'onboarding.css hash rolled for the depth-room redesign'
   );
 
   console.log('--- durable count, timestamps, and sibling preservation ---');
@@ -230,7 +231,7 @@ function createHarness(initialStore, options) {
     await harness.api.flushCopyWrites();
     const envelope = plain(harness.store.fsbAgentProviders);
     assert.deepStrictEqual(Object.keys(envelope.clicked).sort(), ALL_CLIENT_IDS.slice().sort(),
-      'all writes exactly eight clicked entries');
+      'all writes exactly nine clicked entries');
     ALL_CLIENT_IDS.forEach((id) => {
       assert.deepStrictEqual(envelope.clicked[id], {
         count: 1,

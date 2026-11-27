@@ -6,6 +6,7 @@ import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 import { screenshotStore } from '../screenshot-store.js';
 import { getToolByName, jsonSchemaToZod } from './schema-bridge.js';
+import { mcpToolDescription, mcpParamDescriptions } from './descriptions.js';
 
 type ScreenshotMetadata = Record<string, unknown> & {
   warnings?: Array<Record<string, unknown>>;
@@ -59,8 +60,8 @@ export function registerScreenshotTools(
 
   server.tool(
     tool.name,
-    tool.description,
-    jsonSchemaToZod(tool.inputSchema),
+    mcpToolDescription(tool.name, tool.description),
+    jsonSchemaToZod(tool.inputSchema, mcpParamDescriptions(tool.name)),
     async (params: Record<string, unknown>) => {
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });

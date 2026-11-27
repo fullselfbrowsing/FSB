@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-click-accordion-drilldown",
+  "version": 1,
+  "set": "core",
+  "category": "click-heavy",
+  "startPath": "/fixtures/accordion-drilldown/index.html",
+  "instruction": "Open {startUrl}. In Organization, then Security, then Sessions, turn on Require re-authentication for exports. Change nothing else.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/accordion-drilldown/toggle", "count": 1, "jsonEquals": { "path": "organization/security/sessions/reauth-exports", "enabled": true } },
+      { "kind": "request", "method": "POST", "path": "/api/accordion-drilldown/toggle", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/accordion-drilldown/index.html", "queryIncludes": { "view": "updated" } },
+      { "kind": "marker", "name": "reauth-exports", "equals": "on" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "accordion-drilldown/index.html"]
+}

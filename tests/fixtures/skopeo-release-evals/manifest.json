@@ -1,0 +1,58 @@
+{
+  "version": "skopeo-release-evals/v1",
+  "fixture_policy": "synthetic-or-irreversibly-redacted",
+  "network_allowed": false,
+  "llm_judge_allowed": false,
+  "configured_provider_run_allowed": false,
+  "provisional_results_are_gold": false,
+  "legal_domain_approval": "human_needed",
+  "authorized_live_drive_docs_pdf": "human_needed",
+  "native_notification_approval": "human_needed",
+  "human_accessibility_approval": "human_needed",
+  "live_approved": false,
+  "requirements": [
+    "ALERT-01", "ALERT-02", "ALERT-03", "ALERT-04", "ALERT-05",
+    "VERIFY-01", "VERIFY-02", "VERIFY-03", "VERIFY-04", "VERIFY-05"
+  ],
+  "threats": [
+    "T59-01", "T59-02", "T59-03", "T59-04", "T59-05", "T59-06",
+    "T59-07", "T59-08", "T59-09", "T59-10", "T59-11", "T59-12"
+  ],
+  "case_file": "cases.json",
+  "ordered_case_ids": [
+    "G01", "G02", "G03", "G04", "G05", "G06", "G07", "G08", "G09", "G10", "G11", "G12",
+    "S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10",
+    "L01", "L02", "L03", "L04", "L05", "L06"
+  ],
+  "category_counts": {
+    "gold": 12,
+    "security": 10,
+    "lifecycle": 6
+  },
+  "required_source_roles": [
+    "governing", "partially-governing", "replacement", "historical", "unsigned",
+    "conflicting", "unreadable", "inaccessible", "policy", "memo"
+  ],
+  "production_modules": [
+    "extension/utils/skopeo-truth-schema.js",
+    "extension/utils/skopeo-deadline-engine.js",
+    "extension/utils/skopeo-alert-schema.js",
+    "extension/utils/skopeo-alert-engine.js",
+    "extension/utils/skopeo-alert-store.js",
+    "extension/utils/skopeo-alert-runtime.js",
+    "extension/utils/skopeo-hud-schema.js",
+    "extension/utils/skopeo-hud-projector.js",
+    "extension/content/skopeo-adaptive-composer.js"
+  ],
+  "forbidden_disclosure_fields": [
+    "accountPermissionId", "corpusRootFileId", "partitionKey", "ownerStableRecordId",
+    "ownerRelationStableId", "sourceFileId", "sourceRevision", "contentFingerprint",
+    "alertKey", "alarmName", "notificationId", "canonicalUrl", "rawText", "providerData"
+  ],
+  "provisional_oracle_sha256": "6b1d6d0bd357c785448ad6453ac6e6629b26fda47f6ddcea7c4643dd8cb0ac59",
+  "report_lines": [
+    "deterministic_gold", "structural_security", "lifecycle_browser_provisional",
+    "domain_fidelity", "authorized_live_drive_docs_pdf", "native_notification",
+    "human_accessibility"
+  ]
+}

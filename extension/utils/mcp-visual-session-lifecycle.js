@@ -217,6 +217,7 @@
     return {
       sessionToken: 'lifecycle:' + String(entry.tabId),
       clientLabel: entry.client,
+      agentId: typeof entry.agentId === 'string' ? entry.agentId : '',
       tabId: Number(entry.tabId),
       task: entry.visualReason || 'FSB Automating',
       detail: '',

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-bench-app="settings-change">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account settings</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .profile p { margin: 0 0 6px; }
+  .profile .k { color: var(--muted); }
+  .field { margin-bottom: 14px; }
+  .field > label { display: block; font-weight: 600; margin-bottom: 4px; }
+  select { font: inherit; padding: 6px 8px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; min-width: 18rem; }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 24rem; padding: 8px 10px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; user-select: none; }
+  .switch-text { font-weight: 600; }
+  .switch-track { position: relative; flex: none; width: 40px; height: 22px; border-radius: 999px; background: #c3c8d2; }
+  .switch-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .switch-state { flex: none; width: 2rem; color: var(--muted); }
+  .switch-row[aria-checked="true"] .switch-track { background: var(--accent); }
+  .switch-row[aria-checked="true"] .switch-thumb { left: 21px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Account settings</h1>
+  <div class="layout">
+    <section class="panel profile" aria-labelledby="profile-heading">
+      <h2 id="profile-heading">Profile</h2>
+      <p><span class="k">Name:</span> Jordan Lee</p>
+      <p><span class="k">Role:</span> Operations lead</p>
+      <p><span class="k">Language:</span> English (United States)</p>
+      <p><span class="k">Time zone:</span> America/New_York (UTC-05:00)</p>
+    </section>
+    <form id="digest-form" class="panel" aria-labelledby="digest-heading" novalidate>
+      <h2 id="digest-heading">Email digest</h2>
+      <div class="field">
+        <label for="digest-timezone">Digest time zone</label>
+        <select id="digest-timezone" name="digestTimezone">
+          <option value="UTC" selected>UTC (UTC+00:00)</option>
+          <option value="America/Los_Angeles">America/Los_Angeles (UTC-08:00)</option>
+          <option value="America/Denver">America/Denver (UTC-07:00)</option>
+          <option value="America/Chicago">America/Chicago (UTC-06:00)</option>
+          <option value="America/Toronto">America/Toronto (UTC-05:00)</option>
+          <option value="America/New_York">America/New_York (UTC-05:00)</option>
+          <option value="Europe/London">Europe/London (UTC+00:00)</option>
+          <option value="Europe/Berlin">Europe/Berlin (UTC+01:00)</option>
+          <option value="Asia/Kolkata">Asia/Kolkata (UTC+05:30)</option>
+          <option value="Asia/Tokyo">Asia/Tokyo (UTC+09:00)</option>
+          <option value="Australia/Sydney">Australia/Sydney (UTC+10:00)</option>
+        </select>
+      </div>
+      <div id="weekly-digest" class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Weekly digest">
+        <span class="switch-text">Weekly digest</span>
+        <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+        <span class="switch-state" aria-hidden="true">Off</span>
+      </div>
+      <button id="save" class="btn primary" type="submit">Save</button>
+      <p id="save-error" class="error" role="alert" hidden></p>
+      <p id="save-status" class="status" role="status" hidden>Settings saved: <output data-bench-marker="settings-saved"></output></p>
+    </form>
+  </div>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const form = document.getElementById('digest-form');
+    const zone = document.getElementById('digest-timezone');
+    const toggle = document.getElementById('weekly-digest');
+    const toggleState = toggle.querySelector('.switch-state');
+    const saveButton = document.getElementById('save');
+    const error = document.getElementById('save-error');
+    const status = document.getElementById('save-status');
+    let busy = false;
+
+    function isOn() {
+      return toggle.getAttribute('aria-checked') === 'true';
+    }
+
+    onActivate(toggle, () => {
+      const on = !isOn();
+      toggle.setAttribute('aria-checked', String(on));
+      toggleState.textContent = on ? 'On' : 'Off';
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      const digestTimezone = zone.value;
+      const weeklyDigest = isOn();
+      busy = true;
+      saveButton.disabled = true;
+      error.hidden = true;
+      try {
+        await benchPost('save', { digestTimezone, weeklyDigest });
+        setView({ view: 'saved' });
+        setMarker('settings-saved', `${digestTimezone}|${weeklyDigest ? 'on' : 'off'}`);
+        status.hidden = false;
+      } catch {
+        error.textContent = 'The settings could not be saved. Try again.';
+        error.hidden = false;
+      } finally {
+        busy = false;
+        saveButton.disabled = false;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

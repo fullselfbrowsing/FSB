@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" data-bench-app="search-detail">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trailhead Outfitters</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+  .search label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .search input { font: inherit; width: 22rem; max-width: 100%; padding: 6px 8px; border: 1px solid #b8bfcc; border-radius: 6px; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Trailhead Outfitters</h1>
+  <section class="panel" aria-label="Product search">
+    <form class="search" action="results.html" method="get" role="search">
+      <div>
+        <label for="q">Search products</label>
+        <input id="q" name="q" type="search" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn primary" type="submit">Search</button>
+    </form>
+  </section>
+  <p class="muted">Shop running, hiking and camp gear. Departments: trail running shoes, road running shoes, hiking boots, sandals, apparel and accessories.</p>
+</main>
+<script src="../_shared/bench.js"></script>
+</body>
+</html>

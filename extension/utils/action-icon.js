@@ -10,18 +10,17 @@
  *
  *   idle      - base glyph only. Full strength until a dashboard relay has
  *               connected at least once and then dropped.
- *   thinking  - SWEEP. The indeterminate progress bar, quoting
- *               .fsb-progress-bar.indeterminate .fsb-progress-fill and its
- *               fsbProgressSweep keyframe (1.2s ease-in-out, 38% fill,
- *               translateX -120% -> 320%). No orbit bead.
+ *   thinking  - SWEEP. The status pill's track sweep in visual-feedback.js
+ *               (1.2s ease-in-out, 38% fill, translateX -120% -> 320%). No
+ *               orbit bead.
  *   acting    - ORBIT. The ViewportGlow perimeter bead, 4s, _getDuration().
  *   calling   - CAPABILITY RING. An inset violet border repeating while an
  *               invocation is in flight, plus a ping travelling INWARD -- an
  *               icon cannot paint outside its own box, so the design's outward
  *               spread is unrenderable.
- *               This form has NO upstream source: there is no ring pulse and no
- *               1.6s cadence anywhere in the extension. It is design-only, and
- *               it deliberately diverges from ViewportGlow's 4s calling glow.
+ *               From the design export. The status pill plays the same ring
+ *               on its border, from this module's clock (getMotion), and it
+ *               deliberately diverges from ViewportGlow's 4s calling glow.
  *   watching  - BREATHE. Quotes the trigger badge dot's 2.4s ease-in-out
  *               cadence and loops for as long as a watch remains armed. The
  *               mark fades over a fixed black plate while a deliberately
@@ -52,9 +51,9 @@
   var DIM_FILTER = 'grayscale(0.8)';
 
   // ---- Sweep (thinking) ---------------------------------------------------
-  // Canonical: visual-feedback.js .fsb-progress-bar / .fsb-progress-fill and the
-  // fsbProgressSweep keyframe. The track is scaled for legibility rather than
-  // proportionally -- the canonical 4/128 height lands at half a pixel at 16px.
+  // Shared with the status pill's track sweep in visual-feedback.js. The track is
+  // scaled for legibility rather than proportionally -- a 4/128 height lands at
+  // half a pixel at 16px.
   var SWEEP_TRACK_W_RATIO = 0.594;   // 76/128, the design's own 32px check
   var SWEEP_TRACK_H_RATIO = 0.0625;  // 8/128 -> 1px at 16, 2px at 32
   var SWEEP_TRACK_H_MIN = 1;
@@ -140,11 +139,11 @@
   // would actively mislead here: orbit now means READING, so a key called
   // "acting" naming the read animation is a trap for the next reader.
   var STATES = {
-    // Driving the browser. fsbProgressSweep, visual-feedback.js -- 1.2s ease-in-out.
+    // Driving the browser. The status pill's track sweep -- 1.2s ease-in-out.
     sweep: { duration: 1200, form: 'sweep', from: '#ff8c00', to: '#ff6600', animated: true },
     // Reading. ViewportGlow _getDuration() + .state-acting custom properties.
     orbit: { duration: 4000, form: 'orbit', from: '#ff6600', to: '#ff8c00', animated: true },
-    // An in-flight capability invocation. Design-only: no ring pulse or 1.6s cadence exists upstream.
+    // An in-flight capability invocation. From the design export; the status pill plays it too.
     ring: { duration: 1600, form: 'ring', from: '#8b5cf6', to: '#8b5cf6', animated: true },
     // A trigger watch. fsb-trigger-badge-dot cadence.
     breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS }
@@ -178,6 +177,13 @@
   var preReadyClaimKeys = Object.create(null); // keys explicitly touched before restore
   var activityTimers = Object.create(null);  // claim key -> expiry timeout id
   var capabilityCounts = Object.create(null); // 'capability:<tabId>' -> in-flight invoke count
+  // The on-page status pill plays the same motion as the icon. It needs each
+  // tab's winning form and the moment it began, so it can place itself in the
+  // cycle from the wall clock.
+  var claimSince = Object.create(null);  // claim key -> Date.now() when it took its current state
+  var motionListeners = [];
+  var motionTabsSent = Object.create(null); // tab key -> true while it was last told of a motion
+  var motionNotifyQueued = false;
   var resolved = null;                // the state currently on screen
   var animating = false;
   var animationsEnabled = true;
@@ -1066,12 +1072,14 @@
       // mid-animation, and a bounded hold was short by the build's duration.
       startTime = Date.now();
       startLoop();
+      queueMotionNotify();
       return;
     }
     ensureAnimatedFrames(next).then(function () {
       if (!animating || resolved !== next) return;
       startTime = Date.now();
       startLoop();
+      queueMotionNotify();
     }).catch(function () { /* reported by ensureAnimatedFrames */ });
   }
 
@@ -1093,6 +1101,7 @@
     resolved = null;
     if (changed) persistIntent();
     emit(staticFrame());
+    queueMotionNotify();
   }
 
   // ---- Claims -------------------------------------------------------------
@@ -1135,6 +1144,8 @@
     if (!ready) preReadyClaimKeys[key] = true;
     if (had === want) return;
     if (want) claims[key] = want; else delete claims[key];
+    if (want) claimSince[key] = Date.now(); else delete claimSince[key];
+    queueMotionNotify();
     if (!ready) return;
     persistIntent();
     if (animationsEnabled) applyResolved();
@@ -1144,6 +1155,7 @@
     var next = isEnabled !== false;
     if (animationsEnabled === next) return;
     animationsEnabled = next;
+    queueMotionNotify();
     if (!ready || unavailable) return;
     if (!animationsEnabled) {
       // Preserve claims so re-enabling immediately restores the correct winner,
@@ -1305,10 +1317,13 @@
         clearActivityTimer(keys[i]);
         delete capabilityCounts[keys[i]];
         delete claims[keys[i]];
+        delete claimSince[keys[i]];
         changed = true;
       }
     }
-    if (!changed || !ready || unavailable) return;
+    if (!changed) return;
+    queueMotionNotify();
+    if (!ready || unavailable) return;
     persistIntent();
     applyResolved();
   }
@@ -1349,11 +1364,13 @@
         if (animatedFrames[revived]) {
           startTime = Date.now();
           startLoop();
+          queueMotionNotify();
         } else {
           ensureAnimatedFrames(revived).then(function () {
             if (!animating || resolved !== revived) return;
             startTime = Date.now();
             startLoop();
+            queueMotionNotify();
           }).catch(function () { /* reported by ensureAnimatedFrames */ });
         }
       } else {
@@ -1366,6 +1383,62 @@
     }).catch(function () { /* the icon is presentation-only */ });
   }
 
+  // ---- Motion for the on-page status pill ---------------------------------
+
+  // The form this tab's own claims resolve to, and when it began. When the icon
+  // is showing that same form, its own clock is the start time, so the pill and
+  // the icon sit at the same point in the cycle.
+  function getMotion(tabId) {
+    if (unavailable || !animationsEnabled) return null;
+    var tab = tabKey(tabId);
+    if (tab === 'global') return null;
+    var best = null;
+    var bestKey = null;
+    var prefixes = ['watch:', 'capability:', 'session:'];
+    for (var i = 0; i < prefixes.length; i++) {
+      var key = prefixes[i] + tab;
+      var state = claims[key];
+      if (state && STATES[state] && (!best || RANK[state] > RANK[best])) {
+        best = state;
+        bestKey = key;
+      }
+    }
+    if (!best) return null;
+    // A claim restored from storage has no recorded start; it begins now.
+    if (!claimSince[bestKey]) claimSince[bestKey] = Date.now();
+    var startedAt = animating && resolved === best && startTime ? startTime : claimSince[bestKey];
+    return { form: STATES[best].form, startedAt: startedAt };
+  }
+
+  function onMotionChange(listener) {
+    if (typeof listener === 'function') motionListeners.push(listener);
+  }
+
+  // Batched to one pass per turn: a claim change and the clock that follows it
+  // usually land together.
+  function queueMotionNotify() {
+    if (!motionListeners.length || motionNotifyQueued) return;
+    motionNotifyQueued = true;
+    Promise.resolve().then(flushMotionNotify);
+  }
+
+  function flushMotionNotify() {
+    motionNotifyQueued = false;
+    var tabs = Object.create(null);
+    Object.keys(claims).forEach(function (key) { tabs[key.slice(key.indexOf(':') + 1)] = true; });
+    Object.keys(motionTabsSent).forEach(function (tab) { tabs[tab] = true; });
+    var sent = Object.create(null);
+    Object.keys(tabs).forEach(function (tab) {
+      if (tab === 'global') return;
+      var motion = getMotion(Number(tab));
+      if (motion) sent[tab] = true;
+      for (var i = 0; i < motionListeners.length; i++) {
+        try { motionListeners[i](Number(tab), motion); } catch (_e) { /* the pill is presentation-only */ }
+      }
+    });
+    motionTabsSent = sent;
+  }
+
   globalThis.fsbActionIcon = Object.freeze({
     init: init,
     noteActivity: noteActivity,
@@ -1375,6 +1448,8 @@
     setAnimationsEnabled: setAnimationsEnabled,
     setConnected: setConnected,
     dropTab: dropTab,
-    repair: repair
+    repair: repair,
+    getMotion: getMotion,
+    onMotionChange: onMotionChange
   });
 })();

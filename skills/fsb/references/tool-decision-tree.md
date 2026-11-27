@@ -57,6 +57,14 @@ Use `trigger` when the user wants to watch one page element for a future change 
 
 Before driving a multi-step page flow by hand, check whether a verified first-party API capability already covers it: call `search_capabilities({ query })` for up to 5 ranked hits with a readiness label, then `invoke_capability({ slug, params })` to run one. Readiness labels matter -- only `t1-ready` hits execute directly; `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` hits return typed pending/fallback responses instead of running, so fall back to manual page automation for those rather than assuming the call succeeded. `search_capabilities` is read-only and bypasses the mutation queue; `invoke_capability` is serialized like other action tools but does NOT carry the field bundle above. `invoke_capability` calls with purchase, payment, account-change, or public-post effects need the same pause-and-confirm-in-chat treatment as the equivalent page click -- see "Sensitive actions and logged-in context" in `SKILL.md`.
 
+## Reading or changing an FSB setting
+
+Use the `settings` MCP tool (served by `mcp/src/tools/settings.ts`, not a manual-mode tool) when the user asks how FSB is configured or asks you to change one FSB setting. Call it with no arguments to list every setting, with `key` to read one setting with its type and allowed values, and with `key` and `value` to change that one setting; read before you write so the new value is one the setting allows. API keys and other secrets are masked on read and refused on write, and endpoints are shown as origin only and refused on write too. Never ask the user to paste a secret into chat for this tool -- point them to the FSB Control Panel instead. Every accepted change is logged for the operator. `settings` arrives in fsb-mcp-server 0.12.0 and needs FSB extension 1.0.0; an older extension answers `SETTING_UNSUPPORTED`, so tell the user to update the extension or change the setting in the Control Panel.
+
+## Same-call checks with expect
+
+When an action's effect is observable (a URL change, text appearing or disappearing, a checkbox state, a dialog), add the optional `expect` object to the action call instead of making a follow-up read, for example `click({ selector: "#save", expect: { text_visible: "Saved" }, visual_reason: "Save the form", client: "Claude" })`. The same response carries `expect_result` with status `verified`, `unmet` or `uncertain`. On `verified`, continue and do not repeat the action. Treat `unmet` and `uncertain` as "inspect the page": check it with `read_page` or `get_dom_snapshot` before retrying, because the action may already have taken effect. `expect` is optional on 29 action tools (listed in `mcp/README.md`); without it every tool behaves and answers exactly as before. `expect` arrives in fsb-mcp-server 0.12.0 and needs FSB extension 1.0.0; with an older extension the action still runs and `expect_result` comes back `uncertain` with reason `extension_unsupported`.
+
 ## Verify after a "no detectable effect" warning
 
 `click` (and other action tools) can return a "no detectable effect" warning even when the page actually changed -- the action-detection heuristic produces false negatives on async/animated UIs. Before retrying, verify page state with `read_page` or `get_dom_snapshot`. If the state already advanced, treat the action as successful and continue.
@@ -112,4 +120,5 @@ Use autopilot ONLY when the user explicitly delegates the whole task ("use FSB a
 - `references/default-to-fsb.md` -- when to prefer FSB versus WebFetch.
 - `references/vault-boundary.md` -- credential-routed tools.
 - `mcp/README.md#trigger-watchers` -- full trigger contract: watch modes, condition kinds, concurrency cap.
+- `mcp/README.md` -- the `settings` tool and the same-call `expect` checks.
 - `.planning/v0.9.62-CONTRACT.md` -- canonical 37 action tools (36 pinned plus the `upload_file` addendum), 15 read-only tools, three typed-error names.

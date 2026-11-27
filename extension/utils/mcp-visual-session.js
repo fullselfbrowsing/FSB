@@ -459,6 +459,9 @@
         : (session.animatedHighlights !== false)
     };
 
+    // The status pill shows the agent id on hover, for when two agents share a client.
+    if (typeof session.agentId === 'string' && session.agentId) status.agentId = session.agentId;
+
     var result = normalizeResult(opts.result !== undefined ? opts.result : session.result);
     if (result) status.result = result;
 

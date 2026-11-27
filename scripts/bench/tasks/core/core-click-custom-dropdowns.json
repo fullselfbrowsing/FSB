@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-click-custom-dropdowns",
+  "version": 1,
+  "set": "core",
+  "category": "click-heavy",
+  "startPath": "/fixtures/custom-dropdowns/index.html",
+  "instruction": "Open {startUrl}. Choose Europe (West) for Region, Large for Size, Graphite for Color and Express for Shipping, then submit.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/custom-dropdowns/submit", "count": 1, "jsonEquals": { "region": "eu-west", "size": "large", "color": "graphite", "shipping": "express" } },
+      { "kind": "request", "method": "POST", "path": "/api/custom-dropdowns/submit", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/custom-dropdowns/index.html", "queryIncludes": { "view": "submitted" } },
+      { "kind": "marker", "name": "selection", "equals": "eu-west|large|graphite|express" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "custom-dropdowns/index.html"]
+}

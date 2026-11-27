@@ -3,8 +3,10 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const { pathToFileURL } = require('node:url');
 const replayHelpers = require('../extension/utils/lattice-replay.js');
+const trustedStoreApi = require('../extension/utils/trusted-local-feature-store.js');
 
 let passed = 0;
 function check(label, fn) {
@@ -143,6 +145,88 @@ function manifest() {
       replay: { risk: 'write', availability: 'approval-once', reason: 'Browser interaction may repeat a side effect' }
     }]
   };
+}
+
+function createTrustedSessionStore() {
+  const values = {};
+  const copy = (value) => JSON.parse(JSON.stringify(value));
+  const local = {
+    async get(keys) {
+      const selected = {};
+      for (const key of (Array.isArray(keys) ? keys : [keys])) {
+        if (Object.prototype.hasOwnProperty.call(values, key)) selected[key] = copy(values[key]);
+      }
+      return selected;
+    },
+    async set(update) { Object.assign(values, copy(update)); },
+    async remove(keys) { for (const key of (Array.isArray(keys) ? keys : [keys])) delete values[key]; }
+  };
+  const store = trustedStoreApi.create({
+    chrome: { runtime: { id: 'fsb-replay-test-extension' }, storage: { local } }
+  });
+  return { store, values, local };
+}
+
+// The replay module reads sessions straight from chrome.storage.local and
+// asks the offscreen host over runtime messages, as it does in the worker.
+async function withReplayRuntime(local, harness, work) {
+  const previous = globalThis.chrome;
+  globalThis.chrome = {
+    runtime: {
+      id: 'fsb-replay-test-extension',
+      sendMessage(message) { return harness.dispatch(message.type, message.payload); }
+    },
+    storage: { local }
+  };
+  try {
+    return await work();
+  } finally {
+    globalThis.chrome = previous;
+  }
+}
+
+function backgroundFunctionSource(name) {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  let start = source.indexOf('async function ' + name + '(');
+  if (start === -1) start = source.indexOf('function ' + name + '(');
+  assert.notEqual(start, -1, 'missing background function ' + name);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  for (let i = open; i < source.length; i++) {
+    const char = source[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') depth++;
+    if (char === '}' && --depth === 0) return source.slice(start, i + 1);
+  }
+  throw new Error('unterminated background function ' + name);
+}
+
+function loadLoggerWithStore(store) {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'utils', 'automation-logger.js'), 'utf8');
+  const context = vm.createContext({
+    chrome: { runtime: { id: 'fsb-replay-test-extension' } },
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout,
+    clearTimeout,
+    URL,
+    Blob,
+    TextEncoder,
+    fsbTrustedLocalFeatureStore: store
+  });
+  context.globalThis = context;
+  vm.runInContext(source, context, { filename: 'automation-logger.js' });
+  return context.automationLogger;
 }
 
 async function loadHost(harness, nonce) {
@@ -538,6 +622,490 @@ async function main() {
     assert.notEqual(driftedCheckpoint.resultHash, sealed.manifest.steps[0].resultHash);
     assert.equal(verifiedDriftedCheckpoint.ok, true);
     assert.equal(verifiedDriftedCheckpoint.body.parentReceiptCid, checkpoint.receiptCid);
+  });
+
+  // Replay only trusts a stored record whose version is the replay schema
+  // version; anything else is rebuilt from the session's action history,
+  // which keeps no call arguments. The store and the logger must keep that
+  // version intact, or every saved capture is replaced by such a rebuild.
+  const versionHistory = createTrustedSessionStore();
+  const versionSessionId = 'session_version_round_trip';
+  const versionTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'content'
+  };
+  const versionCapture = replayHelpers.createReplayRecord({
+    sessionId: versionSessionId,
+    task: 'Version round trip',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'navigate',
+    requestPayload: { params: { url: 'https://example.com/start' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 2000,
+    replayContext: Object.assign({}, versionTarget, { routeFamily: 'background' })
+  }, {
+    tool: 'click',
+    requestPayload: { params: { selector: '#continue' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 1000,
+    replayContext: versionTarget
+  }], 'capture');
+  await versionHistory.store.saveAutomationSession(versionSessionId, {
+    id: versionSessionId,
+    task: 'Version round trip',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay: versionCapture
+  }, []);
+  const storedVersion = (await versionHistory.store.loadAutomationSession(versionSessionId)).session.replay.version;
+  const versionLogger = loadLoggerWithStore(versionHistory.store);
+  versionLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'capture attached',
+    data: { sessionId: versionSessionId }
+  }];
+  await versionLogger.saveSession(versionSessionId, { status: 'completed', mode: 'mcp-agent', replay: versionCapture });
+  const loggerVersion = versionHistory.values.fsbSessionLogs[versionSessionId].replay.version;
+  const versionPrepared = await withReplayRuntime(versionHistory.local, second,
+    () => replayHelpers.prepareReplay(versionSessionId));
+  check('a saved capture keeps its replay schema version and is replayed as captured', () => {
+    assert.equal(versionCapture.version, replayHelpers.REPLAY_SCHEMA_VERSION);
+    assert.equal(storedVersion, replayHelpers.REPLAY_SCHEMA_VERSION);
+    assert.equal(loggerVersion, replayHelpers.REPLAY_SCHEMA_VERSION);
+    assert.equal(versionPrepared.verified, true);
+    assert.equal(versionPrepared.replay.provenance, 'capture');
+    assert.deepEqual(versionPrepared.steps.map((step) => step.arguments),
+      versionCapture.manifest.steps.map((step) => step.arguments));
+  });
+
+  // A sealed record is written back to storage as sealed, but every later
+  // outcome update, load and append-save passes it through the trusted
+  // store, and a save that carries a replay record also passes it through
+  // the logger. Both must keep a sealed step exactly as sealed, or the
+  // committed manifest hash stops matching and the session can no longer be
+  // replayed. Sealing reads the stored record, so the sealed manifest already
+  // has the store's shape.
+  const history = createTrustedSessionStore();
+  const roundTripId = 'session_sealed_round_trip';
+  const roundTripTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'content'
+  };
+  const roundTripCapture = replayHelpers.createReplayRecord({
+    sessionId: roundTripId,
+    task: 'Sealed history round trip',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'click',
+    requestPayload: { params: { selector: '#continue' } },
+    response: { success: true, clicked: true, tabId: 7 },
+    success: true,
+    timestamp: Date.now() - 2000,
+    replayContext: roundTripTarget
+  }, {
+    tool: 'click',
+    requestPayload: { params: { selector: '#missing' } },
+    response: { success: false, errorCode: 'element_not_found', error: 'No element matched #missing' },
+    success: false,
+    timestamp: Date.now() - 1000,
+    replayContext: roundTripTarget
+  }], 'capture');
+  const firstSave = await history.store.saveAutomationSession(roundTripId, {
+    id: roundTripId,
+    task: 'Sealed history round trip',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay: roundTripCapture
+  }, []);
+  const pendingReplay = (await history.store.loadAutomationSession(roundTripId)).session.replay;
+  const roundTripSeal = await second.dispatch('lattice-replay-seal', {
+    manifest: pendingReplay.manifest,
+    provenance: pendingReplay.provenance
+  });
+  const sealedRecord = Object.assign({}, pendingReplay, {
+    integrity: 'verified',
+    manifest: roundTripSeal.manifest,
+    manifestHash: roundTripSeal.manifestHash,
+    receipt: roundTripSeal.receipt,
+    receiptCid: roundTripSeal.receiptCid,
+    signerKid: roundTripSeal.signerKid,
+    counts: replayHelpers.replayCounts(roundTripSeal.manifest.steps),
+    error: null
+  });
+  check('a pending record keeps its step results until it is sealed', () => {
+    assert.equal(firstSave.ok, true);
+    assert.equal(pendingReplay.manifest.steps.every((step) => Object.prototype.hasOwnProperty.call(step, 'result')), true);
+    assert.equal(roundTripSeal.ok, true);
+    assert.equal(roundTripSeal.manifest.steps[1].resultSummary.errorCode, 'element_not_found');
+  });
+
+  history.values.fsbSessionLogs[roundTripId].replay = JSON.parse(JSON.stringify(sealedRecord));
+  const outcomeUpdate = await history.store.updateAutomationSessionOutcome(roundTripId, {
+    status: 'completed', outcome: 'success', reason: 'completed', summary: 'done', result: 'done',
+    completionMessage: 'done', error: '', blocker: '', nextStep: ''
+  });
+  const afterOutcome = JSON.parse(JSON.stringify(history.values.fsbSessionLogs[roundTripId].replay));
+  const loadedSession = (await history.store.loadAutomationSession(roundTripId)).session;
+  await history.store.saveAutomationSession(roundTripId, loadedSession, []);
+  const afterStoreSave = JSON.parse(JSON.stringify(history.values.fsbSessionLogs[roundTripId].replay));
+  check('the trusted store keeps a sealed manifest exactly as sealed', () => {
+    assert.equal(outcomeUpdate.ok, true);
+    assert.deepEqual(afterOutcome.manifest, sealedRecord.manifest);
+    assert.deepEqual(loadedSession.replay.manifest, sealedRecord.manifest);
+    assert.deepEqual(afterStoreSave.manifest, sealedRecord.manifest);
+    assert.equal(afterStoreSave.manifestHash, sealedRecord.manifestHash);
+    assert.equal(afterStoreSave.manifest.steps.some((step) => Object.prototype.hasOwnProperty.call(step, 'result')), false);
+  });
+
+  const roundTripLogger = loadLoggerWithStore(history.store);
+  roundTripLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'replay record attached',
+    data: { sessionId: roundTripId }
+  }];
+  const loggerSaved = await roundTripLogger.saveSession(roundTripId, {
+    status: 'completed',
+    mode: 'mcp-agent',
+    replay: sealedRecord
+  });
+  const afterLoggerSave = JSON.parse(JSON.stringify(history.values.fsbSessionLogs[roundTripId].replay));
+  check('a logger save that carries the sealed record keeps it exactly as sealed', () => {
+    assert.equal(loggerSaved, true);
+    assert.deepEqual(afterLoggerSave.manifest, sealedRecord.manifest);
+  });
+
+  const roundTripMaterialized = await second.dispatch('lattice-replay-materialize', {
+    manifest: afterLoggerSave.manifest,
+    manifestHash: afterLoggerSave.manifestHash,
+    receipt: afterLoggerSave.receipt,
+    signerKid: afterLoggerSave.signerKid
+  });
+  check('a sealed record still verifies after the store and logger round trips', () => {
+    assert.equal(roundTripMaterialized.ok, true, roundTripMaterialized.error && roundTripMaterialized.error.message);
+    assert.equal(roundTripMaterialized.verified, true);
+    assert.equal(roundTripMaterialized.manifestHash, sealedRecord.manifestHash);
+  });
+
+  const forgedRecord = JSON.parse(JSON.stringify(sealedRecord));
+  forgedRecord.manifest.steps[0].argumentHash = '<img src=x>';
+  forgedRecord.manifest.steps[1].resultSummary = 'element_not_found';
+  history.values.fsbSessionLogs[roundTripId].replay = forgedRecord;
+  await history.store.updateAutomationSessionOutcome(roundTripId, { status: 'completed', outcome: 'success' });
+  const afterForgery = history.values.fsbSessionLogs[roundTripId].replay;
+  const forgedMaterialized = await second.dispatch('lattice-replay-materialize', {
+    manifest: afterForgery.manifest,
+    manifestHash: afterForgery.manifestHash,
+    receipt: afterForgery.receipt,
+    signerKid: afterForgery.signerKid
+  });
+  check('malformed sealed fields are dropped and the record then fails closed', () => {
+    assert.equal(Object.prototype.hasOwnProperty.call(afterForgery.manifest.steps[0], 'argumentHash'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(afterForgery.manifest.steps[1], 'resultSummary'), false);
+    assert.equal(afterForgery.manifest.steps[1].resultHash, sealedRecord.manifest.steps[1].resultHash);
+    assert.equal(forgedMaterialized.ok, false);
+    assert.match(forgedMaterialized.error.message, /hash mismatch/i);
+  });
+
+  // A capability step is classified by the slug capture wrote. Once the
+  // session has passed through the trusted store (an outcome update, a load,
+  // a logger save), replay must still see the same capability, or
+  // prepareReplay refuses the whole recording.
+  const capabilityHistory = createTrustedSessionStore();
+  const capabilitySessionId = 'session_capability_round_trip';
+  const capabilityTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'capabilities'
+  };
+  const capabilityCapture = replayHelpers.createReplayRecord({
+    sessionId: capabilitySessionId,
+    task: 'Capability round trip',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'mcp:capabilities-invoke',
+    requestPayload: { slug: 'github.get_repository', params: { owner: 'fullselfbrowsing', repo: 'FSB' } },
+    response: { success: true, repository: 'FSB' },
+    success: true,
+    dispatcher_route: 'message',
+    timestamp: Date.now() - 2000,
+    replayContext: Object.assign({}, capabilityTarget, {
+      slug: 'github.get_repository', sideEffectClass: 'read', service: 'GitHub', tier: 'T1a'
+    })
+  }, {
+    tool: 'mcp:capabilities-invoke',
+    requestPayload: { slug: 'github.create_issue', params: { owner: 'fullselfbrowsing', repo: 'FSB' } },
+    response: { success: true },
+    success: true,
+    dispatcher_route: 'message',
+    timestamp: Date.now() - 1000,
+    replayContext: Object.assign({}, capabilityTarget, { slug: 'github.create_issue', service: 'GitHub' })
+  }], 'capture');
+  const capturedCapabilities = capabilityCapture.manifest.steps.map((step) => step.capability);
+  const capabilitySessionRecord = (replay) => ({
+    id: capabilitySessionId,
+    task: 'Capability round trip',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay
+  });
+  await capabilityHistory.store.saveAutomationSession(capabilitySessionId, capabilitySessionRecord(capabilityCapture), []);
+  await capabilityHistory.store.updateAutomationSessionOutcome(capabilitySessionId, {
+    status: 'completed', outcome: 'success', reason: 'completed'
+  });
+  const storedCapabilityReplay = (await capabilityHistory.store.loadAutomationSession(capabilitySessionId)).session.replay;
+  check('the trusted store keeps a capability step as capture wrote it', () => {
+    assert.deepEqual(capturedCapabilities.map((capability) => capability.slug),
+      ['github.get_repository', 'github.create_issue']);
+    assert.deepEqual(storedCapabilityReplay.manifest.steps.map((step) => step.capability), capturedCapabilities);
+    assert.doesNotThrow(() => replayHelpers.validateReplayClassifications(storedCapabilityReplay.manifest.steps));
+  });
+
+  const capabilityLogger = loadLoggerWithStore(capabilityHistory.store);
+  capabilityLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'capability capture attached',
+    data: { sessionId: capabilitySessionId }
+  }];
+  const capabilityLoggerSaved = await capabilityLogger.saveSession(capabilitySessionId, {
+    status: 'completed',
+    mode: 'mcp-agent',
+    replay: capabilityCapture
+  });
+  const loggerCapabilitySteps = capabilityHistory.values.fsbSessionLogs[capabilitySessionId].replay.manifest.steps;
+  check('a logger save that carries a capture keeps its capability steps', () => {
+    assert.equal(capabilityLoggerSaved, true);
+    assert.deepEqual(loggerCapabilitySteps.map((step) => step.capability), capturedCapabilities);
+  });
+
+  const capabilityPrepared = await withReplayRuntime(capabilityHistory.local, second,
+    () => replayHelpers.prepareReplay(capabilitySessionId));
+  await capabilityHistory.store.updateAutomationSessionOutcome(capabilitySessionId, {
+    status: 'completed', outcome: 'success', reason: 'completed'
+  });
+  const capabilityPreparedAgain = await withReplayRuntime(capabilityHistory.local, second,
+    () => replayHelpers.prepareReplay(capabilitySessionId));
+  check('prepareReplay accepts capability steps before and after a sealed outcome update', () => {
+    assert.equal(capabilityPrepared.verified, true);
+    assert.deepEqual(capabilityPrepared.steps.map((step) => step.replay.availability), ['ready', 'approval-once']);
+    assert.equal(capabilityPreparedAgain.verified, true);
+    assert.equal(capabilityPreparedAgain.replay.manifestHash, capabilityPrepared.replay.manifestHash);
+    assert.deepEqual(capabilityPreparedAgain.steps.map((step) => step.capability), capturedCapabilities);
+  });
+
+  // Sessions saved before the slug was kept carry an always-null
+  // capabilityId instead, and some of them are already sealed. Their stored
+  // shape must not change, or their committed hash would stop matching.
+  const legacyCapabilityRecord = JSON.parse(JSON.stringify(capabilityHistory.values.fsbSessionLogs[capabilitySessionId]));
+  legacyCapabilityRecord.replay.manifest.steps.forEach((step) => {
+    step.capability = { capabilityId: null, sideEffectClass: step.capability.sideEffectClass, service: 'GitHub', tier: null };
+  });
+  capabilityHistory.values.fsbSessionLogs[capabilitySessionId] = JSON.parse(JSON.stringify(legacyCapabilityRecord));
+  await capabilityHistory.store.updateAutomationSessionOutcome(capabilitySessionId, { status: 'completed', outcome: 'success' });
+  check('a step stored with the older capability shape keeps that shape', () => {
+    assert.deepEqual(
+      capabilityHistory.values.fsbSessionLogs[capabilitySessionId].replay.manifest.steps.map((step) => step.capability),
+      legacyCapabilityRecord.replay.manifest.steps.map((step) => step.capability)
+    );
+  });
+
+  // A replay that stops for a decision writes its run (progress, the signed
+  // step receipts, playback position and owned tabs) onto the recording as
+  // lastRun, and background reads it back to offer the decision and to
+  // resume after a worker restart. A later outcome update or save, which
+  // passes the record through the trusted store, must keep it.
+  const runHistory = createTrustedSessionStore();
+  const runSessionId = 'session_paused_run';
+  const runTarget = {
+    targetUrl: 'https://example.com/start',
+    targetOrigin: 'https://example.com',
+    routeFamily: 'content'
+  };
+  const runSessionRecord = (sessionId, replay) => ({
+    id: sessionId,
+    task: 'Paused replay run',
+    mode: 'mcp-agent',
+    startTime: Date.now() - 5000,
+    endTime: Date.now(),
+    status: 'completed',
+    logs: [],
+    replay
+  });
+  const runCapture = (sessionId) => replayHelpers.createReplayRecord({
+    sessionId,
+    task: 'Paused replay run',
+    startUrl: 'https://example.com/start',
+    endTime: Date.now(),
+    mode: 'mcp-agent',
+    status: 'completed'
+  }, [{
+    tool: 'click',
+    requestPayload: { params: { selector: '#first' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 2000,
+    replayContext: runTarget
+  }, {
+    tool: 'click',
+    requestPayload: { params: { selector: '#second' } },
+    response: { success: true },
+    success: true,
+    timestamp: Date.now() - 1000,
+    replayContext: runTarget
+  }], 'capture');
+  await runHistory.store.saveAutomationSession(runSessionId, runSessionRecord(runSessionId, runCapture(runSessionId)), []);
+  const runPrepared = await withReplayRuntime(runHistory.local, second,
+    () => replayHelpers.prepareReplay(runSessionId));
+  const runCheckpoint = await second.dispatch('lattice-replay-checkpoint', {
+    replaySessionId: 'replay_paused_run',
+    manifestHash: runPrepared.replay.manifestHash,
+    sourceReceiptCid: runPrepared.receiptCid,
+    step: runPrepared.steps[0],
+    result: { success: true },
+    success: true
+  });
+  const pausedRun = {
+    id: 'replay_paused_run',
+    manifestHash: runPrepared.replay.manifestHash,
+    sourceReceiptCid: runPrepared.receiptCid,
+    targetTabId: 41,
+    startedAt: Date.now() - 3000,
+    status: 'paused',
+    nextStep: 1,
+    previousReceiptCid: runCheckpoint.receiptCid,
+    steps: [{
+      stepId: runPrepared.steps[0].id,
+      index: 0,
+      tool: 'click',
+      attemptNumber: 1,
+      status: 'executed',
+      success: true,
+      recordedResultHash: runPrepared.steps[0].resultHash,
+      resultHash: runCheckpoint.resultHash,
+      match: runPrepared.steps[0].resultHash === runCheckpoint.resultHash,
+      receipt: runCheckpoint.receipt,
+      receiptCid: runCheckpoint.receiptCid,
+      completedAt: Date.now() - 2000
+    }],
+    error: 'The service worker restarted during a write, so completion cannot be proven.',
+    playback: { speed: 2, paused: true, positionMs: 1500, interpolationTargetMs: 1500 },
+    expectedOrigin: 'https://example.com',
+    logicalTabs: [{ logicalTab: 'primary', tabId: 41, expectedOrigin: 'https://example.com' }]
+  };
+  const runPersisted = await withReplayRuntime(runHistory.local, second,
+    () => replayHelpers.persistReplayRun(runSessionId, pausedRun));
+  const runOutcome = await runHistory.store.updateAutomationSessionOutcome(runSessionId, {
+    status: 'completed', outcome: 'success', reason: 'completed'
+  });
+  const runLogger = loadLoggerWithStore(runHistory.store);
+  runLogger.logs = [{
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: 'session saved again',
+    data: { sessionId: runSessionId }
+  }];
+  const runLoggerSaved = await runLogger.saveSession(runSessionId, { status: 'completed', mode: 'mcp-agent' });
+  const runPreparedAgain = await withReplayRuntime(runHistory.local, second,
+    () => replayHelpers.prepareReplay(runSessionId));
+  check('a paused replay run survives an outcome update and a later save', () => {
+    assert.ok(runPersisted);
+    assert.equal(runOutcome.ok, true);
+    assert.equal(runLoggerSaved, true);
+    assert.equal(runPreparedAgain.verified, true);
+    assert.equal(runPreparedAgain.replay.manifestHash, pausedRun.manifestHash);
+    assert.deepEqual(runPreparedAgain.replay.lastRun, pausedRun);
+  });
+
+  const replayViewContext = vm.createContext({
+    activeSessions: new Map([[pausedRun.id, {
+      replaySessionId: pausedRun.id,
+      status: 'replay_paused',
+      tabId: 41,
+      currentStep: 1,
+      replaySteps: runPreparedAgain.steps,
+      replayRun: pausedRun
+    }]]),
+    fsbReplayBootstrapTab() { return null; }
+  });
+  vm.runInContext(
+    ['fsbReplayClone', 'fsbReplayIsTruncated', 'fsbReplayTruncatedMessage', 'fsbReplayPublicPreparation']
+      .map(backgroundFunctionSource).join('\n') + '\nthis.publicPreparation = fsbReplayPublicPreparation;',
+    replayViewContext,
+    { filename: 'extension/background.js' }
+  );
+  const replayView = replayViewContext.publicPreparation(runPreparedAgain);
+  check('the replay view still offers the paused decision from the stored run', () => {
+    assert.ok(replayView.pendingDecision, 'pending decision');
+    assert.equal(replayView.pendingDecision.sessionId, pausedRun.id);
+    assert.equal(replayView.pendingDecision.stepId, runPreparedAgain.steps[1].id);
+  });
+
+  // A long run's signed receipts can outgrow a session's byte limit. The
+  // session must still save, giving up the oldest receipts before anything
+  // a resume reads.
+  const longRunSessionId = 'session_long_run';
+  await runHistory.store.saveAutomationSession(longRunSessionId,
+    runSessionRecord(longRunSessionId, runCapture(longRunSessionId)), []);
+  const longRun = {
+    id: 'replay_long_run',
+    status: 'running',
+    nextStep: 1,
+    previousReceiptCid: 'cid-159',
+    steps: Array.from({ length: 160 }, (_, attempt) => ({
+      stepId: attempt % 2 ? 'step-2' : 'step-1',
+      index: attempt % 2,
+      tool: 'click',
+      attemptNumber: Math.floor(attempt / 2) + 1,
+      status: 'executed',
+      success: true,
+      recordedResultHash: null,
+      resultHash: 'c'.repeat(64),
+      match: null,
+      receipt: { payloadType: 'application/vnd.in-toto+json', payload: 'A'.repeat(2000), signatures: [{ sig: 'B'.repeat(88) }] },
+      receiptCid: 'cid-' + attempt,
+      completedAt: Date.now() - 1000
+    }))
+  };
+  await withReplayRuntime(runHistory.local, second, () => replayHelpers.persistReplayRun(longRunSessionId, longRun));
+  const longRunOutcome = await runHistory.store.updateAutomationSessionOutcome(longRunSessionId, {
+    status: 'completed', outcome: 'success'
+  });
+  const storedLongRun = runHistory.values.fsbSessionLogs[longRunSessionId].replay.lastRun;
+  check('a run too large for the session keeps its progress and drops its oldest receipts first', () => {
+    assert.equal(longRunOutcome.ok, true);
+    assert.ok(storedLongRun, 'stored run');
+    assert.equal(storedLongRun.steps.length, 160);
+    assert.equal(storedLongRun.nextStep, 1);
+    assert.equal(storedLongRun.steps[0].receipt, null);
+    assert.deepEqual(storedLongRun.steps[159].receipt, longRun.steps[159].receipt);
+    assert.equal(storedLongRun.steps.every((row, attempt) => row.receiptCid === 'cid-' + attempt), true);
+    assert.ok(Buffer.byteLength(JSON.stringify(runHistory.values.fsbSessionLogs[longRunSessionId])) <=
+      trustedStoreApi.LIMITS.SESSION_RESPONSE_BYTES);
   });
 
   console.log('Summary:', passed, 'passed');

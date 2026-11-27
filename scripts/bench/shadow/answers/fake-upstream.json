@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "note": "Hand-written fake upstream answers for the offline shadow run (D-26). Not Jev output: plausible values only, mostly right at mixed confidence, a few deliberate wrong picks on near-miss elements, and high risk p on the four risk-positive records. Choice {pick, top}; Noul {p}.",
+  "servedModel": "typesafe/jev-1.13-20260917",
+  "answers": {
+    "shadow-accordion-drilldown-01": {
+      "operation": { "pick": "click", "top": 0.93 },
+      "target": { "pick": "e1", "top": 0.88 },
+      "completion": { "p": 0.04 },
+      "stuck": { "p": 0.06 }
+    },
+    "shadow-accordion-drilldown-02": {
+      "operation": { "pick": "click", "top": 0.9 },
+      "target": { "pick": "e2", "top": 0.7 },
+      "completion": { "p": 0.05 },
+      "risk": { "p": 0.08 }
+    },
+    "shadow-checklist-01": {
+      "operation": { "pick": "check_box", "top": 0.86 },
+      "target": { "pick": "e4", "top": 0.62 },
+      "completion": { "p": 0.03 },
+      "stuck": { "p": 0.1 }
+    },
+    "shadow-checklist-02": {
+      "completion": { "p": 0.91 },
+      "stuck": { "p": 0.12 }
+    },
+    "shadow-confirm-modals-01": {
+      "operation": { "pick": "click", "top": 0.95 },
+      "target": { "pick": "e4", "top": 0.55 },
+      "completion": { "p": 0.02 }
+    },
+    "shadow-confirm-modals-02": {
+      "operation": { "pick": "click", "top": 0.97 },
+      "target": { "pick": "e0", "top": 0.9 },
+      "risk": { "p": 0.88 }
+    },
+    "shadow-confirm-modals-03": {
+      "operation": { "pick": "click", "top": 0.96 },
+      "target": { "pick": "e0", "top": 0.93 },
+      "completion": { "p": 0.06 },
+      "risk": { "p": 0.97 }
+    },
+    "shadow-custom-dropdowns-01": {
+      "operation": { "pick": "click", "top": 0.9 },
+      "target": { "pick": "e5", "top": 0.48 },
+      "completion": { "p": 0.04 },
+      "stuck": { "p": 0.07 }
+    },
+    "shadow-custom-dropdowns-02": {
+      "operation": { "pick": "none_of_the_above", "top": 0.66 },
+      "target": { "pick": "none_of_the_above", "top": 0.58 },
+      "completion": { "p": 0.83 }
+    },
+    "shadow-invoice-lookup-01": {
+      "operation": { "pick": "type_text", "top": 0.82 },
+      "target": { "pick": "e0", "top": 0.92 },
+      "completion": { "p": 0.03 },
+      "stuck": { "p": 0.05 }
+    },
+    "shadow-invoice-lookup-02": {
+      "operation": { "pick": "click", "top": 0.5 },
+      "target": { "pick": "none_of_the_above", "top": 0.61 },
+      "completion": { "p": 0.77 },
+      "stuck": { "p": 0.09 }
+    },
+    "shadow-kanban-moves-01": {
+      "operation": { "pick": "click", "top": 0.94 },
+      "target": { "pick": "e2", "top": 0.66 },
+      "completion": { "p": 0.05 }
+    },
+    "shadow-kanban-moves-02": {
+      "completion": { "p": 0.08 },
+      "stuck": { "p": 0.86 }
+    },
+    "shadow-paginate-find-01": {
+      "operation": { "pick": "click", "top": 0.92 },
+      "target": { "pick": "e1", "top": 0.84 },
+      "completion": { "p": 0.02 },
+      "stuck": { "p": 0.04 }
+    },
+    "shadow-paginate-find-02": {
+      "completion": { "p": 0.06 },
+      "stuck": { "p": 0.79 },
+      "risk": { "p": 0.12 }
+    },
+    "shadow-search-detail-01": {
+      "operation": { "pick": "type_text", "top": 0.88 },
+      "target": { "pick": "e0", "top": 0.95 },
+      "completion": { "p": 0.01 },
+      "risk": { "p": 0.05 }
+    },
+    "shadow-search-detail-02": {
+      "operation": { "pick": "click", "top": 0.91 },
+      "target": { "pick": "e1", "top": 0.87 },
+      "completion": { "p": 0.12 }
+    },
+    "shadow-settings-change-01": {
+      "operation": { "pick": "check_box", "top": 0.84 },
+      "target": { "pick": "e1", "top": 0.89 },
+      "completion": { "p": 0.04 }
+    },
+    "shadow-settings-change-02": {
+      "operation": { "pick": "click", "top": 0.95 },
+      "target": { "pick": "e2", "top": 0.9 },
+      "completion": { "p": 0.18 },
+      "risk": { "p": 0.71 }
+    },
+    "shadow-tabbed-toggles-01": {
+      "operation": { "pick": "click", "top": 0.93 },
+      "target": { "pick": "e1", "top": 0.85 },
+      "completion": { "p": 0.03 },
+      "stuck": { "p": 0.05 }
+    },
+    "shadow-tabbed-toggles-02": {
+      "operation": { "pick": "click", "top": 0.9 },
+      "target": { "pick": "e2", "top": 0.8 },
+      "completion": { "p": 0.07 },
+      "risk": { "p": 0.1 }
+    },
+    "shadow-ticket-triage-01": {
+      "operation": { "pick": "click", "top": 0.92 },
+      "target": { "pick": "e5", "top": 0.4 },
+      "completion": { "p": 0.02 }
+    },
+    "shadow-ticket-triage-02": {
+      "operation": { "pick": "click", "top": 0.89 },
+      "target": { "pick": "e12", "top": 0.76 },
+      "completion": { "p": 0.09 },
+      "risk": { "p": 0.35 }
+    },
+    "shadow-wizard-submit-01": {
+      "operation": { "pick": "type_text", "top": 0.81 },
+      "target": { "pick": "e3", "top": 0.83 },
+      "completion": { "p": 0.05 }
+    },
+    "shadow-wizard-submit-02": {
+      "operation": { "pick": "click", "top": 0.96 },
+      "target": { "pick": "e1", "top": 0.94 },
+      "completion": { "p": 0.22 },
+      "risk": { "p": 0.92 }
+    }
+  }
+}

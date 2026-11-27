@@ -122,8 +122,10 @@ const vfSrc = fs.readFileSync(
 );
 ok(vfSrc.indexOf('agentIdShort') >= 0,
   'Test 5a: visual-feedback.js reads overlayState.agentIdShort');
-ok(vfSrc.indexOf('combineBadgeText') >= 0 || vfSrc.indexOf("' / '") >= 0,
-  'Test 5b: visual-feedback.js uses combineBadgeText helper or " / " join');
+// The status pill names the client on its top line and keeps the agent id for
+// its hover row, for when two agents share a client.
+ok(vfSrc.indexOf("this._setText('.pl-who', v.agentId)") >= 0,
+  'Test 5b: the status pill shows the agent id in its hover row');
 
 console.log('\n=== badge-agent-id results: ' + passed + ' passed, ' + failed + ' failed ===');
 if (failed > 0) process.exit(1);

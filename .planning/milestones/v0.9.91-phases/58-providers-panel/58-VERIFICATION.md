@@ -52,8 +52,8 @@ human_verification:
 
 **Phase goal:** Turn API Configuration into a Providers panel that separates the seven BYOK API providers from agent CLIs, derives one non-selecting recommendation from Phase 57 evidence, and reports agent usage/billing without fabrication.
 
-**Verified:** 2026-07-12T23:10:51Z  
-**Status:** `human_needed`  
+**Verified:** 2026-07-12T23:10:51Z
+**Status:** `human_needed`
 **Re-verification:** No — initial independent verification.
 
 ## Verdict
@@ -242,5 +242,5 @@ No automated or source-level gap blocks the Phase 58 goal. The only unresolved e
 
 ---
 
-_Verified: 2026-07-12T23:10:51Z_  
+_Verified: 2026-07-12T23:10:51Z_
 _Verifier: independent gsd-verifier agent_

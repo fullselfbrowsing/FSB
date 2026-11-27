@@ -79,7 +79,8 @@ function entry(overrides = {}) {
       sideEffectClass: 'read'
     },
     redactedInputs: overrides.redactedInputs === true,
-    targetRedacted: overrides.targetRedacted === true
+    targetRedacted: overrides.targetRedacted === true,
+    ...(Object.prototype.hasOwnProperty.call(overrides, 'timing') ? { timing: overrides.timing } : {})
   };
 }
 
@@ -1664,4 +1665,163 @@ test('sealed journal manifests regenerate deterministically without persisting a
   assert.deepEqual(second.resultProjectionByStepId, first.resultProjectionByStepId);
   assert.equal(Object.prototype.hasOwnProperty.call(first.replay.manifest, 'resultProjectionByStepId'), false);
   assert.equal(JSON.stringify(first.replay.manifest).includes('journal-full-v1'), false);
+});
+
+// ---- Phase 66: per-call MCP timing (D-03, D-04, D-09) ------------------------
+
+const CALL_TIMING_LEGEND = 'Timing: fsb = extension receive to completion; caller gap = receive(n) - completion(n-1), an upper bound on host thinking time; MCP queue wait not measured';
+
+function callLines(report) {
+  return report.split('\n').filter((line) => /^\[(?:OK|FAILED)\] Call \d+: /.test(line));
+}
+
+async function streamedText(sessionId) {
+  const chunks = [];
+  assert.equal(await journal.streamSessionExport(sessionId, 'text', async (chunk) => {
+    chunks.push(chunk);
+  }), true);
+  return chunks.join('');
+}
+
+test('tool.call metadata stores only a validated call timing and replay never sees it', async () => {
+  setup();
+  const runId = 'timing-metadata-run';
+  const timing = { v: 1, receivedAt: 1_799_999_999_000, completedAt: 1_799_999_999_250, fsbMs: 250 };
+  const invalidTimings = [
+    { ...timing, receivedAt: -1 },
+    { ...timing, receivedAt: String(timing.receivedAt) },
+    { ...timing, completedAt: timing.receivedAt - 1 },
+    { ...timing, v: 2 },
+    { ...timing, completedAt: timing.completedAt + 0.5 },
+    'v1:250',
+    null
+  ];
+  let sessionId = (await journal.recordDispatch(entry({
+    recordingRunId: runId,
+    recordingCallId: 'timing-metadata-valid',
+    timing: { ...timing }
+  }))).sessionId;
+  await journal.recordDispatch(entry({
+    recordingRunId: runId,
+    recordingCallId: 'timing-metadata-corrected',
+    timing: { ...timing, fsbMs: 3 }
+  }));
+  await journal.recordDispatch(entry({ recordingRunId: runId, recordingCallId: 'timing-metadata-untimed' }));
+  for (const [index, invalid] of invalidTimings.entries()) {
+    sessionId = (await journal.recordDispatch(entry({
+      recordingRunId: runId,
+      recordingCallId: `timing-metadata-invalid-${index}`,
+      timing: invalid
+    }))).sessionId;
+  }
+
+  const calls = (await allDetail(sessionId)).events.filter((event) => event.kind === 'tool.call');
+  assert.equal(calls.length, 3 + invalidTimings.length);
+  assert.deepEqual(calls[0].metadata.timing, timing);
+  assert.deepEqual(calls[1].metadata.timing, timing, 'an inconsistent fsbMs is recomputed');
+  for (const call of calls.slice(2)) {
+    assert.equal(Object.prototype.hasOwnProperty.call(call.metadata, 'timing'), false,
+      `${call.metadata.callId} carries no timing key`);
+  }
+
+  const projection = await journal.getReplayProjection(sessionId);
+  assert.equal(projection.entries.length, calls.length);
+  assert.equal(projection.entries.some((row) => Object.prototype.hasOwnProperty.call(row, 'timing')), false);
+  assert.equal(JSON.stringify(projection.entries).includes('receivedAt'), false);
+});
+
+test('the budget-exhausted compact marker keeps a validated call timing', async () => {
+  const { backend } = setup();
+  const getActualTotalBytes = backend.getTotalBytes.bind(backend);
+  let budgetChecks = 0;
+  backend.getTotalBytes = async () => budgetChecks++ === 0
+    ? journal.MAX_ENCODED_BYTES
+    : getActualTotalBytes();
+  backend.listClosedOldest = async () => [];
+  journal._setBackendForTests(backend);
+  const timing = { v: 1, receivedAt: 5_000, completedAt: 5_420, fsbMs: 420 };
+
+  const result = await journal.recordDispatch(entry({
+    recordingRunId: 'timing-quota-run',
+    recordingCallId: 'timing-quota-call',
+    timing
+  }));
+  const event = (await allDetail(result.sessionId)).events.find((candidate) => candidate.kind === 'tool.call');
+  assert.equal(event.metadata.storageBudgetExhausted, true);
+  assert.deepEqual(event.metadata.timing, timing);
+});
+
+test('both text exports show per-call fsb time and labelled caller gaps under one legend', async () => {
+  setup();
+  const runId = 'timing-text-run';
+  const calls = [
+    { callId: 'timing-text-a', tool: 'click_a', timing: { v: 1, receivedAt: 1000, completedAt: 1120, fsbMs: 120 } },
+    { callId: 'timing-text-b', tool: 'click_b', timing: { v: 1, receivedAt: 1620, completedAt: 1700, fsbMs: 80 } },
+    { callId: 'timing-text-c', tool: 'click_c', success: false },
+    { callId: 'timing-text-d', tool: 'click_d', timing: { v: 1, receivedAt: 1650, completedAt: 1800, fsbMs: 150 } },
+    { callId: 'timing-text-e', tool: 'click_e', timing: { v: 1, receivedAt: 1750, completedAt: 1900, fsbMs: 150 } }
+  ];
+  let sessionId;
+  for (const call of calls) {
+    const overrides = { recordingRunId: runId, recordingCallId: call.callId, tool: call.tool };
+    if (call.timing) overrides.timing = call.timing;
+    if (call.success === false) {
+      overrides.success = false;
+      overrides.response = { success: false, error: 'not clickable' };
+    }
+    sessionId = (await journal.recordDispatch(entry(overrides))).sessionId;
+  }
+
+  const report = await journal.exportHumanReadable(sessionId);
+  const lines = report.split('\n');
+  assert.equal(lines.filter((line) => line === CALL_TIMING_LEGEND).length, 1);
+  const retainedIndex = lines.indexOf('Calls retained: 5');
+  assert.ok(retainedIndex > 0);
+  assert.equal(lines[retainedIndex + 1], CALL_TIMING_LEGEND);
+  assert.equal(lines[retainedIndex + 2], '');
+  assert.deepEqual(callLines(report), [
+    '[OK] Call 1: click_a | fsb 120 ms',
+    '[OK] Call 2: click_b | fsb 80 ms | caller gap 500 ms (upper bound)',
+    '[FAILED] Call 3: click_c | timing not recorded',
+    '[OK] Call 4: click_d | fsb 150 ms',
+    '[OK] Call 5: click_e | fsb 150 ms | overlapped previous call'
+  ]);
+  assert.equal(await streamedText(sessionId), report, 'the streamed text export stays byte-identical');
+});
+
+test('a timed 505-call text export stays continuous and byte-identical across stream pages', async () => {
+  setup();
+  const fsbFor = (index) => 100 + (index % 7);
+  const receivedFor = (index) => 10_000 + index * 1_000;
+  let sessionId;
+  for (let index = 0; index < 505; index++) {
+    const receivedAt = receivedFor(index);
+    const result = await journal.recordDispatch(entry({
+      recordingRunId: 'timed-long-recording-run',
+      recordingCallId: `timed-long-call-${index}`,
+      tool: `timed_step_${index}`,
+      response: { success: true, value: index },
+      timing: { v: 1, receivedAt, completedAt: receivedAt + fsbFor(index), fsbMs: fsbFor(index) }
+    }));
+    sessionId = result.sessionId;
+  }
+
+  const report = await journal.exportHumanReadable(sessionId);
+  assert.equal(await streamedText(sessionId), report,
+    'the caller gap carries across the 500-event page boundary');
+  const lines = report.split('\n');
+  const retainedIndex = lines.indexOf('Calls retained: 505');
+  assert.equal(lines[retainedIndex + 1], 'Executable replay: latest 100 of 505');
+  assert.equal(lines[retainedIndex + 2], CALL_TIMING_LEGEND);
+  assert.equal(lines[retainedIndex + 3], '');
+  const expected = [];
+  for (let index = 0; index < 505; index++) {
+    const gap = index === 0
+      ? ''
+      : ' | caller gap ' + String(receivedFor(index) - (receivedFor(index - 1) + fsbFor(index - 1))) + ' ms (upper bound)';
+    expected.push('[OK] Call ' + String(index + 1) + ': timed_step_' + String(index) +
+      ' | fsb ' + String(fsbFor(index)) + ' ms' + gap);
+  }
+  assert.deepEqual(callLines(report), expected);
+  assert.ok(lines.includes('[OK] Call 500: timed_step_499 | fsb 102 ms | caller gap 899 ms (upper bound)'));
 });
