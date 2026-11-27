@@ -33,10 +33,11 @@ export const MCP_COMMON_PARAM_DESCRIPTIONS: TextTable = Object.freeze({
 });
 
 // Appended (after one space) to the description of every action tool whose
-// registry entry has _emitChangeReport === true. The extension leaves out a
-// change_report that records nothing, so its absence means nothing changed.
+// registry entry has _emitChangeReport === true. The extension sends a
+// change_report that records nothing as {changed:false}; no change_report at
+// all means the change was not observed.
 export const MCP_CHANGE_REPORT_SENTENCE =
-  'Returns change_report (what changed) unless nothing changed, plus view (page refs) on a URL change or dialog; if the outcome is unknown, inspect the page before retrying.';
+  'Returns change_report (what changed, or changed:false; absent if not observed), plus view (page refs) on a URL change or dialog; if the outcome is unknown, inspect the page before retrying.';
 
 // The description of the optional `expect` parameter (published by plan 69-06).
 export const MCP_EXPECT_DESCRIPTION =

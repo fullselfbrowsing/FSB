@@ -1,9 +1,11 @@
 'use strict';
 
 /**
- * An action result reaches the MCP server without a change_report that
- * records nothing; the session recorder still stores the full report, and a
- * report that records anything goes out unchanged.
+ * A change_report that records nothing reaches the MCP server as
+ * {changed:false}, never dropped, so the host can tell "nothing changed" from
+ * "not observed"; the session recorder still stores the full report, a
+ * partial report is never treated as empty, and a report that records
+ * anything goes out unchanged.
  *
  * Part 1 drives isEmptyChangeReport (extension/utils/action-verification.js)
  * over real buildChangeReport output. Part 2 loads the real bridge client in a
@@ -60,7 +62,8 @@ check(typeof av.isEmptyChangeReport === 'function', 'isEmptyChangeReport is expo
 check(av.isEmptyChangeReport(emptyReport()) === true, 'same URL and title, no mutation, no change: empty');
 const partialEmpty = emptyReport();
 partialEmpty.partial = true;
-check(av.isEmptyChangeReport(partialEmpty) === true, 'a partial report that recorded nothing is empty');
+check(av.isEmptyChangeReport(partialEmpty) === false,
+  'a partial report is kept even when it recorded nothing: the wait was cut off, so a change may still have been coming');
 
 const noiseOnly = av.buildChangeReport(state(), state(), [], { mutationCount: 3 });
 check(av.isEmptyChangeReport(noiseOnly) === false, 'mutation_count above zero is kept, even with empty buckets');
@@ -176,12 +179,20 @@ async function routeAction(actionResult) {
   check(emptyResult.change_report === empty, 'the result object itself still carries the report');
   const frame = a.sent.find((f) => f && f.type === 'mcp:result');
   check(!!frame, 'an mcp:result frame was sent');
-  check(frame && !Object.prototype.hasOwnProperty.call(frame.payload, 'change_report'),
-    'the wire payload has no change_report key when it recorded nothing');
+  check(frame && JSON.stringify(frame.payload.change_report) === JSON.stringify({ changed: false }),
+    'a report that recorded nothing goes out as change_report {changed:false}');
   check(frame && frame.payload.success === true && frame.payload.clicked === '#save' && frame.payload.hadEffect === true,
     'success and every other field stay on the wire');
-  check(frame && JSON.stringify(Object.keys(frame.payload)) === JSON.stringify(['success', 'clicked', 'hadEffect']),
-    'the remaining keys keep their order');
+  check(frame && JSON.stringify(Object.keys(frame.payload)) === JSON.stringify(['success', 'clicked', 'hadEffect', 'change_report']),
+    'the keys keep their order');
+
+  const partial = emptyReport();
+  partial.partial = true;
+  const partialResult = { success: true, clicked: '#save', change_report: partial };
+  const p = await routeAction(partialResult);
+  const partialFrame = p.sent.find((f) => f && f.type === 'mcp:result');
+  check(partialFrame && JSON.stringify(partialFrame.payload.change_report) === JSON.stringify(partial),
+    'a partial report goes out whole, with partial:true, not as changed:false');
 
   const changed = av.buildChangeReport(state(), state({ title: 'Saved' }), [], { mutationCount: 2, settleMs: 300 });
   const changedResult = { success: true, clicked: '#save', change_report: changed, change_report_hint: 'truncated; call read_page for full state' };
@@ -198,6 +209,8 @@ async function routeAction(actionResult) {
   const failedFrame = c.sent.find((f) => f && f.type === 'mcp:result');
   check(failedFrame && failedFrame.payload.success === false && failedFrame.payload.error === 'Element not found',
     'a result without a report passes through untouched');
+  check(failedFrame && !Object.prototype.hasOwnProperty.call(failedFrame.payload, 'change_report'),
+    'a result that was never observed gets no change_report, so its absence means not observed');
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

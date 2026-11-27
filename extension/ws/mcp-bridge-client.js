@@ -1357,20 +1357,21 @@ class MCPBridgeClient {
     });
   }
 
-  // An action result goes to the MCP server without a change_report that
-  // records nothing, so the host reads less; its absence means nothing
-  // changed. pageStable, the content script's signal to the change-report
-  // wait, is left out too. The session recorder has already stored the full
-  // result, and the result object itself is left untouched.
+  // A change_report that records nothing goes to the MCP server as
+  // {changed:false}, so the host reads less but can still tell "nothing
+  // changed" from "not observed" (no report at all: reports switched off, or
+  // the observation could not start). pageStable, the content script's signal
+  // to the change-report wait, is left out. The session recorder has already
+  // stored the full result, and the result object itself is left untouched.
   _actionResultForWire(result) {
     if (!result || typeof result !== 'object') return result;
     const hasOwn = (key) => Object.prototype.hasOwnProperty.call(result, key);
-    const dropReport = hasOwn('change_report')
+    const emptyReport = hasOwn('change_report')
       && typeof isEmptyChangeReport === 'function' && isEmptyChangeReport(result.change_report);
     const dropStable = hasOwn('pageStable');
-    if (!dropReport && !dropStable) return result;
+    if (!emptyReport && !dropStable) return result;
     const wireResult = { ...result };
-    if (dropReport) delete wireResult.change_report;
+    if (emptyReport) wireResult.change_report = { changed: false };
     if (dropStable) delete wireResult.pageStable;
     return wireResult;
   }

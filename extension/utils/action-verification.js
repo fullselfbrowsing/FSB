@@ -674,11 +674,14 @@ const EMPTY_CHANGE_REPORT_KEYS = Object.freeze([
 
 /**
  * True when a change_report records nothing: zero mutations, the same URL and
- * title, and no dialog, node, attribute, input or focus change. partial and
- * settle_ms describe the wait, not the page, so they do not count.
+ * title, and no dialog, node, attribute, input or focus change. settle_ms
+ * describes the wait, not the page, so it does not count. A partial report
+ * (the wait was cut off before the page settled) is never empty: a change may
+ * still have been on its way.
  */
 function isEmptyChangeReport(report) {
   if (!report || typeof report !== 'object' || Array.isArray(report)) return false;
+  if (report.partial === true) return false;
   for (const key of Object.keys(report)) {
     if (EMPTY_CHANGE_REPORT_KEYS.indexOf(key) === -1) return false;
   }
