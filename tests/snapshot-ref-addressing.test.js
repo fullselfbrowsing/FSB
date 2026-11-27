@@ -499,6 +499,28 @@ test('a ref from another document is unknown here, and refs never start at e1', 
   }
 });
 
+test('a snapshot scans only its own generation of refs, while earlier refs still resolve', () => {
+  const ctx = loadContentScripts();
+  const page = buildForm(ctx);
+  const first = snapshot(ctx);
+  const saveRef = refFor(first, 'Save');
+  // Page views and name binding register elements between snapshots; a long
+  // session piles up hundreds. The snapshot code walks refMap.map once per
+  // element, so that walk must not grow with the session.
+  const extras = [];
+  for (let i = 0; i < 300; i++) {
+    const row = ctx.el('div', { id: `extra-${i}` }, [`Extra ${i}`]);
+    ctx.doc.body.appendChild(adopt(ctx.doc, row));
+    extras.push({ row, ref: ctx.FSB.refMap.register(row, `#extra-${i}`, 'generic', `Extra ${i}`) });
+  }
+  const second = snapshot(ctx);
+  const printed = [...second.matchAll(/`(e\d+):/g)].map((m) => m[1]);
+  assert.equal(refFor(second, 'Save'), saveRef, 'the element keeps its ref');
+  assert.equal(ctx.FSB.refMap.map.size, printed.length, 'the scanned map holds this snapshot\'s refs only');
+  assert.equal(ctx.FSB.resolveRef(extras[0].ref), extras[0].row, 'a ref from before the snapshot still resolves');
+  assert.equal(JSON.stringify(ctx.FSB.refMap.getInfo(extras[299].ref)), JSON.stringify({ role: 'generic', name: 'Extra 299', selector: '#extra-299' }));
+});
+
 test('a document that uses up its block of refs opens a fresh random block, not the next range', () => {
   // Page A numbers in block 457; page B starts in block 456. Counting on past
   // e456999 would reach e457001, a number page A may already have handed out.
