@@ -4997,6 +4997,26 @@ async function runEnsureTransaction() {
     const repeat = await installer.installNativeHostBrowser({ browser: 'edge' }, harness.dependencies);
     equal(repeat.status, 'already-installed', `${platformName} the added browser is idempotent`);
   }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const harness = fakeEnsureHarness(modules, platformName, {});
+    harness.register('chrome');
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', `${platformName} uninstall-all refuses a registration whose runtime is gone`);
+    equal(result.reason, 'split-state', `${platformName} the leftover registration is a split state, as install reports it`);
+    deepEqual(harness.registeredBrowsers(), ['chrome'], `${platformName} the refused uninstall-all leaves the registration`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the refused uninstall-all changes nothing`);
+    const client = await installer.uninstallAllNativeHost({ onlyProvenance: 'auto' }, harness.dependencies);
+    equal(client.outcome, 'absent', `${platformName} a client uninstall has no helper of its own to remove`);
+  }
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const harness = fakeEnsureHarness(modules, platformName, {
+      foreignManifests: [['edge', '{"foreign":"edge"}\n']],
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'absent', `${platformName} uninstall-all with only a registration this package does not own reports nothing installed`);
+    deepEqual(harness.registeredBrowsers(), ['edge'], `${platformName} the registration this package does not own is left in place`);
+    equal(ensureMutations(harness.trace).length, 0, `${platformName} the foreign registration causes zero mutation`);
+  }
   {
     const harness = fakeEnsureHarness(modules, 'linux', {
       installed: { version: '0.9.0' },

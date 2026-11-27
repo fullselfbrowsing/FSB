@@ -2599,7 +2599,15 @@ export async function uninstallAllNativeHost(
         return uninstallAllResult('unavailable', { reason: 'unavailable' });
       }
       if (runtime.state === 'absent') {
-        return surfaces.some((surface) => surface.state === 'exact')
+        // A registration of this package's own that lost its runtime never
+        // reads as exact, since the marker went with the runtime; it reads as
+        // a split registration. That is refused, as install and the
+        // per-browser uninstall refuse it, instead of being reported as
+        // nothing installed. A registration this package does not own is left
+        // alone and does not count. A client uninstall removes only a helper
+        // that install set up, and there is none, so it stays quiet.
+        const orphaned = surfaces.some((surface) => surface.reason.endsWith(':registration-split'));
+        return orphaned && !onlyAuto
           ? uninstallAllResult('refused', { reason: 'split-state' })
           : uninstallAllResult('absent', { reason: 'absent' });
       }

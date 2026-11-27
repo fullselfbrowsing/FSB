@@ -804,6 +804,22 @@ function run() {
       assert(!fs.existsSync(stableRoot), 'production uninstall removes only the exact owned runtime');
       assert(!fs.existsSync(manifestPath), 'production uninstall removes the exact Chrome manifest');
 
+      // FSB's own Chrome registration whose runtime was deleted by hand is a
+      // split state: uninstall refuses it, as install does, instead of saying
+      // nothing is installed.
+      const orphanInstall = runCli(['install', '--native-host'], fixture);
+      assertEqual(orphanInstall.status, 0, 'the orphaned registration fixture installs first');
+      fs.rmSync(stableRoot, { recursive: true, force: true });
+      const orphanUninstall = runCli(['uninstall', '--native-host'], fixture);
+      assertEqual(orphanUninstall.status, 1, 'uninstall refuses a registration whose runtime is gone');
+      assertIncludes(
+        `${orphanUninstall.stdout}${orphanUninstall.stderr}`,
+        'not changed: split-state',
+        'uninstall reports the orphaned registration as a split state',
+      );
+      assert(fs.existsSync(manifestPath), 'the refused uninstall leaves the orphaned registration in place');
+      fs.rmSync(manifestPath, { force: true });
+
       const duplicateId = runCli([
         'install',
         '--native-host',
