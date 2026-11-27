@@ -8,8 +8,7 @@
  * Each form quotes an existing on-page signal where one exists, so the icon and
  * the page read as one system. Three of the four do:
  *
- *   idle      - base glyph only. Full strength until a dashboard relay has
- *               connected at least once and then dropped.
+ *   idle      - base glyph only, at full strength.
  *   thinking  - SWEEP. The status pill's track sweep in visual-feedback.js
  *               (1.2s ease-in-out, 38% fill, translateX -120% -> 320%). No
  *               orbit bead.
@@ -57,8 +56,6 @@
   var CORNER_RATIO = 30 / 128;
   var BEAD_SEGMENTS = 24;
   var SEAM_OVERLAP = 0.5;            // fraction of a segment
-  var DIM_ALPHA = 0.5;
-  var DIM_FILTER = 'grayscale(0.8)';
 
   // ---- Sweep (thinking) ---------------------------------------------------
   // Shared with the status pill's track sweep in visual-feedback.js. The track is
@@ -123,11 +120,6 @@
 
   var INTENT_KEY = 'fsbActionIconIntent';
   var ANIMATIONS_KEY = 'animatedActionHighlights';
-  // Install-scoped, so it outlives the session record above. Dimming means "the
-  // relay you use is down", not "you have never opened the dashboard": the relay
-  // has no enable switch and connect() runs unconditionally at startup, so a
-  // plain extension/MCP user would otherwise sit at the dimmed frame forever.
-  var RELAY_SEEN_KEY = 'fsbActionIconRelaySeen';
   // Armed only while a loop is owed. A frozen static frame needs no repair --
   // action state lives in the browser process and survives eviction intact --
   // so a permanent beat here would wake the worker every 30s forever for
@@ -238,9 +230,6 @@
   var wantedTile = 'dark';            // the latest tile asked for; ahead of `tile` while it builds
   var tileExplicit = false;           // a switch arrived, so the stored value read at init is stale
   var preferenceListenerArmed = false;
-  var connected = false;
-  var relaySeen = false;
-  var connectedExplicit = false;
   var startTime = 0;
   var timerId = null;
   // chrome.action.setIcon is asynchronous. Keep one browser-process update in
@@ -394,28 +383,16 @@
   // plate itself never moves. Fading the artwork instead fades the whole icon,
   // because the artwork IS the plate. So the plate is painted solid first and the
   // mark composited over it: black-on-black is a no-op, so only the lettering
-  // varies. The white tile does the same over a white plate. Dim is deliberately
-  // different -- a dropped relay recedes the whole icon, and it outranks the
-  // glow because grayscale would fight an orange halo.
+  // varies. The white tile does the same over a white plate.
   //
-  // Every undimmed frame starts from that plate as a full square. The artwork's
-  // cut corners are plain plate colour (black, or white in the light pair), so
-  // the square under it rebuilds the uncut tile; renderFrame then cuts the
-  // finished frame back to the artwork's own rounded edge, so whatever was drawn
-  // near a corner ends on exactly the edge pixels of the static icon. A dimmed
-  // frame is only the faded artwork, whose alpha already carries the corners.
+  // Every frame starts from that plate as a full square. The artwork's cut
+  // corners are plain plate colour (black, or white in the light pair), so the
+  // square under it rebuilds the uncut tile; renderFrame then cuts the finished
+  // frame back to the artwork's own rounded edge, so whatever was drawn near a
+  // corner ends on exactly the edge pixels of the static icon.
   function drawGlyph(ctx, size, bitmap, spec, look) {
     var drawn = size * GLYPH_SCALE;
     var offset = (size - drawn) / 2;
-
-    if (spec.dimmed === true) {
-      ctx.globalAlpha = DIM_ALPHA;
-      ctx.filter = DIM_FILTER;
-      ctx.drawImage(bitmap, offset, offset, drawn, drawn);
-      ctx.globalAlpha = 1;
-      ctx.filter = 'none';
-      return;
-    }
 
     ctx.fillStyle = look.plate;
     ctx.fillRect(0, 0, size, size);
@@ -452,15 +429,13 @@
   // glyph, so the orbit, sweep and ring paint over it and the breathe never
   // fades it. The path is closed and smooth, so cap and join never show; leaving
   // them alone keeps the motion strokes that follow identical on either tile.
-  function drawTileEdge(ctx, size, look, alpha) {
+  function drawTileEdge(ctx, size, look) {
     if (!look.edge) return;
     var width = Math.max(EDGE_W_MIN, Math.round(EDGE_W_RATIO * size));
-    ctx.globalAlpha = alpha;
     ctx.lineWidth = width;
     ctx.strokeStyle = look.edge;
     tilePath(ctx, size, width / 2);
     ctx.stroke();
-    ctx.globalAlpha = 1;
   }
 
   // The orbit's centreline: the tile's outline inset by half the stroke, so the
@@ -702,13 +677,13 @@
   // The only background is the artwork's own tile, rebuilt as a square under it
   // (drawGlyph). A service worker cannot read the toolbar theme, so the tile is
   // black unless FSB's own theme is set to Light (TILES); the white tile also gets
-  // its edge (drawTileEdge), at half strength when dimmed like the artwork. The
-  // last step cuts each undimmed frame with the artwork's alpha, so its rounded
-  // corners are pixel-for-pixel the static icon's in every state.
+  // its edge (drawTileEdge). The last step cuts each frame with the artwork's
+  // alpha, so its rounded corners are pixel-for-pixel the static icon's in every
+  // state.
   //
   // Exactly one clearRect per frame, which opens it: the test harness splits its
   // recorded op log on clearRect to reconstruct frames. The glyph is the first
-  // bitmap draw and, in an undimmed frame, the corner cut is the last.
+  // bitmap draw and the corner cut is the last.
   function renderFrame(bitmaps, spec, look) {
     look = look || TILES.dark;
     var frame = {};
@@ -718,18 +693,16 @@
       var progress = spec.progress || 0;
       ctx.clearRect(0, 0, size, size);
       drawGlyph(ctx, size, bitmaps[size], spec, look);
-      drawTileEdge(ctx, size, look, spec.dimmed === true ? DIM_ALPHA : 1);
+      drawTileEdge(ctx, size, look);
       if (spec.form === 'orbit') strokeOrbit(ctx, size, spec.palette, progress);
       else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress, look);
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
       else if (spec.form === 'ask') drawAskBadge(ctx, size, progress);
-      if (spec.dimmed !== true) {
-        var drawn = size * GLYPH_SCALE;
-        var offset = (size - drawn) / 2;
-        ctx.globalCompositeOperation = 'destination-in';
-        ctx.drawImage(bitmaps[size], offset, offset, drawn, drawn);
-        ctx.globalCompositeOperation = 'source-over';
-      }
+      var drawn = size * GLYPH_SCALE;
+      var offset = (size - drawn) / 2;
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.drawImage(bitmaps[size], offset, offset, drawn, drawn);
+      ctx.globalCompositeOperation = 'source-over';
       frame[size] = ctx.getImageData(0, 0, size, size);
     }
     // Reuse this exact request object for every cycle. Rebuilding the two nested
@@ -794,7 +767,7 @@
   // stop eases each segment separately rather than easing the whole cycle once.
   function frameSpec(state, progress) {
     var def = STATES[state];
-    var spec = { form: def.form, palette: def, progress: progress, dimmed: false };
+    var spec = { form: def.form, palette: def, progress: progress };
     if (def.form === 'breathe') {
       // 0%,100% -> min, 50% -> peak.
       var toPeak = progress < 0.5
@@ -812,12 +785,11 @@
 
   // What an armed watch shows before its frames exist -- during init, and on the
   // repair path after a worker restart. The breathe itself no longer settles.
-  function settledSpec(dimmed) {
+  function settledSpec() {
     return {
       form: 'breathe',
       palette: STATES.breathe,
       progress: 0,
-      dimmed: dimmed,
       glyphAlpha: SETTLE_ALPHA,
       glowRatio: SETTLE_GLOW_RATIO,
       glowAlpha: SETTLE_GLOW_ALPHA
@@ -870,7 +842,7 @@
     return build;
   }
 
-  // Only the four resting frames and one Ring kickoff are rendered up front. A
+  // Only the two resting frames and one Ring kickoff are rendered up front. A
   // worker wake that never animates should not pay for full animation cycles.
   // The set is published whole, so a tile's resting frames are all there or
   // none are.
@@ -878,12 +850,11 @@
     var bitmaps = await ensureGlyphs(name);
     var look = TILES[name];
     var frames = Object.create(null);
-    frames['idle:on'] = renderFrame(bitmaps, { dimmed: false }, look);
-    frames['idle:off'] = renderFrame(bitmaps, { dimmed: true }, look);
-    // Keep the reduced-motion watching frames cached alongside idle so a cold
+    // Idle is the bare glyph: no form, so nothing is drawn over the artwork.
+    frames['idle'] = renderFrame(bitmaps, {}, look);
+    // Keep the reduced-motion watching frame cached alongside idle so a cold
     // restore can render watch state without rebuilding the glyphs.
-    frames['watching:on'] = renderFrame(bitmaps, settledSpec(false), look);
-    frames['watching:off'] = renderFrame(bitmaps, settledSpec(true), look);
+    frames['watching'] = renderFrame(bitmaps, settledSpec(), look);
     // Keep one Ring frame ready so a short capability invoke can paint
     // immediately without delaying business logic for the full frame build.
     frames['ring:kickoff'] = renderFrame(bitmaps, frameSpec('ring', 0), look);
@@ -1019,17 +990,12 @@
     drainEmit();
   }
 
-  // Dim is a "your relay dropped" signal, so it needs a relay to have been there
-  // in the first place. Until one has connected once, every resting frame is
-  // full strength -- that is the only appearance the design has.
+  // A settled breathe keeps its claim, so the resting frame it lands on is the
+  // watching one; only an empty claim set falls back to idle.
   function staticFrame() {
     var frames = staticFrames[tile];
     if (!frames) return null;
-    var dim = relaySeen && !connected;
-    // A settled breathe keeps its claim, so the resting frame it lands on is the
-    // watching one; only an empty claim set falls back to idle.
-    var base = resolved === 'breathe' ? 'watching' : 'idle';
-    return frames[base + (dim ? ':off' : ':on')];
+    return frames[resolved === 'breathe' ? 'watching' : 'idle'];
   }
 
   function frameAt(now) {
@@ -1155,34 +1121,11 @@
         animating: animating,
         claims: claimCopy,
         resolved: resolved,
-        connected: connected,
         updatedAt: Date.now()
       };
       var result = area.set(record);
       if (result && typeof result.catch === 'function') result.catch(function () {});
     } catch (_e) { /* persistence is best-effort */ }
-  }
-
-  function persistRelaySeen() {
-    try {
-      var area = chrome.storage && chrome.storage.local;
-      if (!area || typeof area.set !== 'function') return;
-      var record = {};
-      record[RELAY_SEEN_KEY] = true;
-      var result = area.set(record);
-      if (result && typeof result.catch === 'function') result.catch(function () {});
-    } catch (_e) { /* persistence is best-effort */ }
-  }
-
-  async function readRelaySeen() {
-    try {
-      var area = chrome.storage && chrome.storage.local;
-      if (!area || typeof area.get !== 'function') return false;
-      var stored = await area.get(RELAY_SEEN_KEY);
-      return !!(stored && stored[RELAY_SEEN_KEY] === true);
-    } catch (_e) {
-      return false;
-    }
   }
 
   async function readAnimationsEnabled() {
@@ -1452,7 +1395,8 @@
       if (!(await buildRestingFrames())) return;
       var intent = await readIntent();
       if (intent) {
-        if (!connectedExplicit) connected = intent.connected === true;
+        // Only the claims are read back. Fields an older build stored beside
+        // them are ignored, and the next write replaces the whole record.
         if (intent.claims && typeof intent.claims === 'object') {
           var storedKeys = Object.keys(intent.claims);
           for (var s = 0; s < storedKeys.length; s++) {
@@ -1468,9 +1412,6 @@
           }
         }
       }
-      // OR, never assign: a setConnected(true) that raced this init already
-      // learned the relay, and the stored write may not have landed yet.
-      if (!relaySeen) relaySeen = await readRelaySeen();
       await pruneClosedTabClaims();
       var live = true;
       if (liveSessionProbe) {
@@ -1594,25 +1535,6 @@
     applyResolved();
   }
 
-  function setConnected(isConnected) {
-    if (unavailable) return;
-    var next = isConnected === true;
-    connectedExplicit = true;
-    // Recorded before the no-op bail so the very first connect still arms the
-    // dim, even when it lands on an already-true value restored from intent.
-    var learned = false;
-    if (next && !relaySeen) {
-      relaySeen = true;
-      learned = true;
-      persistRelaySeen();
-    }
-    if (connected === next && !learned) return;
-    connected = next;
-    if (!ready) return;
-    persistIntent();
-    if (!animating) emit(staticFrame());
-  }
-
   // Watchdog entry point. A worker killed mid-cycle leaves the icon frozen on
   // its last frame because action state lives in the browser process; this
   // re-derives the intended frame and revives the loop when one is owed.
@@ -1708,7 +1630,6 @@
     setWatching: setWatching,
     setAsking: setAsking,
     setAnimationsEnabled: setAnimationsEnabled,
-    setConnected: setConnected,
     dropTab: dropTab,
     repair: repair,
     getMotion: getMotion,

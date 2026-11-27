@@ -17,19 +17,18 @@ const {
 const REDIRECTS = {
   '/index.html': '/',
   '/about.html': '/about',
-  '/dashboard.html': '/dashboard',
   '/privacy.html': '/privacy',
   '/support.html': '/support',
 };
 
 const EXPECTED_BY_LOCALE = {
-  es: ['/es', '/es/about', '/es/dashboard', '/es/privacy', '/es/support'],
-  de: ['/de', '/de/about', '/de/dashboard', '/de/privacy', '/de/support'],
-  ru: ['/ru', '/ru/about', '/ru/dashboard', '/ru/privacy', '/ru/support'],
-  ja: ['/ja', '/ja/about', '/ja/dashboard', '/ja/privacy', '/ja/support'],
-  ko: ['/ko', '/ko/about', '/ko/dashboard', '/ko/privacy', '/ko/support'],
-  'zh-CN': ['/zh-CN', '/zh-CN/about', '/zh-CN/dashboard', '/zh-CN/privacy', '/zh-CN/support'],
-  'zh-TW': ['/zh-TW', '/zh-TW/about', '/zh-TW/dashboard', '/zh-TW/privacy', '/zh-TW/support'],
+  es: ['/es', '/es/about', '/es/privacy', '/es/support'],
+  de: ['/de', '/de/about', '/de/privacy', '/de/support'],
+  ru: ['/ru', '/ru/about', '/ru/privacy', '/ru/support'],
+  ja: ['/ja', '/ja/about', '/ja/privacy', '/ja/support'],
+  ko: ['/ko', '/ko/about', '/ko/privacy', '/ko/support'],
+  'zh-CN': ['/zh-CN', '/zh-CN/about', '/zh-CN/privacy', '/zh-CN/support'],
+  'zh-TW': ['/zh-TW', '/zh-TW/about', '/zh-TW/privacy', '/zh-TW/support'],
 };
 
 const targets = Object.values(REDIRECTS);
@@ -88,12 +87,12 @@ function invokeHandler(request) {
 }
 
 const localizedRedirect = invokeHandler({
-  path: '/dashboard.html',
+  path: '/about.html',
   headers: { cookie: 'session=abc; fsb-locale=zh-TW; theme=dark' },
 });
 assert.deepStrictEqual(
   localizedRedirect.redirectResult,
-  { status: 302, location: '/zh-TW/dashboard' },
+  { status: 302, location: '/zh-TW/about' },
   'handler uses a temporary redirect while applying a validated locale cookie'
 );
 assert.strictEqual(
@@ -109,12 +108,12 @@ assert.strictEqual(
 assert.strictEqual(localizedRedirect.nextCalled, false, 'known legacy path does not fall through');
 
 const defaultLocaleRedirect = invokeHandler({
-  path: '/dashboard.html',
+  path: '/about.html',
   headers: { cookie: 'fsb-locale=en' },
 });
 assert.deepStrictEqual(
   defaultLocaleRedirect.redirectResult,
-  { status: 302, location: '/dashboard' },
+  { status: 302, location: '/about' },
   'the same legacy URL follows a changed locale cookie without a permanent redirect'
 );
 

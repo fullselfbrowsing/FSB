@@ -32,7 +32,7 @@
       "tokenForks": 0
     },
     "extension/ui/options.css": {
-      "colors": 59,
+      "colors": 55,
       "zIndex": 1,
       "fontFamily": 4,
       "tokenForks": 3
@@ -96,12 +96,6 @@
       "zIndex": 1,
       "fontFamily": 5,
       "tokenForks": 9
-    },
-    "showcase/angular/src/app/pages/dashboard/dashboard-page.component.scss": {
-      "colors": 97,
-      "zIndex": 9,
-      "fontFamily": 3,
-      "tokenForks": 0
     },
     "showcase/angular/src/app/pages/home/home-page.component.scss": {
       "colors": 12,

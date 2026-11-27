@@ -23,7 +23,7 @@ const DEPTH_PATHS: Readonly<Record<string, DepthPageKey>> = {
 const SHELLLESS_PATHS: ReadonlySet<string> = new Set(['stats', 'lattice', 'concierge', 'phantom-stream', 'prometheus']);
 
 /* Nav cue entries, top to bottom. Its list opens upward from the bottom edge. */
-const CUE_ORDER: readonly string[] = ['home', 'about', 'agents', 'dashboard', 'privacy', 'support'];
+const CUE_ORDER: readonly string[] = ['home', 'about', 'agents', 'privacy', 'support'];
 
 @Component({
   selector: 'app-showcase-shell',

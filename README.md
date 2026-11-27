@@ -146,13 +146,12 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, direct JavaScript, and real file uploads. |
 | Capability catalog | Searches the 128-app catalog and invokes verified signed, audited, denylist-gated T1/T1b first-party API capabilities through `search_capabilities` and `invoke_capability`. Catalog-tail hits remain learn-pending, discovery-pending, or guarded fail-closed until proven. Sensitive origins are flagged, while denylisted origins remain blocked. |
 | Verification | Checks post-action state, loading behavior, DOM stability, and stuck-action repetition. |
-| UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, 1Password connection, and sync controls. |
+| UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, and 1Password connection. |
 | Model support | Hosted providers, OpenRouter routing, LM Studio local models, custom endpoints, and live model discovery. |
 | Output rendering | Markdown, sanitized HTML, Mermaid diagrams, Chart.js charts, and task progress messages. |
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
 | Security | Encrypted keys, 1Password-backed credential fills, redaction helpers, DOMPurify, capability signature/audit gates, origin denylisting, upload-path denylisting, and restricted-tab recovery messaging. |
 | Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
-| DOM live preview | PhantomStream-backed capture, renderer, protocol, media mirroring, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
 The core design goal is to keep the browser as the source of truth. The model receives structured page context, makes a tool decision, and the extension verifies what changed before moving to the next step.
 
@@ -164,7 +163,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 **`upload_file`: real file input uploads.** MCP clients and FSB autopilot can now call `upload_file(selector, file_path, tab_id?)` to set an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
 
-**PhantomStream 0.2.1 media mirroring.** Dashboard DOM live preview now consumes the published PhantomStream media side channel in reference mode, so progressive `<video>` and `<audio>` nodes can mirror alongside DOM snapshots. Adaptive HLS/DASH discovery remains deferred because it would require a new `webRequest` permission; MCP tool schemas, pairing, auth, and dashboard ownership behavior are unchanged.
+**Live Dashboard retired.** The showcase Live Dashboard is gone, along with pairing, the extension's always-on relay connection to full-selfbrowsing.com, DOM live preview, and remote control from the web. v0.9.95 is the last version that has them; an update removes the hash key and relay settings they left behind. [PhantomStream](https://full-selfbrowsing.com/phantom-stream) continues as a standalone open-source library. MCP tool schemas and the local bridge are unchanged.
 
 **Engineering milestone 0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
 
@@ -181,8 +180,8 @@ Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its o
 | [`extension/`](./extension/README.md) | Chrome extension package. Load this directory as an unpacked MV3 extension. |
 | [`mcp/`](./mcp/README.md) | npm package `fsb-mcp-server`, the local MCP bridge for external AI clients. |
 | [`skills/fsb/`](./skills/fsb/SKILL.md) | OpenClaw + Hermes skill: doctor + stdio/YAML printers + consent gated install for multiple hosts. |
-| [`showcase/`](./showcase/README.md) | Marketing and dashboard site for full-selfbrowsing.com. Angular 20 static prerender + Express relay. |
-| `showcase/server/` | Node/Express deploy backend for pairing, PhantomStream-compatible relay, auth, and dashboard data. |
+| [`showcase/`](./showcase/README.md) | Marketing site for full-selfbrowsing.com. Angular 20 static prerender + Express server. |
+| `showcase/server/` | Node/Express deploy backend that serves the site, telemetry ingest, public stats, and the hosted Jev gateway. |
 | `server-py/` | Legacy Python/FastAPI-style backend prototype retained for reference. |
 | `tests/` | Node tests for extension modules, MCP contracts, bridge behavior, and regression coverage. |
 | `scripts/` | Repo maintenance and validation scripts. |
@@ -447,7 +446,7 @@ graph TB
 ### Main Runtime Pieces
 
 - **Background worker** (`extension/background.js`): owns sessions, model calls, tool execution, MCP routing, and storage orchestration.
-- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, stream DOM state through the PhantomStream capture adapter, wait for stable state, and render visual feedback.
+- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, wait for stable state, and render visual feedback.
 - **AI layer** (`extension/ai/`): universal OpenAI-compatible request engine, provider settings, model discovery, tool definitions, transcripts, and action history.
 - **Memory** (`extension/lib/memory/`): stores episodic, semantic, and procedural records, then retrieves relevant prior context for later tasks.
 - **Visualization** (`extension/lib/visualization/`): D3/site graph views for guide and memory exploration.
@@ -465,7 +464,7 @@ graph TB
 
 ### State And Data Flow
 
-FSB stores configuration and runtime data in Chrome storage. API keys and saved sensitive values go through the secure configuration layer. Session logs, analytics, and memory records are kept locally unless a user explicitly enables server sync or uses the showcase dashboard pairing flow.
+FSB stores configuration and runtime data in Chrome storage. API keys and saved sensitive values go through the secure configuration layer. Session logs, analytics, and memory records are kept locally.
 
 During a task, the background worker owns the session state and talks to three main collaborators:
 
@@ -610,7 +609,7 @@ Use separate API keys for development and production, rotate keys regularly, res
 
 Provider calls receive the page/task context needed to complete the requested automation. That can include visible page text, form labels, selectors, and user-supplied task instructions. Avoid running automation on sensitive pages unless you are comfortable sending that task context to the selected model provider.
 
-FSB does not require a hosted FSB account for local extension use. The showcase backend and dashboard pairing server are separate from normal local extension operation.
+FSB does not require a hosted FSB account for local extension use. The showcase backend is separate from normal local extension operation.
 
 ---
 

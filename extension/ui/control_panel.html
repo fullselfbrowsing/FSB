@@ -48,10 +48,6 @@
               <i class="fas fa-key"></i>
               <span data-i18n="panel_8ad747d05c">API Configuration</span>
             </li>
-            <li class="nav-item" data-section="sync">
-              <i class="fas fa-sync-alt"></i>
-              <span><span data-i18n="panel_8d261a372f">Sync</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
-            </li>
             <li class="nav-item" data-section="vault">
               <i class="fas fa-vault"></i>
               <span><span data-i18n="panel_5d55c415e3">Vault</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
@@ -872,80 +868,6 @@
               </div>
             </div>
 
-          </div>
-        </section>
-
-        <!-- Sync Section (Phase 213) -->
-        <section class="content-section" id="sync">
-          <div class="section-header sync-section-header">
-            <div class="section-header-text">
-              <h2 data-i18n="panel_8d261a372f">Sync</h2>
-              <p data-i18n="panel_76e917ee87">Pair this extension with the FSB dashboard for remote control and result storage</p>
-            </div>
-            <span class="sync-status-pill" id="syncStatusPill" role="status" aria-live="polite" aria-atomic="true" data-state="disconnected">
-              <span class="dot"></span>
-              <span class="label" data-i18n="panel_04dfac3671">Disconnected</span>
-            </span>
-          </div>
-
-          <!-- Server Sync card relocated from background-agents per Phase 213 D-05 -->
-          <div class="settings-card full-width" style="margin-top: 20px;">
-            <div class="settings-card-header">
-              <div class="settings-card-icon">
-                <i class="fas fa-server"></i>
-              </div>
-              <div class="settings-card-title">
-                <h3 data-i18n="panel_acf2db1614">Server Sync</h3>
-                <p data-i18n="panel_c11de3bb2e">Connect to FSB server for result storage and dashboard access</p>
-              </div>
-            </div>
-            <div class="settings-card-content">
-              <input type="hidden" id="serverUrl">
-              <div class="form-group">
-                <label for="serverHashKey" data-i18n="panel_609bbbdf07">Hash Key</label>
-                <div class="sync-key-row">
-                  <input type="text" id="serverHashKey" class="form-input sync-key-input" placeholder="Your server hash key" readonly data-i18n-attr="placeholder:copy_81649d0543">
-                  <button class="control-btn" id="btnGenerateHashKey"><i class="fas fa-rotate"></i> <span data-i18n="panel_49e49bb440">Generate</span></button>
-                  <button class="control-btn sync-copy-btn" id="btnCopyHashKey" title="Copy hash key" aria-label="Copy hash key" data-i18n-attr="title:copy_e4cdf160f5,aria-label:copy_e4cdf160f5"><i class="fas fa-copy"></i></button>
-                </div>
-                <div class="form-help" data-i18n="panel_097b5fa7f6">Generate a key, then pair the dashboard to link this browser to the FSB server.</div>
-              </div>
-              <div class="sync-action-row">
-                <button class="control-btn accent" id="btnPairDashboard">
-                  <i class="fas fa-qrcode"></i>
-                  <span data-i18n="panel_534803768c">Pair Dashboard</span>
-                </button>
-                <button class="control-btn" id="btnTestConnection">
-                  <i class="fas fa-plug"></i>
-                  <span data-i18n="panel_c02977b07e">Test Connection</span>
-                </button>
-                <span class="connection-status" id="syncConnectionStatus"></span>
-              </div>
-              <div id="pairingQROverlay" class="pairing-qr-overlay" style="display: none;">
-                <div class="pairing-qr-popup">
-                  <div class="pairing-qr-popup-header">
-                    <span data-i18n="panel_9a177de63c">Scan to Pair</span>
-                    <button class="pairing-qr-close" id="btnCancelPairing">&times;</button>
-                  </div>
-                  <div id="pairingQRCode" class="pairing-qr-code"></div>
-                  <div class="pairing-qr-countdown">
-                    <span id="pairingCountdown">60s</span> <span data-i18n="panel_43e3ece73f">remaining</span>
-                  </div>
-                  <div id="pairingQRMessage" class="pairing-qr-message"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Background agents: inline informational note (was a card) -->
-          <div class="sync-deprecation">
-            <div class="sync-deprecation-head"><i class="fas fa-flag-checkered"></i> <span data-i18n="panel_75d0625c55">Background agents have left the building</span></div>
-            <p class="sync-deprecation-body"><span data-i18n="panel_d17d0cfd98">FSB stays focused on precise single-attempt browser execution. Scheduled and recurring task work is better served by tools built for it:</span> <strong>OpenClaw</strong> <span data-i18n="panel_5a694f4532">for an open-source agent loop, and</span> <strong>Claude Routines</strong> <span data-i18n="panel_6e34781c2f">for managed long-running automations. Pick whichever fits the way you work.</span></p>
-            <div class="sync-deprecation-links">
-              <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener noreferrer"><span data-i18n="panel_e76c360683">Try OpenClaw</span> <i class="fas fa-arrow-up-right-from-square"></i></a>
-              <a href="https://www.anthropic.com/claude/routines" target="_blank" rel="noopener noreferrer"><span data-i18n="panel_1a58d9154d">Try Claude Routines</span> <i class="fas fa-arrow-up-right-from-square"></i></a>
-            </div>
-            <small class="sync-deprecation-foot" data-i18n="panel_582ba53e9e">Retired in v0.9.45rc1 · April 2026</small>
           </div>
         </section>
 
@@ -1777,7 +1699,7 @@
                 <i class="fas fa-shield-alt"></i>
               </div>
               <h3 data-i18n="panel_506ff39462">Privacy Policy</h3>
-              <p data-i18n="panel_f3cb441c27">Read how FSB handles data, storage, and optional server sync</p>
+              <p data-i18n="panel_71b36c0b35">Read how FSB handles data and storage</p>
               <a href="https://full-selfbrowsing.com/privacy.html" target="_blank" rel="noopener" class="help-link" data-i18n="panel_377733b622">View Privacy Policy</a>
             </div>
 
@@ -1949,7 +1871,6 @@
   <!-- Site guides viewer (must be after all guide scripts) -->
   <script src="pin-input.js"></script>
   <script src="site-guides-viewer.js"></script>
-  <script src="lib/qrcode-generator.min.js"></script>
   <script src="pin-input.js"></script>
   <script src="../utils/agent-cap-recommendation.js"></script>
   <!-- Phase 243 Plan 04 / UI-03: pure helpers for the cap counter + validation. Must load BEFORE options.js. -->

@@ -84,10 +84,9 @@ The shared product policy is the [FSB Privacy Policy](https://www.full-selfbrows
 | Loopback WebSocket port `7225` on Bot's computer | Connect the MCP server to the FSB extension |
 | Websites and application APIs selected for the task | Browser operations using that profile's session |
 | `https://full-selfbrowsing.com/api/telemetry/events` | Extension anonymous usage telemetry, enabled by default; disable **Send anonymous usage data** in Advanced Settings |
-| `https://full-selfbrowsing.com/api/auth/register` and `wss://full-selfbrowsing.com/ws` | Extension dashboard registration and relay connection; PhantomStream live preview belongs to the dashboard feature |
 | `api.x.ai`, `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `openrouter.ai`, or the configured LM Studio/custom endpoint | Optional FSB AI features use the provider the user configures; LM Studio defaults to `http://localhost:1234` on that computer |
 
-Anonymous telemetry is separate from the dashboard relay. The policy describes usage fields, coarse region, retention and erasure. Relay connection timing depends on the installed extension build; disabling telemetry does not necessarily disconnect dashboard networking.
+The policy describes the anonymous telemetry's usage fields, coarse region, retention and erasure. Extension builds up to v0.9.95 also registered with `https://full-selfbrowsing.com/api/auth/register` and kept a `wss://full-selfbrowsing.com/ws` relay connection for the retired Live Dashboard; later builds do not.
 
 If separately enabled, HTTP serving uses loopback port `7226`. This plugin selects stdio and does not expose an HTTP endpoint. Browser pairing state, local session recordings and screenshot files are described in the product policy. [FSB source](https://github.com/fullselfbrowsing/FSB) contains the extension and published server implementation.
 

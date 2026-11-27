@@ -1,13 +1,14 @@
 /**
  * Background-agents retirement: control panel and chat UI checks.
  *
- *   - The Sync tab keeps its note about the retired agents, with both
- *     links (target=_blank rel=noopener noreferrer) and a footer naming
- *     v0.9.45rc1 and April 2026.
+ *   - The note about the retired agents is gone too: no "Background agents
+ *     have left the building" block, OpenClaw / Claude Routines links or
+ *     "Retired in v0.9.45rc1" footer is left in the control panel.
  *   - The commented-out agent UI (agent forms, /agent slash commands) and
  *     the old "Your previous agents" notice are gone; nothing in the UI
  *     reads bgAgents any more.
- *   - Server Sync and pairing wiring stays live.
+ *   - The Server Sync and pairing controls left with the Live Dashboard;
+ *     none of their buttons is wired any more.
  *
  * Plain Node + assert + fs. No browser, no chrome stubs.
  */
@@ -53,22 +54,22 @@ function fail(label, detail) {
   if (detail) console.log('       ' + detail);
 }
 
-// ---- Section 1: AGENTS-01 deprecation notice present in control_panel.html ----
+// ---- Section 1: the retired-agents note is gone from control_panel.html ----
 
 {
   const src = read('extension/ui/control_panel.html');
-  const tryOpenClaw = countSubstring(src, 'Try OpenClaw') === 1;
-  const tryRoutines = countSubstring(src, 'Try Claude Routines') === 1;
-  const noNoopener = (src.match(/rel="noopener noreferrer"/g) || []).length;
+  const leftovers = [
+    'Background agents have left the building',
+    'Try OpenClaw',
+    'Try Claude Routines',
+    'Retired in v0.9.45rc1',
+    'sync-deprecation',
+  ].filter(text => src.includes(text));
   const footerTexts = extractDeprecationFooterTexts(src);
-  const footer = footerTexts.filter(text => (
-    text.includes('Retired in v0.9.45rc1') &&
-    text.includes('April 2026')
-  )).length === 1;
-  if (tryOpenClaw && tryRoutines && noNoopener >= 2 && footer) {
-    pass('AGENTS-01 deprecation notice present (CTAs + semantic footer; rel=noopener noreferrer count=' + noNoopener + ')');
+  if (leftovers.length === 0 && footerTexts.length === 0) {
+    pass('AGENTS-01 the retired-agents note and its footer are removed from the control panel');
   } else {
-    fail('AGENTS-01 deprecation notice incomplete', 'tryOpenClaw=' + tryOpenClaw + ' tryRoutines=' + tryRoutines + ' noopener=' + noNoopener + ' footer=' + footer + ' footerTexts=' + JSON.stringify(footerTexts));
+    fail('AGENTS-01 retired-agents note still present', 'found: ' + JSON.stringify(leftovers) + ' footers=' + JSON.stringify(footerTexts));
   }
 }
 
@@ -116,26 +117,22 @@ const emojiTargets = [
   }
 }
 
-// ---- Section 4: D-15 -- Server Sync + pairing wiring at ui/options.js:4189-4205 stays LIVE ----
+// ---- Section 4: the Server Sync and pairing controls are gone ----
 
 {
-  const src = read('extension/ui/options.js');
-  const lines = src.split('\n');
-  const liveIds = ['btnPairDashboard', 'btnGenerateHashKey', 'btnCopyHashKey', 'btnTestConnection', 'btnCancelPairing'];
+  const js = read('extension/ui/options.js');
+  const html = read('extension/ui/control_panel.html');
+  // btnTestConnection is left out: the id is generic enough for a future feature to reuse.
+  const retiredIds = ['btnPairDashboard', 'btnGenerateHashKey', 'btnCopyHashKey', 'btnCancelPairing'];
 
-  let violations = [];
-  for (const id of liveIds) {
-    const liveHits = lines.filter(line =>
-      line.indexOf("getElementById('" + id + "')") !== -1 &&
-      !/^\s*\/\//.test(line)
-    );
-    if (liveHits.length === 0) {
-      violations.push(id + ' -- no LIVE getElementById call found (Phase 213 relocation requires this preserved)');
-    }
+  let leftovers = [];
+  for (const id of retiredIds) {
+    if (js.includes("getElementById('" + id + "')")) leftovers.push('options.js looks up ' + id);
+    if (html.includes('id="' + id + '"')) leftovers.push('control_panel.html renders ' + id);
   }
 
-  if (violations.length === 0) pass('D-15 Server Sync + pairing wiring preserved LIVE for Phase 213 relocation');
-  else fail('D-15 Server Sync + pairing wiring broken', violations.join('; '));
+  if (leftovers.length === 0) pass('Server Sync and pairing controls are removed from the control panel');
+  else fail('Server Sync and pairing controls still present', leftovers.join('; '));
 }
 
 // ---- Section 5: the old agent-names notice is gone ----

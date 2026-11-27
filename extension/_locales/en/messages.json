@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API Configuration"
   },
-  "panel_8d261a372f": {
-    "message": "Sync"
-  },
   "panel_703390318b": {
     "message": "Beta"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "Discard"
-  },
-  "panel_49e49bb440": {
-    "message": "Generate"
   },
   "panel_0e91610117": {
     "message": "Refresh"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "Read full policy →"
   },
-  "panel_04dfac3671": {
-    "message": "Disconnected"
-  },
-  "panel_acf2db1614": {
-    "message": "Server Sync"
-  },
-  "panel_609bbbdf07": {
-    "message": "Hash Key"
-  },
-  "panel_534803768c": {
-    "message": "Pair Dashboard"
-  },
-  "panel_9a177de63c": {
-    "message": "Scan to Pair"
-  },
-  "panel_43e3ece73f": {
-    "message": "remaining"
-  },
   "panel_c9b3c38247": {
     "message": "Total"
   },
@@ -984,36 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "Turning voice input off stops FSB from using your microphone, but does not revoke Chrome's saved permission."
-  },
-  "panel_76e917ee87": {
-    "message": "Pair this extension with the FSB dashboard for remote control and result storage"
-  },
-  "panel_c11de3bb2e": {
-    "message": "Connect to FSB server for result storage and dashboard access"
-  },
-  "panel_097b5fa7f6": {
-    "message": "Generate a key, then pair the dashboard to link this browser to the FSB server."
-  },
-  "panel_75d0625c55": {
-    "message": "Background agents have left the building"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB stays focused on precise single-attempt browser execution. Scheduled and recurring task work is better served by tools built for it:"
-  },
-  "panel_5a694f4532": {
-    "message": "for an open-source agent loop, and"
-  },
-  "panel_6e34781c2f": {
-    "message": "for managed long-running automations. Pick whichever fits the way you work."
-  },
-  "panel_e76c360683": {
-    "message": "Try OpenClaw"
-  },
-  "panel_1a58d9154d": {
-    "message": "Try Claude Routines"
-  },
-  "panel_582ba53e9e": {
-    "message": "Retired in v0.9.45rc1 · April 2026"
   },
   "panel_9f83a0b7bf": {
     "message": "Long-term memory learned from past automation sessions"
@@ -1555,8 +1501,8 @@
   "panel_d2286811e6": {
     "message": "Connect MCP clients like Claude Code and Cursor, then verify with the doctor command"
   },
-  "panel_f3cb441c27": {
-    "message": "Read how FSB handles data, storage, and optional server sync"
+  "panel_71b36c0b35": {
+    "message": "Read how FSB handles data and storage"
   },
   "panel_476481e410": {
     "message": "Report bugs, request features, and track development progress"
@@ -1636,20 +1582,8 @@
   "panel_22965568d2": {
     "message": "Connected"
   },
-  "panel_ee172faa9c": {
-    "message": "Invalid key"
-  },
   "panel_031a8f0f65": {
     "message": "Failed"
-  },
-  "panel_424a2551d3": {
-    "message": "Expired"
-  },
-  "panel_c7730178f4": {
-    "message": "Generate new code"
-  },
-  "panel_ac116124f7": {
-    "message": "Could not generate pairing code. Try again."
   },
   "panel_d03fd96d28": {
     "message": "Choose a loaded model..."
@@ -3167,66 +3101,6 @@
   "copy_84e9814ece": {
     "message": "Failed to clear research results"
   },
-  "copy_491c2ddc8e": {
-    "message": "Please enter a server URL first"
-  },
-  "copy_9526d57756": {
-    "message": "Hash key generated and saved"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "Failed to generate hash key"
-  },
-  "copy_52b3b70484": {
-    "message": "Cannot connect to server: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "No hash key to copy"
-  },
-  "copy_f0b64c63d8": {
-    "message": "Hash key copied"
-  },
-  "copy_0cf23c4489": {
-    "message": "Failed to copy"
-  },
-  "copy_8cab3b4552": {
-    "message": "Please enter server URL and hash key"
-  },
-  "copy_271b7b0f3b": {
-    "message": "Server connection successful"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "Hash key is invalid"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "Cannot connect to server"
-  },
-  "copy_0ea446a05f": {
-    "message": "Server did not return a hash key"
-  },
-  "copy_e5697f10b5": {
-    "message": "Malformed pairing response"
-  },
-  "copy_30fa7c27e5": {
-    "message": "Could not generate pairing code: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "Could not register hash key: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "Delete this memory?"
   },
@@ -3275,9 +3149,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "Remote control active"
   },
   "copy_23a711ebd2": {
     "message": "No models match search"
@@ -3401,12 +3272,6 @@
   },
   "copy_f38984cf15": {
     "message": "Anonymous usage data is being sent. Click to stop."
-  },
-  "copy_81649d0543": {
-    "message": "Your server hash key"
-  },
-  "copy_e4cdf160f5": {
-    "message": "Copy hash key"
   },
   "copy_8c16fe2070": {
     "message": "When enabled, new memories are automatically analyzed by AI for deeper insights"

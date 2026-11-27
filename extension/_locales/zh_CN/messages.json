@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API 配置"
   },
-  "panel_8d261a372f": {
-    "message": "同步"
-  },
   "panel_703390318b": {
     "message": "测试版"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "放弃"
-  },
-  "panel_49e49bb440": {
-    "message": "生成"
   },
   "panel_0e91610117": {
     "message": "刷新"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "阅读完整政策 →"
   },
-  "panel_04dfac3671": {
-    "message": "未连接"
-  },
-  "panel_acf2db1614": {
-    "message": "服务器同步"
-  },
-  "panel_609bbbdf07": {
-    "message": "哈希密钥"
-  },
-  "panel_534803768c": {
-    "message": "配对仪表盘"
-  },
-  "panel_9a177de63c": {
-    "message": "扫码配对"
-  },
-  "panel_43e3ece73f": {
-    "message": "剩余"
-  },
   "panel_c9b3c38247": {
     "message": "合计"
   },
@@ -984,36 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "关闭语音输入后，FSB 不再使用麦克风，但不会撤销 Chrome 已保存的权限。"
-  },
-  "panel_76e917ee87": {
-    "message": "将此扩展程序与 FSB 仪表盘配对，以便远程控制和保存结果"
-  },
-  "panel_c11de3bb2e": {
-    "message": "连接 FSB 服务器以保存结果并访问仪表盘"
-  },
-  "panel_097b5fa7f6": {
-    "message": "生成密钥，然后配对仪表盘，将此浏览器连到 FSB 服务器。"
-  },
-  "panel_75d0625c55": {
-    "message": "后台代理已经离开"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB 专注于一次到位的精确浏览器执行。定时和重复任务更适合专为此设计的工具："
-  },
-  "panel_5a694f4532": {
-    "message": "用于开源代理循环，以及"
-  },
-  "panel_6e34781c2f": {
-    "message": "用于托管的长时间自动化。选择适合你工作方式的那个。"
-  },
-  "panel_e76c360683": {
-    "message": "试用 OpenClaw"
-  },
-  "panel_1a58d9154d": {
-    "message": "试用 Claude Routines"
-  },
-  "panel_582ba53e9e": {
-    "message": "已在 v0.9.45rc1 停用 · 2026 年 4 月"
   },
   "panel_9f83a0b7bf": {
     "message": "从过往自动化会话中学到的长期记忆"
@@ -1555,8 +1501,8 @@
   "panel_d2286811e6": {
     "message": "连接 Claude Code 和 Cursor 等 MCP 客户端，然后用 doctor 命令验证"
   },
-  "panel_f3cb441c27": {
-    "message": "阅读 FSB 如何处理数据、存储和可选的服务器同步"
+  "panel_71b36c0b35": {
+    "message": "阅读 FSB 如何处理数据和存储"
   },
   "panel_476481e410": {
     "message": "报告缺陷、请求功能并跟踪开发进度"
@@ -1636,20 +1582,8 @@
   "panel_22965568d2": {
     "message": "已连接"
   },
-  "panel_ee172faa9c": {
-    "message": "无效密钥"
-  },
   "panel_031a8f0f65": {
     "message": "失败"
-  },
-  "panel_424a2551d3": {
-    "message": "已过期"
-  },
-  "panel_c7730178f4": {
-    "message": "生成新代码"
-  },
-  "panel_ac116124f7": {
-    "message": "无法生成配对码。请重试。"
   },
   "panel_d03fd96d28": {
     "message": "选择已加载的模型..."
@@ -3167,66 +3101,6 @@
   "copy_84e9814ece": {
     "message": "无法清除研究结果"
   },
-  "copy_491c2ddc8e": {
-    "message": "请先输入服务器 URL"
-  },
-  "copy_9526d57756": {
-    "message": "已生成并保存哈希密钥"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "无法生成哈希密钥"
-  },
-  "copy_52b3b70484": {
-    "message": "无法连接服务器：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "没有可复制的哈希密钥"
-  },
-  "copy_f0b64c63d8": {
-    "message": "已复制哈希密钥"
-  },
-  "copy_0cf23c4489": {
-    "message": "复制失败"
-  },
-  "copy_8cab3b4552": {
-    "message": "请输入服务器 URL 和哈希密钥"
-  },
-  "copy_271b7b0f3b": {
-    "message": "服务器连接成功"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "哈希密钥无效"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "无法连接服务器"
-  },
-  "copy_0ea446a05f": {
-    "message": "服务器未返回哈希密钥"
-  },
-  "copy_e5697f10b5": {
-    "message": "配对响应格式错误"
-  },
-  "copy_30fa7c27e5": {
-    "message": "无法生成配对码：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "无法注册哈希密钥：$ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "删除此记忆？"
   },
@@ -3275,9 +3149,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "远程控制已启用"
   },
   "copy_23a711ebd2": {
     "message": "没有模型匹配搜索"
@@ -3401,12 +3272,6 @@
   },
   "copy_f38984cf15": {
     "message": "正在发送匿名使用数据。点击以停止。"
-  },
-  "copy_81649d0543": {
-    "message": "你的服务器哈希密钥"
-  },
-  "copy_e4cdf160f5": {
-    "message": "复制哈希密钥"
   },
   "copy_8c16fe2070": {
     "message": "启用后，新记忆会由 AI 自动分析以获得更深入的见解"

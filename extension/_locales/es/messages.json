@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "Configuración de API"
   },
-  "panel_8d261a372f": {
-    "message": "Sincronización"
-  },
   "panel_703390318b": {
     "message": "Versión beta"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "Descartar"
-  },
-  "panel_49e49bb440": {
-    "message": "Generar"
   },
   "panel_0e91610117": {
     "message": "Actualizar"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "Leer la política completa →"
   },
-  "panel_04dfac3671": {
-    "message": "Desconectado"
-  },
-  "panel_acf2db1614": {
-    "message": "Sincronización con el servidor"
-  },
-  "panel_609bbbdf07": {
-    "message": "Clave hash"
-  },
-  "panel_534803768c": {
-    "message": "Emparejar el panel"
-  },
-  "panel_9a177de63c": {
-    "message": "Escanear para emparejar"
-  },
-  "panel_43e3ece73f": {
-    "message": "restantes"
-  },
   "panel_c9b3c38247": {
     "message": "En total"
   },
@@ -984,36 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "Desactivar la entrada de voz hace que FSB deje de usar el micrófono, pero no revoca el permiso guardado por Chrome."
-  },
-  "panel_76e917ee87": {
-    "message": "Empareja esta extensión con el panel de FSB para el control remoto y el almacenamiento de resultados"
-  },
-  "panel_c11de3bb2e": {
-    "message": "Conéctate al servidor de FSB para guardar resultados y acceder al panel"
-  },
-  "panel_097b5fa7f6": {
-    "message": "Genera una clave y empareja el panel para vincular este navegador con el servidor de FSB."
-  },
-  "panel_75d0625c55": {
-    "message": "Los agentes en segundo plano se han ido"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB se centra en una ejecución precisa del navegador en un solo intento. El trabajo programado y recurrente encaja mejor en herramientas hechas para ello:"
-  },
-  "panel_5a694f4532": {
-    "message": "para un bucle de agente de código abierto, y"
-  },
-  "panel_6e34781c2f": {
-    "message": "para automatizaciones largas gestionadas. Elige la que encaje con tu forma de trabajar."
-  },
-  "panel_e76c360683": {
-    "message": "Probar OpenClaw"
-  },
-  "panel_1a58d9154d": {
-    "message": "Probar Claude Routines"
-  },
-  "panel_582ba53e9e": {
-    "message": "Retirado en v0.9.45rc1 · abril de 2026"
   },
   "panel_9f83a0b7bf": {
     "message": "Memoria a largo plazo aprendida de sesiones de automatización anteriores"
@@ -1555,8 +1501,8 @@
   "panel_d2286811e6": {
     "message": "Conecta clientes MCP como Claude Code y Cursor, y verifica con el comando doctor"
   },
-  "panel_f3cb441c27": {
-    "message": "Lee cómo FSB trata los datos, el almacenamiento y la sincronización opcional con el servidor"
+  "panel_71b36c0b35": {
+    "message": "Lee cómo FSB trata los datos y el almacenamiento"
   },
   "panel_476481e410": {
     "message": "Informa de errores, pide funciones y sigue el progreso del desarrollo"
@@ -1636,20 +1582,8 @@
   "panel_22965568d2": {
     "message": "Conectado"
   },
-  "panel_ee172faa9c": {
-    "message": "Clave no válida"
-  },
   "panel_031a8f0f65": {
     "message": "Falló"
-  },
-  "panel_424a2551d3": {
-    "message": "Caducado"
-  },
-  "panel_c7730178f4": {
-    "message": "Generar un código nuevo"
-  },
-  "panel_ac116124f7": {
-    "message": "No se pudo generar el código de emparejamiento. Inténtalo de nuevo."
   },
   "panel_d03fd96d28": {
     "message": "Elige un modelo cargado..."
@@ -3167,66 +3101,6 @@
   "copy_84e9814ece": {
     "message": "No se pudieron borrar los resultados de investigación"
   },
-  "copy_491c2ddc8e": {
-    "message": "Introduce primero la URL del servidor"
-  },
-  "copy_9526d57756": {
-    "message": "Clave hash generada y guardada"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "No se pudo generar la clave hash"
-  },
-  "copy_52b3b70484": {
-    "message": "No se puede conectar al servidor: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "No hay clave hash para copiar"
-  },
-  "copy_f0b64c63d8": {
-    "message": "Clave hash copiada"
-  },
-  "copy_0cf23c4489": {
-    "message": "No se pudo copiar"
-  },
-  "copy_8cab3b4552": {
-    "message": "Introduce la URL del servidor y la clave hash"
-  },
-  "copy_271b7b0f3b": {
-    "message": "Conexión al servidor correcta"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "La clave hash no es válida"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "No se puede conectar al servidor"
-  },
-  "copy_0ea446a05f": {
-    "message": "El servidor no devolvió una clave hash"
-  },
-  "copy_e5697f10b5": {
-    "message": "Respuesta de emparejamiento mal formada"
-  },
-  "copy_30fa7c27e5": {
-    "message": "No se pudo generar el código de emparejamiento: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "No se pudo registrar la clave hash: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "¿Eliminar esta memoria?"
   },
@@ -3275,9 +3149,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "Control remoto activo"
   },
   "copy_23a711ebd2": {
     "message": "Ningún modelo coincide con la búsqueda"
@@ -3401,12 +3272,6 @@
   },
   "copy_f38984cf15": {
     "message": "Se están enviando datos de uso anónimos. Haz clic para detener."
-  },
-  "copy_81649d0543": {
-    "message": "Tu clave hash del servidor"
-  },
-  "copy_e4cdf160f5": {
-    "message": "Copiar clave hash"
   },
   "copy_8c16fe2070": {
     "message": "Si está activado, la IA analiza automáticamente las memorias nuevas para obtener información más profunda"

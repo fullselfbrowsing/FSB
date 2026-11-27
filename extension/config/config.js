@@ -51,12 +51,7 @@ class Config {
 
       // CAPTCHA Solver
       captchaSolverEnabled: false,
-      captchaApiKey: '',
-
-      // Remote Dashboard sync server
-      serverUrl: 'https://fsb-server.fly.dev',
-      serverHashKey: '',
-      serverSyncEnabled: false
+      captchaApiKey: ''
     };
 
     // PERF: In-memory config cache with TTL to avoid repeated chrome.storage reads

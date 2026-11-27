@@ -8,8 +8,7 @@
  *   - On extension update, background.js deletes the saved agent data
  *     (bgAgents, fsb_sync_queue, the old notice flag) and clears every
  *     fsb_agent_* alarm, leaving other storage keys and alarms alone.
- *   - The alarm listener still returns early for the MCP reconnect alarm
- *     and keeps the dom-stream watchdog branch live.
+ *   - The alarm listener still returns early for the MCP reconnect alarm.
  *
  * Plain Node + assert. Static checks plus one sandboxed run of the cleanup.
  */
@@ -59,7 +58,6 @@ for (const rel of [
 
 const sourceFiles = [
   'extension/background.js',
-  'extension/ws/ws-client.js',
   'extension/ws/mcp-bridge-client.js',
   'extension/ui/popup.js',
   'extension/ui/sidepanel.js',
@@ -157,16 +155,6 @@ const bgSource = read('extension/background.js');
   const expected = '  if (isMcpReconnectAlarm) {\n    armMcpBridge(\'alarm:\' + MCP_RECONNECT_ALARM);\n    return;\n  }';
   if (bgSource.indexOf(expected) !== -1) pass('MCP_RECONNECT_ALARM early-return byte-for-byte preserved');
   else fail('MCP_RECONNECT_ALARM early-return path mutated or missing', 'Expected substring not found');
-}
-
-// ---- Section 5: dom-stream watchdog branch preserved on a live line ----
-
-{
-  const lines = bgSource.split('\n');
-  const hits = lines.filter(line => /if\s*\(alarm\.name\s*===\s*'fsb-domstream-watchdog'\)/.test(line));
-  const liveHits = hits.filter(line => !/^\s*\/\//.test(line));
-  if (liveHits.length === 1) pass('dom-stream watchdog branch is live (and unique)');
-  else fail('expected exactly 1 live dom-stream watchdog hit, found ' + liveHits.length);
 }
 
 // ---- Result ----

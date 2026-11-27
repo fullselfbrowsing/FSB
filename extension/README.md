@@ -28,10 +28,10 @@ Google Sheets capabilities reuse an already signed-in, agent-owned spreadsheet t
 | `manifest.json` | MV3 manifest, permissions, entry points, and web-accessible resources. |
 | `background.js` | Service worker for sessions, model calls, MCP bridge handling, storage, and orchestration. |
 | `canvas-interceptor.js` | MAIN-world content script loaded at `document_start`. |
-| `content/` | DOM analysis, action execution, messaging, lifecycle, visual feedback, and PhantomStream-backed DOM streaming. |
+| `content/` | DOM analysis, action execution, messaging, lifecycle, and visual feedback. |
 | `ui/` | Popup, side panel, control panel, the 1Password login sheet, and shared UI behavior. |
 | `ai/` | Provider integration, model discovery, tool registry, agent loop, transcripts, and state emitters. |
-| `ws/` | WebSocket bridge client, PhantomStream protocol bridge, remote-control mapping, and MCP tool dispatcher. |
+| `ws/` | Local MCP bridge client and MCP tool dispatcher. |
 | `lib/` | Vendored libraries plus memory and visualization subsystems. |
 | `site-guides/` | Domain and category-specific automation guidance. |
 | `config/` | Defaults, migration, and secure encrypted configuration. |
@@ -47,10 +47,6 @@ npm test
 ```
 
 `validate:extension` checks manifest sanity and JavaScript syntax across the extension tree. The Node test suite covers extension modules that can run outside Chrome, including analytics, costs, transcript storage, tool routing, MCP bridge contracts, and regression cases.
-
-## DOM Streaming Boundary
-
-FSB uses `@full-self-browsing/phantom-stream@0.2.1` for generic browser mirroring and reference-mode media mirroring. `content/dom-stream.js` is an FSB adapter around the bundled PhantomStream capture bridge; `ws/ws-client.js` uses the PhantomStream protocol bridge for stream/control envelopes while preserving FSB task/status traffic and remote-control ownership diagnostics. Progressive `<video>` and `<audio>` nodes can mirror through the media side channel; adaptive HLS/DASH discovery remains deferred because enabling it would require a new `webRequest` permission.
 
 ## Trigger Watchers
 
@@ -87,7 +83,6 @@ The extension is driven through:
 - control panel settings and diagnostics
 - content-script visual overlay
 - local WebSocket bridge for `fsb-mcp-server`
-- optional showcase/dashboard sync flows
 
 ## Packaging Note
 

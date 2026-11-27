@@ -8,7 +8,7 @@
  * Covers:
  *   ICON-01: every state still tracks its own canonical source (drift guard)
  *   ICON-02: the icon reads no phase at all -- it diverges from the overlay
- *   ICON-03: resting frame is full strength until a relay has actually connected
+ *   ICON-03: the resting frame is always the full-strength glyph
  *   ICON-04: watchdog alarm is armed only while a loop is owed
  *   ICON-05: the four forms -- orbit / sweep / ring / breathe -- and their geometry
  *   ICON-06: the breathe loops for as long as a watch is armed
@@ -75,7 +75,6 @@ const ACTIVITY_TTL_MS = 60000;
 const BREATHE_MIN_ALPHA = 0.45;
 const BREATHE_GLOW_RATIO = 0.15625;
 const BREATHE_GLOW_ALPHA = 0.95;
-const RELAY_SEEN_KEY = 'fsbActionIconRelaySeen';
 const INTENT_KEY = 'fsbActionIconIntent';
 const ANIMATIONS_KEY = 'animatedActionHighlights';
 
@@ -254,7 +253,11 @@ function makeWorker(opts) {
     },
     storage: {
       session: {
-        get: async (k) => (Object.prototype.hasOwnProperty.call(sessionStore, k) ? { [k]: sessionStore[k] } : {}),
+        get: async (k) => {
+          // Lets a test act at an exact point in init's sequence of reads.
+          if (opts.onSessionGet) opts.onSessionGet(k);
+          return Object.prototype.hasOwnProperty.call(sessionStore, k) ? { [k]: sessionStore[k] } : {};
+        },
         set: async (rec) => { Object.assign(sessionStore, rec); }
       },
       local: {
@@ -419,7 +422,7 @@ async function renderCapability(w, tabId) {
 }
 
 const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
-// An undimmed frame ends by cutting itself with the artwork's rounded alpha: the
+// Every frame ends by cutting itself with the artwork's rounded alpha: the
 // bitmap drawn destination-in over the whole tile. Returns that op, or null.
 const cutOf = (group, size) => {
   const last = group && group[group.length - 1];
@@ -561,64 +564,57 @@ const cutOf = (group, size) => {
     'the on-page overlay still maps phases -- only the icon opted out');
 
   // -------------------------------------------------------------------------
-  console.log('\nICON-03: resting frame is full strength until a relay connects');
+  console.log('\nICON-03: the resting frame is the full-strength glyph');
   // -------------------------------------------------------------------------
 
   {
     const w = makeWorker();
     await w.api.init({ hasLiveSession: () => false });
 
-    // Static cache renders in order: idle:on, idle:off, watching:on, watching:off,
-    // ring:kickoff, each at 16 then 32. Idle sequence numbers remain unchanged.
-    const IDLE_ON_32 = 2;
-    const IDLE_OFF_32 = 4;
+    // Static cache renders in order: idle, watching, ring:kickoff, each at 16
+    // then 32.
+    const IDLE_32 = 2;
 
     assertEq(w.emits.length, 1, 'init emits exactly one resting frame');
-    assertEq(w.emits[0].imageData[32].seq, IDLE_ON_32, 'fresh install rests on the UNDIMMED idle frame');
+    assertEq(w.emits[0].imageData[32].seq, IDLE_32, 'fresh install rests on the UNDIMMED idle frame');
     assert(w.emits[0].imageData[16] && w.emits[0].imageData[32], 'every emit carries both 16 and 32');
 
     const g32 = w.groups(32);
-    assertEq(g32.length, 5, 'four resting frames and one Ring kickoff render at 32');
+    assertEq(g32.length, 3, 'two resting frames and one Ring kickoff render at 32');
     const firstDraw = (group) => opsOf(group, 'drawImage')[0] || {};
-    assertEq(firstDraw(g32[0]).alpha, 1, 'idle:on drawn at full alpha');
-    assertEq(firstDraw(g32[0]).filter, 'none', 'idle:on drawn unfiltered');
-    assertEq(firstDraw(g32[1]).alpha, 0.5, 'idle:off drawn at half alpha');
-    assert(/grayscale/.test(firstDraw(g32[1]).filter), 'idle:off drawn desaturated');
+    assertEq(firstDraw(g32[0]).alpha, 1, 'idle drawn at full alpha');
+    assertEq(firstDraw(g32[0]).filter, 'none', 'idle drawn unfiltered');
+    assert(g32.every((g) => opsOf(g, 'drawImage').every((d) => !/grayscale/.test(d.filter))),
+      'no static frame is desaturated');
 
-    // The artwork's corners are cut (transparent). An undimmed frame rebuilds the
+    // The artwork's corners are cut (transparent). Every frame rebuilds the
     // square tile with black under it, draws, then cuts itself back to the
-    // artwork's alpha, so its corners match the static icon in every state. A
-    // dimmed frame is only the faded artwork, which already carries the corners.
-    const idleOn = g32[0] || [];
-    const plate = opsOf(idleOn, 'fillRect')[0];
+    // artwork's alpha, so its corners match the static icon in every state.
+    const idle = g32[0] || [];
+    const plate = opsOf(idle, 'fillRect')[0];
     assert(!!plate && plate.fillStyle === '#000000' && plate.w === 32 && plate.h === 32
-      && plate.composite === 'source-over' && idleOn.indexOf(plate) < idleOn.indexOf(firstDraw(idleOn)),
-    'idle:on paints the black square under the artwork first');
-    assert(!!cutOf(idleOn, 32), 'idle:on ends with the corner cut');
-    assert(!cutOf(g32[1], 32) && opsOf(g32[1], 'fillRect').length === 0,
-      'idle:off has no plate and no cut: its faded artwork keeps the corners');
-
-    // The regression: a relay that never connects must not dim anything.
-    w.api.setConnected(false);
-    assertEq(w.emits.length, 1, 'a failed/never-connected relay causes no repaint');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_ON_32,
-      'icon stays UNDIMMED when the relay has never connected');
-
-    // Once a relay has connected, losing it is a real signal and does dim.
-    w.api.setConnected(true);
-    assertEq(w.emits.length, 1, 'connecting does not repaint (appearance unchanged)');
-    assertEq(w.localStore[RELAY_SEEN_KEY], true, 'first connect records the relay install-wide');
-
-    w.api.setConnected(false);
-    assertEq(w.emits.length, 2, 'losing a relay that HAD connected repaints');
-    assertEq(w.emits[1].imageData[32].seq, IDLE_OFF_32, 'dropped relay dims the icon');
+      && plate.composite === 'source-over' && idle.indexOf(plate) < idle.indexOf(firstDraw(idle)),
+    'idle paints the black square under the artwork first');
+    assert(g32.every((g) => !!cutOf(g, 32)), 'every static frame ends with the corner cut');
+    assertEq(typeof w.api.setConnected, 'undefined',
+      'the icon API has no connection switch that could dim it');
   }
 
   {
-    // A dashboard user restarting the browser: relay known, not yet reconnected.
-    const w = makeWorker({ local: { [RELAY_SEEN_KEY]: true } });
+    // An install upgraded from a build that dimmed the icon while its server
+    // relay was down. Neither leftover -- the install-wide flag in local storage
+    // or the connected field in the stored intent -- may dim the new icon.
+    const w = makeWorker({
+      local: { fsbActionIconRelaySeen: true },
+      session: { [INTENT_KEY]: { animating: false, claims: {}, resolved: null, connected: false, updatedAt: 1 } }
+    });
     await w.api.init({ hasLiveSession: () => false });
-    assertEq(w.emits[0].imageData[32].seq, 4, 'known relay + not connected dims from the first frame');
+    assertEq(w.emits.length, 1, 'legacy relay state still emits exactly one resting frame');
+    assertEq(w.emits[0].imageData[32].seq, 2, 'legacy relay state rests on the undimmed idle frame');
+    assert(!Object.prototype.hasOwnProperty.call(w.sessionStore[INTENT_KEY] || {}, 'connected'),
+      'the rewritten intent drops the legacy connected field');
+    assertEq(w.localStore.fsbActionIconRelaySeen, true,
+      'the icon does not rewrite the legacy flag');
   }
 
   // -------------------------------------------------------------------------
@@ -1126,8 +1122,8 @@ const cutOf = (group, size) => {
     const w = makeWorker();
     await w.api.init({ hasLiveSession: () => false });
 
-    // Static cache order is unchanged: seq 2 is idle:on@32.
-    const IDLE_ON_32 = 2;
+    // Static cache order is unchanged: seq 2 is idle@32.
+    const IDLE_32 = 2;
 
     w.api.setWatching(true);
     await flush();
@@ -1154,7 +1150,7 @@ const cutOf = (group, size) => {
     await flush();
     assertEq(w.timerCount(), 0, 'disarming stops the loop');
     assert(w.alarmLog.cleared.includes(WATCHDOG), 'and clears the watchdog');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_ON_32,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, IDLE_32,
       'disarming drops straight to the idle frame');
   }
 
@@ -1212,8 +1208,7 @@ const cutOf = (group, size) => {
   {
     // Worker died mid-animation, session is still live -> restart the loop.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } },
-      local: { [RELAY_SEEN_KEY]: true }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => true });
     await new Promise((r) => setImmediate(r));
@@ -1225,7 +1220,7 @@ const cutOf = (group, size) => {
   {
     // Worker died mid-animation, but the session is gone -> snap to static.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:1': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => false });
     await flush();
@@ -1240,7 +1235,7 @@ const cutOf = (group, size) => {
   {
     // A stored SESSION claim with no live session behind it is dropped.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'session:1': 'orbit' }, resolved: 'orbit', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'session:1': 'orbit' }, resolved: 'orbit', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => false });
     await flush();
@@ -1254,7 +1249,7 @@ const cutOf = (group, size) => {
     // older generation accidentally wrote Ring into session storage, recovery
     // must not resurrect it without a matching promise that can end it.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'capability:1': 'ring' }, resolved: 'ring', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'capability:1': 'ring' }, resolved: 'ring', updatedAt: 1 } }
     });
     await w.api.init({ hasLiveSession: () => true });
     await flush();
@@ -1284,7 +1279,6 @@ const cutOf = (group, size) => {
     await ctx.fsbActionIcon.init({});
     ctx.fsbActionIcon.noteActivity(1, 'orbit');
     ctx.fsbActionIcon.setWatching(true);
-    ctx.fsbActionIcon.setConnected(true);
     await ctx.fsbActionIcon.repair();
     assert(true, 'a worker without OffscreenCanvas degrades silently instead of throwing');
     assertEq(w.errors.filter((e) => /setIcon failed/.test(e)).length, 0, 'no spurious emit failures');
@@ -1411,7 +1405,7 @@ const cutOf = (group, size) => {
     // A live arm during boot coexists with a stored claim rather than being
     // clobbered by the restore.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     const booting = w.api.init({ hasLiveSession: () => true });
     w.api.setWatching(true, 9);
@@ -1426,7 +1420,7 @@ const cutOf = (group, size) => {
     // A disarm during boot is also authoritative even though the claim has not
     // been restored into memory yet.
     const w = makeWorker({
-      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', connected: true, updatedAt: 1 } }
+      session: { [INTENT_KEY]: { animating: true, claims: { 'watch:5': 'breathe' }, resolved: 'breathe', updatedAt: 1 } }
     });
     const booting = w.api.init({ hasLiveSession: () => true });
     w.api.setWatching(false, 5);
@@ -1510,10 +1504,10 @@ const cutOf = (group, size) => {
     w.api.noteActivity(1, 'orbit');
     await flush();
 
-    // Static cache is seqs 1-10; the acting frames follow, frame f at 32 = 12+2f.
+    // Static cache is seqs 1-6; the acting frames follow, frame f at 32 = 8+2f.
     const first = w.emits[staticEmits];
     assert(!!first, 'the loop emitted a frame');
-    assertEq(first && first.imageData[32].seq, 12,
+    assertEq(first && first.imageData[32].seq, 8,
       'the first frame shown is frame 0, not a frame partway into the cycle');
   }
 
@@ -1847,7 +1841,7 @@ const cutOf = (group, size) => {
     assertEq(resolvedNow(), 'ring', 'beginCapability claims Ring');
     assertEq(w.emits.length, emitsBefore + 1,
       'beginCapability paints the cached kickoff frame synchronously');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 10,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 6,
       'the immediate frame is the cached Ring kickoff');
     await flush();
     assertEq(w.timerCount(), 1, 'Ring repeats while the capability remains unsettled');
@@ -1985,7 +1979,7 @@ const cutOf = (group, size) => {
     w.resolveNextIcon();
     await flush();
     assertEq(w.emits.length, before + 2, 'completion drains exactly one latest frame');
-    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 18,
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 14,
       'the drained frame matches the current wall-clock phase, not the oldest queued phase');
     w.resolveNextIcon();
     await flush();
@@ -2185,10 +2179,10 @@ const cutOf = (group, size) => {
     const label = value === undefined ? 'no stored theme' : 'a stored ' + JSON.stringify(value);
     assert(onTile(lastShown(w, 16), false, 16) && onTile(lastShown(w, 32), false, 32), `${label} keeps the black tile`);
     assertEq(lightFetches(w), 0, `${label} never fetches the light pair`);
-    // The fifth resting frame is the ring's kickoff, whose violet stroke is the ring.
+    // The third resting frame is the ring's kickoff, whose violet stroke is the ring.
     assert([16, 32].every((size) => {
       const resting = w.groups(size);
-      return resting.length === 5 && resting.slice(0, 4).every((f) => opsOf(f, 'stroke').length === 0)
+      return resting.length === 3 && resting.slice(0, 2).every((f) => opsOf(f, 'stroke').length === 0)
         && resting.every((f) => opsOf(f, 'stroke').every((s) => s.strokeStyle !== EDGE_COLOR));
     }), `${label}: the black tile draws no edge`);
   }
@@ -2198,8 +2192,9 @@ const cutOf = (group, size) => {
     await w.api.init({ hasLiveSession: () => false });
     await flush();
     for (const size of [16, 32]) {
-      // The resting frames render in order: idle:on, then idle:off.
-      const [idle, dimmed] = w.groups(size);
+      // The resting frames render in order: idle, watching, ring:kickoff.
+      const resting = w.groups(size);
+      const idle = resting[0];
       const plate = (idle || [])[0];
       assert(!!plate && plate.op === 'fillRect' && plate.fillStyle === '#ffffff' && plate.w === size && plate.h === size,
         `${size}px: idle opens with the white plate as a full square`);
@@ -2208,18 +2203,10 @@ const cutOf = (group, size) => {
         `${size}px: the artwork is the light pair's`);
       const cut = cutOf(idle, size);
       assert(!!cut && fromPair(cut.src, true, size), `${size}px: the corner cut uses the light pair's own alpha`);
-      assertEq(opsOf(dimmed, 'fillRect').length, 0, `${size}px: a dimmed light frame paints no plate`);
-      const faded = opsOf(dimmed, 'drawImage');
-      assert(faded.length === 1 && fromPair(faded[0].src, true, size) && faded[0].alpha === 0.5,
-        `${size}px: it is only the light artwork at half strength, with no cut`);
-      // Resting frames render as idle:on, idle:off, watching:on, watching:off, ring:kickoff.
-      const resting = w.groups(size);
-      assertEq(resting.length, 5, `${size}px: the five resting frames render`);
+      assertEq(resting.length, 3, `${size}px: the three resting frames render`);
       assert(hasEdge(resting[0], size, 1), `${size}px: idle traces the white tile's edge`);
-      assert(hasEdge(resting[1], size, 0.5), `${size}px: dimmed, the edge fades with the artwork`);
-      assert(hasEdge(resting[2], size, 1) && hasEdge(resting[3], size, 0.5),
-        `${size}px: so does the resting watch, lit and dimmed`);
-      assert(hasEdge(resting[4], size, 1), `${size}px: and the ring's first frame, under the violet`);
+      assert(hasEdge(resting[1], size, 1), `${size}px: so does the resting watch`);
+      assert(hasEdge(resting[2], size, 1), `${size}px: and the ring's first frame, under the violet`);
     }
     assert(onTile(lastShown(w, 16), true, 16) && onTile(lastShown(w, 32), true, 32),
       'the toolbar shows the white tile at both sizes');
@@ -2368,10 +2355,10 @@ const cutOf = (group, size) => {
 
   // A switch can reach init at two points: while the stored tile's artwork is
   // still being fetched, and after its resting frames exist but before init is
-  // done (it still reads the relay record then). Both must land.
+  // done (it still reads the stored intent then). Both must land.
   const initMoments = [
     ['while init fetches the stored tile', 'onFetch', () => true],
-    ['after the stored tile is rendered, before init is done', 'onLocalGet', (key) => key === RELAY_SEEN_KEY]
+    ['after the stored tile is rendered, before init is done', 'onSessionGet', (key) => key === INTENT_KEY]
   ];
   for (const [moment, hook, at] of initMoments) {
     for (const [stored, chosen] of [['light', 'dark'], ['dark', 'light']]) {

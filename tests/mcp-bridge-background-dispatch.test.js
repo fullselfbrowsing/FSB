@@ -1596,8 +1596,8 @@ async function runDriftSettlementCases() {
 
   const redactorImport = backgroundSource.indexOf("importScripts('utils/redactForLog.js')");
   const reporterImport = backgroundSource.indexOf("importScripts('utils/agent-protocol-drift-diagnostics.js')");
-  const webSocketImport = backgroundSource.indexOf("importScripts('ws/ws-client.js')");
-  assert(redactorImport >= 0 && redactorImport < reporterImport && reporterImport < webSocketImport,
+  const runtimeImport = backgroundSource.indexOf("importScripts('lib/jmespath.min.js')");
+  assert(redactorImport >= 0 && redactorImport < reporterImport && reporterImport < runtimeImport,
     'drift reporter loads after diagnostics/redaction and before final-capable runtime code');
 }
 

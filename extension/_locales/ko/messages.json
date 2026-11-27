@@ -424,9 +424,6 @@
   "panel_8ad747d05c": {
     "message": "API 구성"
   },
-  "panel_8d261a372f": {
-    "message": "동기화"
-  },
   "panel_703390318b": {
     "message": "베타"
   },
@@ -657,9 +654,6 @@
   },
   "panel_eb1a70e392": {
     "message": "버리기"
-  },
-  "panel_49e49bb440": {
-    "message": "생성"
   },
   "panel_0e91610117": {
     "message": "새로고침"
@@ -922,24 +916,6 @@
   "panel_9ec9376910": {
     "message": "전체 정책 읽기 →"
   },
-  "panel_04dfac3671": {
-    "message": "연결 끊김"
-  },
-  "panel_acf2db1614": {
-    "message": "서버 동기화"
-  },
-  "panel_609bbbdf07": {
-    "message": "해시 키"
-  },
-  "panel_534803768c": {
-    "message": "대시보드 페어링"
-  },
-  "panel_9a177de63c": {
-    "message": "스캔하여 페어링"
-  },
-  "panel_43e3ece73f": {
-    "message": "남음"
-  },
   "panel_c9b3c38247": {
     "message": "합계"
   },
@@ -984,36 +960,6 @@
   },
   "panel_509f0b9d50": {
     "message": "음성 입력을 끄면 FSB가 마이크를 쓰지 않지만, Chrome이 저장한 권한은 취소되지 않습니다."
-  },
-  "panel_76e917ee87": {
-    "message": "원격 제어와 결과 저장을 위해 이 확장 프로그램을 FSB 대시보드와 페어링합니다"
-  },
-  "panel_c11de3bb2e": {
-    "message": "결과 저장과 대시보드 이용을 위해 FSB 서버에 연결합니다"
-  },
-  "panel_097b5fa7f6": {
-    "message": "키를 만든 뒤 대시보드를 페어링하여 이 브라우저를 FSB 서버에 연결합니다."
-  },
-  "panel_75d0625c55": {
-    "message": "백그라운드 에이전트가 자리를 비웠습니다"
-  },
-  "panel_d17d0cfd98": {
-    "message": "FSB는 한 번의 정확한 브라우저 실행에 집중합니다. 예약되고 반복되는 작업은 그것을 위해 만든 도구가 더 적합합니다:"
-  },
-  "panel_5a694f4532": {
-    "message": "오픈 소스 에이전트 루프에는, 그리고"
-  },
-  "panel_6e34781c2f": {
-    "message": "관리되는 장시간 자동화에는. 일하는 방식에 맞는 쪽을 고르세요."
-  },
-  "panel_e76c360683": {
-    "message": "OpenClaw 사용해 보기"
-  },
-  "panel_1a58d9154d": {
-    "message": "Claude Routines 사용해 보기"
-  },
-  "panel_582ba53e9e": {
-    "message": "v0.9.45rc1에서 종료 · 2026년 4월"
   },
   "panel_9f83a0b7bf": {
     "message": "지난 자동화 세션에서 배운 장기 메모리"
@@ -1555,8 +1501,8 @@
   "panel_d2286811e6": {
     "message": "Claude Code와 Cursor 같은 MCP 클라이언트를 연결한 뒤 doctor 명령으로 확인합니다"
   },
-  "panel_f3cb441c27": {
-    "message": "FSB가 데이터, 저장, 선택적 서버 동기화를 어떻게 다루는지 읽습니다"
+  "panel_71b36c0b35": {
+    "message": "FSB가 데이터와 저장을 어떻게 다루는지 읽습니다"
   },
   "panel_476481e410": {
     "message": "버그를 보고하고, 기능을 요청하고, 개발 진행을 추적합니다"
@@ -1636,20 +1582,8 @@
   "panel_22965568d2": {
     "message": "연결됨"
   },
-  "panel_ee172faa9c": {
-    "message": "잘못된 키"
-  },
   "panel_031a8f0f65": {
     "message": "실패"
-  },
-  "panel_424a2551d3": {
-    "message": "만료됨"
-  },
-  "panel_c7730178f4": {
-    "message": "새 코드 생성"
-  },
-  "panel_ac116124f7": {
-    "message": "페어링 코드를 만들지 못했습니다. 다시 시도하세요."
   },
   "panel_d03fd96d28": {
     "message": "불러온 모델 선택..."
@@ -3167,66 +3101,6 @@
   "copy_84e9814ece": {
     "message": "조사 결과를 지우지 못했습니다"
   },
-  "copy_491c2ddc8e": {
-    "message": "먼저 서버 URL을 입력하세요"
-  },
-  "copy_9526d57756": {
-    "message": "해시 키를 생성하고 저장했습니다"
-  },
-  "copy_fdc08c5f7b": {
-    "message": "해시 키를 생성하지 못했습니다"
-  },
-  "copy_52b3b70484": {
-    "message": "서버에 연결할 수 없습니다: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_cbdbc53db1": {
-    "message": "복사할 해시 키가 없습니다"
-  },
-  "copy_f0b64c63d8": {
-    "message": "해시 키를 복사했습니다"
-  },
-  "copy_0cf23c4489": {
-    "message": "복사하지 못했습니다"
-  },
-  "copy_8cab3b4552": {
-    "message": "서버 URL과 해시 키를 입력하세요"
-  },
-  "copy_271b7b0f3b": {
-    "message": "서버에 연결했습니다"
-  },
-  "copy_3e8bcabc0b": {
-    "message": "해시 키가 올바르지 않습니다"
-  },
-  "copy_09f7c3ac2a": {
-    "message": "서버에 연결할 수 없습니다"
-  },
-  "copy_0ea446a05f": {
-    "message": "서버가 해시 키를 반환하지 않았습니다"
-  },
-  "copy_e5697f10b5": {
-    "message": "페어링 응답 형식이 올바르지 않습니다"
-  },
-  "copy_30fa7c27e5": {
-    "message": "페어링 코드를 생성할 수 없습니다: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
-  "copy_acce51c1d3": {
-    "message": "해시 키를 등록할 수 없습니다: $ERROR$",
-    "placeholders": {
-      "error": {
-        "content": "$1"
-      }
-    }
-  },
   "copy_cb4c956be2": {
     "message": "이 메모리를 삭제할까요?"
   },
@@ -3275,9 +3149,6 @@
         "content": "$1"
       }
     }
-  },
-  "copy_21ce69d58b": {
-    "message": "원격 제어가 활성입니다"
   },
   "copy_23a711ebd2": {
     "message": "검색과 일치하는 모델이 없습니다"
@@ -3401,12 +3272,6 @@
   },
   "copy_f38984cf15": {
     "message": "익명 사용 데이터를 보내는 중입니다. 클릭하여 중지하세요."
-  },
-  "copy_81649d0543": {
-    "message": "서버 해시 키"
-  },
-  "copy_e4cdf160f5": {
-    "message": "해시 키 복사"
   },
   "copy_8c16fe2070": {
     "message": "사용하면 새 메모리가 AI에 의해 자동으로 분석되어 더 깊은 인사이트를 얻습니다"

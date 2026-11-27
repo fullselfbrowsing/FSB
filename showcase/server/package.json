@@ -1,7 +1,7 @@
 {
   "name": "fsb-server",
   "version": "0.9.99",
-  "description": "FSB Background Agents backend server with result storage and dashboard",
+  "description": "FSB showcase server: serves the full-selfbrowsing.com site, anonymous telemetry ingest, public stats and the hosted Jev gateway",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -83,9 +83,13 @@ async function main() {
   check('action-icon.js declares CORNER_RATIO as n / 128', !!ratio, 'missing var CORNER_RATIO = n / 128;');
   check('CORNER_RATIO equals the radius the PNGs are cut with', !!ratio && Number(ratio[1]) === corners.RADIUS_128,
     `${ratio && ratio[1]} / 128 in action-icon.js vs ${corners.RADIUS_128} / 128 in scripts/build-icon-corners.mjs`);
-  check('renderFrame cuts every undimmed frame with the artwork\'s alpha',
-    /if \(spec\.dimmed !== true\) \{[\s\S]{0,200}?globalCompositeOperation = 'destination-in';\s*ctx\.drawImage\(bitmaps\[size\]/.test(icon),
-    'the destination-in corner cut is missing from renderFrame');
+  // The relay dimming is gone with the Live Dashboard, so the cut no longer
+  // sits behind a dimmed check: every frame renderFrame draws ends with it.
+  const renderFrameBody = (/function renderFrame\(bitmaps, spec, look\) \{([\s\S]*?)\n  \}\n/.exec(icon) || [])[1] || '';
+  check('renderFrame cuts every frame with the artwork\'s alpha',
+    /globalCompositeOperation = 'destination-in';\s*ctx\.drawImage\(bitmaps\[size\]/.test(renderFrameBody)
+      && !/dimmed/.test(renderFrameBody),
+    'the destination-in corner cut is missing from renderFrame, or is skipped for some frames');
   check('the animated frames are drawn from the files that carry the corners',
     icon.includes("GLYPH_PATHS = { 16: 'assets/icon16.png', 32: 'assets/icon128.png' }"), 'GLYPH_PATHS changed');
 
