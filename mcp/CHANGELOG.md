@@ -43,6 +43,8 @@ Not published yet. The package version is still 0.11.5 and needs a bump before t
 - The shared tool registry and its SHA-256 pin are unchanged. `list_browsers` and the `browser` argument live in the MCP registration layer and are not forwarded to the extension.
 - One extension ID is served at a time, paired or not, so a development build and the store build cannot be attached together. That was already so. Serving several IDs needs the native host to vouch for more than one, which it does not yet do. Safari attaches beside Chromium while nothing is paired, and cannot be paired yet, so delegated runs there are not available.
 
+<a id="v0.11.5"></a>
+
 ## 0.11.5 (2026-10-18)
 
 Patch release making Cline and Antigravity officially supported install targets, checking Grok Build by capability instead of an exact version, and removing three tools that did nothing useful, released alongside FSB extension 0.9.95.
