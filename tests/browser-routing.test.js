@@ -510,6 +510,8 @@ async function main() {
     checkEqual(matchBrowser(three, 'chrome-00000000'), null, 'a key nothing attached has names nothing');
     checkEqual(matchBrowser(three, 'firefox'), null, 'nor does a kind FSB does not run in');
     checkEqual(matchBrowser([safari], 'chrome'), null, '"chrome" names nothing when no Chromium browser is attached');
+    checkEqual(matchBrowser([safari, work], 'chrome', HOME), null, 'nor, while a session\'s own Chrome profile is away, another profile');
+    checkEqual(matchBrowser([work], 'safari', SAFARI), null, 'and "safari" names no other browser while the session\'s Safari is away');
 
     checkEqual(pickDefaultBrowser(three), WORK, 'with no focus: a Chromium browser before Safari, then the one attached longest');
     checkEqual(pickDefaultBrowser([home, work]), WORK, 'whatever order the roster lists them in');
@@ -578,6 +580,11 @@ async function main() {
     checkEqual(pinnedAway.code, 'BROWSER_NOT_CONNECTED', 'a client pinned to a profile that is closed is not started in another one');
     checkEqual(pinnedAway.connectedBrowsers.join(','), `${SAFARI},${WORK}`, 'and is told which are open');
     checkEqual(resolveBrowser({ roster: [safari, work], current: HOME }).code, 'BROWSER_NOT_CONNECTED', 'a session whose profile closed is not moved to the other profile');
+    // A worker restart takes a profile out of the roster for a moment.
+    const kindAway = resolveBrowser({ roster: [safari, work], named: 'chrome', current: HOME });
+    checkEqual(kindAway.code, 'BROWSER_NOT_CONNECTED', 'nor by naming "chrome" while its profile is away');
+    checkEqual(kindAway.browser, HOME, 'and the failure names the profile that is away, not the kind');
+    checkEqual(JSON.stringify(resolveBrowser({ roster: [safari, work], named: 'chrome', current: SAFARI })), ok(WORK), 'a session in Safari that names "chrome" still gets the default Chrome profile');
     checkEqual(resolveBrowser({ roster: null, named: HOME }).code, 'BROWSER_CHOICE_UNAVAILABLE', 'an older hub cannot be asked for a profile');
 
     checkEqual(browserKeyStems('chrome', EXTENSION, INSTALL).join(','), 'chrome-4187c196,chrome-4187c1963c4b,chrome-4187c1963c4b4778,chrome-4187c1963c4b4778b904a7ad', 'the names that can only mean one install are its id at each length');
@@ -605,6 +612,7 @@ async function main() {
     checkEqual(JSON.stringify(resolveBrowser({ roster: [], tabId: 7, seenIn: [HOME], current: WORK })), ok(HOME), 'or the one its tab lives in');
     checkEqual(JSON.stringify(resolveBrowser({ roster: [], configured: HOME })), ok(HOME), 'or the one its client is pinned to');
     checkEqual(JSON.stringify(resolveBrowser({ roster: [], named: 'chrome', current: null })), ok(null), 'a kind names no one browser, so that call stays unnamed');
+    checkEqual(JSON.stringify(resolveBrowser({ roster: [], named: 'chrome', current: HOME })), ok(HOME), 'unless the session is in a profile of that kind: the call carries that profile');
     checkEqual(JSON.stringify(resolveBrowser({ roster: [], configured: 'not a key!' })), ok(null), 'as does a name that could never be a key');
     checkEqual(JSON.stringify(resolveBrowser({ roster: [] })), ok(null), 'and a call tied to nothing');
 
@@ -680,6 +688,11 @@ async function main() {
     const stranded = JSON.parse(textOf(await first.call('list_browsers')));
     checkEqual(stranded.default, null, 'list_browsers shows it has nowhere to go by default');
     check(stranded.hint.includes(HOME) && /not connected/.test(stranded.hint), 'and why');
+    const sentBeforeKind = bridge.calls.length;
+    const byKind = textOf(await first.call('list_tabs', { browser: 'chrome' }));
+    check(/not connected/.test(byKind) && byKind.includes(HOME), 'asking for "chrome" then says its own profile is away');
+    checkEqual(bridge.calls.length, sentBeforeKind, 'and sends nothing to the profile that is left');
+    checkEqual(first.agentScope.browserSession().current, HOME, 'so the agent is still in its profile when that profile comes back');
     await first.call('list_tabs', { browser: WORK });
     checkEqual(bridge.last().browser, WORK, 'naming the other profile moves it there');
     checkEqual(first.agentScope.browserSession().current, WORK, 'for the calls that follow');

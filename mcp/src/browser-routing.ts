@@ -180,13 +180,23 @@ export function pickDefaultBrowser(roster: readonly BrowserRosterEntry[]): strin
 }
 
 /**
+ * The browser of one kind the session is in, attached or not. Every key starts
+ * with its kind ("chrome-4187c196"), so this needs no roster: a profile that
+ * is away for a moment (a worker restart, a reconnect) is still the one meant.
+ */
+function currentOfKind(name: string, current: string | null): string | null {
+  return current && isBrowserKind(name) && current.startsWith(`${name}-`) ? current : null;
+}
+
+/**
  * The attached browser a name means, or null if it means none of them.
  *
  * A name is a key from the roster ("chrome-4187c196"), or a kind ("chrome",
  * "safari"). A kind means the browser of that kind the session is already in,
  * and otherwise the default among the browsers of that kind. So "chrome" keeps
  * working as it did when there was one Chrome, and never moves a session that
- * is already in a Chrome profile to another one.
+ * is already in a Chrome profile to another one: while that profile is away,
+ * "chrome" means nothing attached.
  */
 export function matchBrowser(
   roster: readonly BrowserRosterEntry[],
@@ -195,9 +205,9 @@ export function matchBrowser(
 ): string | null {
   if (roster.some((entry) => entry.key === name)) return name;
   if (!BROWSER_KINDS.includes(name as BrowserKind)) return null;
-  const ofKind = roster.filter((entry) => entry.kind === name);
-  if (current && ofKind.some((entry) => entry.key === current)) return current;
-  return pickDefaultBrowser(ofKind);
+  const own = currentOfKind(name, current);
+  if (own) return roster.some((entry) => entry.key === own) ? own : null;
+  return pickDefaultBrowser(roster.filter((entry) => entry.kind === name));
 }
 
 export function resolveBrowser(call: BrowserCall): BrowserRoute {
@@ -241,16 +251,25 @@ export function resolveBrowser(call: BrowserCall): BrowserRoute {
     const tabBrowser = typeof call.tabId === 'number' && Number.isFinite(call.tabId) && seen.length === 1
       ? seen[0]
       : null;
-    const tied = named ?? tabBrowser ?? current ?? configured;
+    // A kind the session is already in names that browser, as it does below.
+    const own = named ? currentOfKind(named, current) : null;
+    const tied = own ?? named ?? tabBrowser ?? current ?? configured;
     return { ok: true, browser: tied && BROWSER_KEY_PATTERN.test(tied) && !isBrowserKind(tied) ? tied : null };
   }
 
   const roster = call.roster;
   const decided = (name: string): BrowserRoute => {
     const browser = matchBrowser(roster, name, current);
+    // A kind that meant the session's own browser is reported as that
+    // browser, so the caller is told which profile is away.
     return browser
       ? { ok: true, browser }
-      : { ok: false, code: 'BROWSER_NOT_CONNECTED', browser: name, connectedBrowsers: connected };
+      : {
+          ok: false,
+          code: 'BROWSER_NOT_CONNECTED',
+          browser: currentOfKind(name, current) ?? name,
+          connectedBrowsers: connected,
+        };
   };
 
   // 1. The browser the call names.
