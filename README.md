@@ -603,7 +603,7 @@ Use separate API keys for development and production, rotate keys regularly, res
 - The extension can interact with the active page, tabs, and debugger-backed coordinate tools because those permissions are declared in the MV3 manifest.
 - `upload_file` requires an absolute local path, blocks known sensitive path patterns, and records audit metadata without persisting the disk path.
 - Capability invokes allow every non-denied origin under Auto and run through denylist, mutation, signature, and audit gates. Only verified T1/T1b capabilities execute directly; guarded or catalog-tail capabilities return typed pending/fallback responses. Sensitive origins are flagged for review; network-capture discovery on sensitive origins still requires extra confirmation.
-- Saved credentials and payment methods require explicit user configuration and unlock flows.
+- Logins and cards come from the user's own 1Password, connected explicitly from the control panel's Vault page or with `fsb-mcp-server onepassword`; FSB keeps none of its own.
 - Automation should be treated like a fast assistant operating your browser, not like an unattended production worker.
 
 ### Data Handling

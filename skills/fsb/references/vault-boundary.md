@@ -64,7 +64,7 @@ The values are never returned to the MCP client, the agent host, or the model.
 
 ## Why this boundary matters
 
-The MCP transport layer logs tool args by default; OpenClaw and other hosts retain context across turns; retry buffers in the bridge can replay calls. Anything passed as a tool argument or returned as a tool result is durable. Secrets resolved by FSB are not -- they move from 1Password to the FSB local server to the extension to the page, all on the user's machine. Routing a password through `type_text` instead of `fill_credential` collapses that boundary and turns a one-shot page fill into a value that persists across the entire stack.
+The MCP transport layer logs tool args by default; OpenClaw and other hosts retain context across turns; retry buffers in the bridge can replay calls. Anything passed as a tool argument or returned as a tool result is durable. Secrets resolved by FSB are not -- they move from 1Password to the FSB local server to the extension to the page, never through a tool argument or result. With the 1Password desktop app that whole path stays on the user's machine; a service account first fetches them from 1Password's servers. Routing a password through `type_text` instead of `fill_credential` collapses that boundary and turns a one-shot page fill into a value that persists across the entire stack.
 
 ## See also
 

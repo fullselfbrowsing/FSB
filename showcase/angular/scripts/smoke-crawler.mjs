@@ -103,7 +103,7 @@ const AEO_MUST_CONTAIN = [
   't1-guarded-fail-closed',
   'fill_credential',
   'use_payment_method',
-  'secrets do not cross the MCP bridge',
+  'never reach the MCP client or the model',
   'OpenClaw',
   'Hermes',
   'FSB: E-Commerce Autopilot by Grok 4.1',

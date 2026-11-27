@@ -29,7 +29,7 @@ Google Sheets capabilities reuse an already signed-in, agent-owned spreadsheet t
 | `background.js` | Service worker for sessions, model calls, MCP bridge handling, storage, and orchestration. |
 | `canvas-interceptor.js` | MAIN-world content script loaded at `document_start`. |
 | `content/` | DOM analysis, action execution, messaging, lifecycle, visual feedback, and PhantomStream-backed DOM streaming. |
-| `ui/` | Popup, side panel, control panel, unlock screens, and shared UI behavior. |
+| `ui/` | Popup, side panel, control panel, the 1Password login sheet, and shared UI behavior. |
 | `ai/` | Provider integration, model discovery, tool registry, agent loop, transcripts, and state emitters. |
 | `ws/` | WebSocket bridge client, PhantomStream protocol bridge, remote-control mapping, and MCP tool dispatcher. |
 | `lib/` | Vendored libraries plus memory and visualization subsystems. |
@@ -77,7 +77,7 @@ The extension declares permissions for tabs, scripting, storage, side panel, deb
 
 ## Local Data
 
-The extension stores settings, encrypted keys, analytics, memory, logs, vault data, and legacy agent records in Chrome storage. Uninstalling the extension or clearing extension storage can remove that local state. Export settings from the control panel before destructive browser cleanup if you need to preserve local configuration.
+The extension stores settings, encrypted keys, analytics, memory, logs, any entries left in the old FSB vault, and legacy agent records in Chrome storage. Logins and cards stay in the user's 1Password. Uninstalling the extension or clearing extension storage can remove that local state. Export settings from the control panel before destructive browser cleanup if you need to preserve local configuration.
 
 ## Public Surfaces
 

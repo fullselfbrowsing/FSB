@@ -36,7 +36,7 @@ Setup notes:
 
 - AI-powered automation requires your own provider API key or a reachable local model endpoint such as LM Studio.
 - The extension stores configuration in Chrome storage.
-- API keys and saved sensitive values are handled through the extension's secure configuration and vault flows.
+- API keys are encrypted in the extension's secure configuration. Logins and cards come from the user's own 1Password and are filled into the page without being shown to the AI.
 - FSB asks for broad browser permissions because it needs to read and act on the pages you choose to automate.
 - Model requests are sent to the provider you configure.
 
