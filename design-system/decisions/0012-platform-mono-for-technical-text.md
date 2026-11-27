@@ -42,7 +42,10 @@ This is the stack the control panel already ships. Kept from 0004:
   - Both Space Mono `@font-face` pairs and the two font files are gone.
   - Onboarding and the control panel now draw Monaco on macOS, where Space Mono drew before. Showcase labels that fell back to Menlo draw Monaco too.
   - The showcase's CJK code rule keeps a literal, because its CJK fallbacks sit between the platform stack and `monospace`.
-- **Still to move.** The release-notes template's inline styles (about 497) name Space Mono. Inline styles inside i18n messages are part of the extracted message, so changing them means re-extracting all eight locales.
+- **The release-notes template too.** Its 533 inline styles read `--font-mono`. They also appear as placeholder text inside 38 i18n messages, so the source catalogue and the seven locale files were edited in place:
+  - a fresh extraction matches the edited source byte for byte;
+  - every message ID is unchanged;
+  - `sync-xliff-targets.mjs` keeps every translation, with no unit marked for review.
 - **The ratchet tracks the migration.** `scripts/check-style-literals.mjs` already counts literal `font-family` stacks, so each step lowers the baseline.
 - **The pills.** The status pill sets its labels in the platform stack and loads no font. The vault pill in PR #172 still registers Space Mono on the document (`fsb-vault-mono`) and should switch the same way; shadow roots ignore `@font-face`, so no web font is needed.
 - **Poppins on the showcase.** Since PR #173 the wordmark's F and S are one-glyph `data:` faces in `fsb-wordmark.css`, which `font-src 'self' data:` admits. Space Mono needs no hosting there.

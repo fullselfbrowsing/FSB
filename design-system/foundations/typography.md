@@ -41,7 +41,6 @@ The 0012 stack ships as `--fsb-font-mono` in the product core, with a `--font-mo
 ## Known gaps
 
 - **Poppins outside the wordmark never loads on the showcase.** No face named `'Poppins'` exists on the site (the wordmark's two glyphs are their own family), and the Content-Security-Policy blocks the Google Fonts imports. Text set in `'Poppins'` elsewhere, against the rule above, draws in its fallback: Concierge's `.con-mark`, all of Prometheus through `.pr-page`, and the `.ps-mini-*` mocks on PhantomStream and release notes. Outfit, imported by lattice, concierge and phantom-stream, falls back the same way.
-- **Space Mono remains in the release-notes template's inline styles** (522). The font never loads on the site, so they draw a fallback. Moving them changes the extracted i18n messages in all eight locales ([0012](../decisions/0012-platform-mono-for-technical-text.md)).
 - **Many literal sizes:** 85 distinct literal font sizes in the extension's `ui/` and `shared/` CSS and 83 in the showcase SCSS, not counting `clamp()`, `var()` and other functions. `scripts/check-style-literals.mjs` counts literal `font-family` stacks; it does not yet count sizes.
 - Phase design specs disagree on the product scale (a 24px heading in one, a 14px/600 label in another). The rule above is the common ground, not a contract.
 
