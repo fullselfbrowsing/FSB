@@ -4,7 +4,7 @@ import { bridgeDisconnectReason, isBridgeDisconnectError, type WebSocketBridge }
 import type { TaskQueue } from '../queue.js';
 import type { MCPMessageType, MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
-import { sendAgentScopedBridgeMessage, targetTabIdFromParams } from '../agent-bridge.js';
+import { isBridgeConnectedTo, sendAgentScopedBridgeMessage, targetTabIdFromParams } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
 import { TOOL_REGISTRY, jsonSchemaToZod } from './schema-bridge.js';
 
@@ -133,12 +133,21 @@ function triggerProgressToNotification(
   });
 }
 
-async function waitForBridgeReconnect(bridge: WebSocketBridge, timeoutMs: number): Promise<void> {
+// Waits for the browser the trigger is armed in. Another browser being
+// attached must not end the wait: the trigger is not there.
+async function waitForBridgeReconnect(
+  bridge: WebSocketBridge,
+  timeoutMs: number,
+  browser: string | null = null,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  while (!bridge.isConnected && Date.now() < deadline) {
+  while (!isBridgeConnectedTo(bridge, browser) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
+
+// A session remembers the browser of this many triggers it armed.
+const MAX_REMEMBERED_TRIGGERS = 500;
 
 function jsonText(value: Record<string, unknown>): { content: Array<{ type: 'text'; text: string }> } {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
@@ -209,6 +218,21 @@ export function registerTriggerTools(
   _queue: TaskQueue,
   agentScope: AgentScope,
 ): void {
+  // trigger_id -> the browser it was armed in. A trigger lives in one
+  // browser, so stopping it or asking after it goes back to that browser.
+  const triggerBrowsers = new Map<string, string>();
+  const rememberTriggerBrowser = (triggerId: string, browser: string | null): void => {
+    if (!browser) return;
+    if (!triggerBrowsers.has(triggerId) && triggerBrowsers.size >= MAX_REMEMBERED_TRIGGERS) {
+      const oldest = triggerBrowsers.keys().next().value;
+      if (oldest !== undefined) triggerBrowsers.delete(oldest);
+    }
+    triggerBrowsers.set(triggerId, browser);
+  };
+  const browserOfTrigger = (params: Record<string, unknown>): string | undefined => (
+    typeof params.trigger_id === 'string' ? triggerBrowsers.get(params.trigger_id.trim()) : undefined
+  );
+
   for (const toolName of TRIGGER_TOOL_NAMES) {
     const tool = TOOL_REGISTRY.find((t) => t.name === toolName);
     if (!tool) {
@@ -234,7 +258,7 @@ export function registerTriggerTools(
             agentScope,
             messageType,
             params,
-            { timeout, targetTabId: triggerTargetTabId(params) },
+            { timeout, targetTabId: triggerTargetTabId(params), returnToBrowser: browserOfTrigger(params) },
           );
           return mapFSBError(result);
         }
@@ -243,6 +267,7 @@ export function registerTriggerTools(
         const triggerId = triggerPayload.trigger_id as string;
         const targetTabId = triggerTargetTabId(triggerPayload);
         const detached = isDetached(triggerPayload);
+        let triggerBrowser: string | null = null;
 
         let result: Record<string, unknown>;
         try {
@@ -255,6 +280,10 @@ export function registerTriggerTools(
               timeout: detached ? TRIGGER_TIMEOUTS.trigger : blockingWaitMs(triggerPayload) + TRIGGER_BRIDGE_SETTLE_GRACE_MS,
               targetTabId,
               onProgress: detached ? undefined : (progress) => triggerProgressToNotification(server, extra, progress),
+              onBrowser: (chosen) => {
+                triggerBrowser = chosen;
+                rememberTriggerBrowser(triggerId, chosen);
+              },
             },
           );
         } catch (sendErr) {
@@ -270,8 +299,8 @@ export function registerTriggerTools(
 
           let lookup: Record<string, unknown> | null = null;
           try {
-            await waitForBridgeReconnect(bridge, TRIGGER_HEARTBEAT_INTERVAL_MS);
-            if (bridge.isConnected) {
+            await waitForBridgeReconnect(bridge, TRIGGER_HEARTBEAT_INTERVAL_MS, triggerBrowser);
+            if (isBridgeConnectedTo(bridge, triggerBrowser)) {
               lookup = await sendAgentScopedBridgeMessage(
                 bridge,
                 agentScope,
@@ -280,7 +309,7 @@ export function registerTriggerTools(
                   trigger_id: triggerId,
                   ...(targetTabId ? { tab_id: targetTabId } : {}),
                 },
-                { timeout: 5_000, targetTabId },
+                { timeout: 5_000, targetTabId, returnToBrowser: triggerBrowser },
               );
             }
           } catch (_lookupErr) {

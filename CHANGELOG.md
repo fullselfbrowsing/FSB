@@ -6,6 +6,11 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Added
+
+- **One MCP server drives Chrome and Safari together.** The bridge on port 7225 keeps a slot per browser, so both can be attached at once and an agent chooses between them: an optional `browser` argument on `open_tab`, `list_tabs` and `run_task`, with every other call following its tab or the browser the agent used last. Setting `FSB_BROWSER` in a client's MCP config starts that client in one browser, which lets one agent work in Safari while another works in Chrome. A call is never sent to a different browser than the one it belongs to. The details are in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) and need the next `fsb-mcp-server` release.
+- **The extension reports when its browser last had focus.** The state frame it already sends on connect and on every keepalive carries the time. Once every attached browser reports it, a call that names no browser goes to the one used last; until then it goes to Chrome. No new permission and no new listener.
+
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline and Antigravity installer fixes, Grok Build capability checks, and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.

@@ -129,6 +129,29 @@ check('execution and recovery decisions require an extension-page sender',
   background.includes('function fsbReplayIsTrustedUiSender(sender)') &&
   start.includes('!fsbReplayIsTrustedUiSender(sender)') &&
   functionBody(background, 'handleReplayStepDecision').includes('!fsbReplayIsTrustedUiSender(sender)'));
+{
+  // The sender check must hold for the extension's own pages however the
+  // browser spells their origin. Safari's runtime.id is not part of the URL.
+  const trusted = (runtime) => new Function('chrome',
+    'function fsbReplayIsTrustedUiSender(sender) {' + functionBody(background, 'fsbReplayIsTrustedUiSender')
+    + '}\nreturn fsbReplayIsTrustedUiSender;')({ runtime });
+  const chromium = trusted({ id: 'abcdefgh', getURL: (file) => 'chrome-extension://abcdefgh/' + file });
+  const safari = trusted({
+    id: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)',
+    getURL: (file) => 'safari-web-extension://CE4E82AD-7CAA/' + file
+  });
+  check('a Chromium extension page is a trusted replay sender, a content script or another extension is not',
+    chromium({ id: 'abcdefgh', url: 'chrome-extension://abcdefgh/ui/sidepanel.html' }) === true &&
+    chromium({ id: 'abcdefgh', url: 'https://example.com/', tab: { id: 3 } }) === false &&
+    chromium({ id: 'zzzz', url: 'chrome-extension://zzzz/ui/sidepanel.html' }) === false &&
+    chromium({ id: 'abcdefgh', url: 'chrome-extension://abcdefghi/ui/sidepanel.html' }) === false &&
+    chromium(null) === false);
+  check('a Safari extension page is one too, though its origin does not carry runtime.id',
+    safari({ id: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)', url: 'safari-web-extension://CE4E82AD-7CAA/ui/sidepanel.html' }) === true &&
+    safari({ id: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)', url: 'safari-web-extension://OTHER-UUID/ui/sidepanel.html' }) === false &&
+    safari({ id: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)', url: 'https://example.com/', tab: { id: 3 } }) === false &&
+    safari({ id: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)' }) === false);
+}
 check('start verifies the preview hash before creating anything',
   start.indexOf('prepareSessionReplay') < start.indexOf('fsbReplayCreateOwnedTab') &&
   start.includes('request.manifestHash !== prepared.replay.manifestHash'));

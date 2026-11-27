@@ -8,6 +8,9 @@ import { screenshotStore, type ManagedScreenshotAttestor } from '../screenshot-s
 import {
   TOOL_REGISTRY,
   jsonSchemaToZod,
+  BROWSER_ARGUMENT_TOOLS,
+  splitBrowserArgument,
+  withBrowserArgument,
   PARAM_TRANSFORMS,
   type ToolDefinition,
 } from './schema-bridge.js';
@@ -168,6 +171,7 @@ async function execAction(
   params: Record<string, unknown>,
   visualSession: VisualSessionSidecar | null,
   screenshotAttestor: ManagedScreenshotAttestor,
+  browser?: unknown,
 ): Promise<ToolCallResult> {
   if (!bridge.isConnected) {
     console.error(`[FSB Manual] ${toolName}: bridge not connected`);
@@ -216,7 +220,7 @@ async function execAction(
         agentScope,
         'mcp:execute-action',
         basePayload,
-        { timeout, targetTabId: targetTabIdFromParams(params) },
+        { timeout, targetTabId: targetTabIdFromParams(params), browser },
       );
       if (!result?.success) {
         console.error(`[FSB Manual] ${toolName}: FAILED - ${result?.error || 'unknown error'}`);
@@ -262,8 +266,14 @@ export function registerManualTools(
     server.tool(
       tool.name,
       description,
-      zodShape,
-      async (params: Record<string, unknown>) => {
+      withBrowserArgument(tool.name, zodShape),
+      async (rawParams: Record<string, unknown>) => {
+        // The browser argument is this server's routing. It is taken out here,
+        // before anything below reads or forwards the params.
+        const { browser, params } = BROWSER_ARGUMENT_TOOLS.has(tool.name)
+          ? splitBrowserArgument(rawParams)
+          : { browser: undefined, params: rawParams };
+
         // Phase 255 Plan 03: visual-session field-bundle gate runs
         // BEFORE the param transform + execAction. Rejections do not
         // proceed to queue.enqueue or sendAgentScopedBridgeMessage, so
@@ -291,6 +301,7 @@ export function registerManualTools(
           finalParams,
           visualSession,
           screenshotAttestor,
+          browser,
         );
       },
     );

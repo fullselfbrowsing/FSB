@@ -160,6 +160,8 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node scripts/verify-extension-i18n.mjs',
   'node scripts/verify-extension-copy.mjs',
   'node tests/benchmark-assets-parity.test.js',
+  'node tests/execute-js-trusted-types.test.js',
+  'node tests/drag-drop-selector-resolution.test.js',
   'node tests/showcase-static-cache-policy.test.js',
   'node tests/showcase-capability-logos.test.js',
   'node tests/about-knowledge-categories-parity.test.js',
@@ -172,6 +174,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/jev-gateway-log-hygiene.test.js',
   'node tests/jev-calibration-profile.test.js',
   'node tests/server-jev-gateway-boot.test.js',
+  'node tests/browser-routing.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([

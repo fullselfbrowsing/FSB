@@ -15,6 +15,12 @@
   // A hung page never settles an injected script or a CDP command. Give up
   // before the 20s lease watchdog and the MCP call timeout do.
   const CAPTURE_DEADLINE_MS = 15000;
+  // A browser without CDP captures what is on screen, and Safari paints nothing
+  // while its window is covered or minimized: a wait for the next frame never
+  // ends there, and captureVisibleTab may never answer. Neither is a hung page,
+  // so each gets a short limit of its own inside the capture deadline.
+  const VISIBLE_TAB_SETTLE_MS = 2000;
+  const VISIBLE_TAB_CAPTURE_MS = 5000;
   const VALID_MODES = new Set(['viewport', 'full_page', 'region', 'element']);
   const VALID_COORDINATE_SPACES = new Set(['viewport', 'page']);
   const VALID_DEVICE_MODES = new Set(['current', 'desktop', 'mobile']);
@@ -420,6 +426,218 @@
     };
   }
 
+  // ---- Safari: tabs.captureVisibleTab --------------------------------------
+  // No chrome.debugger means no Page.captureScreenshot, no layout metrics, no
+  // device emulation and nothing beyond the viewport. captureVisibleTab returns
+  // what is on screen in a window's active tab, so viewport is that image and
+  // region and element are cut out of it. Anything that needs more than the
+  // visible viewport, or a tab that is not the one on screen, gets a typed
+  // error rather than a picture of something else. The codes are the ones the
+  // MCP server already maps (mcp/src/tools/screenshots.ts).
+
+  function viewportScript() {
+    const doc = document.documentElement;
+    return {
+      x: globalThis.scrollX,
+      y: globalThis.scrollY,
+      width: globalThis.innerWidth,
+      height: globalThis.innerHeight,
+      contentWidth: Math.max(doc ? doc.scrollWidth : 0, globalThis.innerWidth),
+      contentHeight: Math.max(doc ? doc.scrollHeight : 0, globalThis.innerHeight)
+    };
+  }
+
+  function pngDataUrlBase64(dataUrl) {
+    const match = typeof dataUrl === 'string' && /^data:image\/png;base64,(.+)$/.exec(dataUrl);
+    if (!match) fail('SCREENSHOT_CAPTURE_FAILED', 'tabs.captureVisibleTab did not return a PNG data URL.');
+    return match[1];
+  }
+
+  function encodeBase64(bytes) {
+    if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(binary);
+  }
+
+  async function cropPng(bytes, crop, imaging) {
+    if (!imaging || typeof imaging.createImageBitmap !== 'function' || typeof imaging.OffscreenCanvas !== 'function') {
+      fail('SCREENSHOT_CAPTURE_FAILED', 'Cropping needs OffscreenCanvas and createImageBitmap.');
+    }
+    const bitmap = await imaging.createImageBitmap(new imaging.Blob([bytes], { type: PNG_MIME_TYPE }));
+    try {
+      const canvas = new imaging.OffscreenCanvas(crop.width, crop.height);
+      canvas.getContext('2d').drawImage(bitmap, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
+      const blob = await canvas.convertToBlob({ type: PNG_MIME_TYPE });
+      return new Uint8Array(await blob.arrayBuffer());
+    } finally {
+      if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+    }
+  }
+
+  // Rejects with late() once work has not settled in ms. The work is left
+  // running: nothing here can cancel a page script or a browser call.
+  function limited(work, ms, late) {
+    let timer = null;
+    const expiry = new Promise((_, reject) => { timer = setTimeout(() => reject(late()), ms); });
+    return Promise.race([work, expiry]).finally(() => clearTimeout(timer));
+  }
+
+  async function captureVisibleTabFrame(params, targetTabId, deps) {
+    const { tabs, scripting, cryptoApi, imaging, startedAt } = deps;
+    const warnings = [{
+      code: 'SCREENSHOT_VISIBLE_VIEWPORT_ONLY',
+      message: 'Captured with tabs.captureVisibleTab: without chrome.debugger only the visible viewport of the active tab can be captured.'
+    }];
+    const limitOf = (value, fallback) => (finite(value) && value > 0 ? value : fallback);
+    const settleMs = limitOf(deps.settleMs, VISIBLE_TAB_SETTLE_MS);
+    const captureMs = limitOf(deps.captureMs, VISIBLE_TAB_CAPTURE_MS);
+    let overlayStyleId = null;
+    // One deadline for every step that waits on the page, as on the CDP path:
+    // a hung page becomes a typed error instead of the caller's own timeout.
+    let expiredError = null;
+    let deadlineTimer = null;
+    const expiry = new Promise((_, reject) => {
+      deadlineTimer = setTimeout(() => {
+        expiredError = new ScreenshotError('PAGE_UNRESPONSIVE',
+          'The page did not respond before the capture deadline. Navigate or close the tab to recover it.');
+        reject(expiredError);
+      }, limitOf(deps.deadlineMs, CAPTURE_DEADLINE_MS));
+    });
+    expiry.catch(() => {});
+    const bounded = (work) => Promise.race([work, expiry]);
+    try {
+      if (params.mode === 'full_page') {
+        fail('INVALID_SCREENSHOT_ARGUMENTS', 'full_page needs chrome.debugger, which this browser does not provide. Use viewport, region or element for what is on screen.');
+      }
+      if (params.device_mode !== 'current') {
+        fail('INVALID_SCREENSHOT_ARGUMENTS', 'Device emulation needs chrome.debugger, which this browser does not provide.');
+      }
+      if (!tabs || typeof tabs.get !== 'function' || typeof tabs.captureVisibleTab !== 'function' || !scripting) {
+        fail('SCREENSHOT_CAPTURE_FAILED', 'tabs.captureVisibleTab is unavailable.');
+      }
+
+      const tab = await bounded(tabs.get(targetTabId));
+      if (!tab || tab.active !== true) {
+        fail('SCREENSHOT_CAPTURE_FAILED',
+          'Only the tab on screen can be captured here. Use switch_tab with active:true, then retry.', { retryable: true });
+      }
+
+      if (!params.include_fsb_overlays) {
+        overlayStyleId = `fsb-screenshot-hide-${captureId(cryptoApi)}`;
+        await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
+      }
+      try {
+        // The settle wait ends on the page's next painted frame. A window that
+        // is not painting never has one, so this wait is cut short on its own.
+        await bounded(limited(executeScript(scripting, targetTabId, settleScript, [params.wait_ms]),
+          settleMs + params.wait_ms, () => new Error('The page painted no frame')));
+      } catch (error) {
+        if (error === expiredError) throw error;
+        warnings.push({ code: 'SCREENSHOT_SETTLE_INCOMPLETE', message: 'The page settle wait did not complete; the live frame was captured.' });
+      }
+      if (overlayStyleId) await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
+
+      const view = await bounded(executeScript(scripting, targetTabId, viewportScript, []));
+      if (!view || ![view.x, view.y, view.width, view.height].every(finite) || view.width <= 0 || view.height <= 0) {
+        fail('SCREENSHOT_CAPTURE_FAILED', 'Could not read the page viewport.');
+      }
+      let elementRect = null;
+      if (params.mode === 'element') {
+        try {
+          elementRect = await bounded(executeScript(scripting, targetTabId, elementRectScript, [params.selector]));
+        } catch (error) {
+          if (error === expiredError) throw error;
+          fail('SCREENSHOT_TARGET_NOT_FOUND', `Unable to resolve element ${params.selector}: ${error.message}`);
+        }
+      }
+      const visible = { x: view.x, y: view.y, width: view.width, height: view.height };
+      const rect = selectCaptureRect(params, {
+        cssVisualViewport: { pageX: view.x, pageY: view.y, clientWidth: view.width, clientHeight: view.height },
+        cssContentSize: { width: view.contentWidth, height: view.contentHeight }
+      }, elementRect);
+      if (!within(rect, visible)) {
+        fail('SCREENSHOT_REGION_OUT_OF_BOUNDS', 'Only what is on screen can be captured here. Scroll the target into view, then retry.');
+      }
+
+      // captureVisibleTab takes whatever tab is in front of the window right
+      // now, and the settle wait above can last seconds. If another agent or
+      // the user switched tabs meanwhile, this would return their page under
+      // this tab's URL.
+      const current = await bounded(tabs.get(targetTabId));
+      if (!current || current.active !== true || current.windowId !== tab.windowId) {
+        fail('SCREENSHOT_CAPTURE_FAILED',
+          'The tab left the screen before it could be captured. Use switch_tab with active:true, then retry.', { retryable: true });
+      }
+
+      const screenBase64 = pngDataUrlBase64(await bounded(limited(
+        Promise.resolve(tabs.captureVisibleTab(tab.windowId, { format: 'png' })), captureMs,
+        () => new ScreenshotError('SCREENSHOT_CAPTURE_FAILED',
+          'The browser returned no frame. Its window may be covered or minimized: bring it to the front, then retry.',
+          { retryable: true }))));
+      let bytes = decodeBase64(screenBase64);
+      const screen = pngDimensions(bytes);
+      const scale = screen.width / view.width;
+      let imageData = screenBase64;
+      if (params.mode !== 'viewport') {
+        const x = Math.max(0, Math.round((rect.x - view.x) * scale));
+        const y = Math.max(0, Math.round((rect.y - view.y) * scale));
+        const crop = {
+          x,
+          y,
+          width: Math.max(1, Math.min(screen.width - x, Math.round(rect.width * scale))),
+          height: Math.max(1, Math.min(screen.height - y, Math.round(rect.height * scale)))
+        };
+        bytes = await cropPng(bytes, crop, imaging);
+        imageData = encodeBase64(bytes);
+      }
+      const output = pngDimensions(bytes);
+      assertSize(output.width, output.height, bytes.byteLength);
+      const hash = await sha256(bytes, cryptoApi);
+
+      return {
+        success: true,
+        image_data: imageData,
+        mime_type: PNG_MIME_TYPE,
+        metadata: {
+          capture_id: captureId(cryptoApi),
+          source_url: (tab && tab.url) || '',
+          timestamp: new Date().toISOString(),
+          mode: params.mode,
+          css_rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          output_width: output.width,
+          output_height: output.height,
+          byte_length: bytes.byteLength,
+          mime_type: PNG_MIME_TYPE,
+          sha256: hash,
+          effective_emulation: {
+            device_mode: 'current',
+            viewport_width: null,
+            viewport_height: null,
+            device_scale_factor: scale,
+            orientation: null,
+            touch: false
+          },
+          delivery_status: 'captured',
+          duration_ms: Date.now() - startedAt,
+          warnings
+        }
+      };
+    } catch (error) {
+      return errorResult(expiredError || error);
+    } finally {
+      clearTimeout(deadlineTimer);
+      if (overlayStyleId) {
+        // A hung page holds the restore until it answers again, so past the
+        // deadline it runs on its own instead of holding this capture open.
+        const restore = executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]).catch(() => {});
+        if (!expiredError) await restore;
+      }
+    }
+  }
+
   async function capture(rawParams, tabId, options = {}) {
     let params;
     try {
@@ -455,6 +673,25 @@
 
     if (!Number.isInteger(targetTabId) || targetTabId <= 0) {
       return errorResult(new ScreenshotError('INVALID_SCREENSHOT_ARGUMENTS', 'A positive tab_id is required.'));
+    }
+    // A platform without CDP (Safari): FsbPlatform is undefined on Chrome and in
+    // the Node harnesses, so they keep the debugger path below.
+    const platform = own(options, 'platform') ? options.platform : root.FsbPlatform;
+    if (platform && platform.caps && platform.caps.cdp === false) {
+      return captureVisibleTabFrame(params, targetTabId, {
+        tabs,
+        scripting,
+        cryptoApi,
+        imaging: options.imaging || {
+          Blob: root.Blob,
+          createImageBitmap: typeof root.createImageBitmap === 'function' ? root.createImageBitmap.bind(root) : undefined,
+          OffscreenCanvas: root.OffscreenCanvas
+        },
+        startedAt,
+        deadlineMs: options.deadlineMs,
+        settleMs: options.visibleTabSettleMs,
+        captureMs: options.visibleTabCaptureMs
+      });
     }
     if (!debuggerApi || !scripting || !tabs) {
       return errorResult(new ScreenshotError('SCREENSHOT_CAPTURE_FAILED', 'Required Chrome capture APIs are unavailable.'));
@@ -663,7 +900,7 @@
   root.FsbScreenshotCapture = api;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = Object.assign({}, api, {
-      _test: { overlayInstallScript, overlayRemoveScript, elementRectScript }
+      _test: { overlayInstallScript, overlayRemoveScript, elementRectScript, viewportScript }
     });
   }
 })(typeof globalThis !== 'undefined' ? globalThis : self);

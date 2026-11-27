@@ -3,6 +3,9 @@ export interface MCPMessage {
   id: string;          // Unique message ID for request/response correlation
   type: MCPMessageType;
   payload: Record<string, unknown>;
+  // Which connected browser the hub should hand this to. Hub routing only:
+  // the hub removes it before the frame reaches an extension.
+  browser?: string;
 }
 
 export type MCPMessageType =
@@ -84,6 +87,9 @@ export interface BridgeOptions {
   extensionHeartbeatTimeoutMs?: number;
   promotionJitterMs?: number;
   maxReconnectDelayMs?: number;
+  // How long a relay that names no browser keeps the one it was given after
+  // that browser goes away. Tests shorten it.
+  legacyRelayBindingGraceMs?: number;
   allowedBrowserOrigins?: string[];
   capabilities?: BridgeCapability[];
   handleExtRequest?: ExtRequestHandler;
@@ -100,6 +106,11 @@ export interface BridgeTopologyState {
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
   extensionAttachment: ExtensionAttachmentState | null;
+  // Every attached browser. Null when this process is a relay of a hub that
+  // predates the roster, which serves one browser and cannot be told which.
+  browsers: BrowserRosterEntry[] | null;
+  refusedBrowsers: BrowserRefusal[];
+  hubVersion: string | null;
 }
 
 export interface ExtensionAttachmentState {
@@ -108,6 +119,29 @@ export interface ExtensionAttachmentState {
   installInstanceId: string;
   normalWindowCount: number;
   connectedAt: string | null;
+}
+
+// A browser is known by the scheme of the Origin its extension connects with.
+export type BrowserKind = 'chrome' | 'safari';
+
+/** One browser attached to the hub. `key` is what a caller names to reach it. */
+export interface BrowserRosterEntry {
+  key: string;
+  kind: BrowserKind;
+  extensionVersion: string | null;
+  installInstanceId: string | null;
+  authorized: boolean;
+  // When a window of this browser last took focus, as its extension reported
+  // it. Null from an extension that does not report focus.
+  focusedAt: number | null;
+  connectedAt: number;
+}
+
+/** Why a browser that tried to attach is not in the roster. */
+export interface BrowserRefusal {
+  kind: BrowserKind;
+  reason: string;
+  at: number;
 }
 
 // Relay protocol: MCP instance -> hub handshake
@@ -128,6 +162,9 @@ export interface RelayWelcome {
   lastDisconnectReason: string | null;
   extensionAttachment?: ExtensionAttachmentState | null;
   capabilities?: BridgeCapability[];
+  browsers?: BrowserRosterEntry[];
+  refusedBrowsers?: BrowserRefusal[];
+  hubVersion?: string;
 }
 
 export interface RelayState {
@@ -139,6 +176,9 @@ export interface RelayState {
   lastDisconnectReason: string | null;
   extensionAttachment?: ExtensionAttachmentState | null;
   capabilities?: BridgeCapability[];
+  browsers?: BrowserRosterEntry[];
+  refusedBrowsers?: BrowserRefusal[];
+  hubVersion?: string;
 }
 
 export type RelayMessage = RelayHello | RelayWelcome | RelayState;

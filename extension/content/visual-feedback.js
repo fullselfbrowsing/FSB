@@ -2230,7 +2230,10 @@
       this.host = markOverlayElement(document.createElement('div'), 'viewport-glow-host');
       this.host.id = 'fsb-viewport-glow-host';
       // z-index kept as fallback; top-layer via Popover API is the primary mechanism
-      this.host.style.cssText = 'all:initial!important;position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:none!important;margin:0!important;padding:0!important;border:none!important;background:none!important;';
+      // The glow frames the page. Where FSB's own panel takes the left of the
+      // viewport (content/panel-host.js sets --fsb-panel-inset), it starts
+      // after the panel instead of running over it.
+      this.host.style.cssText = 'all:initial!important;position:fixed!important;inset:0!important;left:var(--fsb-panel-inset,0px)!important;z-index:2147483647!important;pointer-events:none!important;margin:0!important;padding:0!important;border:none!important;background:none!important;';
 
       this.shadow = this.host.attachShadow({ mode: 'closed' });
 
@@ -2241,6 +2244,7 @@
       .viewport-glow-root {
         position: fixed;
         inset: 0;
+        left: var(--fsb-panel-inset, 0px);
         pointer-events: none;
         overflow: hidden;
         --glow-color-1: #ff8c00;

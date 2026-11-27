@@ -115,9 +115,9 @@ function createRuntimeOnMessageMock() {
   };
 }
 
-function createChromeMock(initialSession = {}) {
+function createChromeMock(initialSession = {}, localSeed = {}) {
   const session = createStorageArea(initialSession);
-  const local = createStorageArea();
+  const local = createStorageArea(localSeed);
   const alarms = new Map();
   const cleared = [];
   return {
@@ -213,7 +213,7 @@ function createFakeWebSocketClass(options = {}) {
 }
 
 function buildClientHarness(options = {}) {
-  const chrome = createChromeMock(options.session);
+  const chrome = createChromeMock(options.session, options.storageLocalSeed);
   const timers = createFakeTimers();
   const FakeWebSocket = createFakeWebSocketClass(options);
   const deterministicMath = Object.create(Math);
@@ -227,6 +227,7 @@ function buildClientHarness(options = {}) {
     Date,
     EventTarget,
     CustomEvent,
+    TextEncoder,
     setTimeout: timers.setTimeout,
     clearTimeout: timers.clearTimeout,
     setInterval: timers.setInterval,
@@ -249,6 +250,24 @@ function buildClientHarness(options = {}) {
         return options.delegationMappings.map((row) => ({ ...row }));
       },
     };
+  }
+
+  // Transport selection reads globalThis.FsbPlatform. It is undefined on
+  // Chrome and in every other harness here, which is exactly what keeps the
+  // Chrome path at `new WebSocket(...)` with no policy machinery at all.
+  if (options.platform === 'safari') {
+    context.FsbPlatform = { id: 'safari', caps: { cdp: false, trustedInput: false } };
+  }
+  if (options.nativeSocketClass) {
+    context.FsbNativeBridgeSocket = options.nativeSocketClass;
+  }
+  // background.js supplies the attachment metadata and Chrome the windows API.
+  // Without them the client sends no state frame, as every other case expects.
+  if (options.getMcpAttachmentMetadata) {
+    context.getMcpAttachmentMetadata = options.getMcpAttachmentMetadata;
+  }
+  if (options.windows) {
+    chrome.windows = options.windows;
   }
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
@@ -867,6 +886,149 @@ function runBackgroundArmingSourceCase() {
   for (const snippet of visualSessionSnippets) {
     assert(backgroundSource.includes(snippet), `background.js includes ${snippet}`);
   }
+}
+
+/**
+ * Safari transport selection (ws probe -> native pin), including the TTL.
+ *
+ * The pin is remembered in chrome.storage.local for 7 days. _transportPlan()
+ * stops honouring it once it ages out and goes back to probing ws -- so the
+ * outcome recorder MUST score those attempts. When it did not, an expired
+ * native pin was permanent in one direction and unreachable in the other: the
+ * plan said ws, the recorder said "already native, nothing to score", and the
+ * bridge retried a transport that cannot work on that browser forever.
+ */
+async function runSafariTransportPolicyCase() {
+  console.log('\n--- Safari transport policy ---');
+  const TTL = 7 * 24 * 60 * 60 * 1000;
+  const KEY = 'fsbMcpTransportPolicy';
+
+  async function clientWith(policy) {
+    const harness = buildClientHarness({
+      platform: 'safari',
+      storageLocalSeed: policy ? { [KEY]: policy } : undefined
+    });
+    const client = new harness.exports.MCPBridgeClient();
+    await client._policyHydrating;
+    await flushMicrotasks();
+    return { harness, client };
+  }
+
+  // 1. A fresh native pin is honoured.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now(), wsAttempts: 2 });
+    assertEqual(client._transportPlan(), 'native', 'fresh native pin selects the native transport');
+  }
+
+  // 2. An expired pin re-probes ws.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now() - TTL - 1, wsAttempts: 2 });
+    assertEqual(client._transportPlan(), 'ws', 'expired native pin falls back to probing ws');
+
+    // ...and the re-probe is scored. Two strikes, from zero -- not inherited
+    // from the attempt count that pinned it last time.
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'ws', 'one failed re-probe does not re-pin');
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'native', 'a second failure re-pins to native');
+    assert(client._transportPolicy.decidedAt > Date.now() - 5000, 'the renewed pin carries a fresh timestamp');
+  }
+
+  // 3. A working ws under an expired pin wins outright.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now() - TTL - 1, wsAttempts: 2 });
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('open');
+    assertEqual(client._transportPlan(), 'ws', 'a successful ws re-probe pins ws');
+  }
+
+  // 4. A live native pin still suppresses scoring, so a plain server outage
+  //    cannot flap the transport back to ws.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now(), wsAttempts: 2 });
+    client._activeTransport = 'native';
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'native', 'native failures never re-enable ws');
+  }
+
+  // 5. Chrome never enters any of it.
+  {
+    const harness = buildClientHarness();
+    const client = new harness.exports.MCPBridgeClient();
+    assertEqual(client._policyHydrating, null, 'Chrome does not hydrate a transport policy');
+    assertEqual(client._transportPlan(), 'ws', 'Chrome always plans ws');
+    client._recordTransportOutcome('fail', 'security');
+    assertEqual(client._transportPolicy, null, 'Chrome never records a transport policy');
+  }
+
+  // 6. A LIVE ws pin suppresses scoring, symmetrically with the native pin.
+  //
+  //    Without this the probe is one-way: ws gets pinned on first success, then
+  //    the very next time the MCP server is stopped -- a separate local process
+  //    the user starts on demand -- two failed reconnects (~4s at base backoff)
+  //    demote a transport this browser has already PROVEN, for the full 7-day
+  //    TTL. The onclose guard cannot catch it: `!this._connected` only describes
+  //    the current attempt, not "ws has worked here before".
+  {
+    const { client } = await clientWith({ decided: 'ws', decidedAt: Date.now(), wsAttempts: 0 });
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('fail', 'socket_close');
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'ws',
+      'a live ws pin survives a server outage instead of demoting to native');
+    assertEqual(client._transportPolicy.wsAttempts, 0,
+      'failures under a live ws pin are not scored at all');
+  }
+
+  // 7. Every successful open RENEWS the ws pin. A pin that only ever got its
+  //    timestamp on the first connect ages out while the transport is plainly
+  //    working, which reopens case 6 the moment the TTL lapses.
+  {
+    const aging = Date.now() - TTL + 60_000;
+    const { client } = await clientWith({ decided: 'ws', decidedAt: aging, wsAttempts: 0 });
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('open');
+    assert(client._transportPolicy.decidedAt > aging, 'a successful open refreshes an aging ws pin');
+    assert(client._policyIsFresh(client._transportPolicy), 'the renewed ws pin is fresh again');
+  }
+}
+
+/**
+ * The native transport's payload ceiling is a BYTE budget, so the guard in
+ * _sendResult has to measure bytes. JSON.stringify(...).length counts UTF-16
+ * units, which under-reports a CJK or emoji payload by up to 3x -- exactly the
+ * oversized result the guard exists to refuse would sail through it and get
+ * base64-chunked over XPC anyway.
+ *
+ * softPayloadLimit is an own property of the native transport and undefined on
+ * a real WebSocket, so Chrome never reaches any of this.
+ */
+async function runNativePayloadCapCase() {
+  console.log('\n--- native payload cap is measured in bytes ---');
+
+  const harness = buildClientHarness({ platform: 'safari' });
+  const client = new harness.exports.MCPBridgeClient();
+
+  const CAP = 1000;
+  const sent = [];
+  client._ws = { softPayloadLimit: CAP, readyState: 1, send: (s) => sent.push(s) };
+
+  // 600 CJK chars = 1800 UTF-8 bytes: under the cap by .length, over it by bytes.
+  const text = '\u6587'.repeat(600);
+  assert(text.length < CAP, 'fixture is under the cap by UTF-16 length');
+  assert(new TextEncoder().encode(text).length > CAP, 'fixture is over the cap in UTF-8 bytes');
+
+  client._sendResult('req-1', { text });
+  assertEqual(sent.length, 1, 'exactly one frame goes out');
+  const frame = JSON.parse(sent[0]);
+  assertEqual(frame.type, 'mcp:error', 'an over-cap multibyte result is refused, not chunked');
+  assert(/payload_too_large/.test(frame.payload.error), 'the refusal names payload_too_large');
+
+  // An ASCII result that genuinely fits still goes through untouched.
+  sent.length = 0;
+  client._sendResult('req-2', { text: 'a'.repeat(100) });
+  assertEqual(JSON.parse(sent[0]).type, 'mcp:result', 'an in-budget result is still delivered');
 }
 
 const VALID_PAIRING_CODE = 'fsb-auth.' + 'A'.repeat(43);
@@ -1921,7 +2083,97 @@ async function runReconnectAlarmBackstopCase() {
   assertEqual(alarm.periodInMinutes, 1, 'the alarm repeats so one onopen clear cannot end the eviction backstop');
 }
 
+// One MCP hub can hold several browsers, and a call that names none goes to the
+// one used last. Each extension says when a window of its browser last had
+// focus, in the state frame it already sends on connect and on every keepalive.
+async function runBrowserFocusReportCase() {
+  console.log('\n--- browser focus report ---');
+
+  const attachment = {
+    extensionId: 'abcdefghijklmnopabcdefghijklmnop',
+    extensionVersion: '0.9.95',
+    installInstanceId: 'install-1',
+    normalWindowCount: 1,
+  };
+  const stateFrames = (socket) => socket.sent
+    .map((raw) => JSON.parse(raw))
+    .filter((frame) => frame.type === 'mcp:extension-state');
+  const settle = async () => {
+    for (let turn = 0; turn < 6; turn++) await flushMicrotasks();
+  };
+
+  let focused = false;
+  let failing = false;
+  const harness = buildClientHarness({
+    getMcpAttachmentMetadata: async () => ({ ...attachment }),
+    windows: {
+      async getLastFocused() {
+        if (failing) throw new Error('No window');
+        return { id: 1, focused };
+      },
+    },
+  });
+  const client = harness.exports.mcpBridgeClient;
+  client.connect();
+  await flushMicrotasks();
+  const socket = harness.sockets[0];
+  socket.open();
+  await settle();
+
+  const first = stateFrames(socket)[0];
+  assert(!!first, 'the state frame is sent when the socket opens');
+  assertEqual(first.focusedAt, null, 'a browser that has not had focus reports none');
+  assertEqual(first.extensionId, attachment.extensionId, 'the rest of the frame is unchanged');
+  assert(Object.prototype.hasOwnProperty.call(first, 'connectedAt'), 'including when it connected');
+
+  focused = true;
+  const before = Date.now();
+  const ping = harness.timers.intervals.find((timer) => timer.delay === 25000 && !timer.cleared);
+  ping.fn();
+  await settle();
+  const second = stateFrames(socket)[1];
+  assert(Number.isSafeInteger(second.focusedAt) && second.focusedAt >= before, 'a focused window is reported on the next keepalive');
+  assertEqual(
+    harness.chrome.storage.session._dump().mcpBrowserFocusedAt,
+    second.focusedAt,
+    'and kept in session storage, so a worker restart still knows it',
+  );
+
+  focused = false;
+  socket.receive({ type: 'mcp:pong', ts: Date.now() });
+  ping.fn();
+  await settle();
+  assertEqual(stateFrames(socket)[2].focusedAt, second.focusedAt, 'losing focus keeps the last time it had it');
+
+  failing = true;
+  socket.receive({ type: 'mcp:pong', ts: Date.now() });
+  ping.fn();
+  await settle();
+  assertEqual(stateFrames(socket).length, 4, 'a windows API that fails does not stop the state frame');
+  assertEqual(stateFrames(socket)[3].focusedAt, second.focusedAt, 'and the last known time stands');
+
+  const restarted = buildClientHarness({
+    session: { mcpBrowserFocusedAt: 123456 },
+    getMcpAttachmentMetadata: async () => ({ ...attachment }),
+    windows: { async getLastFocused() { return { id: 1, focused: false }; } },
+  });
+  restarted.exports.mcpBridgeClient.connect();
+  await flushMicrotasks();
+  restarted.sockets[0].open();
+  await settle();
+  assertEqual(stateFrames(restarted.sockets[0])[0].focusedAt, 123456, 'a restarted worker reports the focus time it had stored');
+
+  const bare = buildClientHarness({ getMcpAttachmentMetadata: async () => ({ ...attachment }) });
+  bare.exports.mcpBridgeClient.connect();
+  await flushMicrotasks();
+  bare.sockets[0].open();
+  await settle();
+  assertEqual(stateFrames(bare.sockets[0])[0].focusedAt, null, 'with no windows API the frame is still sent, with no focus time');
+}
+
 async function run() {
+  await runSafariTransportPolicyCase();
+  await runNativePayloadCapCase();
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
   await runInboundAuthorityReadinessCase();
@@ -1947,6 +2199,7 @@ async function run() {
   await runOrdinaryKeepaliveLivenessCase();
   await runStalledKeepaliveCloseCase();
   await runReconnectAlarmBackstopCase();
+  await runBrowserFocusReportCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

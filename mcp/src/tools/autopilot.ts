@@ -4,8 +4,9 @@ import { bridgeDisconnectReason, isBridgeDisconnectError, type WebSocketBridge }
 import type { TaskQueue } from '../queue.js';
 import type { MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
-import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
+import { isBridgeConnectedTo, sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
+import { browserArgument } from './schema-bridge.js';
 
 /**
  * Register autopilot tools: run_task, stop_task, get_task_status.
@@ -28,12 +29,20 @@ export function registerAutopilotTools(
   queue: TaskQueue,
   agentScope: AgentScope,
 ): void {
+  // The browser this session's task is running in, while one is running.
+  // stop_task and get_task_status follow it. With no task running they go
+  // where the session is.
+  let runningTaskBrowser: string | null = null;
+
   // run_task -- execute a natural language automation task
   server.tool(
     'run_task',
     'IMPORTANT: Only use this tool if the user explicitly requests autopilot, asks to "run a task", or says "let FSB handle it". For all other browser tasks, use the manual tools (navigate, read_page, get_dom_snapshot, click, type_text, execute_js, etc.) to accomplish the task step by step -- they are more reliable and give you full control. This tool hands control to FSB\'s built-in AI which decides the steps autonomously. Returns a completion summary with success status and action log. Multi-agent contract: agent_id is FSB-issued and required (the server captures it via agent:register on first tool call -- callers do not provide it). The concurrency cap is configurable (default 8, range 1-64); the (N+1)th agent claim is rejected with AGENT_CAP_REACHED { cap, active }. Ownership enforcement: cross-agent calls reject with TAB_NOT_OWNED; incognito tabs reject with TAB_INCOGNITO_NOT_SUPPORTED; cross-window tabs reject with TAB_OUT_OF_SCOPE.',
-    { task: z.string().describe('Natural language description of the task to perform') },
-    async ({ task }, extra) => {
+    {
+      task: z.string().describe('Natural language description of the task to perform'),
+      browser: browserArgument(),
+    },
+    async ({ task, browser }, extra) => {
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
@@ -118,6 +127,10 @@ export function registerAutopilotTools(
         };
 
         let agentIdForSnapshot: string | null = null;
+        // The browser this task runs in. Everything that looks for the task
+        // again (its snapshot after a worker eviction, stop_task,
+        // get_task_status) goes to this browser and no other.
+        let taskBrowser: string | null = null;
         const startPayload: Record<string, unknown> = { task };
         let result: Record<string, unknown>;
         try {
@@ -130,6 +143,11 @@ export function registerAutopilotTools(
               timeout: 600_000, // Phase 239 plan 03 -- 600s safety net (was 300_000); CONTEXT.md D-04 + ROADMAP SC#1
               onProgress,
               onAgentId: (agentId) => { agentIdForSnapshot = agentId; },
+              browser,
+              onBrowser: (chosen) => {
+                taskBrowser = chosen;
+                runningTaskBrowser = chosen;
+              },
             },
           );
         } catch (sendErr) {
@@ -161,12 +179,21 @@ export function registerAutopilotTools(
               // (best effort).
               const reconnectGraceMs = 30_000;
               const reconnectDeadline = Date.now() + reconnectGraceMs;
-              while (!bridge.isConnected && Date.now() < reconnectDeadline) {
+              // Its own browser coming back is what matters. Another browser
+              // being attached must not end the wait, or the snapshot would
+              // be asked of a browser that never ran the task.
+              while (!isBridgeConnectedTo(bridge, taskBrowser) && Date.now() < reconnectDeadline) {
                 await new Promise((r) => setTimeout(r, 250));
               }
-              if (bridge.isConnected) {
+              if (isBridgeConnectedTo(bridge, taskBrowser)) {
+                const taskScope = taskBrowser && typeof agentScope.forBrowser === 'function'
+                  ? agentScope.forBrowser(taskBrowser)
+                  : agentScope;
+                const snapshotPayload = { agentId: agentIdForSnapshot || taskScope.current() || '' };
                 const snap = await bridge.sendAndWait(
-                  { type: 'mcp:get-task-snapshot', payload: { agentId: agentIdForSnapshot || agentScope.current() || '' } },
+                  taskBrowser
+                    ? { type: 'mcp:get-task-snapshot', payload: snapshotPayload, browser: taskBrowser }
+                    : { type: 'mcp:get-task-snapshot', payload: snapshotPayload },
                   { timeout: 5_000 },
                 );
                 const snapshot = (snap as Record<string, unknown> | undefined)?.snapshot as Record<string, unknown> | undefined;
@@ -206,6 +233,8 @@ export function registerAutopilotTools(
 
           // Any other error -- re-throw to the existing MCP error path.
           throw sendErr;
+        } finally {
+          if (runningTaskBrowser === taskBrowser) runningTaskBrowser = null;
         }
         return mapFSBError(result);
       });
@@ -226,7 +255,7 @@ export function registerAutopilotTools(
         agentScope,
         'mcp:stop-automation',
         {},
-        { timeout: 10_000 },
+        { timeout: 10_000, returnToBrowser: runningTaskBrowser },
       );
       return mapFSBError(result);
     },
@@ -247,7 +276,7 @@ export function registerAutopilotTools(
           agentScope,
           'mcp:get-status',
           {},
-          { timeout: 5_000, includeOwnershipToken: false },
+          { timeout: 5_000, includeOwnershipToken: false, returnToBrowser: runningTaskBrowser },
         );
         return mapFSBError(result);
       });

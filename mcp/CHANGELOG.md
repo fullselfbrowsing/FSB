@@ -2,6 +2,36 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+## Unreleased
+
+Not published yet. The package version is still 0.11.5 and needs a bump before these ship.
+
+### Added
+
+- **Chrome and Safari on one server.** The bridge hub keeps one slot per browser instead of one extension socket, told apart by the scheme of the `Origin` each extension connects with. Both browsers can be attached at once, and the extension needs no update for this. Two Chromium browsers still share the `chrome` slot.
+- **An agent chooses its browser.** `open_tab`, `list_tabs` and `run_task` take an optional `browser` argument (`"chrome"` or `"safari"`). Every other tool follows the tab it names, or the browser the session used last, so naming a browser once is the switch. `FSB_BROWSER` in a client's MCP config sets where its sessions start, which is how one agent is kept in Safari while another works in Chrome.
+- **One agent identity per browser.** A session registers separately in each browser it uses and keeps separate tab ownership there. A retry after `AGENT_NOT_REGISTERED` stays in the browser the call was sent to.
+- **Results say where they came from.** With more than one browser attached, every result carries `browser`, and `list_tabs` adds `browsers`. With one browser nothing changes.
+- **`BROWSER_NOT_CONNECTED`, `AMBIGUOUS_TAB_BROWSER` and `BROWSER_CHOICE_UNAVAILABLE`.** A call that belongs to one browser is refused when that browser is away. It is never sent to another.
+- **`status` and `doctor` list every attached browser**, and any browser that was turned away, with the reason. `--browser <name>` chooses which one the detailed lines describe.
+- **Safari's `Origin` is accepted.** `safari-web-extension://` joins the bridge's origin allowlist, and Safari's extension ID (a bundle ID, not 32 letters) is accepted in its state frame.
+
+### Changed
+
+- One browser disconnecting fails only the calls it was holding. Before, every pending call was rejected. The rejection message is unchanged, so `sw_evicted` recovery still arms.
+- A reply is accepted only from the browser the request went to.
+- Each browser has its own liveness timer. Registering or reaping one no longer touches another's.
+- `stop_task` and `get_task_status` go to the browser running the session's task, and the `sw_evicted` snapshot is read from that browser. Trigger lookups go to the browser the trigger was armed in. Their reconnect waits end when that browser is back, not when any browser is.
+- Pairing one browser closes any other browser that was attached, so the result is the same whichever connected first.
+
+### Compatibility and update
+
+- Whichever server binds port 7225 first is the hub. Until every MCP client on a machine runs this version, an older hub means one Chromium browser and no Safari.
+- A client from before this version that connects to a current hub names no browser. The hub gives it one on its first call and keeps it there, through a worker restart too. That browser is Chrome unless every attached browser reports focus, which needs the extension release that follows 0.9.95.
+- `relay:hello` is unchanged. `relay:welcome` and `relay:state` gain `browsers`, `refusedBrowsers` and `hubVersion`, which older clients ignore.
+- The shared tool registry and its SHA-256 pin are unchanged, and the tool count stays 69. The `browser` argument is added in the MCP registration layer and is not forwarded to the extension.
+- Safari cannot be paired yet, so delegated agent runs stay Chrome-only.
+
 <a id="v0.11.5"></a>
 
 ## 0.11.5 (2026-10-18)
