@@ -33,7 +33,16 @@ const mcpStructuredTargets = Object.freeze([
   'mcp/build/version.js',
   'mcp/src/version.ts',
   'mcp/native-host/runtime-integrity.json',
+  'plugins/claude/.claude-plugin/plugin.json',
+  'plugins/claude/.mcp.json',
+  'plugins/claude/README.md',
 ]);
+
+const claudePluginManifestPath = 'plugins/claude/.claude-plugin/plugin.json';
+const claudePluginMcpConfigPath = 'plugins/claude/.mcp.json';
+const claudePluginReadmePath = 'plugins/claude/README.md';
+const claudePluginServerName = 'fsb';
+const claudePluginPinPattern = /fsb-mcp-server@\d+\.\d+\.\d+/gu;
 
 const currentSurfaceTargets = Object.freeze([
   'README.md',
@@ -417,6 +426,47 @@ function setExtensionVersion(version) {
   return changed.some(Boolean);
 }
 
+// The Claude plugin launches one exact npm release (the Claude directory
+// rejects @latest), so its manifest version, launcher pin and README commands
+// all move with the MCP package version.
+function claudePluginServerEntry(config) {
+  const servers = config?.mcpServers;
+  const names = servers && typeof servers === 'object' ? Object.keys(servers) : [];
+  if (names.length !== 1 || names[0] !== claudePluginServerName) {
+    throw new Error(`${claudePluginMcpConfigPath} must declare exactly one "${claudePluginServerName}" server`);
+  }
+  const entry = servers[claudePluginServerName];
+  if (
+    entry?.command !== 'npx'
+    || !Array.isArray(entry.args)
+    || entry.args.length !== 2
+    || entry.args[0] !== '-y'
+    || !/^fsb-mcp-server@\d+\.\d+\.\d+$/u.test(entry.args[1])
+  ) {
+    throw new Error(`${claudePluginMcpConfigPath} must launch "npx -y fsb-mcp-server@X.Y.Z"`);
+  }
+  return entry;
+}
+
+function setClaudePluginSurfaces(version) {
+  const changed = [];
+  const manifest = readJson(claudePluginManifestPath);
+  manifest.version = version;
+  changed.push(writeJson(claudePluginManifestPath, manifest));
+
+  const config = readJson(claudePluginMcpConfigPath);
+  claudePluginServerEntry(config).args[1] = `fsb-mcp-server@${version}`;
+  changed.push(writeJson(claudePluginMcpConfigPath, config));
+
+  changed.push(replaceAllCurrent(
+    claudePluginReadmePath,
+    claudePluginPinPattern,
+    `fsb-mcp-server@${version}`,
+    'pinned fsb-mcp-server command',
+  ));
+  return changed.some(Boolean);
+}
+
 function setMcpVersion(version) {
   validateVersion(version);
   assertPreparedChangelog('mcp', version);
@@ -455,6 +505,7 @@ function setMcpVersion(version) {
   changed.push(writeJson('mcp/native-host/runtime-integrity.json', integrity));
   changed.push(setLlmsMcpSurfaces(version));
   changed.push(setMcpReadmeSurfaces(readJson('extension/manifest.json').version, version));
+  changed.push(setClaudePluginSurfaces(version));
   return changed.some(Boolean);
 }
 
@@ -517,6 +568,27 @@ function collectParityErrors() {
   contains('mcp/src/version.ts', `FSB_MCP_VERSION = '${mcpVersion}'`, 'MCP runtime version');
   contains('mcp/build/version.js', `FSB_MCP_VERSION = '${mcpVersion}'`, 'compiled MCP runtime version');
   contains('mcp/build/version.d.ts', `FSB_MCP_VERSION = "${mcpVersion}"`, 'compiled MCP declaration version');
+  equal(readJson(claudePluginManifestPath).version, mcpVersion, 'Claude plugin manifest version');
+  try {
+    equal(
+      claudePluginServerEntry(readJson(claudePluginMcpConfigPath)).args[1],
+      `fsb-mcp-server@${mcpVersion}`,
+      'Claude plugin MCP launcher pin',
+    );
+  } catch (error) {
+    errors.push(error.message);
+  }
+  const claudePluginReadme = readText(claudePluginReadmePath);
+  const claudePluginReadmePins = claudePluginReadme.match(claudePluginPinPattern) || [];
+  if (claudePluginReadmePins.length === 0) {
+    errors.push(`${claudePluginReadmePath}: expected the pinned fsb-mcp-server command`);
+  }
+  for (const pin of new Set(claudePluginReadmePins)) {
+    equal(pin, `fsb-mcp-server@${mcpVersion}`, `${claudePluginReadmePath} pinned command`);
+  }
+  if (claudePluginReadme.includes('fsb-mcp-server@latest')) {
+    errors.push(`${claudePluginReadmePath}: must not launch fsb-mcp-server@latest`);
+  }
   contains('skills/fsb/SKILL.md', `version: ${extensionVersion}`, 'skill frontmatter');
   contains(
     'showcase/angular/src/app/core/seo/version.ts',

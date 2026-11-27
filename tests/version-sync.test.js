@@ -35,6 +35,9 @@ const mcpExclusiveTargets = [
   'mcp/src/version.ts',
   'mcp/native-host/runtime-integrity.json',
   'mcp/CHANGELOG.md',
+  'plugins/claude/.claude-plugin/plugin.json',
+  'plugins/claude/.mcp.json',
+  'plugins/claude/README.md',
 ];
 
 function run(args, root = repositoryRoot) {
@@ -271,6 +274,22 @@ function main() {
       `FSB_MCP_VERSION = "${nextMcpVersion}"`,
     );
 
+    const claudePlugin = readJson(fixtureRoot, 'plugins/claude/.claude-plugin/plugin.json');
+    const claudePluginMcp = readJson(fixtureRoot, 'plugins/claude/.mcp.json');
+    const claudePluginReadme = fs.readFileSync(path.join(fixtureRoot, 'plugins/claude/README.md'), 'utf8');
+    assert.equal(claudePlugin.version, nextMcpVersion, 'Claude plugin version follows the MCP version');
+    assert.deepEqual(
+      claudePluginMcp.mcpServers.fsb.args,
+      ['-y', `fsb-mcp-server@${nextMcpVersion}`],
+      'Claude plugin launcher pin follows the MCP version',
+    );
+    const readmePins = claudePluginReadme.match(/fsb-mcp-server@\d+\.\d+\.\d+/gu) || [];
+    assert(readmePins.length > 0, 'Claude plugin README keeps its pinned commands');
+    assert(
+      readmePins.every((pin) => pin === `fsb-mcp-server@${nextMcpVersion}`),
+      'Claude plugin README pins follow the MCP version',
+    );
+
     const independentCheck = run(['--check'], fixtureRoot);
     assert.equal(independentCheck.status, 0, independentCheck.stderr || independentCheck.stdout);
     assertIncludes(independentCheck.stdout, `extension ${nextExtensionVersion}; MCP ${nextMcpVersion}`);
@@ -301,6 +320,22 @@ function main() {
     assert.notEqual(mcpDrift.status, 0, 'check accepted MCP metadata drift');
     assertIncludes(mcpDrift.stderr, `MCP server metadata version: expected ${nextMcpVersion}, got 9.9.9`);
     fs.writeFileSync(serverPath, `${JSON.stringify(synchronizedServer, null, 2)}\n`);
+
+    const pluginMcpPath = path.join(fixtureRoot, 'plugins/claude/.mcp.json');
+    const synchronizedPluginMcp = fs.readFileSync(pluginMcpPath, 'utf8');
+    fs.writeFileSync(pluginMcpPath, synchronizedPluginMcp.replace(`fsb-mcp-server@${nextMcpVersion}`, 'fsb-mcp-server@latest'));
+    const pluginPinDrift = run(['--check'], fixtureRoot);
+    assert.notEqual(pluginPinDrift.status, 0, 'check accepted an unpinned Claude plugin launcher');
+    assertIncludes(pluginPinDrift.stderr, 'plugins/claude/.mcp.json must launch "npx -y fsb-mcp-server@X.Y.Z"');
+    fs.writeFileSync(pluginMcpPath, synchronizedPluginMcp);
+
+    const pluginManifestPath = path.join(fixtureRoot, 'plugins/claude/.claude-plugin/plugin.json');
+    const synchronizedPluginManifest = readJson(fixtureRoot, 'plugins/claude/.claude-plugin/plugin.json');
+    writeJson(fixtureRoot, 'plugins/claude/.claude-plugin/plugin.json', { ...synchronizedPluginManifest, version: '9.9.9' });
+    const pluginVersionDrift = run(['--check'], fixtureRoot);
+    assert.notEqual(pluginVersionDrift.status, 0, 'check accepted Claude plugin version drift');
+    assertIncludes(pluginVersionDrift.stderr, `Claude plugin manifest version: expected ${nextMcpVersion}, got 9.9.9`);
+    fs.writeFileSync(pluginManifestPath, `${JSON.stringify(synchronizedPluginManifest, null, 2)}\n`);
 
     const installSourcePath = path.join(fixtureRoot, 'mcp/src/install.ts');
     const synchronizedInstall = fs.readFileSync(installSourcePath, 'utf8');

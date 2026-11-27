@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "fsb": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "fsb-mcp-server@0.11.5"
+      ]
+    }
+  }
+}
