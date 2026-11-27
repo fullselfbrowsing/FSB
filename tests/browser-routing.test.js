@@ -124,6 +124,7 @@ async function main() {
   const visual = await load('tools/visual-session.js');
   const { resolveBrowser, pickDefaultBrowser, tabIdsIn, browserRouteFailure, normalizeBrowserName } = routing;
   const { matchBrowser, browserKeyCandidates, browserKeyStems, compactInstallId, endpointStartingIn } = routing;
+  const { lastFocusedBrowser } = routing;
   const browsers = await load('tools/browsers.js');
   const CLIENT = visual.getAllowedMcpVisualClientLabels()[0];
   const action = (params) => ({ visual_reason: 'test', client: CLIENT, ...params });
@@ -157,16 +158,18 @@ async function main() {
     const ok = (browser) => JSON.stringify({ ok: true, browser });
 
     checkEqual(JSON.stringify(resolveBrowser({ roster: both })), ok('chrome'), 'nothing ties the call: no focus reported, so chrome');
+    // Any Safari extension can attach and say it was focused just now, and the
+    // hub cannot tell it from FSB. It is not handed the calls that name no browser.
     checkEqual(
       JSON.stringify(resolveBrowser({ roster: [entry('chrome', { focusedAt: 5 }), entry('safari', { focusedAt: 9 })] })),
-      ok('safari'),
-      'nothing ties the call: the most recently focused browser',
+      ok('chrome'),
+      'nothing ties the call: a Chromium browser, however recently Safari says it was focused',
     );
     checkEqual(pickDefaultBrowser([entry('safari'), entry('edge')]), 'safari', 'no focus and no chrome: whichever attached first');
     checkEqual(
       pickDefaultBrowser([entry('chrome'), entry('safari', { focusedAt: 9 })]),
       'chrome',
-      'focus is not compared while one browser reports none: an older extension must not lose the default to a newer one',
+      'a Safari that reports focus does not take the default from a Chromium browser that reports none',
     );
     checkEqual(pickDefaultBrowser([entry('safari', { focusedAt: 9 })]), 'safari', 'a single browser is the default whatever it reports');
     checkEqual(pickDefaultBrowser([]), null, 'no browsers: no default');
@@ -495,6 +498,37 @@ async function main() {
       HOME,
       'once every browser reports focus, the profile focused last',
     );
+    // A Safari install cannot be told to be FSB: any Safari extension can
+    // attach and say it was focused just now. Focus orders the Chrome profiles
+    // and nothing else.
+    checkEqual(
+      pickDefaultBrowser([profile(WORK, { focusedAt: 5 }), profile(HOME, { focusedAt: 9 }), entry(SAFARI, { kind: 'safari', focusedAt: 50 })]),
+      HOME,
+      'a Safari focused after every profile still does not take the default from them',
+    );
+    checkEqual(
+      pickDefaultBrowser([profile(WORK, { since: 100 }), profile(HOME, { since: 200, focusedAt: 9 })]),
+      WORK,
+      'focus is not compared while one profile reports none: an older extension must not lose the default to a newer one',
+    );
+    checkEqual(
+      pickDefaultBrowser([profile(WORK, { focusedAt: 5 }), profile(HOME, { focusedAt: 9 }), safari]),
+      HOME,
+      'a Safari that reports no focus does not stop focus ordering the profiles',
+    );
+    checkEqual(pickDefaultBrowser([safari]), SAFARI, 'with no Chromium browser attached, Safari is the default');
+    checkEqual(JSON.stringify(resolveBrowser({ roster: three, named: 'safari' })), ok(SAFARI), 'and it is always reached by name');
+
+    check(typeof lastFocusedBrowser === 'function', 'browser-routing says which browser was focused last');
+    if (typeof lastFocusedBrowser === 'function') {
+      checkEqual(
+        lastFocusedBrowser([profile(WORK, { focusedAt: 5 }), entry(SAFARI, { kind: 'safari', focusedAt: 9 })]),
+        SAFARI,
+        'focused last means focused last, whatever the kind',
+      );
+      checkEqual(lastFocusedBrowser([profile(WORK, { focusedAt: 5 }), safari]), null, 'and is unknown while one browser reports no focus');
+      checkEqual(lastFocusedBrowser([]), null, 'or none is attached');
+    }
 
     checkEqual(JSON.stringify(resolveBrowser({ roster: three, named: HOME, current: WORK })), ok(HOME), 'naming a profile moves a session there');
     checkEqual(JSON.stringify(resolveBrowser({ roster: three, named: 'chrome', current: HOME })), ok(HOME), 'naming "chrome" does not move it between profiles');

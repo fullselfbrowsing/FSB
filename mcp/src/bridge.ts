@@ -603,8 +603,8 @@ export class WebSocketBridge {
 
   /**
    * The browser a call lands in when it names none. The rule is the sessions'
-   * own (pickDefaultBrowser): most recently focused, then Chrome, then
-   * whichever attached first.
+   * own (pickDefaultBrowser): a Chromium browser before Safari, then the most
+   * recently focused, then one with a window, then whichever attached first.
    */
   private _defaultSlot(): ExtensionSlot | null {
     if (this.slots.size === 0) return null;
@@ -1234,8 +1234,11 @@ export class WebSocketBridge {
     // socket. Otherwise any other extension in the browser could attach beside
     // FSB and, by claiming focus, be handed the calls that name no browser.
     // Safari's Origin is random, so there one install is the most that can be
-    // told to be FSB. A paired socket is past this: it has proved itself, and
-    // attaching it closes whatever is outside its pin.
+    // told to be FSB. Even that one may be another extension, which is why a
+    // Safari install never takes the default from a Chromium browser, however
+    // recently it says it was focused (pickDefaultBrowser). A paired socket is
+    // past this: it has proved itself, and attaching it closes whatever is
+    // outside its pin.
     const stranger = [...this.slots.values()].some((slot) => slot.kind === kind
       && (kind === 'safari' ? slot.identity !== identity : slot.origin !== origin));
     if (stranger && !this._isCurrentExtAuthority(ws)) {

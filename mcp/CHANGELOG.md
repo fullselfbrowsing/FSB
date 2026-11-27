@@ -26,7 +26,7 @@ Not published yet. The package version is still 0.11.5 and needs a bump before t
 - Only a second socket from the same install contests a slot, and it wins only when paired, as before. Another profile is never displaced.
 - Every attached Chromium browser runs the same extension ID. A second ID is turned away while the first is attached, as it was when the hub held one extension, and is listed by `status`, `doctor` and `list_browsers` with the reason. One Safari install attaches at a time.
 - A browser's name is never given to another install while the server process lives.
-- A call that names no browser goes to the one focused most recently once every attached browser reports focus. Until then it goes to a Chromium browser before Safari, one with a window open before one without, then the one attached longest. A worker restart does not move it.
+- A call that names no browser goes to a Chromium browser before Safari, whatever either reports. Among those, it goes to the one focused most recently once each reports focus, and until then to one with a window open before one without, then the one attached longest. Safari is used when a call names it, or when no Chromium browser is attached: a Safari Origin is random and its frames are self-reported, so another Safari extension that claims focus must not be handed these calls. A worker restart does not move the default.
 - One browser disconnecting fails only the calls it was holding. Before, every pending call was rejected. The rejection message is unchanged, so `sw_evicted` recovery still arms.
 - A reply is accepted only from the browser the request went to.
 - Each browser has its own liveness timer. Registering or reaping one no longer touches another's.

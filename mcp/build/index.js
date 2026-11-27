@@ -117,7 +117,7 @@ Options:
   --json              Emit machine-readable JSON for status or doctor
   --browser <name>    With several browsers attached, the one \`status\` or
                       \`doctor\` asks: a name they list (chrome-4187c196),
-                      or chrome / safari (default: the one used last)
+                      or chrome / safari (default: where unnamed calls go)
 `);
 }
 const DOCTOR_COMPATIBILITY_LABELS = {

@@ -134,27 +134,41 @@ export function normalizeBrowserName(value: unknown): string | null {
 }
 
 /**
+ * The browser focused most recently, or null unless every one of them reports
+ * focus. An extension from before the report sends none, and would otherwise
+ * lose to any browser that does.
+ */
+export function lastFocusedBrowser(roster: readonly BrowserRosterEntry[]): string | null {
+  if (roster.length === 0 || !roster.every((entry) => entry.focusedAt !== null)) return null;
+  return roster.reduce((latest, entry) => (
+    (entry.focusedAt as number) > (latest.focusedAt as number) ? entry : latest
+  )).key;
+}
+
+/**
  * The browser a call lands in when nothing has tied it to one.
  *
- * When every attached browser reports focus, it is the one focused most
- * recently. Focus is compared only then: an extension from before the report
- * sends none, and would otherwise lose the default to any browser that does.
+ * A Chromium browser before Safari, whatever either reports. The hub admits
+ * one Chromium extension id at a time, so every Chromium browser attached is
+ * that extension. A Safari Origin is random and its state frame says what it
+ * likes, so the hub cannot tell FSB in Safari from any other Safari extension.
+ * If Safari's focus reports could win the default, any Safari extension could
+ * claim focus and be handed every call that names no browser. Safari is used
+ * when a call names it, or when no Chromium browser is attached. (A paired
+ * Safari is not an exception: pairing it closes every Chromium browser.)
  *
- * Without focus the choice has to be one that does not move by itself: a
- * Chromium browser before Safari (agents that have always driven Chrome stay
- * there the day Safari attaches), one with a window open before one without,
- * then the one that has been attached longest. `since` survives a worker
- * restart, so a restart does not hand the default to another profile.
+ * Among those, the one focused most recently, once every one of them reports
+ * focus. Otherwise the choice has to be one that does not move by itself: one
+ * with a window open before one without, then the one attached longest.
+ * `since` survives a worker restart, so a restart does not hand the default to
+ * another profile.
  */
 export function pickDefaultBrowser(roster: readonly BrowserRosterEntry[]): string | null {
   if (roster.length === 0) return null;
-  if (roster.every((entry) => entry.focusedAt !== null)) {
-    return roster.reduce((latest, entry) => (
-      (entry.focusedAt as number) > (latest.focusedAt as number) ? entry : latest
-    )).key;
-  }
   const chromium = roster.filter((entry) => entry.kind === 'chrome');
   const ofKind = chromium.length > 0 ? chromium : roster;
+  const focused = lastFocusedBrowser(ofKind);
+  if (focused) return focused;
   // A count of zero is the only thing that says "no window". Null is a build
   // that has not reported yet, and is not held against it.
   const withWindow = ofKind.filter((entry) => entry.windows !== 0);

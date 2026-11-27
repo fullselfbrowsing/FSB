@@ -3,8 +3,8 @@ import type { AgentScope } from './agent-scope.js';
 import type { BrowserRosterEntry, MCPMessageType, MCPResponse } from './types.js';
 import {
   browserRouteFailure,
+  lastFocusedBrowser,
   normalizeBrowserName,
-  pickDefaultBrowser,
   resolveBrowser,
   tabIdsIn,
 } from './browser-routing.js';
@@ -137,8 +137,9 @@ export function connectedBrowserSummary(
 ): Array<{ browser: string; current: boolean; lastFocused: boolean }> | null {
   const roster = rosterOf(bridge);
   if (!roster || roster.length < 2) return null;
-  // Only meaningful when every browser reports focus: see pickDefaultBrowser.
-  const lastFocused = roster.every((entry) => entry.focusedAt !== null) ? pickDefaultBrowser(roster) : null;
+  // Known only when every browser reports focus. It is not always the default:
+  // a Safari focused last does not take that from a Chromium browser.
+  const lastFocused = lastFocusedBrowser(roster);
   return roster.map((entry) => ({
     browser: entry.key,
     current: entry.key === current,

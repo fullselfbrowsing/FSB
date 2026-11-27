@@ -515,7 +515,7 @@ Each MCP session decides the browser for every call before it registers or sends
 2. The browser the call's tab lives in, as far as the session has seen that tab.
 3. The browser the session's last call used. Naming a browser once is therefore the switch.
 4. `FSB_BROWSER` from the client's MCP config, which sets where a new session starts.
-5. The default: the browser focused most recently, once every attached browser reports focus. Until then, a Chromium browser before Safari, one with a window open before one without, then the one attached longest. Reporting focus needs the extension release after 0.9.95.
+5. The default: a Chromium browser before Safari. Among those, the one focused most recently once each reports focus; until then, one with a window open before one without, then the one attached longest. Safari is the default only when no Chromium browser is attached, because the bridge cannot tell FSB in Safari from another Safari extension that claims focus. Name it (`"safari"`) or set `FSB_BROWSER` to work there. Reporting focus needs the extension release after 0.9.95.
 
 A kind means the browser of that kind the session is already in, and otherwise the default among them. So `"chrome"` works as it did with one Chrome and never moves a session between profiles.
 

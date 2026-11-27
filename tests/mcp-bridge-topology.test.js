@@ -2585,6 +2585,13 @@ function attachFakeBrowser(socket) {
   };
 }
 
+// A call the test answers later. If an assertion fails first, cleanup rejects
+// it, and that must be reported as the case's failure, not crash the run.
+function inFlight(promise) {
+  promise.catch(() => {});
+  return promise;
+}
+
 async function attachBrowser(port, origin, options = {}) {
   const socket = await createBrowserSocket(port, { origin, ...options });
   return { socket, ...attachFakeBrowser(socket) };
@@ -2836,14 +2843,19 @@ async function runLegacyRelayKeepsItsBrowser(WebSocketBridge) {
         () => hub.topology.browsers.find((entry) => entry.key === CHROME_KEY).focusedAt !== null,
         'chrome reports an older focus',
       );
-      const unnamed = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
-      await waitFor(() => safari.requests().length === 1, 'once both report, the default is the most recently focused browser');
-      safari.answer(safari.requests()[0].id, { success: true });
+      // The hub cannot tell FSB in Safari from any other Safari extension, so
+      // a later focus there does not move the default off a Chromium browser.
+      // An old relay staying put when the default does move is
+      // runLegacyRelayStaysWhenTheDefaultMoves.
+      const unnamed = inFlight(hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }));
+      await waitFor(() => chrome.requests().length === 3, 'once both report, a Safari focused more recently still does not take the default from chrome');
+      assertEqual(safari.requests().length, 0, 'safari is sent nothing it was not named for');
+      chrome.answer(chrome.requests()[2].id, { success: true });
       await unnamed;
 
       legacy.send('legacy-2');
-      await waitFor(() => chrome.requests().length === 3, 'the old relay stays in the browser it was given');
-      assertEqual(safari.requests().length, 1, 'and is not moved when the default changes');
+      await waitFor(() => chrome.requests().length === 4, 'the old relay stays in the browser it was given');
+      assertEqual(safari.requests().length, 0, 'and nothing of it reaches safari');
       chrome.answer('legacy-2', { success: true });
       await waitFor(() => legacy.reply('legacy-2') !== null, 'second answer returns');
       assertEqual(legacy.state().extensionConnected, true, 'its state describes its own browser');
@@ -2855,7 +2867,7 @@ async function runLegacyRelayKeepsItsBrowser(WebSocketBridge) {
       legacy.send('legacy-3');
       await waitFor(() => legacy.reply('legacy-3') !== null, 'a frame sent meanwhile is answered');
       assertEqual(legacy.reply('legacy-3').payload.error, 'extension_not_connected', 'as not connected, like a worker restart always was');
-      assertEqual(safari.requests().length, 1, 'and is not handed to the other browser');
+      assertEqual(safari.requests().length, 0, 'and is not handed to the other browser');
 
       chrome = await attachBrowser(port, MULTI_CHROME_ORIGIN);
       resources.sockets.push(chrome.socket);
@@ -2874,10 +2886,60 @@ async function runLegacyRelayKeepsItsBrowser(WebSocketBridge) {
         'past the grace, the old relay is told a browser is connected again, unprompted',
         1000,
       );
-      assertEqual(safari.requests().length, 1, 'before it has sent anything more');
+      assertEqual(safari.requests().length, 0, 'before it has sent anything more');
       legacy.send('legacy-5');
-      await waitFor(() => safari.requests().length === 2, 'and its next frame is given the browser that is left');
-      assertEqual(safari.requests()[1].id, 'legacy-5', 'delivered as it was sent');
+      await waitFor(() => safari.requests().length === 1, 'and its next frame is given the browser that is left');
+      assertEqual(safari.requests()[0].id, 'legacy-5', 'delivered as it was sent');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+// The default moves between Chrome profiles as the user switches between
+// them. A relay that names no browser was given one, and must stay there.
+async function runLegacyRelayStaysWhenTheDefaultMoves(WebSocketBridge) {
+  await withTempHome('bridge-legacy-relay-default-moves', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'legacy-relay-moves-hub',
+      handshakeTimeoutMs: 100,
+      extensionIdentifyTimeoutMs: 2000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    try {
+      await hub.connect();
+      const profileA = await attachProfile(port, INSTALL_A, { state: { focusedAt: Date.now() - 60_000 } });
+      const profileB = await attachProfile(port, INSTALL_B, { state: { focusedAt: Date.now() - 120_000 } });
+      resources.sockets.push(profileA.socket, profileB.socket);
+      await waitFor(
+        () => browserKeys(hub) === `${KEY_A},${KEY_B}` && hub.topology.browsers.every((entry) => entry.focusedAt !== null),
+        'both profiles attach and report focus',
+      );
+
+      const legacy = await createLegacyRelay(port, 'legacy-relay-moves');
+      resources.sockets.push(legacy.socket);
+      legacy.send('moves-1');
+      await waitFor(() => profileA.requests().length === 1, 'an old relay is given the profile focused last');
+      profileA.answer('moves-1', { success: true });
+      await waitFor(() => legacy.reply('moves-1') !== null, 'and its answer returns');
+
+      profileB.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() }));
+      await waitFor(
+        () => hub.topology.browsers.find((entry) => entry.key === KEY_B).focusedAt > Date.now() - 60_000,
+        'the other profile takes focus',
+      );
+      const unnamed = inFlight(hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }));
+      await waitFor(() => profileB.requests().length === 1, 'the default moves to the profile focused last');
+      profileB.answer(profileB.requests()[0].id, { success: true });
+      await unnamed;
+
+      legacy.send('moves-2');
+      await waitFor(() => profileA.requests().length === 2, 'the old relay stays in the profile it was given');
+      assertEqual(profileB.requests().length, 1, 'and is not moved when the default changes');
+      assertEqual(profileA.requests()[1].id, 'moves-2', 'delivered as it was sent');
     } finally {
       await cleanup(resources);
     }
@@ -3006,7 +3068,7 @@ async function runSafariIdentityAndFocus(WebSocketBridge) {
       await sleep(40);
       assertEqual(entry(CHROME_KEY).focusedAt, first, 'a second report inside the rate limit is dropped');
       const unnamed = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} });
-      await waitFor(() => chrome.requests().length === 1, 'the default follows the browser focused last');
+      await waitFor(() => chrome.requests().length === 1, 'chrome is the default');
       chrome.answer(chrome.requests()[0].id, { success: true });
       await unnamed;
 
@@ -3672,6 +3734,29 @@ async function runOneExtensionAtATime(WebSocketBridge, auth) {
         extensionId: 'com.fullselfbrowsing.fsb.Extension (UNSIGNED)',
       }));
       await waitFor(() => hub.isConnectedTo('safari-b3f6f5c2'), 'and so is Safari, which is another kind');
+
+      // A Safari Origin is random and its frames say what they like, so the
+      // hub cannot tell FSB in Safari from any other Safari extension. However
+      // recently it says it was focused, it is not handed the calls that name
+      // no browser while a Chromium browser is attached.
+      fsb.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() - 60_000 }));
+      second.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() - 30_000 }));
+      safari.socket.send(JSON.stringify({ type: 'mcp:browser-state', focusedAt: Date.now() + 60_000 }));
+      await waitFor(
+        () => hub.topology.browsers.length === 3 && hub.topology.browsers.every((entry) => entry.focusedAt !== null),
+        'every browser reports focus, Safari last',
+      );
+      const unnamedBesideSafari = inFlight(hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }));
+      await waitFor(() => second.requests().length === 1, 'a call that names no browser goes to the Chrome profile focused last');
+      assertEqual(safari.requests().length, 0, 'and not to Safari, focused later still');
+      assertEqual(fsb.requests().length, 1, 'nor to the other profile');
+      second.answer(second.requests()[0].id, { success: true });
+      await unnamedBesideSafari;
+      const namedSafari = inFlight(hub.sendAndWait({ type: 'mcp:get-tabs', payload: {}, browser: 'safari-b3f6f5c2' }));
+      await waitFor(() => safari.requests().length === 1, 'Safari is still reached by name');
+      safari.answer(safari.requests()[0].id, { success: true });
+      await namedSafari;
+
       const secondSafari = await attachBrowser(port, 'safari-web-extension://11111111-2222-4333-8444-555555555555');
       resources.sockets.push(secondSafari.socket);
       secondSafari.socket.send(installState('deadbeef-9d0e-4f0b-8a53-0d3a2f1c9e77', {
@@ -3683,6 +3768,10 @@ async function runOneExtensionAtATime(WebSocketBridge, auth) {
       fsb.socket.close();
       second.socket.close();
       await waitFor(() => browserKeys(hub) === 'safari-b3f6f5c2', 'the first extension leaves');
+      const unnamedSafariAlone = inFlight(hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }));
+      await waitFor(() => safari.requests().length === 2, 'with no Chromium browser left, Safari is the default');
+      safari.answer(safari.requests()[1].id, { success: true });
+      await unnamedSafariAlone;
       const later = await attachProfile(port, otherInstall, { origin: otherOrigin });
       resources.sockets.push(later.socket);
       await waitFor(() => hub.isConnectedTo('chrome-c0ffee00'), 'and only then can another extension id attach, as it always could');
@@ -3797,6 +3886,7 @@ async function run() {
   await runCase('one browser closing leaves the other\'s calls alone', () => runOneBrowserClosingLeavesTheOther(WebSocketBridge));
   await runCase('a reply from another browser is ignored', () => runReplyFromAnotherBrowserIsIgnored(WebSocketBridge));
   await runCase('a relay that names no browser keeps the one it was given', () => runLegacyRelayKeepsItsBrowser(WebSocketBridge));
+  await runCase('a relay that names no browser stays when the default moves', () => runLegacyRelayStaysWhenTheDefaultMoves(WebSocketBridge));
   await runCase('pairing one browser closes the other', () => runPairingClosesTheOtherBrowser(WebSocketBridge, auth));
   await runCase('safari identity and focus reports', () => runSafariIdentityAndFocus(WebSocketBridge));
   await runCase('each browser has its own liveness reaper', () => runEachBrowserHasItsOwnReaper(WebSocketBridge));
