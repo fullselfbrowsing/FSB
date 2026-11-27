@@ -1870,7 +1870,11 @@ async function rebuildWithWakeLock(
   return Object.freeze({ ok: true, receipt: rebuilt });
 }
 
-type RegistrationStep = Readonly<{ ok: true }> | Readonly<{ ok: false; reason: string }>;
+// registrationRemoved marks a removal that failed after the registration
+// itself was already gone, so the browser can no longer reach the helper.
+type RegistrationStep =
+  | Readonly<{ ok: true }>
+  | Readonly<{ ok: false; reason: string; registrationRemoved?: true }>;
 
 /**
  * Puts back registrations an uninstall removed just before the runtime itself
@@ -2005,17 +2009,23 @@ async function removeRegistrationLocked(
     return fail('registration-remove-failed');
   }
   if (registry) {
+    // The registry value is already gone; only its emptied key is left.
+    const cleanupFailed = (): RegistrationStep => Object.freeze({
+      ok: false,
+      reason: 'registry-key-cleanup-failed',
+      registrationRemoved: true,
+    });
     let keyFact;
     try {
       keyFact = await adapter.inspectCanonicalKey();
     } catch {
       keyFact = Object.freeze({ status: 'unavailable' as const });
     }
-    if (keyFact.status !== 'empty') return fail('registry-key-cleanup-failed');
+    if (keyFact.status !== 'empty') return cleanupFailed();
     try {
       await adapter.deleteCanonicalKeyIfEmpty();
     } catch {
-      return fail('registry-key-cleanup-failed');
+      return cleanupFailed();
     }
   }
   return Object.freeze({ ok: true });
@@ -2693,7 +2703,10 @@ async function removeHelperLocked(
         helper.markerFact,
         helper.extensionId,
       );
-      if (!removed.ok) return fail(removed.reason);
+      if (!removed.ok) {
+        if (removed.registrationRemoved) removedBrowsers.push(browser);
+        return fail(removed.reason);
+      }
       removedBrowsers.push(browser);
     }
     let unchanged = false;

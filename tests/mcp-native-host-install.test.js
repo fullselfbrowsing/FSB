@@ -3673,6 +3673,11 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
   const failingRegistrationWrites = new Set((options.failRegistrationWrites || []).map((browser) => (
     platformName === 'win32' ? layouts[browser].registration.key : layouts[browser].manifestPath
   )));
+  // Windows browsers whose emptied registry key cannot be deleted once their
+  // registry value is gone.
+  const failingKeyCleanups = new Set(platformName === 'win32'
+    ? (options.failKeyCleanups || []).map((browser) => layouts[browser].registration.key)
+    : []);
   const platformDependencies = {
     files: {
       inspectFile: async (pathname) => {
@@ -3717,6 +3722,7 @@ function fakeEnsureHarness(modules, platformName, options = {}) {
         : Object.freeze({ status: 'empty' })),
       deleteEmptyKey: async (view, key) => {
         trace.push(`registry:key-delete:${view}:${key}`);
+        if (failingKeyCleanups.has(key)) throw new Error('sensitive:EACCES');
       },
     },
   };
@@ -5161,6 +5167,33 @@ async function runEnsureTransaction() {
       equal(harness.stable().marker.origin, ORIGIN, `${platformName} the failed runtime removal keeps the old helper`);
       equal(harness.publishCount(), 0, `${platformName} the failed runtime removal publishes nothing`);
     }
+  }
+  {
+    // On Windows a registry value goes first and its emptied key after it, so
+    // a key cleanup that fails still leaves that browser unregistered.
+    const { harness, result } = await replaceFor('win32', { failKeyCleanups: ['chrome'] });
+    equal(result.status, 'refused', 'win32 a replacement whose first key cleanup fails is refused');
+    equal(result.reason, 'replacement-incomplete', 'win32 a registry value removed before its key cleanup failed counts as removed');
+    deepEqual(harness.registeredBrowsers(), ['edge'], 'win32 the browser whose value was removed stays unregistered');
+    equal(harness.publishCount(), 0, 'win32 a replacement stopped by a key cleanup publishes nothing');
+    equal(harness.stable().marker.origin, ORIGIN, 'win32 a replacement stopped by a key cleanup keeps the old helper');
+    const rerun = await installer.installNativeHostBrowser(
+      { browser: 'chrome', extensionId: DEVELOPMENT_EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(rerun.status, 'installed', 'win32 running the same install again finishes the replacement');
+  }
+  {
+    const harness = fakeEnsureHarness(modules, 'win32', {
+      installed: { provenance: 'auto' },
+      registered: ['chrome', 'edge'],
+      failKeyCleanups: ['chrome'],
+    });
+    const result = await installer.uninstallAllNativeHost({}, harness.dependencies);
+    equal(result.outcome, 'refused', 'win32 uninstall-all whose first key cleanup fails is refused');
+    equal(result.reason, 'registry-key-cleanup-failed', 'win32 uninstall-all reports the failed key cleanup');
+    deepEqual(result.removedBrowsers, ['chrome'], 'win32 uninstall-all lists the browser whose value it already removed');
+    deepEqual(harness.registeredBrowsers(), ['edge'], 'win32 uninstall-all stops before the next browser');
   }
   for (const platformName of ['darwin', 'linux', 'win32']) {
     const harness = fakeEnsureHarness(modules, platformName, {});
