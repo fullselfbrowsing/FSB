@@ -397,6 +397,46 @@ async function main() {
     check(/paired to another browser/.test(refusal) && /pair --reset/.test(refusal), 'naming a browser the hub turned away explains why and how to release it');
     checkEqual(refusedBridge.calls.length, 0, 'and sends nothing');
 
+    // A session already in Safari when pairing another browser turns Safari
+    // away. Its next call names the Safari key, not the kind, and is still
+    // told why, by the latest refusal.
+    const pinnedBridge = createBridge({
+      roster: [profile('chrome-aaaaaaaa'), entry('safari-1a2b3c4d', { kind: 'safari' })],
+    });
+    const inSafari = createSession(pinnedBridge);
+    await inSafari.call('list_tabs', { browser: 'safari' });
+    checkEqual(inSafari.agentScope.browserSession().current, 'safari-1a2b3c4d', 'naming the kind puts the session in that safari');
+    pinnedBridge.roster = [profile('chrome-aaaaaaaa', { authorized: true })];
+    pinnedBridge.refused = [
+      { kind: 'safari', reason: 'browser_limit_reached', at: 1 },
+      { kind: 'safari', reason: 'extension_origin_pin_mismatch', at: 2 },
+    ];
+    const sentBeforeAway = pinnedBridge.calls.length;
+    const turnedAway = textOf(await inSafari.call('list_tabs'));
+    check(
+      /paired to another browser/.test(turnedAway) && /pair --reset/.test(turnedAway),
+      'a session in a safari the hub turned away is told why and how to release it',
+    );
+    checkEqual(pinnedBridge.calls.length, sentBeforeAway, 'and nothing is sent');
+
+    // A Chrome profile that is away is not blamed on a refusal of another
+    // extension ID: several can be about, and a refusal names no profile.
+    const closedBridge = createBridge({ roster: [profile('chrome-aaaaaaaa'), profile('chrome-bbbbbbbb')] });
+    const inProfile = createSession(closedBridge);
+    await inProfile.call('list_tabs', { browser: 'chrome-aaaaaaaa' });
+    closedBridge.roster = [profile('chrome-bbbbbbbb')];
+    closedBridge.refused = [{
+      kind: 'chrome',
+      reason: 'extension_origin_pin_mismatch',
+      at: 3,
+      extensionId: 'ponmlkjihgfedcbaponmlkjihgfedcba',
+    }];
+    const closed = textOf(await inProfile.call('list_tabs'));
+    check(
+      /not connected/.test(closed) && !/pair --reset/.test(closed),
+      'a chrome profile that is away is reported as away, not as turned away',
+    );
+
     const configuredBridge = createBridge();
     const configured = createSession(configuredBridge, { FSB_BROWSER: 'safari' });
     await configured.call('list_tabs');

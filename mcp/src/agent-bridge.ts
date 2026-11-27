@@ -43,6 +43,29 @@ function rosterOf(bridge: WebSocketBridge): BrowserRosterEntry[] | null {
 }
 
 /**
+ * Why the hub turned away the browser a call belongs to, if it did. A refusal
+ * knows only the kind it turned away (a refused upgrade names no install), so
+ * a kind matches every refusal of that kind. A Safari key matches a Safari
+ * refusal too: the hub attaches at most one unpaired Safari install at a time,
+ * so a Safari refusal is about the Safari the session was in. A Chrome key
+ * matches none: several extension IDs can be about, and a refusal of another
+ * one says nothing about a profile that simply closed. The latest one counts.
+ */
+function refusalReasonFor(refusals: unknown, browser: string | null): string | null {
+  if (!browser || !Array.isArray(refusals)) return null;
+  let latest: { reason: string; at: number } | null = null;
+  for (const raw of refusals) {
+    if (!raw || typeof raw !== 'object') continue;
+    const { kind, reason, at } = raw as { kind?: unknown; reason?: unknown; at?: unknown };
+    if (typeof reason !== 'string') continue;
+    if (kind !== browser && !(kind === 'safari' && browser.startsWith('safari-'))) continue;
+    const when = typeof at === 'number' && Number.isFinite(at) ? at : 0;
+    if (latest === null || when >= latest.at) latest = { reason, at: when };
+  }
+  return latest ? latest.reason : null;
+}
+
+/**
  * Decide which browser a call goes to, and with which of the session's
  * identities. Decided once per call: the registration, the send and any retry
  * all use the same answer, so a browser that drops out in the middle cannot
@@ -87,13 +110,11 @@ export function routeBrowserCall(
     const failure = browserRouteFailure(route);
     // A browser the hub turned away cannot be told why itself (a refused
     // upgrade carries no reason), so the caller that asks for it is.
-    const refusals = (bridge as { refusedBrowsers?: unknown }).refusedBrowsers;
-    const refused = Array.isArray(refusals)
-      ? refusals.find((entry) => entry && (entry as { kind?: unknown }).kind === route.browser)
-      : null;
-    if (refused && typeof (refused as { reason?: unknown }).reason === 'string') {
-      failure.refusalReason = (refused as { reason: string }).reason;
-    }
+    const refusalReason = refusalReasonFor(
+      (bridge as { refusedBrowsers?: unknown }).refusedBrowsers,
+      route.browser,
+    );
+    if (refusalReason) failure.refusalReason = refusalReason;
     return { ok: false, failure };
   }
   const place = route.browser ?? route.scope ?? null;
