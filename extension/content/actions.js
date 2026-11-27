@@ -5311,7 +5311,25 @@ const tools = {
         const toggleLabel = FSB.visibleLabelOfHiddenToggle?.(element);
         if (toggleLabel) {
           const ticked = await tickThroughLabel(element, toggleLabel, params.checked !== undefined ? !!params.checked : !element.checked);
-          if (!ticked.confirmed) { lastAttemptError = ticked.error; continue; }
+          if (!ticked.dispatched) { lastAttemptError = ticked.error; continue; }
+          // The label was clicked, but the input did not reach the wanted
+          // state. The page may keep the state elsewhere or update it later,
+          // so no further selector is tried (a second click could toggle it
+          // back) and the outcome is reported as unknown.
+          if (!ticked.confirmed) {
+            actionRecorder.record(null, 'toggleCheckbox', params, { selectorTried: selectors[0], selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(toggleLabel), success: false, error: ticked.error, hadEffect: false, verification: ticked.verification, duration: Date.now() - startTime });
+            return {
+              success: false,
+              outcome: 'unknown',
+              mayHaveExecuted: true,
+              checked: element.checked,
+              viaLabel: true,
+              selector: currentSelector,
+              hadEffect: false,
+              error: `${ticked.error}. Inspect the page before retrying.`,
+              verification: ticked.verification ? { verified: ticked.verification.verified, reason: ticked.verification.reason, changes: ticked.verification.changes } : null
+            };
+          }
           actionRecorder.record(null, 'toggleCheckbox', params, { selectorTried: selectors[0], selectorUsed: currentSelector, elementFound: true, elementDetails: captureElementDetails(toggleLabel), success: true, hadEffect: true, verification: ticked.verification, duration: Date.now() - startTime });
           return { success: true, checked: element.checked, viaLabel: true, selector: currentSelector, selectorIndex, usedFallback: selectorIndex > 0, hadEffect: true, verification: { verified: ticked.verification.verified, reason: ticked.verification.reason, changes: ticked.verification.changes } };
         }

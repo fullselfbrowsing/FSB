@@ -745,10 +745,20 @@ test('a state that does not change is reported as a failure', async () => {
 
   const toggled = (await ctx.execute('toggleCheckbox', { selector: '#email' })).result;
   assert.equal(toggled.success, false, JSON.stringify(toggled));
-  assert.equal(toggled.error, 'Clicked its label, but the checkbox is still unchecked');
+  assert.equal(toggled.error, 'Clicked its label, but the checkbox is still unchecked. Inspect the page before retrying.');
+  assert.equal(toggled.outcome, 'unknown', 'the label click went out, so the outcome is unknown');
+  assert.equal(toggled.mayHaveExecuted, true);
   assert.equal(page.email.checked, false);
   assert.equal(page.emailLabel.events.filter((type) => type === 'click').length, 1, 'the label was clicked once, not retried');
   assert.equal(page.email.scriptWrites, 0, 'the state is not forced by script');
+
+  // More selectors for the same control: the label is still clicked once,
+  // since a second click could toggle a control whose state lives elsewhere.
+  page.emailLabel.events.length = 0;
+  const cascade = (await ctx.execute('toggleCheckbox', { selector: '#email', selectors: ['#email', '#email'] })).result;
+  assert.equal(cascade.success, false);
+  assert.equal(cascade.outcome, 'unknown');
+  assert.equal(page.emailLabel.events.filter((type) => type === 'click').length, 1, 'no further selector is tried after the label click');
 
   const wanted = (await ctx.execute('toggleCheckbox', { selector: '#email', checked: true })).result;
   assert.equal(wanted.success, false);
@@ -774,7 +784,8 @@ test('a change away from the wanted state is reported as a failure', async () =>
 
   const toggled = (await ctx.execute('toggleCheckbox', { selector: '#racy', checked: true })).result;
   assert.equal(toggled.success, false, JSON.stringify(toggled));
-  assert.equal(toggled.error, 'Clicked its label, but the checkbox is now unchecked');
+  assert.equal(toggled.error, 'Clicked its label, but the checkbox is now unchecked. Inspect the page before retrying.');
+  assert.equal(toggled.mayHaveExecuted, true);
   assert.equal(racy.checked, false);
   assert.equal(racyLabel.events.filter((type) => type === 'click').length, 1);
 });
