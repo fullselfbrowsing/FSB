@@ -113,6 +113,24 @@ async function run() {
     check(message.options && message.options.maxElements === 200, 'options.maxElements is capped at 200');
   }
   {
+    // The DOM snapshot resource (mcp/src/resources/index.ts) sends this payload.
+    const client = stubClient();
+    await getDOM.call(client, { agentId: 'agent_a', maxElements: 2000, prioritizeViewport: true });
+    const { message } = client.sent[0];
+    check(message.options && message.options.prioritizeViewport === true && message.options.maxElements === 200,
+      'the resource request keeps prioritizeViewport, within the 200 cap');
+  }
+  {
+    const client = stubClient();
+    await getDOM.call(client, { agentId: 'agent_a', prioritizeViewport: false });
+    const { message } = client.sent[0];
+    check(message.options && message.options.prioritizeViewport === false, 'prioritizeViewport false is passed through');
+    const plain = stubClient();
+    await getDOM.call(plain, { agentId: 'agent_a', maxElements: 120 });
+    check(!Object.prototype.hasOwnProperty.call(plain.sent[0].message.options, 'prioritizeViewport'),
+      'without prioritizeViewport the content default applies');
+  }
+  {
     const client = stubClient();
     await getDOM.call(client, { agentId: 'agent_a', maxElements: 0 });
     const { message } = client.sent[0];

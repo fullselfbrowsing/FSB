@@ -1803,12 +1803,16 @@ class MCPBridgeClient {
       return resolved;
     }
     // The content script builds the snapshot from request.options. Each
-    // element costs about half a kilobyte, so a request is capped at 200.
+    // element costs about half a kilobyte, so every request is capped at 200,
+    // the DOM snapshot resource's request for 2000 included.
+    // prioritizeViewport passes through when given; the content default is true.
     const requested = Number(payload.maxElements);
     const maxElements = Number.isFinite(requested) && requested >= 1 ? Math.min(Math.floor(requested), 200) : 50;
+    const options = { maxElements };
+    if (typeof payload.prioritizeViewport === 'boolean') options.prioritizeViewport = payload.prioritizeViewport;
     const response = await this._sendToContentScript(resolved.tabId, {
       action: 'getDOM',
-      options: { maxElements },
+      options,
     });
     return response;
   }
