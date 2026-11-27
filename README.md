@@ -1,4 +1,4 @@
-# FSB v0.9.95 Full Self Browsing
+# FSB v0.9.96 Full Self Browsing
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.95-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.96-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
 [![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25-FF6B35?style=for-the-badge)](#benchmark)
@@ -65,7 +65,7 @@ FSB: [AI-reviewed result (277/300)](https://github.com/fullselfbrowsing/FSB/blob
 
 FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.95 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.96 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 
@@ -92,6 +92,8 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 | Codex | `npx -y fsb-mcp-server@latest install --codex` |
 | Cline | `npx -y fsb-mcp-server@latest install --cline` |
 | All at once | `npx -y fsb-mcp-server@latest install --all` |
+
+**LM Studio (0.3.17+):** [![Add MCP Server fsb to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](lmstudio://add_mcp?name=fsb&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImZzYi1tY3Atc2VydmVyIl19) · **Gemini CLI:** `gemini extensions install https://github.com/fullselfbrowsing/FSB`
 
 Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
 

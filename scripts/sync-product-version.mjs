@@ -33,6 +33,7 @@ const mcpStructuredTargets = Object.freeze([
   'mcp/build/version.js',
   'mcp/src/version.ts',
   'mcp/native-host/runtime-integrity.json',
+  'gemini-extension.json',
 ]);
 
 const currentSurfaceTargets = Object.freeze([
@@ -430,6 +431,9 @@ function setMcpVersion(version) {
   }
   server.packages[0].version = version;
   changed.push(writeJson('mcp/server.json', server));
+  const geminiExtension = readJson('gemini-extension.json');
+  geminiExtension.version = version;
+  changed.push(writeJson('gemini-extension.json', geminiExtension));
   changed.push(replaceExactly(
     'mcp/src/version.ts',
     /FSB_MCP_VERSION = '\d+\.\d+\.\d+'/gu,
@@ -514,6 +518,7 @@ function collectParityErrors() {
   const server = readJson('mcp/server.json');
   equal(server.version, mcpVersion, 'MCP server metadata version');
   equal(server.packages?.[0]?.version, mcpVersion, 'MCP server package version');
+  equal(readJson('gemini-extension.json').version, mcpVersion, 'Gemini CLI extension manifest version');
   contains('mcp/src/version.ts', `FSB_MCP_VERSION = '${mcpVersion}'`, 'MCP runtime version');
   contains('mcp/build/version.js', `FSB_MCP_VERSION = '${mcpVersion}'`, 'compiled MCP runtime version');
   contains('mcp/build/version.d.ts', `FSB_MCP_VERSION = "${mcpVersion}"`, 'compiled MCP declaration version');

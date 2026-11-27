@@ -2,6 +2,33 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+<a id="v0.11.6"></a>
+
+## 0.11.6 (2026-11-15)
+
+Security update for the bundled runtime dependencies, plus a clean shutdown when the MCP host closes stdout, released alongside FSB extension 0.9.96. Thanks to Trace824, whose 0.11.3 patch in #159 this release carries forward.
+
+### Security
+
+- `npm audit --omit=dev` for the package drops from 13 flagged packages (1 critical, 9 high, 3 moderate) to 3, all from the two advisories listed below (the SDK is flagged only through `@hono/node-server`).
+- Bundled direct dependencies: `@modelcontextprotocol/sdk` 1.29.0 → 1.32.2, `ws` 8.19.0 → 8.23.0, `smol-toml` 1.6.1 → 1.9.1.
+- Bundled transitive dependencies refreshed within their declared ranges: `express` 5.3.0, `body-parser` 2.4.0, `proxy-addr` 2.0.8, `hono` 4.13.18, `@hono/node-server` 1.19.19, `qs` 6.17.1, `path-to-regexp` 8.4.2, `fast-uri` 3.1.9, `ip-address` 10.7.6, `express-rate-limit` 8.7.4, and `type-is` 2.1.0.
+- `content-type` is 2.1.0 everywhere in the bundled runtime. `express`, `body-parser`, and `type-is` now require 2.x while the SDK still declares ^1.0.5, so the SDK's copy is set through `overrides`; otherwise npm would nest extra copies, which the native host's flat runtime does not allow. Streamable HTTP accepts and rejects the same `Content-Type` headers with either version.
+- Two advisories remain:
+  - `zod` 3.25.76, GHSA-mrhx-c7xc-m3w5 (high): validating an oversized constrained collection can exhaust memory. The fix exists only in zod 4, a major upgrade planned for a later release. Both the stdio server and the HTTP server accept loopback connections only, so the input comes from a local MCP client.
+  - `@hono/node-server` 1.19.19, GHSA-rmxm-3fg6-px4f (moderate): `serveStatic` decodes the request path twice. FSB does not use `serveStatic`. The fix is in 2.x, which requires Node 20 (see below).
+
+### Fixed
+
+- The stdio server no longer crashes with an unhandled `EPIPE` when the MCP host closes the pipe while a response is being written; it shuts down cleanly instead. `ERR_STREAM_DESTROYED` and `ECONNRESET` on stdout are treated the same way, and any other stdout error is still raised. The handler is installed before stdio starts, so a response written while the bridge is still connecting is covered too.
+
+### Compatibility and update
+
+- Node.js 18.20 or newer remains supported. `@hono/node-server` is held on 1.19.x through `overrides`, because the 2.x line the SDK now accepts requires Node 20 and fails Streamable HTTP requests on Node 18.
+- Server identity, capabilities, bridge contracts, the 69 tool schemas, and installer configuration are unchanged. Pair it with FSB extension 0.9.96, whose page-action fixes apply to MCP `click_at`, `execute_js`, and snapshot refs.
+- The native helper stages its own package runtime, so rerun `npx -y fsb-mcp-server@latest install --native-host` after publication to pick up the updated dependencies.
+- Merging this release into `main` automatically publishes `fsb-mcp-server@0.11.6` and creates the `mcp-v0.11.6` GitHub release. Later main pushes skip publication when the MCP version is already on npm; explicit MCP release tags remain supported.
+
 <a id="v0.11.5"></a>
 
 ## 0.11.5 (2026-10-18)

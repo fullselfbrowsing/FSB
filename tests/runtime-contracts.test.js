@@ -49,8 +49,10 @@ console.log('\n--- background contract cleanup tests ---');
 // asserts lock in the further-narrowed contract.
 assert(!backgroundSource.includes('emitter: sessionHooks.emitter'), 'background no longer passes sessionHooks.emitter into runAgentLoop');
 assert(!/new\s+SessionStateEmitter\s*\(/.test(backgroundSource), 'background no longer instantiates SessionStateEmitter');
-assert(backgroundSource.includes('createToolProgressHook(function'), 'tool progress hook is wired to a sendSessionStatus callback');
-assert(backgroundSource.includes('sendSessionStatus(tabId, statusData)'), 'progress hook callback delegates to sendSessionStatus');
+// The tool progress hook calls .emit on its argument, so a plain callback
+// made it throw on every tool call. With no emitter in the worker it is not
+// registered at all.
+assert(!/createToolProgressHook\s*\(/.test(backgroundSource), 'background does not register the tool progress hook without an emitter');
 assert(backgroundSource.includes('function createSessionHooks(sessionId)'), 'createSessionHooks signature preserved');
 
 console.log('\n--- direct consumer boundary tests ---');

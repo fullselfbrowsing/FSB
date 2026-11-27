@@ -2281,29 +2281,18 @@ class MCPBridgeClient {
       throw new Error('execute_js requires a "code" parameter (string)');
     }
 
+    if (typeof fsbRunGuardedPageScript !== 'function') {
+      return { success: false, tool: 'execute_js', error: 'execute_js is unavailable: the page-script runner did not load' };
+    }
+
     try {
+      // Runs the code as a function body (so `return` works) and refuses
+      // activations of disabled controls; see fsbRunGuardedPageScript.
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         world: 'MAIN',
-        func: (userCode) => {
-          try {
-            // Use Function constructor to execute in page context
-            // This allows return values and multi-statement code
-            const fn = new Function(userCode);
-            const result = fn();
-            // Serialize result for message passing
-            if (result === undefined) return { value: 'undefined' };
-            if (result === null) return { value: 'null' };
-            if (typeof result === 'object') {
-              try { return { value: JSON.stringify(result) }; }
-              catch { return { value: String(result) }; }
-            }
-            return { value: String(result) };
-          } catch (execError) {
-            return { error: execError.message || String(execError) };
-          }
-        },
-        args: [code],
+        func: fsbRunGuardedPageScript,
+        args: [code, 'function'],
       });
 
       // chrome.scripting.executeScript returns an array of InjectionResult
@@ -2313,6 +2302,16 @@ class MCPBridgeClient {
       }
 
       const resultValue = injectionResult.result;
+      if (resultValue && Array.isArray(resultValue.blocked) && resultValue.blocked.length > 0) {
+        return {
+          success: false,
+          tool: 'execute_js',
+          errorCode: 'TARGET_DISABLED',
+          error: describeBlockedPageActivations(resultValue.blocked),
+          blocked: resultValue.blocked,
+          result: resultValue.error ? undefined : resultValue.value,
+        };
+      }
       if (resultValue && resultValue.error) {
         return { success: false, error: resultValue.error };
       }

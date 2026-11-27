@@ -1036,6 +1036,15 @@
             }
           }
 
+          // Snapshot refs ("e12") reach here as `selector`: tool-calling models
+          // and MCP clients only have a selector parameter. No page element is
+          // named e12, so querying it as CSS can only fail; resolve it as a ref.
+          if (params && !params.ref && typeof params.selector === 'string'
+              && /^e\d+$/i.test(params.selector.trim())) {
+            params.ref = params.selector.trim().toLowerCase();
+            delete params.selector;
+          }
+
           // COMPACT REF RESOLUTION
           if (params && params.ref && !params.selector) {
             const resolvedElement = FSB.resolveRef(params.ref);

@@ -10,7 +10,8 @@
  *
  *   - URLs visited
  *   - Focused-element identifiers (selector / elementId of last mutation)
- *   - Action-result outcome class (`${tool}:${ok|err}:${fx|nf}`)
+ *   - Action-result outcome class (`${tool}:${ok|err}:${fx|nf}`), plus, for a
+ *     successful action, what it put on the page or where it left the view
  *
  * If none of these three sets has grown in the last N iterations, the
  * detectStuck integration fires reasonCode=stuck_no_goal_progress.
@@ -156,8 +157,14 @@ if (typeof module !== 'undefined' && module.exports) {
   };
 }
 
-// Chrome extension global attachment (mirrors action-history.js style).
+// Chrome extension global attachment (mirrors action-history.js style). The
+// service worker has no `window`, so attach to `self` there: agent-loop.js
+// looks the helper up by this name and otherwise falls back to a window of 8
+// for every task type.
 if (typeof window !== 'undefined') {
   window.GoalProgressTracker = GoalProgressTracker;
   window.getGoalProgressOverrideThreshold = getOverrideThreshold;
+} else if (typeof self !== 'undefined') {
+  self.GoalProgressTracker = GoalProgressTracker;
+  self.getGoalProgressOverrideThreshold = getOverrideThreshold;
 }
