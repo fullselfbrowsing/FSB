@@ -185,6 +185,11 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/onepassword-credential-sheet.test.js',
   'node tests/onepassword-mcp-errors.test.js',
   'node tests/dashboard-sunset.test.js',
+  'node tests/page-recording-store.test.js',
+  'node tests/page-recorder-content.test.js',
+  'node tests/page-recorder-host.test.js',
+  'node tests/page-recorder-wiring.test.js',
+  'node tests/recording-player.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
