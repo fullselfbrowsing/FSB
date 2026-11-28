@@ -172,6 +172,8 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/jev-gateway-log-hygiene.test.js',
   'node tests/jev-calibration-profile.test.js',
   'node tests/server-jev-gateway-boot.test.js',
+  'node tests/server-ip-geo-binary.test.js',
+  'node tests/server-telemetry-ip-hash-compact.test.js',
   'node tests/claude-plugin-spec.test.js',
 ]);
 

@@ -39,6 +39,9 @@ const inPath = path.join(os.tmpdir(), `fsb-dbip-merge-in-${process.pid}.csv`);
 const outPath = path.join(os.tmpdir(), `fsb-dbip-merge-out-${process.pid}.csv`);
 const ipv6OutPath = outPath.slice(0, -4) + '.ipv6.csv';
 const placesOutPath = outPath.slice(0, -4) + '.places.csv';
+const binOutPath = outPath.slice(0, -4) + '.bin';
+const ipv6BinOutPath = outPath.slice(0, -4) + '.ipv6.bin';
+const outputs = [outPath, ipv6OutPath, placesOutPath, binOutPath, ipv6BinOutPath];
 
 // Upstream DB-IP IP-to-City Lite shape: ip_start,ip_end,continent,country,stateprov,city,lat,lon
 const upstream = [
@@ -124,11 +127,36 @@ try {
   check('no ZZ or unknown place', !places.has('ZZ') && !places.has('unknown') && !labels.some((l) => l.startsWith('ZZ')), `got ${JSON.stringify(labels)}`);
   check('coordinates are rounded to 0.1 degree',
     placeLines.every((l) => l.split(',').slice(1).every((n) => /^-?\d+(\.\d)?$/.test(n))), `got ${JSON.stringify(placeLines)}`);
+
+  // The compact binary tables are written beside the CSVs and verify against them.
+  const convert = path.join(path.dirname(SCRIPT), 'convert-dbip-to-binary.mjs');
+  check('binary tables written beside the CSVs', fs.existsSync(binOutPath) && fs.existsSync(ipv6BinOutPath),
+    `missing ${binOutPath} or ${ipv6BinOutPath}`);
+  for (const [family, csv, bin] of [[4, outPath, binOutPath], [6, ipv6OutPath, ipv6BinOutPath]]) {
+    let ok = false;
+    try {
+      execFileSync(process.execPath, [convert, '--verify', '--family', String(family), '--in', csv, '--bin', bin], { stdio: 'pipe' });
+      ok = true;
+    } catch { /* reported below */ }
+    check(`IPv${family} binary verifies against its CSV`, ok, `${bin} does not match ${csv}`);
+  }
+  check('no staged .next files left behind', outputs.every((p) => !fs.existsSync(`${p}.next`)), 'a .next file remains');
+
+  // A non-.csv output (e.g. a DBIP_DATASET_PATH pointing at a deployed .bin) is
+  // refused before any work, and nothing is written there.
+  const binTarget = path.join(os.tmpdir(), `fsb-dbip-merge-target-${process.pid}.bin`);
+  let refused = false;
+  try {
+    execFileSync(process.execPath, [SCRIPT, '--in', inPath, '--out', binTarget], { stdio: 'pipe' });
+  } catch {
+    refused = true;
+  }
+  check('refuses a non-.csv --out without writing it', refused && !fs.existsSync(binTarget), 'accepted or wrote a .bin --out');
 } finally {
   try { fs.unlinkSync(inPath); } catch { /* best effort */ }
-  try { fs.unlinkSync(outPath); } catch { /* best effort */ }
-  try { fs.unlinkSync(ipv6OutPath); } catch { /* best effort */ }
-  try { fs.unlinkSync(placesOutPath); } catch { /* best effort */ }
+  for (const p of outputs) {
+    try { fs.unlinkSync(p); } catch { /* best effort */ }
+  }
 }
 
 console.log(`\n=== server-ip-geo-merge results: ${passed} passed, ${failed} failed ===`);

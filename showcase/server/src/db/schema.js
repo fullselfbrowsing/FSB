@@ -2,6 +2,8 @@
  * SQLite database schema setup
  */
 
+const { IP_HASH_HEX_CHARS } = require('../utils/telemetry-hash');
+
 const GITHUB_CACHE_PAYLOAD_VERSION = 1;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -157,6 +159,28 @@ function scrubLegacyGithubCache(db) {
   scrub();
 }
 
+/**
+ * Shorten ip_hash values stored before hashIp() kept only the first 64 bits of
+ * the HMAC (utils/telemetry-hash.js), so old and new rows from the same source
+ * keep comparing equal. Runs in batches of 5,000 rows, each its own
+ * transaction, with a small page cache so the 256 MB VM's memory stays flat.
+ * Idempotent: shortened rows no longer match. Values of any other length
+ * (test fixtures such as 'h1') are left alone.
+ */
+function shortenStoredIpHashes(db) {
+  const shorten = db.prepare(`
+    UPDATE telemetry_events SET ip_hash = substr(ip_hash, 1, ${IP_HASH_HEX_CHARS})
+    WHERE rowid IN (SELECT rowid FROM telemetry_events WHERE length(ip_hash) = 64 LIMIT 5000)
+  `);
+  const cacheSize = db.pragma('cache_size', { simple: true });
+  db.pragma('cache_size = -2000');
+  try {
+    while (shorten.run().changes > 0) { /* next batch */ }
+  } finally {
+    db.pragma(`cache_size = ${Number(cacheSize)}`);
+  }
+}
+
 function initializeDatabase(db) {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
@@ -170,6 +194,9 @@ function initializeDatabase(db) {
   db.pragma('cache_size = -64000');
   db.pragma('temp_store = MEMORY');
   db.pragma('mmap_size = 30000000000');
+  // After a checkpoint resets the WAL, truncate the file to 4 MiB instead of
+  // leaving it at its high-water mark.
+  db.pragma('journal_size_limit = 4194304');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS hash_keys (
@@ -239,7 +266,8 @@ function initializeDatabase(db) {
     -- Phase 273 / INGEST-05 -- anonymous telemetry ingest. Additive only; existing tables untouched.
     -- telemetry_events: raw event log; 7-day retention enforced by housekeeper. event_id is PRIMARY KEY
     --   so INSERT OR IGNORE satisfies BEAT-04 (client-side replay-dedup). ip_hash stores ONLY the
-    --   HMAC-SHA256(plaintext_ip, todays_salt); plaintext IP never persisted.
+    --   first 64 bits of HMAC-SHA256(plaintext_ip, todays_salt) as 16 hex chars; plaintext IP
+    --   never persisted.
     -- Quick task 260630-hct -- short-lived region column (coarse city/state/country
     -- label, e.g. US-CA/San Jose, DEFAULT 'unknown'). Derived at ingest from Fly-Client-IP,
     -- copied onto 365-day rollups (durable anonymous last-known location), and
@@ -467,6 +495,9 @@ function initializeDatabase(db) {
   // deleted regardless of payload version. ETags are cleared and every
   // retained row stays incomplete, forcing a full repoll.
   scrubLegacyGithubCache(db);
+
+  // Rows from before ip_hash was shortened keep grouping with new rows.
+  shortenStoredIpHashes(db);
 
   console.log('[FSB Server] Database schema initialized');
 }

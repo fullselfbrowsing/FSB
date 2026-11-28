@@ -30,7 +30,15 @@
  *     IPv6    start64,end64,country,subdivision,city    (/64 prefixes, 16 hex digits)
  *     places  label,lat,lon                              (sorted by label)
  *   Four-column range rows from the older state-level files still parse, with
- *   an empty city. The places file maps every region label the refresh script
+ *   an empty city.
+ *
+ *   Either range table may instead be its compact FSBGEO1 binary form
+ *   (src/utils/ip-geo-binary.js, built by scripts/convert-dbip-to-binary.mjs):
+ *   fixed-width records pointing into a place dictionary, about a fifth of the
+ *   CSV's size. The format is detected by content when the file is opened, and
+ *   both forms answer every address identically.
+ *
+ *   The places file is always CSV. It maps every region label the refresh script
  *   can produce (country, subdivision, and city level; see region-label.js) to
  *   an approximate centroid, so public stats can position a published place
  *   without anything location-shaped being stored per install.
@@ -58,6 +66,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const geoBin = require('./ip-geo-binary');
+
+const { cmp64, regionFromFields } = geoBin;
 
 // Default production artifact paths. The refresh script writes here; .gitignore
 // excludes them (but keeps *.fixture.csv).
@@ -80,6 +91,10 @@ function siblingPath(ipv4Path, kind, fallback) {
     return ipv4Path.replace(/\.fixture\.csv$/, `.${kind}.fixture.csv`);
   }
   if (ipv4Path.endsWith('.csv')) return ipv4Path.slice(0, -4) + `.${kind}.csv`;
+  // A binary IPv4 table's IPv6 sibling is binary too; places are always CSV.
+  if (ipv4Path.endsWith('.bin')) {
+    return ipv4Path.slice(0, -4) + (kind === 'places' ? '.places.csv' : `.${kind}.bin`);
+  }
   return `${ipv4Path}.${kind}`;
 }
 
@@ -231,13 +246,6 @@ function ipv6ToPrefix64(ip) {
   };
 }
 
-/** Compare two 64-bit values given as uint32 (hi, lo) word pairs. */
-function cmp64(aHi, aLo, bHi, bLo) {
-  if (aHi !== bHi) return aHi < bHi ? -1 : 1;
-  if (aLo !== bLo) return aLo < bLo ? -1 : 1;
-  return 0;
-}
-
 /**
  * Parse exactly 8 ASCII hex digits at buf[p..p+8) into a uint32, or -1.
  *
@@ -273,12 +281,22 @@ const MAX_LINE_BYTES = 64 * 1024;
 
 const STOP = Symbol('stop');
 
-function openSortedFile(filePath) {
+/**
+ * Open a dataset file as a CSV handle, or as an FSBGEO1 binary handle when it
+ * starts with that format's magic. `family` (4 or 6) is the table a binary
+ * file must be; the places slot passes null, so a binary file there is
+ * rejected. Anything absent, unreadable, empty or invalid yields null.
+ */
+function openSortedFile(filePath, family) {
   let fd = null;
   try {
     fd = fs.openSync(filePath, 'r');
     const { size } = fs.fstatSync(fd);
-    if (size > 0) return { fd, size, buf: Buffer.allocUnsafe(MAX_LINE_BYTES) };
+    if (size > 0) {
+      if (!geoBin.hasMagic(fd, size)) return { kind: 'csv', fd, size, buf: Buffer.allocUnsafe(MAX_LINE_BYTES) };
+      const bin = family ? geoBin.openBinary(fd, size, family) : null;
+      if (bin) return bin;
+    }
   } catch {
     // Absent / unreadable: fall through to the graceful null below.
   }
@@ -291,17 +309,17 @@ function closeSortedFile(file) {
 }
 
 function ipv4File() {
-  if (_ipv4File === undefined) _ipv4File = openSortedFile(resolveIpv4DatasetPath());
+  if (_ipv4File === undefined) _ipv4File = openSortedFile(resolveIpv4DatasetPath(), 4);
   return _ipv4File;
 }
 
 function ipv6File() {
-  if (_ipv6File === undefined) _ipv6File = openSortedFile(resolveIpv6DatasetPath());
+  if (_ipv6File === undefined) _ipv6File = openSortedFile(resolveIpv6DatasetPath(), 6);
   return _ipv6File;
 }
 
 function placesFile() {
-  if (_placesFile === undefined) _placesFile = openSortedFile(resolvePlacesDatasetPath());
+  if (_placesFile === undefined) _placesFile = openSortedFile(resolvePlacesDatasetPath(), null);
   return _placesFile;
 }
 
@@ -428,13 +446,8 @@ function _decodePlaceFields(buf, p, end) {
   return { country, subdivision, city };
 }
 
-// DB-IP marks private/reserved space (RFC 1918, loopback, link-local, ULA incl.
-// Fly 6PN) as country 'ZZ'. That is not a place, so it must not become a region.
-const RESERVED_COUNTRY = 'ZZ';
-
-function regionFromFields(fields) {
-  return fields.country === RESERVED_COUNTRY ? 'unknown' : fields;
-}
+// regionFromFields (DB-IP's reserved 'ZZ' country -> 'unknown') lives in
+// ip-geo-binary.js so the CSV and binary lookups share one definition.
 
 /** Parse an IPv4 row's bounds and label-field offset into `out`; false for a non-data line. */
 function _parseIpv4Bounds(buf, start, end, out) {
@@ -459,6 +472,7 @@ function _parseIpv4Bounds(buf, start, end, out) {
 function lookupIpv4(key) {
   const file = ipv4File();
   if (!file) return 'unknown';
+  if (file.kind === 'bin') return geoBin.lookup4(file, key);
   const row = { lo: 0, hi: 0, fields: 0 };
   const found = searchSortedFile(
     file,
@@ -500,6 +514,7 @@ function _parseIpv6Bounds(buf, start, end, out) {
 function lookupIpv6(hi, lo) {
   const file = ipv6File();
   if (!file) return 'unknown';
+  if (file.kind === 'bin') return geoBin.lookup6(file, hi, lo);
   const row = { startHi: 0, startLo: 0, endHi: 0, endLo: 0, fields: 0 };
   const found = searchSortedFile(
     file,
@@ -514,6 +529,63 @@ function lookupIpv6(hi, lo) {
     }
   );
   return found || 'unknown';
+}
+
+/**
+ * Strictly parse a whole range table held in `buf`, for the binary converter:
+ * yield every data row as { start, end, country, subdivision, city } through
+ * the same line parsing the on-disk search uses. Throws on anything that search
+ * might read differently from a plain interval table -- a line too long for it
+ * to read, a non-blank, non-comment line that is not a data row, an IPv4 end
+ * above 255.255.255.255, a field longer than the binary format allows, and rows
+ * that overlap or are out of order. Lines split on '\n' only, dropping one
+ * trailing '\r', exactly as forEachLine() does. IPv4 bounds are Numbers; IPv6
+ * bounds are BigInt /64 prefixes.
+ *
+ * @param {Buffer} buf  the whole CSV file
+ * @param {4|6} family
+ */
+function* csvDataRows(buf, family) {
+  if (family !== 4 && family !== 6) throw new Error('ip-geo: family must be 4 or 6');
+  const row = family === 4
+    ? { lo: 0, hi: 0, fields: 0 }
+    : { startHi: 0, startLo: 0, endHi: 0, endLo: 0, fields: 0 };
+  let pos = 0;
+  let lineNo = 0;
+  let prevEnd = null;
+  while (pos < buf.length) {
+    const nl = buf.indexOf(10, pos);
+    const lineEnd = nl === -1 ? buf.length : nl;
+    const s = pos;
+    const e = lineEnd > s && buf[lineEnd - 1] === 13 ? lineEnd - 1 : lineEnd;
+    pos = nl === -1 ? buf.length : nl + 1;
+    lineNo += 1;
+    if (lineEnd - s + 1 >= MAX_LINE_BYTES) throw new Error(`ip-geo: line ${lineNo} is too long for the on-disk search`);
+    if (_dataStart(buf, s, e) < 0) continue;
+
+    let start;
+    let end;
+    if (family === 4) {
+      if (!_parseIpv4Bounds(buf, s, e, row)) throw new Error(`ip-geo: line ${lineNo} is not an IPv4 range row`);
+      if (row.hi > 0xFFFFFFFF) throw new Error(`ip-geo: line ${lineNo} ends above 255.255.255.255`);
+      start = row.lo;
+      end = row.hi;
+    } else {
+      if (!_parseIpv6Bounds(buf, s, e, row)) throw new Error(`ip-geo: line ${lineNo} is not an IPv6 range row`);
+      start = (BigInt(row.startHi) << 32n) | BigInt(row.startLo);
+      end = (BigInt(row.endHi) << 32n) | BigInt(row.endLo);
+    }
+    if (prevEnd !== null && start <= prevEnd) throw new Error(`ip-geo: line ${lineNo} overlaps or is out of order`);
+    prevEnd = end;
+
+    const fields = _decodePlaceFields(buf, row.fields, e);
+    for (const name of ['country', 'subdivision', 'city']) {
+      if (Buffer.byteLength(fields[name], 'utf8') > geoBin.MAX_FIELD_BYTES) {
+        throw new Error(`ip-geo: line ${lineNo} has a ${name} longer than ${geoBin.MAX_FIELD_BYTES} bytes`);
+      }
+    }
+    yield { start, end, country: fields.country, subdivision: fields.subdivision, city: fields.city };
+  }
 }
 
 /**
@@ -615,6 +687,9 @@ module.exports = {
   siblingIpv6Path,
   siblingPlacesPath,
   _resetForTest,
+  // For scripts/convert-dbip-to-binary.mjs and its tests: the strict whole-file
+  // parse that the binary converter builds from and verifies against.
+  _csvInternals: { dataRows: csvDataRows },
 };
 module.exports.DEFAULT_DATASET_PATH = DEFAULT_DATASET_PATH;
 module.exports.DEFAULT_IPV6_DATASET_PATH = DEFAULT_IPV6_DATASET_PATH;
