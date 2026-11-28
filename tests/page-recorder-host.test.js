@@ -10,7 +10,9 @@ const test = require('node:test');
 const store = require('../extension/utils/page-recording-store.js');
 const host = require('../extension/utils/page-recorder-host.js');
 
-const tick = (ms = 0) => new Promise((resolve) => { const t = setTimeout(resolve, ms); if (t.unref) t.unref(); });
+// Ref'd timers on purpose: on Node 20 the test runner exits the event loop when
+// only unref'd timers remain, cancelling tests that are still awaiting them.
+const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function makeChrome() {
   const local = {};
@@ -123,7 +125,7 @@ function setup(options) {
     chrome,
     store,
     now: () => clock,
-    setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
     recorder: () => ({
       SENSITIVE_FIELD_PATTERNS: { target: { source: 'otp', flags: 'i' }, pinToken: { source: 'pin', flags: 'i' } },
       sanitizeSummaryTextForPersistence: (text) => String(text).replace(/api_key=\S+/g, 'api_key=[REDACTED]'),
@@ -256,7 +258,7 @@ test('a restarted service worker resumes the same segment and dedupes resent bat
   const saved = chrome._session.fsbPageRecorderState;
   assert.ok(saved.tabs[5]);
   // Simulate eviction: in-memory state gone, chrome.storage.session kept.
-  const deps = { chrome, store, now: () => clock, setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; } };
+  const deps = { chrome, store, now: () => clock, setTimeout: (fn, ms) => setTimeout(fn, ms) };
   host._test.reset();
   host._test.setDeps(deps);
   // A restarted worker registers its listeners afresh; drop the old ones.
