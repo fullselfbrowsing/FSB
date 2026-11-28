@@ -5416,5 +5416,107 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "In diesem Browser abgemeldet. Der lokale Server hat die 1Password-Anmeldung noch, und FSB entfernt sie dort, sobald es kann."
+  },
+  "copy_ace7956e0e": {
+    "message": "Sitzungswiedergabe"
+  },
+  "copy_c7ab272787": {
+    "message": "Seitenbilder laden"
+  },
+  "copy_8b1e5d9990": {
+    "message": "Dem Agenten folgen"
+  },
+  "copy_0f0309db88": {
+    "message": "Aufzeichnung wird geladen…"
+  },
+  "copy_11b39c9377": {
+    "message": "Agent"
+  },
+  "copy_730c9f9f65": {
+    "message": "Vorherige Aktion"
+  },
+  "copy_436e61016e": {
+    "message": "Abspielen"
+  },
+  "copy_858e4ba7a2": {
+    "message": "Pausieren"
+  },
+  "copy_365987d015": {
+    "message": "Nächste Aktion"
+  },
+  "copy_67ae3405bc": {
+    "message": "Springen"
+  },
+  "copy_afec2b2211": {
+    "message": "Wiedergabegeschwindigkeit"
+  },
+  "copy_7e5def23e4": {
+    "message": "Die Wiedergabe ist nur zum Ansehen: Hier kann nichts auf einer Website klicken, tippen oder absenden."
+  },
+  "copy_3e6af86b93": {
+    "message": "Für diese Sitzung wurde keine Aufzeichnung gefunden."
+  },
+  "copy_3e0a806bfa": {
+    "message": "Diese Aufzeichnung konnte nicht geladen werden."
+  },
+  "copy_00b3e86690": {
+    "message": "Diese Sitzung wird noch aufgezeichnet. Die Wiedergabe zeigt sie bis jetzt."
+  },
+  "copy_f5a13d552c": {
+    "message": "Diese Aufzeichnung wurde vorzeitig beendet, weil sie ihre Größenbegrenzung erreicht hat."
+  },
+  "copy_e7869cc29f": {
+    "message": "Dieser Tab wird erst später in der Sitzung geöffnet."
+  },
+  "copy_c867f88b72": {
+    "message": "Tab $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "copy_aeeb67ebe9": {
+    "message": "Hier wurde nichts aufgezeichnet: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "the page blocked recording"
+      }
+    }
+  },
+  "copy_367f587bcc": {
+    "message": "eine Browserseite, die FSB nicht aufzeichnen kann"
+  },
+  "copy_89a5dfdec6": {
+    "message": "dies ist keine Webseite"
+  },
+  "copy_d2d36106ed": {
+    "message": "die Seite hat die Aufzeichnung blockiert"
+  },
+  "copy_3cb5448220": {
+    "message": "die Seite war zu groß zum Aufzeichnen"
+  },
+  "copy_83a4a6f0f6": {
+    "message": "die Aufzeichnung hat ihre Größenbegrenzung erreicht"
+  },
+  "copy_b4dbe83fcc": {
+    "message": "die Aufzeichnung kam nicht hinterher"
+  },
+  "copy_cd9603f2cf": {
+    "message": "Aufzeichnung pausiert"
+  },
+  "shell_watch_session": {
+    "message": "Sitzung ansehen"
+  },
+  "shell_run_session_again": {
+    "message": "Diese Sitzung erneut ausführen"
+  },
+  "panel_e1cebde35d": {
+    "message": "Seiten für die Videowiedergabe aufzeichnen"
+  },
+  "panel_7ee9d4b56e": {
+    "message": "Zeichnet die Seiten, auf denen ein MCP-Agent oder Autopilot handelt, nur auf diesem Gerät auf, damit Sie eine Sitzung später ansehen können, ohne sie erneut auszuführen. Passwörter und Felder, die nach Geheimnissen aussehen, werden maskiert. Eine Aufzeichnung wird mit ihrer Sitzung gelöscht."
   }
 }

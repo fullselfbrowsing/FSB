@@ -32,7 +32,9 @@ const SCOPE = [
   'extension/content/visual-feedback.js',
   'extension/content/vault-pill.js',
   'extension/ui/credential-sheet.html',
-  'extension/ui/credential-sheet.js'
+  'extension/ui/credential-sheet.js',
+  'extension/ui/recording-player.html',
+  'extension/ui/recording-player.js'
 ];
 
 const UNTRANSLATED = new Set([

@@ -310,6 +310,8 @@
     'No actions were recorded in this session.': 'shell_no_actions',
     'Failed to load sessions.': 'shell_history_failed',
     'Replay session': 'shell_replay_session',
+    'Watch session': 'shell_watch_session',
+    'Run this session again': 'shell_run_session_again',
     'Delete session': 'shell_delete_session',
     'Autopilot': 'shell_autopilot',
     'Checking local agent service': 'shell_checking_local',

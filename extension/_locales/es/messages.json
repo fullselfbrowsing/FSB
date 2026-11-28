@@ -5416,5 +5416,107 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "Sesión cerrada en este navegador. El servidor local aún conserva el inicio de sesión de 1Password, y FSB lo eliminará allí en cuanto pueda."
+  },
+  "copy_ace7956e0e": {
+    "message": "Reproducción de la sesión"
+  },
+  "copy_c7ab272787": {
+    "message": "Cargar imágenes de la página"
+  },
+  "copy_8b1e5d9990": {
+    "message": "Seguir al agente"
+  },
+  "copy_0f0309db88": {
+    "message": "Cargando la grabación…"
+  },
+  "copy_11b39c9377": {
+    "message": "Agente"
+  },
+  "copy_730c9f9f65": {
+    "message": "Acción anterior"
+  },
+  "copy_436e61016e": {
+    "message": "Reproducir"
+  },
+  "copy_858e4ba7a2": {
+    "message": "Pausar"
+  },
+  "copy_365987d015": {
+    "message": "Acción siguiente"
+  },
+  "copy_67ae3405bc": {
+    "message": "Buscar posición"
+  },
+  "copy_afec2b2211": {
+    "message": "Velocidad de reproducción"
+  },
+  "copy_7e5def23e4": {
+    "message": "La reproducción es solo para ver: nada aquí puede hacer clic, escribir ni enviar en ningún sitio."
+  },
+  "copy_3e6af86b93": {
+    "message": "No se encontró ninguna grabación de esta sesión."
+  },
+  "copy_3e0a806bfa": {
+    "message": "No se pudo cargar esta grabación."
+  },
+  "copy_00b3e86690": {
+    "message": "Esta sesión se sigue grabando. La reproducción la muestra hasta ahora."
+  },
+  "copy_f5a13d552c": {
+    "message": "Esta grabación se interrumpió porque alcanzó su límite de tamaño."
+  },
+  "copy_e7869cc29f": {
+    "message": "Esta pestaña se abre más adelante en la sesión."
+  },
+  "copy_c867f88b72": {
+    "message": "Pestaña $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "copy_aeeb67ebe9": {
+    "message": "Aquí no se grabó nada: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "the page blocked recording"
+      }
+    }
+  },
+  "copy_367f587bcc": {
+    "message": "una página del navegador que FSB no puede grabar"
+  },
+  "copy_89a5dfdec6": {
+    "message": "esto no es una página web"
+  },
+  "copy_d2d36106ed": {
+    "message": "la página bloqueó la grabación"
+  },
+  "copy_3cb5448220": {
+    "message": "la página era demasiado grande para grabarla"
+  },
+  "copy_83a4a6f0f6": {
+    "message": "la grabación alcanzó su límite de tamaño"
+  },
+  "copy_b4dbe83fcc": {
+    "message": "la grabadora se quedó atrás"
+  },
+  "copy_cd9603f2cf": {
+    "message": "grabación en pausa"
+  },
+  "shell_watch_session": {
+    "message": "Ver sesión"
+  },
+  "shell_run_session_again": {
+    "message": "Volver a ejecutar esta sesión"
+  },
+  "panel_e1cebde35d": {
+    "message": "Grabar páginas para verlas como video"
+  },
+  "panel_7ee9d4b56e": {
+    "message": "Graba las páginas en las que actúa un agente MCP o Autopilot, solo en este dispositivo, para que puedas ver una sesión más tarde sin volver a ejecutarla. Las contraseñas y los campos que parecen secretos se enmascaran. Una grabación se elimina junto con su sesión."
   }
 }

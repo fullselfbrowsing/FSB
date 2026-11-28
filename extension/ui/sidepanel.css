@@ -1768,6 +1768,46 @@ body[data-sidepanel-view="history"] .author-footer {
   border-color: rgba(100, 116, 139, 0.24);
 }
 
+/* Watch: look-only playback of the session's page recording. */
+.history-watch-btn {
+  width: 30px;
+  height: 30px;
+  background: color-mix(in srgb, var(--bg-tertiary) 88%, var(--bg-primary) 12%);
+  border: 1px solid var(--border-color);
+  color: var(--fsb-primary);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 12px;
+  opacity: 0.72;
+  transition: opacity 0.2s, background 0.2s, color 0.2s, transform 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-item:hover .history-watch-btn {
+  opacity: 1;
+}
+
+.history-watch-btn:hover {
+  background: var(--fsb-primary-soft);
+  border-color: var(--fsb-border-accent);
+  transform: translateY(-1px);
+}
+
+.history-watch-btn:focus-visible {
+  outline: none;
+  opacity: 1;
+  box-shadow: var(--fsb-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-watch-btn { transition: none; }
+  .history-watch-btn:hover { transform: none; }
+}
+
 .replay-preview-card,
 .replay-decision-card {
   width: min(100%, 440px);

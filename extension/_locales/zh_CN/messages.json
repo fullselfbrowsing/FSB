@@ -5416,5 +5416,107 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "已在此浏览器中退出登录。本地服务器仍保留 1Password 登录，FSB 会在下次可以时将其删除。"
+  },
+  "copy_ace7956e0e": {
+    "message": "会话回放"
+  },
+  "copy_c7ab272787": {
+    "message": "加载页面图片"
+  },
+  "copy_8b1e5d9990": {
+    "message": "跟随代理"
+  },
+  "copy_0f0309db88": {
+    "message": "正在加载录制内容…"
+  },
+  "copy_11b39c9377": {
+    "message": "代理"
+  },
+  "copy_730c9f9f65": {
+    "message": "上一个操作"
+  },
+  "copy_436e61016e": {
+    "message": "播放"
+  },
+  "copy_858e4ba7a2": {
+    "message": "暂停"
+  },
+  "copy_365987d015": {
+    "message": "下一个操作"
+  },
+  "copy_67ae3405bc": {
+    "message": "定位"
+  },
+  "copy_afec2b2211": {
+    "message": "播放速度"
+  },
+  "copy_7e5def23e4": {
+    "message": "回放仅供观看：这里不会在任何网站上点击、输入或提交内容。"
+  },
+  "copy_3e6af86b93": {
+    "message": "未找到此会话的录制内容。"
+  },
+  "copy_3e0a806bfa": {
+    "message": "无法加载此录制内容。"
+  },
+  "copy_00b3e86690": {
+    "message": "此会话仍在录制中。回放显示到目前为止的内容。"
+  },
+  "copy_f5a13d552c": {
+    "message": "此录制内容已达到大小上限，因此提前结束。"
+  },
+  "copy_e7869cc29f": {
+    "message": "此标签页会在会话稍后打开。"
+  },
+  "copy_c867f88b72": {
+    "message": "标签页 $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "copy_aeeb67ebe9": {
+    "message": "此处未录制任何内容：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "the page blocked recording"
+      }
+    }
+  },
+  "copy_367f587bcc": {
+    "message": "FSB 无法录制的浏览器页面"
+  },
+  "copy_89a5dfdec6": {
+    "message": "这不是网页"
+  },
+  "copy_d2d36106ed": {
+    "message": "页面阻止了录制"
+  },
+  "copy_3cb5448220": {
+    "message": "页面太大，无法录制"
+  },
+  "copy_83a4a6f0f6": {
+    "message": "录制内容已达到大小上限"
+  },
+  "copy_b4dbe83fcc": {
+    "message": "录制跟不上页面变化"
+  },
+  "copy_cd9603f2cf": {
+    "message": "录制已暂停"
+  },
+  "shell_watch_session": {
+    "message": "观看会话"
+  },
+  "shell_run_session_again": {
+    "message": "再次运行此会话"
+  },
+  "panel_e1cebde35d": {
+    "message": "录制页面以便像视频一样回放"
+  },
+  "panel_7ee9d4b56e": {
+    "message": "仅在此设备上录制 MCP 代理或 Autopilot 操作过的页面，让你稍后无需重新运行即可观看会话。密码和看起来像机密信息的字段会被遮盖。录制内容会随其会话一起删除。"
   }
 }
