@@ -105,7 +105,9 @@ const defaultSettings = {
   // Exact-fidelity MCP replay is opt-out. Saved MCP sessions age out
   // independently of Autopilot history.
   fsbMcpSessionRecordingEnabled: true,
-  fsbMcpSessionRetentionDays: 30
+  fsbMcpSessionRetentionDays: 30,
+  // Page recordings for look-only session playback (MCP and Autopilot).
+  fsbPageRecordingEnabled: true
 };
 
 let fsbRecommendedAgentCap = defaultSettings.fsbAgentCap;
@@ -391,6 +393,7 @@ function cacheElements() {
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
   elements.fsbMcpSessionRecordingEnabled = document.getElementById('fsbMcpSessionRecordingEnabled');
   elements.fsbMcpSessionRetentionDays = document.getElementById('fsbMcpSessionRetentionDays');
+  elements.fsbPageRecordingEnabled = document.getElementById('fsbPageRecordingEnabled');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
   elements.animatedActionHighlights = document.getElementById('animatedActionHighlights');
   elements.showSidepanelProgress = document.getElementById('showSidepanelProgress');
@@ -933,7 +936,8 @@ function setupEventListeners() {
     elements.sttProvider,
     elements.voiceInputEnabled,
     elements.fsbMcpSessionRecordingEnabled,
-    elements.fsbMcpSessionRetentionDays
+    elements.fsbMcpSessionRetentionDays,
+    elements.fsbPageRecordingEnabled
   ];
 
   formInputs.forEach(input => {
@@ -2181,6 +2185,9 @@ function loadSettings() {
     if (elements.fsbMcpSessionRecordingEnabled) {
       elements.fsbMcpSessionRecordingEnabled.checked = settings.fsbMcpSessionRecordingEnabled !== false;
     }
+    if (elements.fsbPageRecordingEnabled) {
+      elements.fsbPageRecordingEnabled.checked = settings.fsbPageRecordingEnabled !== false;
+    }
     if (elements.fsbMcpSessionRetentionDays) {
       const retentionDays = clampMcpSessionRetentionDays(settings.fsbMcpSessionRetentionDays);
       elements.fsbMcpSessionRetentionDays.value = String(retentionDays);
@@ -2520,7 +2527,8 @@ function saveSettings() {
     // builds where the user has never visited the toggle still emit reports.
     fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true,
     fsbMcpSessionRecordingEnabled: elements.fsbMcpSessionRecordingEnabled?.checked ?? true,
-    fsbMcpSessionRetentionDays: clampMcpSessionRetentionDays(elements.fsbMcpSessionRetentionDays?.value)
+    fsbMcpSessionRetentionDays: clampMcpSessionRetentionDays(elements.fsbMcpSessionRetentionDays?.value),
+    fsbPageRecordingEnabled: elements.fsbPageRecordingEnabled?.checked ?? true
   };
   
   chrome.storage.local.set(settings, () => {

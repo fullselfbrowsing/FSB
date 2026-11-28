@@ -5416,5 +5416,107 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "已在此瀏覽器中登出。本機伺服器仍保留 1Password 登入，FSB 會在下次可以時將其移除。"
+  },
+  "copy_ace7956e0e": {
+    "message": "工作階段回放"
+  },
+  "copy_c7ab272787": {
+    "message": "載入網頁圖片"
+  },
+  "copy_8b1e5d9990": {
+    "message": "跟隨代理程式"
+  },
+  "copy_0f0309db88": {
+    "message": "正在載入錄製內容…"
+  },
+  "copy_11b39c9377": {
+    "message": "代理程式"
+  },
+  "copy_730c9f9f65": {
+    "message": "上一個操作"
+  },
+  "copy_436e61016e": {
+    "message": "播放"
+  },
+  "copy_858e4ba7a2": {
+    "message": "暫停"
+  },
+  "copy_365987d015": {
+    "message": "下一個操作"
+  },
+  "copy_67ae3405bc": {
+    "message": "定位"
+  },
+  "copy_afec2b2211": {
+    "message": "播放速度"
+  },
+  "copy_7e5def23e4": {
+    "message": "回放僅供觀看：這裡不會在任何網站上點擊、輸入或提交內容。"
+  },
+  "copy_3e6af86b93": {
+    "message": "找不到此工作階段的錄製內容。"
+  },
+  "copy_3e0a806bfa": {
+    "message": "無法載入此錄製內容。"
+  },
+  "copy_00b3e86690": {
+    "message": "此工作階段仍在錄製中。回放會顯示到目前為止的內容。"
+  },
+  "copy_f5a13d552c": {
+    "message": "此錄製內容已達大小上限，因此提前結束。"
+  },
+  "copy_e7869cc29f": {
+    "message": "此分頁會在工作階段稍後開啟。"
+  },
+  "copy_c867f88b72": {
+    "message": "分頁 $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "copy_aeeb67ebe9": {
+    "message": "此處未錄製任何內容：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "the page blocked recording"
+      }
+    }
+  },
+  "copy_367f587bcc": {
+    "message": "FSB 無法錄製的瀏覽器頁面"
+  },
+  "copy_89a5dfdec6": {
+    "message": "這不是網頁"
+  },
+  "copy_d2d36106ed": {
+    "message": "網頁封鎖了錄製"
+  },
+  "copy_3cb5448220": {
+    "message": "網頁太大，無法錄製"
+  },
+  "copy_83a4a6f0f6": {
+    "message": "錄製內容已達大小上限"
+  },
+  "copy_b4dbe83fcc": {
+    "message": "錄製跟不上網頁變化"
+  },
+  "copy_cd9603f2cf": {
+    "message": "錄製已暫停"
+  },
+  "shell_watch_session": {
+    "message": "觀看工作階段"
+  },
+  "shell_run_session_again": {
+    "message": "再次執行此工作階段"
+  },
+  "panel_e1cebde35d": {
+    "message": "錄製網頁以便像影片一樣回放"
+  },
+  "panel_7ee9d4b56e": {
+    "message": "僅在此裝置上錄製 MCP 代理程式或 Autopilot 操作過的網頁，讓你之後不必重新執行就能觀看工作階段。密碼和看似機密資訊的欄位會被遮蔽。錄製內容會隨其工作階段一起刪除。"
   }
 }

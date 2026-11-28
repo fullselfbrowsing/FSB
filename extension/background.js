@@ -103,6 +103,10 @@ try { importScripts('utils/lattice-replay.js'); } catch (e) { console.error('[FS
 // sibling hooks resolve the recorder lazily, while recorder startup can use the
 // logger's storage mutation chain before any WS dispatch fires.
 try { importScripts('utils/mcp-session-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-session-recorder.js:', e.message); }
+// Page recordings for video-style session playback: local storage plus the
+// host that records the tabs an automation session acts on. Loaded after the
+// MCP recorder, whose redaction patterns and history lookups it reuses.
+try { importScripts('utils/page-recording-store.js', 'utils/page-recorder-host.js'); } catch (e) { console.error('[FSB] Failed to load the page recorder:', e.message); }
 // Phase 272 / v0.9.69 -- TelemetryCollector. Loaded AFTER mcp-metrics-recorder
 // (collector reads the rows the recorder writes to fsbUsageData). The alarm
 // handler in chrome.alarms.onAlarm + the install_announce setTimeout in
@@ -4429,6 +4433,11 @@ async function cleanupSession(sessionId, options = {}) {
   // PERF: Flush any pending debounced log writes before session cleanup
   if (automationLogger && typeof automationLogger.flush === 'function') {
     automationLogger.flush();
+  }
+
+  // An Autopilot page recording finishes with its session (no-op otherwise).
+  if (globalThis.FsbPageRecorderHost) {
+    globalThis.FsbPageRecorderHost.finalizeAutopilotSession(sessionId);
   }
 
   activeSessions.delete(sessionId);
@@ -12395,6 +12404,10 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
           const deleted = isJournalSession
             ? await globalThis.FsbMcpLatticeJournal.deleteSession(sessionId)
             : await automationLogger.deleteSession(sessionId);
+          // Its page recording goes with it.
+          if (deleted && globalThis.FsbPageRecorderHost) {
+            globalThis.FsbPageRecorderHost.onHistoryDeleted([sessionId]);
+          }
           sendResponse(deleted
             ? { success: true }
             : { success: false, error: 'Failed to delete session history' });
@@ -12413,6 +12426,7 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
             await globalThis.FsbMcpLatticeJournal.clearSessions();
           }
           const cleared = await automationLogger.clearAllSessions();
+          if (cleared && globalThis.FsbPageRecorderHost) globalThis.FsbPageRecorderHost.onHistoryCleared();
           sendResponse(cleared
             ? { success: true }
             : { success: false, error: 'Failed to clear session history' });

@@ -242,6 +242,45 @@ trusted-by-provenance and exempt from the verify gate, so the bundled capability
 head is unaffected. The trusted public key ships in the extension bundle; it is
 never fetched remotely. The private signing key is offline.
 
+## Page Recordings
+
+While an MCP client or Autopilot acts on a tab, FSB records how that page looks
+and changes so a session can be watched later in a look-only player instead of
+being re-executed. The recording is page structure (a DOM snapshot plus later
+changes, captured with PhantomStream), not video.
+
+### What is recorded
+
+Only tabs an automation session acts on, only while it acts on them: the page
+DOM and its changes, form values, scroll position, the agent's highlight and
+status, and a timeline of actions (tool name and a caption from the agent's own
+status text) and navigations (origin and path only).
+
+### What is never recorded
+
+Password fields are always masked. Fields whose name, label, placeholder or
+autocomplete hint looks like a one-time code, card number, security code, PIN,
+token or other secret are masked with the same patterns the MCP session
+recorder uses. Quoted text is removed from captions, so typed values never
+appear there. FSB's own overlays are left out, and pages FSB cannot script
+(browser pages, the Chrome Web Store, PDFs) are recorded only as a gap.
+
+### Storage and retention
+
+Recordings stay on the device, in the extension's IndexedDB
+(`fsb-page-recordings`); nothing is uploaded. Each recording is deleted with its
+session-history row and follows the MCP replay retention period. One recording
+is capped at 64 MB and all recordings at 1 GB, oldest first. The "Record pages
+for video playback" switch in the control panel stops new recordings.
+
+### Playback
+
+The player renders recordings in a sandboxed frame with no script execution and
+no pointer or keyboard input, so watching never clicks, types or submits
+anything. To show a page as it looked, it may load that page's public images and
+stylesheets from their original sites; private-network hosts are always blocked,
+and a switch in the player turns all such loading off.
+
 ## Contact
 
 For questions about this posture or FSB's data handling, open an issue on the

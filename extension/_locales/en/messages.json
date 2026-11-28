@@ -5416,5 +5416,107 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "Logged out in this browser. The local server still has the 1Password sign-in, and FSB removes it there the next time it can."
+  },
+  "copy_ace7956e0e": {
+    "message": "Session playback"
+  },
+  "copy_c7ab272787": {
+    "message": "Load page images"
+  },
+  "copy_8b1e5d9990": {
+    "message": "Follow the agent"
+  },
+  "copy_0f0309db88": {
+    "message": "Loading recording…"
+  },
+  "copy_11b39c9377": {
+    "message": "Agent"
+  },
+  "copy_730c9f9f65": {
+    "message": "Previous action"
+  },
+  "copy_436e61016e": {
+    "message": "Play"
+  },
+  "copy_858e4ba7a2": {
+    "message": "Pause"
+  },
+  "copy_365987d015": {
+    "message": "Next action"
+  },
+  "copy_67ae3405bc": {
+    "message": "Seek"
+  },
+  "copy_afec2b2211": {
+    "message": "Playback speed"
+  },
+  "copy_7e5def23e4": {
+    "message": "Playback is look-only: nothing here can click, type or submit on any site."
+  },
+  "copy_3e6af86b93": {
+    "message": "No recording was found for this session."
+  },
+  "copy_3e0a806bfa": {
+    "message": "Could not load this recording."
+  },
+  "copy_00b3e86690": {
+    "message": "This session is still recording. Playback shows it up to now."
+  },
+  "copy_f5a13d552c": {
+    "message": "This recording was cut short because it reached its size limit."
+  },
+  "copy_e7869cc29f": {
+    "message": "This tab opens later in the session."
+  },
+  "copy_c867f88b72": {
+    "message": "Tab $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "copy_aeeb67ebe9": {
+    "message": "Nothing was recorded here: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "the page blocked recording"
+      }
+    }
+  },
+  "copy_367f587bcc": {
+    "message": "a browser page FSB cannot record"
+  },
+  "copy_89a5dfdec6": {
+    "message": "this is not a web page"
+  },
+  "copy_d2d36106ed": {
+    "message": "the page blocked recording"
+  },
+  "copy_3cb5448220": {
+    "message": "the page was too large to record"
+  },
+  "copy_83a4a6f0f6": {
+    "message": "the recording reached its size limit"
+  },
+  "copy_b4dbe83fcc": {
+    "message": "the recorder fell behind"
+  },
+  "copy_cd9603f2cf": {
+    "message": "recording paused"
+  },
+  "shell_watch_session": {
+    "message": "Watch session"
+  },
+  "shell_run_session_again": {
+    "message": "Run this session again"
+  },
+  "panel_e1cebde35d": {
+    "message": "Record pages for video playback"
+  },
+  "panel_7ee9d4b56e": {
+    "message": "Records the pages an MCP agent or Autopilot acts on, on this device only, so you can watch a session later without running it again. Passwords and fields that look like secrets are masked. A recording is deleted with its session."
   }
 }

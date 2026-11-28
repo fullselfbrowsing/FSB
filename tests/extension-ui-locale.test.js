@@ -2805,14 +2805,21 @@ async function asyncChecks() {
     storedSessions = { fsbSessionIndex: [
       { id: 's1', status: 'expired', actionCount: 3, totalCost: 0 },
       { id: 's2', status: 'Ready', task: 'Skip', actionCount: 0, totalCost: 0, mode: 'mcp-agent', mcpClient: 'Codex' }
-    ] };
+    ], fsbPageRecordingIndex: { s1: { recordingId: 'rec_1', durationMs: 1000, tracks: 1, state: 'ready' } } };
     await ctx.loadHistoryList();
     const history = parse(historyNode.innerHTML);
     switchTo('de', history);
     check(shows(history, 'de', 'Idle-closed') && shows(history, 'de', 'Unknown task') && shows(history, 'de', 'Autopilot')
         && shows(history, 'de', '$COUNT$ actions', { count: '3' }), 'an open history list follows a language change');
-    check(attrShows(history, 'de', 'title', 'Replay session') && attrShows(history, 'de', 'title', 'Delete session'),
+    // Icon-only buttons carry the label as title and aria-label under one data-i18n-attr.
+    const labelShows = (page, code, english) => page.attrs.some((node) =>
+      node.getAttribute('data-i18n-attr') === 'title:' + key(english) + ',aria-label:' + key(english)
+        && node.getAttribute('title') === catalogText(code, english)
+        && node.getAttribute('aria-label') === catalogText(code, english));
+    check(labelShows(history, 'de', 'Run this session again') && attrShows(history, 'de', 'title', 'Delete session'),
       'history button tooltips follow a language change');
+    check(labelShows(history, 'de', 'Watch session') && history.html.split('history-watch-btn').length === 2,
+      'only a session with a page recording gets a Watch button, and its label follows a language change');
     check(history.html.includes('history-item-task">Skip</div>') && history.html.includes('history-status Ready">Ready</span>'),
       'a recorded task and status stay as recorded, even when they match FSB copy');
 

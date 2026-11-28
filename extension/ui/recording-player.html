@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="copy_ace7956e0e">Session playback</title>
+  <link rel="stylesheet" href="../shared/fsb-ui-core.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="recording-player.css">
+</head>
+<body>
+  <div class="rp-page">
+    <header class="rp-header">
+      <div class="rp-heading">
+        <h1 class="rp-title" data-i18n="copy_ace7956e0e">Session playback</h1>
+        <p class="rp-subtitle" id="rpSubtitle"></p>
+      </div>
+      <label class="rp-switch">
+        <input type="checkbox" id="rpLoadAssets" checked>
+        <span class="rp-switch-track" aria-hidden="true"><span class="rp-switch-thumb"></span></span>
+        <span class="rp-switch-label" data-i18n="copy_c7ab272787">Load page images</span>
+      </label>
+    </header>
+
+    <div class="rp-notice" id="rpNotice" role="status" hidden></div>
+
+    <div class="rp-tabs" id="rpTabs" role="group" hidden>
+      <button type="button" class="rp-chip rp-chip-follow" id="rpFollow" aria-pressed="true">
+        <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+        <span data-i18n="copy_8b1e5d9990">Follow the agent</span>
+      </button>
+    </div>
+
+    <main class="rp-stage" id="rpStage">
+      <div class="rp-slate" id="rpSlate" hidden>
+        <i class="fa-solid fa-eye-slash rp-slate-icon" aria-hidden="true"></i>
+        <p class="rp-slate-text" id="rpSlateText"></p>
+      </div>
+      <div class="rp-empty" id="rpEmpty">
+        <p id="rpEmptyText" data-i18n="copy_0f0309db88">Loading recording…</p>
+      </div>
+    </main>
+
+    <div class="rp-caption" id="rpCaption" aria-live="polite">
+      <span class="rp-caption-eyebrow" data-i18n="copy_11b39c9377">Agent</span>
+      <span class="rp-caption-text" id="rpCaptionText"></span>
+      <code class="rp-caption-tool" id="rpCaptionTool" translate="no"></code>
+    </div>
+
+    <div class="rp-transport">
+      <button type="button" class="rp-btn" id="rpPrev" disabled data-i18n-attr="aria-label:copy_730c9f9f65,title:copy_730c9f9f65" aria-label="Previous action" title="Previous action">
+        <i class="fa-solid fa-backward-step" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="rp-btn rp-btn-primary" id="rpPlay" disabled data-i18n-attr="aria-label:copy_436e61016e,title:copy_436e61016e" aria-label="Play" title="Play">
+        <i class="fa-solid fa-play" aria-hidden="true" id="rpPlayIcon"></i>
+      </button>
+      <button type="button" class="rp-btn" id="rpNext" disabled data-i18n-attr="aria-label:copy_365987d015,title:copy_365987d015" aria-label="Next action" title="Next action">
+        <i class="fa-solid fa-forward-step" aria-hidden="true"></i>
+      </button>
+      <span class="rp-time" id="rpTime" translate="no">0:00 / 0:00</span>
+      <div class="rp-scrub">
+        <div class="rp-markers" id="rpMarkers" aria-hidden="true"></div>
+        <input type="range" id="rpScrub" min="0" max="1" step="1" value="0" disabled data-i18n-attr="aria-label:copy_67ae3405bc" aria-label="Seek">
+      </div>
+      <select class="rp-speed" id="rpSpeed" disabled data-i18n-attr="aria-label:copy_afec2b2211,title:copy_afec2b2211" aria-label="Playback speed" title="Playback speed" translate="no">
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+        <option value="8">8×</option>
+      </select>
+    </div>
+
+    <p class="rp-footnote" data-i18n="copy_7e5def23e4">Playback is look-only: nothing here can click, type or submit on any site.</p>
+  </div>
+
+  <script src="../utils/ui-locale.js"></script>
+  <script src="../utils/page-recording-store.js"></script>
+  <script src="../dist/ui/recording-player-kit.js"></script>
+  <script src="recording-player.js"></script>
+</body>
+</html>

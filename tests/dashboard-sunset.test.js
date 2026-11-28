@@ -669,13 +669,25 @@ function setEntries(source, name) {
   check(missing.length === 0, 'schema.js still creates the dashboard-era tables, so their data is kept',
     'missing: ' + missing.join(', '));
 
-  // Nothing in FSB uses the PhantomStream package any more; the library lives on its own.
+  // The live preview is gone. The session recorder still bundles PhantomStream's
+  // capture, recorder and player at build time (dist/content/page-recorder-capture.js
+  // and dist/ui/recording-player-kit.js), so the package may appear only as an
+  // exact-pinned devDependency that the lockfile resolves from the npm registry.
   const rootPackage = JSON.parse(read('package.json'));
   const rootLock = JSON.parse(read('package-lock.json'));
   const PHANTOM_PACKAGE = '@full-self-browsing/phantom-stream';
-  check(!(rootPackage.dependencies || {})[PHANTOM_PACKAGE] && !(rootPackage.devDependencies || {})[PHANTOM_PACKAGE]
-    && !rootLock.packages['node_modules/' + PHANTOM_PACKAGE],
-    'the root package no longer depends on ' + PHANTOM_PACKAGE);
+  check(!(rootPackage.dependencies || {})[PHANTOM_PACKAGE],
+    PHANTOM_PACKAGE + ' is never a runtime dependency of the root package');
+  const phantomDevSpec = (rootPackage.devDependencies || {})[PHANTOM_PACKAGE];
+  const phantomLock = rootLock.packages['node_modules/' + PHANTOM_PACKAGE];
+  if (phantomDevSpec || phantomLock) {
+    check(/^\d+\.\d+\.\d+$/.test(String(phantomDevSpec || '')),
+      PHANTOM_PACKAGE + ' is pinned to an exact version', 'found: ' + phantomDevSpec);
+    check(!!phantomLock && phantomLock.dev === true && phantomLock.version === phantomDevSpec
+      && /^https:\/\/registry\.npmjs\.org\//.test(phantomLock.resolved || '')
+      && /^sha512-/.test(phantomLock.integrity || ''),
+      'the lockfile resolves ' + PHANTOM_PACKAGE + ' from the npm registry as a dev package with integrity');
+  }
 }
 
 // ---- Section 10: fsb-server -- the legacy relay sink ----

@@ -4259,6 +4259,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const historyListEl = document.getElementById('historyList');
   if (historyListEl) {
     historyListEl.addEventListener('click', async (e) => {
+      const watchBtn = e.target.closest('.history-watch-btn');
+      if (watchBtn) {
+        e.stopPropagation();
+        const sessionId = watchBtn.dataset.sessionId;
+        if (sessionId) openRecordingPlayer(sessionId);
+        return;
+      }
+
       const replayBtn = e.target.closest('.history-replay-btn');
       if (replayBtn) {
         e.stopPropagation();
@@ -6524,8 +6532,12 @@ async function loadHistoryList() {
   if (!historyList) return;
 
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionIndex']);
+    const stored = await chrome.storage.local.get(['fsbSessionIndex', 'fsbPageRecordingIndex']);
     const sessions = stored.fsbSessionIndex || [];
+    // Sessions with a page recording get a Watch button (look-only playback).
+    const recordings = stored.fsbPageRecordingIndex && typeof stored.fsbPageRecordingIndex === 'object'
+      ? stored.fsbPageRecordingIndex
+      : {};
 
     if (sessions.length === 0) {
       historyList.innerHTML = '<div class="history-empty-state">' +
@@ -6557,9 +6569,13 @@ async function loadHistoryList() {
             '<span class="history-status ' + escapeHtml(statusClass) + '">' + statusLabel + '</span>' +
           '</div>' +
         '</div>' +
+        (recordings[session.id] ?
+          '<button class="history-watch-btn" data-session-id="' + escapeHtml(session.id) + '" ' + spAttr('Watch session', 'title,aria-label') + '>' +
+            '<i class="fa fa-play" aria-hidden="true"></i>' +
+          '</button>' : '') +
         (hasReplayDetails ?
-          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" ' + spAttr('Replay session', 'title') + '>' +
-            '<i class="fa fa-play"></i>' +
+          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" ' + spAttr('Run this session again', 'title,aria-label') + '>' +
+            '<i class="fa fa-rotate-right" aria-hidden="true"></i>' +
           '</button>' : '') +
         '<button class="history-delete-btn" data-session-id="' + escapeHtml(session.id) + '" ' + spAttr('Delete session', 'title') + '>' +
           '<i class="fa fa-trash"></i>' +
@@ -6573,6 +6589,21 @@ async function loadHistoryList() {
       '<p>' + spHtml('Failed to load sessions.') + '</p>' +
       '</div>';
   }
+}
+
+// Look-only playback of a session's page recording opens in its own tab.
+function openRecordingPlayer(sessionId) {
+  const url = chrome.runtime.getURL('ui/recording-player.html?session=' + encodeURIComponent(sessionId));
+  chrome.tabs.create({ url, active: true });
+}
+
+// A recording can finish while the history view is open; refresh its buttons.
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener(function (changes, area) {
+    if (area !== 'local' || !changes.fsbPageRecordingIndex) return;
+    const historyView = document.getElementById('historyView');
+    if (historyView && !historyView.classList.contains('hidden')) loadHistoryList();
+  });
 }
 
 function sendReplayRuntimeMessage(message) {
@@ -7080,10 +7111,16 @@ function spHtml(english, subs) {
 
 // An attribute for an HTML template, such as a tooltip or placeholder. The
 // data-i18n-attr key lets apply() rewrite it after a language change.
+// name may list several attributes ('title,aria-label'): each gets the same
+// label, and one data-i18n-attr keeps them all live (pairs comma-separated).
 function spAttr(english, name) {
-  const attr = name + '="' + escapeAttr(spLine(english)) + '"';
+  const names = String(name).split(',');
+  const value = escapeAttr(spLine(english));
+  const attr = names.map((attrName) => attrName + '="' + value + '"').join(' ');
   const key = spExactKey(english);
-  return key ? attr + ' data-i18n-attr="' + name + ':' + escapeAttr(key) + '"' : attr;
+  return key
+    ? attr + ' data-i18n-attr="' + names.map((attrName) => attrName + ':' + escapeAttr(key)).join(',') + '"'
+    : attr;
 }
 
 // Side panel copy from the exact maps (ui-locale.js and copy-exact.js).

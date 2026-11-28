@@ -5416,5 +5416,107 @@
   },
   "panel_bf1eb6a9fc": {
     "message": "이 브라우저에서 로그아웃했습니다. 로컬 서버에 아직 1Password 로그인이 남아 있으며, FSB가 다음에 가능할 때 그곳에서 삭제합니다."
+  },
+  "copy_ace7956e0e": {
+    "message": "세션 재생"
+  },
+  "copy_c7ab272787": {
+    "message": "페이지 이미지 불러오기"
+  },
+  "copy_8b1e5d9990": {
+    "message": "에이전트 따라가기"
+  },
+  "copy_0f0309db88": {
+    "message": "기록을 불러오는 중…"
+  },
+  "copy_11b39c9377": {
+    "message": "에이전트"
+  },
+  "copy_730c9f9f65": {
+    "message": "이전 작업"
+  },
+  "copy_436e61016e": {
+    "message": "재생"
+  },
+  "copy_858e4ba7a2": {
+    "message": "일시정지"
+  },
+  "copy_365987d015": {
+    "message": "다음 작업"
+  },
+  "copy_67ae3405bc": {
+    "message": "탐색"
+  },
+  "copy_afec2b2211": {
+    "message": "재생 속도"
+  },
+  "copy_7e5def23e4": {
+    "message": "재생은 보기 전용입니다. 여기서는 어떤 사이트에서도 클릭, 입력, 제출을 할 수 없습니다."
+  },
+  "copy_3e6af86b93": {
+    "message": "이 세션의 기록을 찾을 수 없습니다."
+  },
+  "copy_3e0a806bfa": {
+    "message": "이 기록을 불러올 수 없습니다."
+  },
+  "copy_00b3e86690": {
+    "message": "이 세션은 아직 기록 중입니다. 재생은 지금까지의 내용을 보여 줍니다."
+  },
+  "copy_f5a13d552c": {
+    "message": "이 기록은 크기 한도에 도달하여 중간에 끝났습니다."
+  },
+  "copy_e7869cc29f": {
+    "message": "이 탭은 세션 후반에 열립니다."
+  },
+  "copy_c867f88b72": {
+    "message": "탭 $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "copy_aeeb67ebe9": {
+    "message": "이 부분은 기록되지 않았습니다: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "the page blocked recording"
+      }
+    }
+  },
+  "copy_367f587bcc": {
+    "message": "FSB가 기록할 수 없는 브라우저 페이지"
+  },
+  "copy_89a5dfdec6": {
+    "message": "웹 페이지가 아닙니다"
+  },
+  "copy_d2d36106ed": {
+    "message": "페이지가 기록을 차단했습니다"
+  },
+  "copy_3cb5448220": {
+    "message": "페이지가 너무 커서 기록할 수 없었습니다"
+  },
+  "copy_83a4a6f0f6": {
+    "message": "기록이 크기 한도에 도달했습니다"
+  },
+  "copy_b4dbe83fcc": {
+    "message": "기록이 따라가지 못했습니다"
+  },
+  "copy_cd9603f2cf": {
+    "message": "기록 일시정지됨"
+  },
+  "shell_watch_session": {
+    "message": "세션 보기"
+  },
+  "shell_run_session_again": {
+    "message": "이 세션 다시 실행"
+  },
+  "panel_e1cebde35d": {
+    "message": "동영상처럼 재생할 수 있도록 페이지 기록"
+  },
+  "panel_7ee9d4b56e": {
+    "message": "MCP 에이전트나 Autopilot이 작업한 페이지를 이 기기에만 기록하여 나중에 세션을 다시 실행하지 않고도 볼 수 있게 합니다. 비밀번호와 비밀 정보로 보이는 필드는 가려집니다. 기록은 해당 세션과 함께 삭제됩니다."
   }
 }

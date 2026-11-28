@@ -1660,6 +1660,10 @@ async function runAgentIteration(sessionId, options) {
     notifySidepanel(sid, sess, terminal);
     // Give the final overlay state a moment to render before cleanup clears it.
     await sleep(900);
+    // The page recording ends after that final frame (cleanupSession repeats this).
+    if (globalThis.FsbPageRecorderHost) {
+      try { await globalThis.FsbPageRecorderHost.finalizeAutopilotSession(sid); } catch (_recErr) { /* best-effort */ }
+    }
     // cleanupSession removes from activeSessions, persistent storage, and sends overlay cleanup
     if (typeof cleanupSession === 'function') {
       try { await cleanupSession(sid); } catch (_e) { /* non-fatal */ }
@@ -2656,6 +2660,20 @@ async function runAgentIteration(sessionId, options) {
             openerTabId: actionOpenerTabId
           });
         }
+        // Page recording: mark the action on the tab it targets. The first
+        // action on a tab starts that tab's recording (best-effort).
+        if (globalThis.FsbPageRecorderHost) {
+          try {
+            await globalThis.FsbPageRecorderHost.noteActionStart({
+              driver: 'autopilot',
+              sessionId: sessionId,
+              tabId: actionOpenerTabId,
+              actionId: call.id || null,
+              tool: call.name,
+              reason: call.name
+            });
+          } catch (_recErr) { /* recording never blocks an action */ }
+        }
         try {
           result = await _executeTool(call.name, call.args, actionOpenerTabId, {
             animateActionIcon: session.animatedActionHighlights,
@@ -2745,6 +2763,16 @@ async function runAgentIteration(sessionId, options) {
       }
 
       toolResults.push({ callId: call.id, name: call.name, result: result });
+      if (globalThis.FsbPageRecorderHost) {
+        try {
+          globalThis.FsbPageRecorderHost.noteActionEnd({
+            tabId: session.tabId,
+            actionId: call.id || null,
+            tool: call.name,
+            success: !(result && result.success === false)
+          });
+        } catch (_recErr) { /* best-effort */ }
+      }
 
       // Phase 10 FINT-17/FINT-18 -- record autopilot dispatch row with
       // driving-model attribution (CONTEXT D-04). Fires AFTER toolResults.push
