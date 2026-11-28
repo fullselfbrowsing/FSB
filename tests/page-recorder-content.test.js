@@ -290,6 +290,23 @@ test('re-injection rebinds a running recorder and replaces a stopped one', async
   assert.equal(log.ports.length, 2);
 });
 
+test('leaving the page flushes the open chunk and capture before the document goes', async () => {
+  const { log, windowListeners } = createSandbox();
+  log.ports[0].deliver(startConfig({ limits: { batchMs: 10_000 } }));
+  await tick(20);
+  log.capture.emitMutations([{ op: 'text', nid: '3', text: 'Order placed' }]);
+  log.recorder.mark('action-start', { actionId: 'last' });
+  const stopsBefore = log.stops;
+  windowListeners.pagehide.forEach((fn) => fn({ persisted: false }));
+  assert.equal(log.stops, stopsBefore + 1, 'capture stops so its final mutations flush');
+  const batches = log.ports[0].posted.filter((m) => m.type === 'batch');
+  const sent = JSON.stringify(batches);
+  assert.ok(sent.includes('Order placed'), 'the last mutations left the page');
+  assert.ok(sent.includes('"type":"ext:dom-mutations"'));
+  windowListeners.pagehide.forEach((fn) => fn({ persisted: true }));
+  assert.equal(log.stops, stopsBefore + 1, 'a bfcache hide keeps capture running');
+});
+
 test('samples the agent highlight by node id and the status without typed text', async () => {
   const { log, sandbox } = createSandbox();
   log.ports[0].deliver(startConfig());

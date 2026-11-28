@@ -605,8 +605,14 @@
 
   // bfcache: flush on the way out; on restore the document is the same, so
   // reconnect and take a keyframe (the host decides whether to keep going).
-  window.addEventListener('pagehide', function () {
-    try { flushBatch(); } catch (_error) { /* page is going away */ }
+  window.addEventListener('pagehide', function (event) {
+    try {
+      // Leaving for good: stop capture so its last mutations flush into the
+      // recorder. Into the bfcache: keep it, a keyframe follows on restore.
+      if (state.capture && !(event && event.persisted)) state.capture.stop();
+      if (state.recorder) state.recorder.flush();
+      flushBatch();
+    } catch (_error) { /* page is going away */ }
   });
   window.addEventListener('pageshow', function (event) {
     if (event && event.persisted && !state.stopped) {
