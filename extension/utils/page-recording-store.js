@@ -565,12 +565,24 @@
     }).map(function (row) { return row.id; }));
   }
 
-  async function pruneOlderThan(cutoffMs) {
+  async function pruneOlderThan(cutoffMs, options) {
     if (!Number.isFinite(cutoffMs)) return 0;
+    var driver = options && options.driver;
     var rows = await listRecordings();
     return deleteRecordings(rows.filter(function (row) {
-      return row.status === STATUS_FINISHED && Number.isFinite(row.endedAt) && row.endedAt < cutoffMs;
+      return row.status === STATUS_FINISHED && Number.isFinite(row.endedAt) && row.endedAt < cutoffMs &&
+        (!driver || row.driver === driver);
     }).map(function (row) { return row.id; }));
+  }
+
+  // An agent that comes back to the same history run continues its recording
+  // instead of starting a second one for the same history row.
+  function reopenRecording(recordingId) {
+    return updateRecording(recordingId, function (row) {
+      if (row.status === STATUS_RECORDING || row.truncated) return false;
+      row.status = STATUS_RECORDING;
+      row.endedAt = null;
+    });
   }
 
   // Oldest finished recordings go first; a live recording is never evicted.
@@ -675,6 +687,7 @@
     upsertTrack: upsertTrack,
     linkHistorySession: linkHistorySession,
     finishRecording: finishRecording,
+    reopenRecording: reopenRecording,
     appendChunks: appendChunks,
     appendMarkers: appendMarkers,
     readTrackChunks: readTrackChunks,

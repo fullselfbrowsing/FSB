@@ -450,6 +450,13 @@
     await deleteStorageEntry(storageKey);
     await clearAlarm(alarmName);
 
+    // This tab's page-recording track ends with its visual session.
+    try {
+      if (global.FsbPageRecorderHost && typeof global.FsbPageRecorderHost.onVisualSessionCleared === 'function') {
+        global.FsbPageRecorderHost.onVisualSessionCleared(entry, reason);
+      }
+    } catch (_e) { /* best-effort */ }
+
     return { ok: true, action: 'cleared', entry: entry };
   }
 

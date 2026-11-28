@@ -74,6 +74,40 @@ const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
 const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
 const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
 
+// Page recording hooks (utils/page-recorder-host.js). Plain functions rather
+// than client methods so stubbed clients in tests run unchanged; both are
+// best-effort and never affect the action itself.
+async function fsbNotePageRecordingStart(tabId, agentId, payload, sidecar) {
+  const host = globalThis.FsbPageRecorderHost;
+  if (!host || typeof host.noteActionStart !== 'function') return;
+  try {
+    await host.noteActionStart({
+      driver: 'mcp',
+      tabId,
+      agentId,
+      recordingRunId: payload && typeof payload.recordingRunId === 'string' ? payload.recordingRunId : null,
+      actionId: payload && typeof payload.recordingCallId === 'string' ? payload.recordingCallId : null,
+      tool: payload && typeof payload.tool === 'string' ? payload.tool : null,
+      reason: sidecar && typeof sidecar.visualReason === 'string' ? sidecar.visualReason : ''
+    });
+  } catch (_err) { /* recording never blocks an action */ }
+}
+
+function fsbNotePageRecordingEnd(payload, response, tabId) {
+  const host = globalThis.FsbPageRecorderHost;
+  if (!host || typeof host.noteActionEnd !== 'function') return;
+  try {
+    host.noteActionEnd({
+      tabId: Number(tabId),
+      agentId: payload && typeof payload.agentId === 'string' ? payload.agentId : null,
+      recordingRunId: payload && typeof payload.recordingRunId === 'string' ? payload.recordingRunId : null,
+      actionId: payload && typeof payload.recordingCallId === 'string' ? payload.recordingCallId : null,
+      tool: payload && typeof payload.tool === 'string' ? payload.tool : null,
+      success: !(response && response.success === false)
+    });
+  } catch (_err) { /* best-effort */ }
+}
+
 function isMcpGoogleSheetsDocumentUrl(value) {
   if (typeof value !== 'string' || value.length === 0) return false;
   if (typeof URL !== 'function') return true;
@@ -1830,6 +1864,7 @@ class MCPBridgeClient {
       // the Phase 256 design (lifecycle is informational, not gating).
       console.warn('[FSB MCP] recordVisualSessionTick failed (non-blocking):', err && err.message);
     }
+    await fsbNotePageRecordingStart(tabId, agentId, payload, sidecar);
   }
 
   /**
@@ -1955,6 +1990,7 @@ class MCPBridgeClient {
   }
 
   _recordMcpSessionAction(payload, response, resolvedTabId, targetContext) {
+    fsbNotePageRecordingEnd(payload, response, resolvedTabId);
     try {
       if (typeof globalThis === 'undefined' ||
           !globalThis.fsbMcpSessionRecorder ||

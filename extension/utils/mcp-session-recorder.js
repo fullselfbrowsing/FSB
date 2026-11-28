@@ -2532,6 +2532,16 @@
     cloneResultForReplay: cloneResultForReplay,
     projectJournalResult: projectJournalResult,
     sanitizeSummaryTextForPersistence: _sanitizeSummaryText,
+    // History id of the legacy (non-journal) MCP session that owns this
+    // agent/tab, for linking a page recording to its history row. Queued behind
+    // pending recordAction mutations so a session born by the current action
+    // is already visible.
+    resolveOpenSessionId: function (agentId, tabId) {
+      return _enqueueRecorderMutation(function () {
+        var session = _findSessionForAgentTab(agentId, _numericTabId(tabId));
+        return session && session.sessionId ? session.sessionId : null;
+      });
+    },
     // Field-name patterns the page recorder (content/page-recorder.js) uses to
     // mask sensitive form values in page recordings.
     SENSITIVE_FIELD_PATTERNS: Object.freeze({
