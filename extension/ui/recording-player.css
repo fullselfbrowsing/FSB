@@ -109,6 +109,10 @@ body {
   gap: var(--fsb-space-2);
 }
 
+/* display: flex above would otherwise beat the hidden attribute. */
+.rp-tabs[hidden],
+.rp-notice[hidden] { display: none; }
+
 .rp-chip {
   display: inline-flex;
   align-items: center;
