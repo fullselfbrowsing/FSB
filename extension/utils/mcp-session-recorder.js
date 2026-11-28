@@ -2532,6 +2532,12 @@
     cloneResultForReplay: cloneResultForReplay,
     projectJournalResult: projectJournalResult,
     sanitizeSummaryTextForPersistence: _sanitizeSummaryText,
+    // Field-name patterns the page recorder (content/page-recorder.js) uses to
+    // mask sensitive form values in page recordings.
+    SENSITIVE_FIELD_PATTERNS: Object.freeze({
+      target: Object.freeze({ source: SENSITIVE_TARGET_PATTERN.source, flags: SENSITIVE_TARGET_PATTERN.flags }),
+      pinToken: Object.freeze({ source: SENSITIVE_PIN_TOKEN_PATTERN.source, flags: SENSITIVE_PIN_TOKEN_PATTERN.flags })
+    }),
     // Compatibility alias retained for existing tests/callers.
     redactParams: cloneParamsForReplay,
     FSB_MCP_SESSION_BUFFER_KEY: FSB_MCP_SESSION_BUFFER_KEY,
