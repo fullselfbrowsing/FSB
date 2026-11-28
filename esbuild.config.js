@@ -169,6 +169,35 @@ const ENTRIES = [
     allowOverwrite: true,
     optional: true, // canvas-interceptor.js is small + may not always be present
   },
+  {
+    // Session recorder: the PhantomStream capture and recorder modules for the
+    // page-recorder content script. Injected by utils/page-recorder-host.js into
+    // the tabs an automation session acts on; never listed in the always-on
+    // content-script set.
+    name: 'content-page-recorder',
+    entryPoints: [path.join(SRC_ROOT, 'content', 'page-recorder-entry.js')],
+    outfile: path.join(OUT_ROOT, 'content', 'page-recorder-capture.js'),
+    format: 'iife',
+    sourcemap: false, // D-04: content-script bundles have NO sourcemap
+    platform: 'browser',
+    target: ['chrome120'],
+    bundle: true,
+    legalComments: 'none',
+    allowOverwrite: true,
+  },
+  {
+    // Recording player page: the PhantomStream player for ui/recording-player.html.
+    name: 'ui-recording-player',
+    entryPoints: [path.join(SRC_ROOT, 'ui', 'recording-player-entry.js')],
+    outfile: path.join(OUT_ROOT, 'ui', 'recording-player-kit.js'),
+    format: 'iife',
+    sourcemap: false, // committed output; keep it map-free so nothing points at an ignored file
+    platform: 'browser',
+    target: ['chrome120'],
+    bundle: true,
+    legalComments: 'none',
+    allowOverwrite: true,
+  },
 ];
 
 /**
