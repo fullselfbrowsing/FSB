@@ -1,0 +1,15 @@
+{
+  "name": "full-self-browsing",
+  "owner": {
+    "name": "Full Self Browsing",
+    "url": "https://full-selfbrowsing.com"
+  },
+  "description": "The Full Self Browsing plugin for Claude Code and Cowork.",
+  "plugins": [
+    {
+      "name": "full-self-browsing",
+      "source": "./",
+      "description": "Let Claude read and operate websites in your own Chrome, Edge or Brave browser through the Full Self Browsing extension and its local MCP server."
+    }
+  ]
+}

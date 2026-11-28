@@ -108,6 +108,8 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 
 **On Grok Bot?** The marketplace wrapper lives in [`plugins/grok-bot/`](./plugins/grok-bot/README.md), with a pinned npm MCP server and one FSB skill. It uses Chrome on Bot's own computer; see its setup and privacy disclosures. Marketplace listing is pending publisher review.
 
+**On Claude Code or Cowork?** Install the Full Self Browsing plugin, which bundles the FSB skill with a pinned local MCP server: run `claude plugin marketplace add fullselfbrowsing/fsb-claude-plugin`, then `claude plugin install full-self-browsing@full-self-browsing`. Its source lives in [`plugins/claude/`](./plugins/claude/README.md) and is mirrored to the [fsb-claude-plugin](https://github.com/fullselfbrowsing/fsb-claude-plugin) repository. If you already added FSB with `install --claude-code`, remove that entry with `claude mcp remove fsb` so Claude sees one FSB server. A Claude directory listing is in preparation.
+
 ### What It Does
 
 - Runs natural language browser tasks from the popup or side panel.
@@ -179,6 +181,7 @@ Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its o
 | [`extension/`](./extension/README.md) | Chrome extension package. Load this directory as an unpacked MV3 extension. |
 | [`mcp/`](./mcp/README.md) | npm package `fsb-mcp-server`, the local MCP bridge for external AI clients. |
 | [`skills/fsb/`](./skills/fsb/SKILL.md) | OpenClaw + Hermes skill: doctor + stdio/YAML printers + consent gated install for multiple hosts. |
+| [`plugins/`](./plugins/claude/README.md) | Host plugins: `plugins/claude/` (Claude Code and Cowork, mirrored to fsb-claude-plugin) and `plugins/grok-bot/` (Grok Bot marketplace wrapper). |
 | [`showcase/`](./showcase/README.md) | Marketing and dashboard site for full-selfbrowsing.com. Angular 20 static prerender + Express relay. |
 | `showcase/server/` | Node/Express deploy backend for pairing, PhantomStream-compatible relay, auth, and dashboard data. |
 | `server-py/` | Legacy Python/FastAPI-style backend prototype retained for reference. |
@@ -191,6 +194,7 @@ Top level deploy and validation files:
 - `Dockerfile`, `fly.toml` - production deploy for the showcase server on fly.io.
 - `.github/workflows/ci.yml` - validates extension, MCP smoke tests, and showcase build.
 - `.github/workflows/deploy.yml` - deploys the production site on `main` pushes.
+- `.github/workflows/claude-plugin-mirror.yml` - mirrors `plugins/claude/` to the public plugin repository when its version changes.
 
 ---
 

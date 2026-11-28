@@ -1,0 +1,30 @@
+{
+  "name": "full-self-browsing",
+  "displayName": "Full Self Browsing",
+  "version": "0.11.5",
+  "description": "Let Claude read and operate websites in your own Chrome, Edge or Brave browser through the Full Self Browsing extension and its local MCP server.",
+  "author": {
+    "name": "Full Self Browsing",
+    "url": "https://full-selfbrowsing.com"
+  },
+  "homepage": "https://full-selfbrowsing.com",
+  "repository": "https://github.com/fullselfbrowsing/FSB",
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "browser-automation",
+    "chrome",
+    "fsb",
+    "full-self-browsing",
+    "web"
+  ],
+  "icon": "./assets/logo.png",
+  "documentationUrl": "https://full-selfbrowsing.com/support",
+  "supportUrl": "https://github.com/fullselfbrowsing/FSB/issues",
+  "privacyPolicyUrl": "https://full-selfbrowsing.com/privacy",
+  "network": {
+    "hosts": [
+      "registry.npmjs.org"
+    ]
+  }
+}

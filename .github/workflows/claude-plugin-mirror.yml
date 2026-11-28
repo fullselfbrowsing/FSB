@@ -1,0 +1,126 @@
+name: claude-plugin-mirror
+
+# Mirrors plugins/claude into the public fullselfbrowsing/fsb-claude-plugin
+# repository, which is the source the Claude plugin directory validates and
+# the marketplace Claude Code users add. A new mirror commit is pushed only
+# when the plugin version changes (it follows the MCP package version), so
+# every pushed commit is one reviewable release, and only after the pinned
+# fsb-mcp-server release exists on npm.
+#
+# Needs the CLAUDE_PLUGIN_DEPLOY_KEY secret: the private half of a deploy key
+# with write access on fullselfbrowsing/fsb-claude-plugin. Without it the
+# workflow logs a notice and does nothing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/claude/**'
+      - 'scripts/claude-plugin-checks.mjs'
+      - 'scripts/export-claude-plugin.mjs'
+      - '.github/workflows/claude-plugin-mirror.yml'
+  workflow_run:
+    workflows: [npm-publish]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Push the current plugin even if its version is unchanged
+        type: boolean
+        default: false
+
+concurrency:
+  group: claude-plugin-mirror
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: mirror plugins/claude to fsb-claude-plugin
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEPLOY_KEY: ${{ secrets.CLAUDE_PLUGIN_DEPLOY_KEY }}
+      FORCE_PUSH_UNCHANGED: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+    steps:
+      - name: Require the deploy key
+        id: gate
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::notice::CLAUDE_PLUGIN_DEPLOY_KEY is not set; skipping the Claude plugin mirror."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify product versions
+        if: steps.gate.outputs.enabled == 'true'
+        run: npm run version:check
+
+      - name: Require the pinned server on npm
+        id: pin
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          pin="$(node -p "require('./plugins/claude/.mcp.json').mcpServers.fsb.args[1]")"
+          version="$(node -p "require('./plugins/claude/.claude-plugin/plugin.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if npm view "$pin" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::$pin is not on npm yet; the mirror runs again when npm-publish finishes."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out the plugin repository
+        id: mirror
+        if: steps.pin.outputs.published == 'true'
+        env:
+          PLUGIN_VERSION: ${{ steps.pin.outputs.version }}
+        run: |
+          install -d -m 700 "$RUNNER_TEMP/ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/ssh/key"
+          chmod 600 "$RUNNER_TEMP/ssh/key"
+          ssh-keyscan -t ed25519 github.com > "$RUNNER_TEMP/ssh/known_hosts" 2>/dev/null
+          echo "GIT_SSH_COMMAND=ssh -i $RUNNER_TEMP/ssh/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/ssh/known_hosts" >> "$GITHUB_ENV"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/ssh/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/ssh/known_hosts"
+          git clone --depth 1 git@github.com:fullselfbrowsing/fsb-claude-plugin.git "$RUNNER_TEMP/fsb-claude-plugin"
+          mirrored="$(node -p "try { require('$RUNNER_TEMP/fsb-claude-plugin/.claude-plugin/plugin.json').version } catch { 'none' }")"
+          if [ "$mirrored" = "$PLUGIN_VERSION" ] && [ "$FORCE_PUSH_UNCHANGED" != "true" ]; then
+            echo "::notice::fsb-claude-plugin already has plugin $PLUGIN_VERSION; nothing to push."
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Export and push
+        if: steps.mirror.outputs.push == 'true'
+        env:
+          PLUGIN_VERSION: ${{ steps.pin.outputs.version }}
+        run: |
+          checkout="$RUNNER_TEMP/fsb-claude-plugin"
+          node scripts/export-claude-plugin.mjs "$checkout"
+          git -C "$checkout" add -A
+          if git -C "$checkout" diff --cached --quiet; then
+            echo "::notice::The exported plugin matches fsb-claude-plugin; nothing to push."
+            exit 0
+          fi
+          git -C "$checkout" \
+            -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Sync plugin $PLUGIN_VERSION from FSB $(git rev-parse --short=12 HEAD)"
+          git -C "$checkout" push origin HEAD:main
